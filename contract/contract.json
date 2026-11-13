@@ -139,7 +139,7 @@
   ],
   "requireShims": [
     { "require": "fmd.env", "fmd2Unit": "LuaFMD", "implementation": "Directory, ExeName ('fmd-web'), Version, Revision, LuaDirectory, SelectedLanguage ('en', D10)", "status": "planned" },
-    { "require": "fmd.crypto", "fmd2Unit": "LuaCrypto", "implementation": "full surface (LuaCrypto.pas:429-494) incl. RC4, AES*GCM(+AAD), X25519_*, P256_*, SecretStream pull-side, PBKDF2SHA256, Base64/Base64URL, CRC16/32, MD4, LongHash, UU, URL enc/dec, synacode block", "status": "planned" },
+    { "require": "fmd.crypto", "fmd2Unit": "LuaCrypto", "implementation": "full surface (LuaCrypto.pas:429-494) incl. RC4 (pure-JS), AES*GCM(+AAD), X25519_*, P256_*, SecretStream pull-side, PBKDF2SHA256, Base64/Base64URL, CRC16/32, MD4, LongHash, UU, URL enc/dec, synacode block — backends node:crypto + sodium-native + pure-JS RC4/MD4; byte-exact base64 Lua bridge; deviations + vectors documented in docs/COMPAT.md crypto notes and server/test/engine/shims/crypto-*.test.ts", "status": "partial" },
     { "require": "fmd.duktape", "fmd2Unit": "LuaDuktape", "implementation": "ExecJS(js) via node:vm (timeout 5s) + Duktape.enc/dec polyfill; JS-side CommonJS require jailed to synced lua/ tree (77 modules); JS error => nil", "status": "planned" },
     { "require": "fmd.gzip", "fmd2Unit": "LuaGZip", "implementation": "single method Inflate (LuaGZip.pas:47-50)", "status": "planned" },
     { "require": "fmd.fileutil", "fmd2Unit": "LuaFileUtil", "implementation": "3 pure helpers: ExtractFileName, ExtractFileNameOnly, SerializeAndMaintainNames", "status": "planned" },

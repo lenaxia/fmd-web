@@ -36,9 +36,11 @@ ENV NODE_ENV=production \
 
 WORKDIR /app
 
-# The placeholder server needs no OS packages beyond the base image;
-# when sharp/7zz/sodium-native land (DESIGN.md §3), add them HERE with
-# apt-get + exact versions, never in the build stage.
+# The base image needs no OS packages for sodium-native (it ships its own
+# prebuilt libsodium binaries for linux-x64); when sharp/7zz land
+# (DESIGN.md §3), add them HERE with apt-get + exact versions, never in
+# the build stage. A native-module smoke check runs at image build time
+# below (crypto shim backends, DESIGN.md §5.7).
 RUN mkdir -p /app/data \
     && chown node:node /app/data
 
@@ -50,6 +52,11 @@ COPY --from=build --chown=root:root /app/server/package.json ./server/package.js
 COPY --from=build --chown=root:root /app/server/dist ./server/dist
 COPY --from=build --chown=root:root /app/corpus/package.json ./corpus/package.json
 COPY --from=build --chown=root:root /app/web/package.json ./web/package.json
+
+# Native backend smoke check (sodium-native for the crypto shim,
+# DESIGN.md §5.7): fails the image build when the prebuilt libsodium
+# binary does not load in the runtime layer.
+RUN node -e "const s = require('sodium-native'); if (typeof s.crypto_scalarmult !== 'function') process.exit(1); console.log('sodium-native OK in docker target');" 
 
 # Non-root (official image ships the `node` user, uid 1000).
 USER node
