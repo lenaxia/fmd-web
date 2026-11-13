@@ -15,7 +15,7 @@ silently).
 | LuaWebsiteModuleHandler.pas | chunk re-exec on module switch | done | §5.3/§5.12 chunk re-exec on module switch |
 | LuaHTTPSend.pas / httpsendthread.pas | `HTTP` shim | in-progress | v0: undici-envelope RecordedResponseResolver (no live net), Document stream facade (ToString/WriteString/Clear/Size, success⇔Size>0), ResultCode/ResultString/LastURL, case-insensitive Headers/Cookies Values + cookie jar from Set-Cookie, GET/POST/XHR (+POST MimeType move + text/html→urlencoded rewrite), Terminated, Reset/ResetBasic. Pending: redirect-follow semantics, proxy support, per-host limits/delays. |
 | LuaStrings.pas | TStrings facade | done | §5.5 full facade surface |
-| LuaXQuery.pas / LuaIXQValue.pas | CreateTXQuery + IXQValue | in-progress | v0: FontoXPath 3.1 + linkedom behind the InternetTools dialect transform (json()/parse-json() node trees, .step shorthand, name() array steps, ?map lookups, css()); sequence toString concatenation + trimmed element deep text (oracle-verified); swallow-to-empty + rate-limited WARN. Pending: repairing-parser text-splitting parity (§gaps below). |
+| LuaXQuery.pas / LuaIXQValue.pas | CreateTXQuery + IXQValue | done | §5.6 full surface (oracle-verified: 100% of the seed expression corpus) — FontoXPath 3.1 + linkedom behind the InternetTools dialect transform: json()/parse-json() NODE TREES (objects → key elements, arrays → item elements, typed scalar leaves), .step shorthand, chained name()() member steps, ?map lookups, css(), fmd:not (JSONiq EBV), fmd:string/fmd:string-join (XQGlobalTrimNodes), repairing-parser preprocessing (CRLF→LF, adjacent-text merge, comment/PI drop, post-</body> text skip, bare-payload scaffold, literal CR normalization), list-fill overloads (XPathStringAll(expr[,node,]list), XPathHREFAll/XPathHREFTitleAll → TStrings mutation, order preserved), ParseHTML 1-arg reparse, swallow-to-empty + per-(module,expression) WARN dedupe. |
 | LuaCrypto.pas | fmd.crypto | done | §5.7 full surface (LuaCrypto.pas:429–494): node:crypto + sodium-native + pure-JS RC4/MD4; vectors in server/test/engine/shims/crypto-*.test.ts — details below |
 | LuaDuktape.pas | fmd.duktape ExecJS + JS require | done | v0: node:vm (5 s timeout), one heap per ExecJS (duk_peval semantics: completion value, JSON text for object/array results), Duktape.enc/dec polyfill, CommonJS require (module/exports, cached, jailed to the synced lua tree), error⇒nil, print→host log. |
 | LuaGZip.pas | fmd.gzip Inflate | planned | §5.7 |
@@ -33,14 +33,13 @@ silently).
 
 - Engine: **fontoxpath-linkedom** (FontoXPath + linkedom behind the dialect transform)
 - Normalization: **udata-normalize** (§5.8 uData pipeline)
-- Cases: 912 · passed: 907 · failed: 5
-- **Pass rate: 99.45%** (gate: ≥99%)
+- Cases: 912 · passed: 908 · failed: 4
+- **Pass rate: 99.56%** (gate: ≥99%)
 
 ### Per-expression results
 
 | Module | Case | Expression | Status | Expected | Actual | Root cause | Tracking |
 |---|---|---|---|---|---|---|---|
-| AsuraScans | 57#1 | `string-join(//text(), " ")` | fail | "\nAsura Scans - Read Manga, Manhwa & Manhua Online\n{\"@context\":\"h | "\nAsura Scans - Read Manga, Manhwa & Manhua Online\n{\"@context\":\"h | Text-node splitting divergence: InternetTools’ repairing parser emits separate text nodes around decoded entities/tags (e.g. "Manhwa " + "&" + " Manhua"), so string-join(//text(), separator) joins more, shorter segments; linkedom keeps the decoded text in single nodes. | Phase-1 parser-parity story (preprocessing pass where needed, DESIGN.md §5.6) |
 | uData (§5.8) | norm-0004-prefixstrip | normalize | fail | {"title":"ExampleMan","altTitles":"","authors":"Author One","artists": | {"title":"ExampleMan","altTitles":"","authors":"Author One","artists": | §5.8 pipeline sub-behaviors in flight: manga-name prefix strip (OptionRemoveMangaNameFromChapter), Link fallback details and the unicode cleanup set are being converged in the facades story. | tsk-feral-lumber-leaves (Facades: §5.8 post-processing pipeline) |
 | uData (§5.8) | norm-0011 | normalize | fail | {"title":"My Manga","altTitles":"","authors":"","artists":"","genres": | {"title":"My Manga","altTitles":"","authors":"","artists":"","genres": | §5.8 pipeline sub-behaviors in flight: manga-name prefix strip (OptionRemoveMangaNameFromChapter), Link fallback details and the unicode cleanup set are being converged in the facades story. | tsk-feral-lumber-leaves (Facades: §5.8 post-processing pipeline) |
 | uData (§5.8) | norm-0021 | normalize | fail | {"title":"K","altTitles":"","authors":"","artists":"","genres":"","sta | {"title":"K","altTitles":"","authors":"","artists":"","genres":"","sta | §5.8 pipeline sub-behaviors in flight: manga-name prefix strip (OptionRemoveMangaNameFromChapter), Link fallback details and the unicode cleanup set are being converged in the facades story. | tsk-feral-lumber-leaves (Facades: §5.8 post-processing pipeline) |
@@ -49,9 +48,9 @@ silently).
 ### Known behavioral divergences (v0, documented)
 
 1. **CSS selector engine** — `css()` runs linkedom’s css-select (CSS3); InternetTools’ css3 subset differences (e.g. `:has`) degrade to swallowed-empty per FMD2 semantics.
-2. **JSON node tree** — objects → key-named child elements, arrays → `item` child elements, scalars → text content; `name()` array steps rewrite to `/*`, `?key` to `/key`. Boolean EBV inside json predicates follows the VALUE (`not(key)` rewrites to `not(string(key) = "true")` in json expressions only).
+2. **JSON node tree** — objects → key-named child elements, arrays → `item` child elements, typed scalar leaves (string/number/boolean/null markers); `name()` member steps rewrite to `/*` (chained `name()()` to nested member steps), `?key` to `/key`; `not(` rewrites to `fmd:not(` carrying InternetTools’ JSONiq EBV (false/0/""/null → false). KNOWN GAP: a BARE `[prop]` predicate over a JSON tree keeps standard node EBV (always true) instead of the boxed-value EBV — FMD2 modules express the filter as `not(prop)`; unexercised by the seed corpus.
 3. **EHentai.lua:71 `.x` field** — reads a nonexistent TXQuery field (`CreateTXQuery(...).x`); FMD2 errors identically (LuaClass `__index` unknown key → nil). The host records the failed dispatch; the update thread keeps the default page count (uUpdateThread.pas:198).
-4. **Line normalization** — text content normalizes CRLF/CR → LF (InternetTools XML line rules).
+4. **Parser preprocessing (corpus-proven divergences only)** — CRLF/CR → LF in text and attributes (parseTextAttribute/parseCDATA normalization); adjacent text nodes merged (readText append semantics — character references never split runs); comments/PIs dropped (readComments/readPIs = false); whitespace text after `</body>` skipped (bpmAfterBody); bare text payloads scaffolded into html/head/body (repairing parser); XQuery string literals normalize CR → LF (LineEndingNormalization xqlenXML1). Implicit node→string coercion inside OTHER XPath functions (substring/upper-case over elements) uses fontoxpath’s raw string value — the seed corpus proves no divergence there.
 
 ## Seed e2e flows (Phase-0 exit evidence)
 
@@ -63,5 +62,3 @@ CFB8, ECDH P-256), `sodium-native` (X25519 `crypto_scalarmult(_base)`,
 SecretStream pull), pure JS (RC4 — see the OpenSSL note below, MD4 — OpenSSL 3
 dropped it, the synacode encoders/CRCs, DCP's exact CBC/CFB variants, the
 base64 Lua↔JS bridge). Full details and vectors: `docs/evidence-dual-sapling-picnics.md`.
-
-

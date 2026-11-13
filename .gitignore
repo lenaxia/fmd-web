@@ -7,3 +7,6 @@ coverage/
 
 # FPC harness build outputs
 corpus/harness/bin/
+
+# Platform session monitor artifacts
+.monitor/

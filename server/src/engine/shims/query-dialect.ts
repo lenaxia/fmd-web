@@ -89,8 +89,10 @@ export function transformExpression(expression: string): string {
   }
 
   // `.name()` array-item steps (before the dot rewrite; `text()`-style node
-  // tests are never preceded by `.` in the corpus).
-  out = out.replace(/\.([A-Za-z_][\w.-]*)\(\)/g, '.$1/*');
+  // tests are never preceded by `.` in the corpus). CHAINED empty-paren
+  // pairs (`arr()()`) map to repeated member steps (`arr/*/*`) — each ()
+  // descends one array level (InternetTools pxp member access).
+  out = expandEmptyParenSteps(out);
   // `?name` / `?*` map lookups → child steps over the JSON node tree.
   out = out.replace(/\?([A-Za-z_][\w-]*)/g, '/$1').replace(/\?\*/g, '/*');
 
@@ -143,6 +145,35 @@ function findQuoteEnd(s: string, start: number): number {
   return s.length;
 }
 
+/**
+ * `.name()` and `.name()()` map to `.name` + one child-step per empty-paren
+ * pair (each pair descends one array level). Quote-aware: literals are
+ * copied verbatim.
+ */
+function expandEmptyParenSteps(expr: string): string {
+  let out = '';
+  let i = 0;
+  while (i < expr.length) {
+    const ch = expr[i] as string;
+    if (ch === '"' || ch === "'") {
+      const end = findQuoteEnd(expr, i);
+      out += expr.slice(i, end);
+      i = end;
+      continue;
+    }
+    const m = /^(\.[A-Za-z_][\w.-]*)((?:\(\))+)/.exec(expr.slice(i));
+    if (m !== null && m[1] !== undefined && m[2] !== undefined) {
+      const levels = Math.floor(m[2].length / 2);
+      out += `${m[1]}${'/*'.repeat(levels)}`;
+      i += m[0].length;
+      continue;
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
+}
+
 /** `fmd:json(X)()` → `fmd:json(X)/*` (balanced-paren aware, quote-aware). */
 function expandJsonCallArrayStep(expr: string): string {
   let result = '';
@@ -183,8 +214,15 @@ function expandJsonCallArrayStep(expr: string): string {
     }
     result += expr.slice(i, k + 1);
     if (expr.startsWith('()', k + 1)) {
-      result += '/*';
-      i = k + 3;
+      // each () pair descends one array level (member access)
+      let pairs = 0;
+      let p = k + 1;
+      while (expr.startsWith('()', p)) {
+        pairs += 1;
+        p += 2;
+      }
+      result += '/*'.repeat(pairs);
+      i = p;
     } else {
       i = k + 1;
     }

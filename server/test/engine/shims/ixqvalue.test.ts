@@ -190,6 +190,60 @@ describe('IXQValue facade (LuaIXQValue.pas:135-149)', () => {
     expect(run(`return X.GetProperty('nope'):GetProperty('deeper'):GetAttribute('x')`)).toBe('');
   });
 
+  it('ToString (inner text, trimmed) is distinct from OuterHTML (serialized markup)', () => {
+    const { document } = parseHTML(
+      '<html><body><div class="wrap">  <b>Bold</b> plain  <script>raw()</script>  </div></body></html>',
+    );
+    const div = document.querySelector('div');
+    bind('X', [div]);
+    const run = (code: string): unknown => engine.innerEngine.doStringSync(code);
+    // contract row: "element => inner text (NOT outerHTML)" — deep text,
+    // trimmed whole (XQGlobalTrimNodes), script content included
+    expect(run(`return X.ToString()`)).toBe('Bold plain  raw()');
+    // OuterHTML is the serialized element itself
+    const outer = run(`return X.OuterHTML()`) as string;
+    expect(outer).toContain('<div class="wrap">');
+    expect(outer).toContain('<b>Bold</b>');
+    expect(outer).toContain('raw()');
+    expect(outer.startsWith('<div')).toBe(true);
+  });
+
+  it('InnerText normalizes runs and emits br/p breaks (not the raw deep text)', () => {
+    const { document } = parseHTML(
+      '<html><body><div>  a   b<br>c   <span style="display:none">hidden</span> d<p>para</p></div></body></html>',
+    );
+    const div = document.querySelector('div');
+    bind('X', [div]);
+    const run = (code: string): unknown => engine.innerEngine.doStringSync(code);
+    expect(run(`return X.InnerText()`)).toBe(' a b\nc d\n\npara');
+    // ToString on the same node has NO breaks and NO hidden-element skip
+    expect(run(`return X.ToString()`)).toBe('a   bc   hidden dpara');
+  });
+
+  it('css(sel) registered function selects through the engine dialect', () => {
+    const run = (code: string): unknown => engine.innerEngine.doStringSync(code);
+    const result = run(`
+      local x = CreateTXQuery('<html><body><a class="chapter" href="/1">A</a><a href="/2">B</a></body></html>')
+      return x.XPathStringAll("css('.chapter')")
+    `);
+    expect(result).toBe('A');
+  });
+
+  it('json(*) flows end-to-end: XPath + GetProperty + ToString over a JSON payload', () => {
+    const run = (code: string): unknown => engine.innerEngine.doStringSync(code);
+    const result = run(`
+      local x = CreateTXQuery('{"meta":{"total":7},"data":[{"slug":"a","title":"Alpha"},{"slug":"b","title":"Beta"}]}')
+      local n = 0
+      local out = {}
+      for v in x.XPath('json(*).data()').Get() do
+        n = n + 1
+        out[n] = v.GetProperty('slug').ToString() .. '=' .. v.GetProperty('title').ToString()
+      end
+      return x.XPathString('json(*).meta.total') .. '#' .. n .. '#' .. table.concat(out, '|')
+    `);
+    expect(result).toBe('7#2#a=Alpha|b=Beta');
+  });
+
   it('XPath results flow through the same facade (multi-node XPath → Get iterator)', () => {
     // CreateTXQuery(html):XPath(expr) — the full §5.6 path, asserting the
     // IXQValue facade is the SAME object shape the corpus modules consume.

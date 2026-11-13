@@ -76,8 +76,8 @@ function main(): void {
       note: 'v0: undici-envelope RecordedResponseResolver (no live net), Document stream facade (ToString/WriteString/Clear/Size, success\u21d4Size>0), ResultCode/ResultString/LastURL, case-insensitive Headers/Cookies Values + cookie jar from Set-Cookie, GET/POST/XHR (+POST MimeType move + text/html\u2192urlencoded rewrite), Terminated, Reset/ResetBasic. Pending: redirect-follow semantics, proxy support, per-host limits/delays.',
     },
     TXQuery: {
-      status: 'partial',
-      note: 'v0: FontoXPath 3.1 + linkedom behind the InternetTools dialect transform (json()/parse-json() node trees, .step shorthand, name() array steps, ?map lookups, css()); sequence toString concatenation + trimmed element deep text (oracle-verified); swallow-to-empty + rate-limited WARN. Pending: repairing-parser text-splitting parity (\u00a7gaps below).',
+      status: 'done',
+      note: '\u00a75.6 full surface (oracle-verified: 100% of the seed expression corpus) \u2014 FontoXPath 3.1 + linkedom behind the InternetTools dialect transform: json()/parse-json() NODE TREES (objects \u2192 key elements, arrays \u2192 item elements, typed scalar leaves), .step shorthand, chained name()() member steps, ?map lookups, css(), fmd:not (JSONiq EBV), fmd:string/fmd:string-join (XQGlobalTrimNodes), repairing-parser preprocessing (CRLF\u2192LF, adjacent-text merge, comment/PI drop, post-</body> text skip, bare-payload scaffold, literal CR normalization), list-fill overloads (XPathStringAll(expr[,node,]list), XPathHREFAll/XPathHREFTitleAll \u2192 TStrings mutation, order preserved), ParseHTML 1-arg reparse, swallow-to-empty + per-(module,expression) WARN dedupe.',
     },
     IXQValue: {
       status: 'done',
@@ -134,7 +134,7 @@ function main(): void {
     'LuaWebsiteModuleHandler.pas': { status: 'done', note: '\u00a75.3/\u00a75.12 chunk re-exec on module switch' },
     'LuaHTTPSend.pas / httpsendthread.pas': { status: 'in-progress', note: bindingStatus['HTTP']?.note ?? '\u00a75.4' },
     'LuaStrings.pas': { status: 'done', note: '\u00a75.5 full facade surface' },
-    'LuaXQuery.pas / LuaIXQValue.pas': { status: 'in-progress', note: bindingStatus['TXQuery']?.note ?? '\u00a75.6' },
+    'LuaXQuery.pas / LuaIXQValue.pas': { status: 'done', note: bindingStatus['TXQuery']?.note ?? '\u00a75.6' },
     'LuaCrypto.pas': { status: 'done', note: '\u00a75.7 full surface (LuaCrypto.pas:429\u2013494): node:crypto + sodium-native + pure-JS RC4/MD4; vectors in server/test/engine/shims/crypto-*.test.ts \u2014 details below' },
     'LuaDuktape.pas': { status: 'done', note: bindingStatus['Duktape']?.note ?? '\u00a75.7' },
     'LuaGZip.pas': { status: 'planned', note: '\u00a75.7' },
@@ -216,21 +216,23 @@ function main(): void {
   lines.push('### Known behavioral divergences (v0, documented)');
   lines.push('');
   lines.push('1. **CSS selector engine** \u2014 `css()` runs linkedom\u2019s css-select (CSS3); InternetTools\u2019 css3 subset differences (e.g. `:has`) degrade to swallowed-empty per FMD2 semantics.');
-  lines.push('2. **JSON node tree** \u2014 objects \u2192 key-named child elements, arrays \u2192 `item` child elements, scalars \u2192 text content; `name()` array steps rewrite to `/*`, `?key` to `/key`. Boolean EBV inside json predicates follows the VALUE (`not(key)` rewrites to `not(string(key) = "true")` in json expressions only).');
+  lines.push('2. **JSON node tree** \u2014 objects \u2192 key-named child elements, arrays \u2192 `item` child elements, typed scalar leaves (string/number/boolean/null markers); `name()` member steps rewrite to `/*` (chained `name()()` to nested member steps), `?key` to `/key`; `not(` rewrites to `fmd:not(` carrying InternetTools\u2019 JSONiq EBV (false/0/""/null \u2192 false). KNOWN GAP: a BARE `[prop]` predicate over a JSON tree keeps standard node EBV (always true) instead of the boxed-value EBV \u2014 FMD2 modules express the filter as `not(prop)`; unexercised by the seed corpus.');
   lines.push('3. **EHentai.lua:71 `.x` field** \u2014 reads a nonexistent TXQuery field (`CreateTXQuery(...).x`); FMD2 errors identically (LuaClass `__index` unknown key \u2192 nil). The host records the failed dispatch; the update thread keeps the default page count (uUpdateThread.pas:198).');
-  lines.push('4. **Line normalization** \u2014 text content normalizes CRLF/CR \u2192 LF (InternetTools XML line rules).');
+  lines.push('4. **Parser preprocessing (corpus-proven divergences only)** \u2014 CRLF/CR \u2192 LF in text and attributes (parseTextAttribute/parseCDATA normalization); adjacent text nodes merged (readText append semantics \u2014 character references never split runs); comments/PIs dropped (readComments/readPIs = false); whitespace text after `</body>` skipped (bpmAfterBody); bare text payloads scaffolded into html/head/body (repairing parser); XQuery string literals normalize CR \u2192 LF (LineEndingNormalization xqlenXML1). Implicit node\u2192string coercion inside OTHER XPath functions (substring/upper-case over elements) uses fontoxpath\u2019s raw string value \u2014 the seed corpus proves no divergence there.');
   lines.push('');
   lines.push('## Seed e2e flows (Phase-0 exit evidence)');
   lines.push('');
   lines.push('Committed goldens under `server/test/engine/golden/e2e/`: comick-getinfo, asurascans-getinfo, hentai2read-getpagenumber (+ PAGENUMBER read-back 1752 on the RECORDED fixture), madara-template-getpagenumber (Duktape JS require + AES decrypt), ehentai-getinfo-login (account constants + MODULE.Account + module-bug parity), tapas-totaldirectory.');
 
   // Preserve curated sections that follow the marker (e.g. the crypto
-  // story's compatibility notes) across regenerations.
+  // story's compatibility notes) across regenerations. Trailing whitespace
+  // is normalized so repeated runs stay byte-stable (the write below adds
+  // the final newline).
   const MARKER = '## fmd.crypto compatibility notes';
   const markerIdx = existing.indexOf(MARKER);
-  const curated = markerIdx >= 0 ? `\n${existing.slice(markerIdx)}` : '';
+  const curated = markerIdx >= 0 ? `\n${existing.slice(markerIdx).replace(/\s+$/u, '')}\n` : '';
   mkdirSync(dirname(compatPath), { recursive: true });
-  writeFileSync(compatPath, `${lines.join('\n')}${curated}\n`);
+  writeFileSync(compatPath, `${lines.join('\n')}${curated}`);
   console.log(`COMPAT.md written: ${report.summary.passed}/${report.summary.cases} = ${(report.summary.passRate * 100).toFixed(2)}%`);
 }
 

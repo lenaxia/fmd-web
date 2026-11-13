@@ -47,6 +47,7 @@ export interface DuckNode {
 export interface DuckDocument {
   createElement(tag: string): DuckElement;
   readonly documentElement: DuckElement | null;
+  querySelector(selectors: string): DuckElement | null;
   querySelectorAll(selectors: string): Iterable<DuckElement>;
 }
 
@@ -435,7 +436,33 @@ export function parseQueryDocument(_kind: QueryDocumentKind, content: string): D
     doc = parseHTML(`<html><head></head><body>${normalized}</body></html>`).document as unknown as DuckDocument;
   }
   mergeAdjacentTextNodes(doc as unknown as DuckNode);
+  dropTextAfterBody(doc);
   return doc;
+}
+
+/**
+ * bpmAfterBody whitespace skip: text after the `</body>` close never
+ * reaches the tree (TTreeParser.readText, basic parsing state AfterBody —
+ * whitespace-only input is skipped without a repair; probed via the FPC
+ * oracle). Text between `</head>` and `<body>` IS kept as an html child.
+ */
+function dropTextAfterBody(doc: DuckDocument): void {
+  const html = doc.documentElement;
+  if (html === null) {
+    return;
+  }
+  const holder = html as unknown as { childNodes?: readonly DuckNode[]; removeChild?(child: DuckNode): unknown };
+  const kids = [...(holder.childNodes ?? [])];
+  let seenBody = false;
+  for (const kid of kids) {
+    if (kid.nodeType === 1 && (kid as unknown as { localName?: string }).localName?.toLowerCase() === 'body') {
+      seenBody = true;
+      continue;
+    }
+    if (seenBody && kid.nodeType === 3) {
+      holder.removeChild?.(kid);
+    }
+  }
 }
 
 interface DocHandle {
