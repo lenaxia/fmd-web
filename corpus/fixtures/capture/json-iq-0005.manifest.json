@@ -1,0 +1,20 @@
+{
+  "fixtureId": "capture/json-iq-0005",
+  "moduleId": "5e6f77889900aabbccddeeff0405",
+  "document": "json-iq",
+  "fixtureDocument": "json-iq-0005.json",
+  "documentNote": "alternative in-engine path: parsed JSON document as evaluation ContextItem (TXQJsonParser + engine-default options, xquery.pas:8410); property access via the (\"key\") postfix form; pairs with its own fixture document json-iq-0005.json",
+  "expressions": [
+    { "id": "title-postfix", "expression": ".(\"data\")(\"manga\")(\"title\")", "engine": "xpath", "output": "scalar" },
+    { "id": "title-paren-chain", "expression": "string((.).data.manga.title)", "engine": "xpath", "output": "scalar" },
+    { "id": "total", "expression": ".(\"data\")(\"total\")", "engine": "xpath", "output": "scalar" },
+    { "id": "chapter-count", "expression": "count(.(\"data\")(\"manga\")(\"chapters\")())", "engine": "xpath", "output": "scalar" },
+    { "id": "chapter-count-nodeset", "expression": ".(\"data\")(\"manga\")(\"chapters\")()", "engine": "xpath", "output": "count" },
+    { "id": "slugs", "expression": ".(\"data\")(\"manga\")(\"chapters\")()(\"slug\")", "engine": "xpath", "output": "list" },
+    { "id": "genres-join", "expression": "string-join(.(\"data\")(\"manga\")(\"genres\")(), '/')", "engine": "xpath", "output": "scalar" },
+    { "id": "members-of-object", "expression": "count(jn:members(.))", "engine": "xpath", "output": "scalar" },
+    { "id": "missing-key", "expression": ".(\"data\")(\"nope\")", "engine": "xpath", "output": "scalar" },
+    { "id": "broken-syntax", "expression": ".(\"data\"[(", "engine": "xpath", "output": "scalar" }
+  ],
+  "outputNote": "output:\"count\" maps FMD2's XPathCount (Eval(...).Count — the SEQUENCE size; feed it node-set expressions). count(...)-returning expressions ride output:\"scalar\" so the triple carries the count VALUE, not the count-of-count artifact."
+}

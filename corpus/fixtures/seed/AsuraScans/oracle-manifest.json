@@ -1,0 +1,91 @@
+{
+  "fixtureId": "seed/AsuraScans/source",
+  "moduleId": "7103ae6839ea46ec80cdfc2c4b37c803",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "47#1",
+      "expression": "title",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "19#1",
+      "expression": "json(*).meta.total",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "48#1",
+      "expression": "string-join(alt_titles?*, \", \")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "30#1",
+      "expression": "json(*).data()",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "49#1",
+      "expression": "cover",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "46#1",
+      "expression": "json(*).series",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "50#1",
+      "expression": "author",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "62#1",
+      "expression": "json(*).data()[not(is_premium)]",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "51#1",
+      "expression": "artist",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "82#1",
+      "expression": "json(*).data.chapter.pages().url",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "52#1",
+      "expression": "string-join((genres?*?name, upper-case(substring(type, 1, 1)) || lower-case(substring(type, 2))), \", \")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "53#1",
+      "expression": "status",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "55#1",
+      "expression": "description",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "57#1",
+      "expression": "string-join(//text(), \"\r\n\")",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

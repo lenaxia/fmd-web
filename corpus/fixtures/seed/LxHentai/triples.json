@@ -1,0 +1,111 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/LxHentai/source.html",
+  "document": "html",
+  "moduleId": "a25c1b1030ee41e49018e1811bdf7085",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/LxHentai/source",
+      "id": "35#1",
+      "expression": "//ul[@class=\"flex gap-2\"]/a[last()]/@href",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/LxHentai/source",
+      "id": "46#1",
+      "expression": "//div[@class=\"p-2 w-full truncate\"]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/LxHentai/source",
+      "id": "59#1",
+      "expression": "(//span[contains(@class, \"text-lg ml-1\")])[1]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/LxHentai/source",
+      "id": "60#1",
+      "expression": "//div[@class=\"cover-frame\"]/div/@style",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/LxHentai/source",
+      "id": "61#1",
+      "expression": "(//div[@class=\"grow\"])[1]/div[contains(., \"T�c gi?\")]//a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/LxHentai/source",
+      "id": "62#1",
+      "expression": "(//div[@class=\"grow\"])[1]/div[contains(., \"Th? lo?i\")]//a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/LxHentai/source",
+      "id": "63#1",
+      "expression": "(//div[@class=\"grow\"])[1]/div[contains(., \"T�nh tr?ng\")]//a",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/LxHentai/source",
+      "id": "64#1",
+      "expression": "string-join(//div[contains(., \"T�m t?t\")]/p[position()>1], \"\r\n\")",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/LxHentai/source",
+      "id": "66#1",
+      "expression": "//ul[@class=\"overflow-y-auto overflow-x-hidden\"]/a",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/LxHentai/source",
+      "id": "68#1",
+      "expression": "li/div[1]/span",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/LxHentai/source",
+      "id": "84#1",
+      "expression": "//div[@id=\"image-container\"]/@data-src",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    }
+  ]
+}

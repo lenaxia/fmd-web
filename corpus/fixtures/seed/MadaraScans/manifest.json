@@ -1,0 +1,15 @@
+{
+  "moduleId": "397fd25544984834bdd72a60ed33053f",
+  "module": "MadaraScans",
+  "capturedAt": "2026-11-13",
+  "expressionSource": "modules",
+  "entries": [
+    {
+      "fixtureId": "seed/MadaraScans/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://madarascans.com/",
+      "description": "MangaThemesia-based (Spanish)"
+    }
+  ]
+}

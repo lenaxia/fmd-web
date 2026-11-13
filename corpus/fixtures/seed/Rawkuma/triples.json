@@ -1,0 +1,66 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/Rawkuma/source.html",
+  "document": "html",
+  "moduleId": "21b0dfcb262d4ae28520679165282666",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/Rawkuma/source",
+      "id": "26#1",
+      "expression": "//div[contains(@class, \"flex justify-center\")]/a",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Rawkuma/source",
+      "id": "31#1",
+      "expression": "h1",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Rawkuma/source",
+      "id": "46#1",
+      "expression": "//div[contains(@class, \"text-sm text-text\")]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Rawkuma/source",
+      "id": "47#1",
+      "expression": "string-join(//div[@data-show=\"false\" and @itemprop=\"description\"]//text(), \"\r\n\")",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Rawkuma/source",
+      "id": "49#1",
+      "expression": "//div[@id=\"gallery-list\"]/@hx-get/substring-before(substring-after(., \"manga_id=\"), \"&\")",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Rawkuma/source",
+      "id": "114#1",
+      "expression": "//section[@data-image-data]//img/@src",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    }
+  ]
+}

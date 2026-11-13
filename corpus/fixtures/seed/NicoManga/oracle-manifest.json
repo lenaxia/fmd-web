@@ -1,0 +1,25 @@
+{
+  "fixtureId": "seed/NicoManga/source",
+  "moduleId": "cc9b87e0e2fe4da5b6e8eb7500c3f8c2",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "37#1",
+      "expression": "//div[@class=\"custom-pagination\"]/a[last()-2]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "48#1",
+      "expression": "//a[@class=\"manga-title\"]",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "88#1",
+      "expression": "string-join(//text(), \"\r\n\")",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

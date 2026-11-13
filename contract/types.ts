@@ -319,6 +319,11 @@ export interface LuaModuleDescriptor {
   readonly rootURL: string;
   readonly category: string;
   readonly accountSupport: boolean;
+  /**
+   * `MODULE.TotalDirectory` (§5.1 module surface): the static directory
+   * page/category count for modules without OnGetDirectoryPageNumber.
+   */
+  readonly totalDirectory?: number;
   readonly options: readonly ModuleOptionDescriptor[];
   /** Event name (§5.2 rows) → Lua handler global the module assigned. */
   readonly eventHandlers: Readonly<Record<string, string>>;
@@ -454,4 +459,97 @@ export interface LuaHost {
    * `sleep(ms)` blocks the caller's thread and is interruptible.
    */
   createDispatcher(engine: LuaEngine, abort: HttpAbortHandle, deadline?: EventDeadlineController): EventDispatcher;
+}
+
+// ---------------------------------------------------------------------------
+// §13.1 — Ground-truth corpus replay (pluggable QueryEngine boundary)
+// ---------------------------------------------------------------------------
+
+/** Document kind a corpus fixture records (the HTTP response body). */
+export type QueryDocumentKind = 'html' | 'xml' | 'json';
+
+/**
+ * Query dialects harvested from FMD2's Lua ecosystem (§13.1): plain
+ * XPath/XQuery, `json(...)` node-tree forms, and `css()` selectors —
+ * all evaluated by FMD2's single TXQuery surface (InternetTools).
+ */
+export type QueryLanguage = 'xpath' | 'xquery' | 'css' | 'json';
+
+/**
+ * How the Lua side consumes a TXQuery result — the method shape decides
+ * it (`XPath` → node iteration, `XPathString` → scalar, `*All(expr, list)`
+ * → list fill, `XPathCount` → count).
+ */
+export type QueryOutputMode = 'scalar' | 'list' | 'count' | 'all';
+
+/** One statically harvested (or captured) query expression. */
+export interface QueryExpression {
+  /** Stable id within its fixture/module scope. */
+  readonly id: string;
+  /** The expression text as FMD2 passes it to TXQuery. */
+  readonly expression: string;
+  readonly language: QueryLanguage;
+  readonly output: QueryOutputMode;
+}
+
+/**
+ * An opaque parsed document handed out by {@link QueryEngine.parse}.
+ * Engines own their representation; the runner only carries it back.
+ */
+export interface ParsedQueryDocument {
+  readonly kind: QueryDocumentKind;
+  /** Engine-private handle. */
+  readonly handle: unknown;
+}
+
+/**
+ * Result of one evaluated expression with FMD2 swallow semantics
+ * (XQueryEngineHTML.pas: try/except → empty): engines report
+ * expression-level failures as `ok: false`, they do not throw.
+ * `scalar` is the string() projection, `list` the string sequence,
+ * `count` the XPathCount projection (0 when empty).
+ */
+export type QueryEngineResult =
+  | {
+      readonly ok: true;
+      readonly scalar: string;
+      readonly list: readonly string[];
+      readonly count: number;
+    }
+  | { readonly ok: false; readonly error: string };
+
+/**
+ * Pluggable query engine for offline corpus replay (§13.1): the live
+ * implementation backs onto FontoXPath + linkedom behind the §5.7
+ * dialect shim; tests use a deterministic mock. Only this boundary is
+ * visible to the corpus runner.
+ */
+export interface QueryEngine {
+  /** Engine identity, recorded verbatim in replay reports. */
+  readonly name: string;
+  /** Parse a recorded response body. Throws only on engine bugs —
+   * document-level parse failures are corpus cases, not exceptions. */
+  parse(kind: QueryDocumentKind, content: string): ParsedQueryDocument;
+  /** Evaluate one expression against a parsed document. */
+  evaluate(
+    document: ParsedQueryDocument,
+    expression: QueryExpression,
+  ): QueryEngineResult;
+  /** Free engine resources for a parsed document. */
+  release(document: ParsedQueryDocument): void;
+}
+
+/**
+ * Pluggable GetInfo normalization pipeline (§5.8, uData.pas:85-207):
+ * raw module output in, post-processed MangaInfo fields out. The corpus
+ * runner replays captured rawModuleOutput→normalized triples through
+ * this boundary; the live implementation is the host engine's §5.8
+ * pipeline, tests use a deterministic mock.
+ */
+export interface NormalizationEngine {
+  /** Engine identity, recorded verbatim in replay reports. */
+  readonly name: string;
+  /** Normalize one raw module output. Never throws on data shape —
+   * normalization is total (FMD2 tolerates empty/partial fields). */
+  normalize(input: Readonly<Record<string, unknown>>): Record<string, unknown>;
 }

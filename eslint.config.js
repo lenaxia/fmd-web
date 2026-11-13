@@ -36,4 +36,11 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // Offline maintenance scripts run under plain node — node globals apply.
+    files: ['corpus/scripts/**/*.mjs'],
+    languageOptions: {
+      globals: { console: 'readonly', process: 'readonly' },
+    },
+  },
 );

@@ -1,0 +1,16 @@
+{
+  "moduleId": "5ee374e402124d55a1d6681ea46d6881",
+  "module": "Doujinku",
+  "capturedAt": "2026-11-13",
+  "template": "MangaThemesia",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/Doujinku/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://doujinku.xyz/",
+      "description": "MangaThemesia-based (id_ID)"
+    }
+  ]
+}

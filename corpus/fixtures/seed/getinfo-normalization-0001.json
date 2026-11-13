@@ -25,15 +25,16 @@
   "expected": {
     "postProcessed": {
       "title": "Example Manga",
-      "altTitles": ["ExampleMan"],
-      "authors": ["Author One", "author one"],
-      "genres": ["Action", "Drama"],
-      "summary": "A  test summary.\n\nSecond line.",
+      "altTitles": "ExampleMan  ,",
+      "authors": "Author One , author one",
+      "genres": "Action,  Drama",
+      "summary": "A  test summary.\nSecond line.",
       "chapterLinks": ["/manga/x/ch-1", "/manga/x/ch-2"],
       "chapterNames": ["Chapter 1", "chapter 2"],
       "numChapter": 2
     },
     "pipelineNotes": {
+      "fieldShape": "altTitles/authors/genres are single uData strings: array inputs are joined ', ' first (Lua table.concat module shape, fmdnormalize.ScalarField), so inner padding survives and the FMD2-captured triple capture/getinfo-normalization-0003.triples.json pins these exact values",
       "dedupe": "case-insensitive duplicate chapter removal deletes the EARLIER index (uData.pas:154-173) so the LAST occurrence's link+name survives (§5.8 step 4)",
       "padPrune": "ChapterNames padded with '' / pruned to match ChapterLinks (uData.pas:143-152)",
       "hostStrip": "RemoveHostFromURLsPair strips hosts from the chapter-links pair (uData.pas:175-179)",
@@ -43,7 +44,7 @@
   "meta": {
     "captured": false,
     "synthetic": true,
-    "source": "DESIGN.md §5.8 walkthrough (uData.pas:85-207); replace with an FPC-captured triple before Phase-1 exit",
+    "source": "DESIGN.md §5.8 walkthrough (uData.pas:85-207); replace with an FPC-captured triple before Phase-1 exit. Corrections (review, tsk-lofty-poncho-slogs): (1) summary was authored with '\\n\\n' preserved, but uData.pas:127 CleanMultilinedString (MaxLineEnding=1) collapses repeated line endings — fixed to the faithful '\\n' form; (2) altTitles/authors/genres were authored as trimmed arrays, but uData.pas:119-127 operates on single strings (array inputs are joined ', ' first, matching Lua module output), yielding 'ExampleMan  ,', 'Author One , author one', 'Action,  Drama' — values byte-matched against the FPC-captured triple corpus/fixtures/capture/getinfo-normalization-0003.triples.json (same raw field inputs).",
     "internettoolsCommit": null
   }
 }

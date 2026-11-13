@@ -1,0 +1,13 @@
+{
+  "fixtureId": "seed/EgoToons/source",
+  "moduleId": "754d4ad9c2424fffa33b4adcac323a51",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "41#1",
+      "expression": "json(*).comics.data()",
+      "engine": "xpath",
+      "output": "all"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "fixtureId": "capture/getinfo-normalization-0003",
+  "moduleId": "3c4d5e6f77889900aabbccddeeff0203",
+  "kind": "getinfo-normalization",
+  "rawModuleOutput": {
+    "title": "  Example Manga  ",
+    "altTitles": ["  ExampleMan  ", ""],
+    "authors": [" Author One ", "author one "],
+    "artists": [],
+    "genres": ["Action", " Drama "],
+    "status": "Ongoing",
+    "summary": "A  test summary.\n\nSecond line.",
+    "coverLink": "https://cdn.site.example//covers/x.jpg",
+    "url": "https://site.example/manga/x",
+    "link": "",
+    "chapterLinks": [
+      "https://site.example/manga/x/ch-1",
+      "https://site.example/manga/x/ch-2",
+      "https://SITE.example/manga/x/ch-2",
+      "  "
+    ],
+    "chapterNames": [
+      "Chapter 1",
+      "Chapter  2 ",
+      "chapter 2",
+      ""
+    ]
+  },
+  "flags": {
+    "removeHostFromChapterLinks": true,
+    "optionRemoveMangaNameFromChapter": false
+  }
+}

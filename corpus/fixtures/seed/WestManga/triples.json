@@ -1,0 +1,120 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/WestManga/source.html",
+  "document": "html",
+  "moduleId": "35e1b3ff5dbf428889d0f316c3d881e6",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/WestManga/source",
+      "id": "71#1",
+      "expression": "title",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/WestManga/source",
+      "id": "42#1",
+      "expression": "json(*).paginator.last_page",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/WestManga/source",
+      "id": "72#1",
+      "expression": "alternative_name",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/WestManga/source",
+      "id": "54#1",
+      "expression": "json(*).data()",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/WestManga/source",
+      "id": "73#1",
+      "expression": "cover",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/WestManga/source",
+      "id": "70#1",
+      "expression": "json(*).data",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/WestManga/source",
+      "id": "74#1",
+      "expression": "author",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/WestManga/source",
+      "id": "95#1",
+      "expression": "json(*).data.images()",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/WestManga/source",
+      "id": "75#1",
+      "expression": "string-join(genres?*?name, \", \")",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/WestManga/source",
+      "id": "76#1",
+      "expression": "status",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/WestManga/source",
+      "id": "77#1",
+      "expression": "sinopsis",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/WestManga/source",
+      "id": "79#1",
+      "expression": "chapters?*",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    }
+  ]
+}

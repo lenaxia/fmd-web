@@ -1,0 +1,111 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/InManga/source.html",
+  "document": "html",
+  "moduleId": "03ae42ac9141443fa0711bd401c0203d",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/InManga/source",
+      "id": "5#1",
+      "expression": "//h1",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/InManga/source",
+      "id": "13#1",
+      "expression": "json(json(*).data)",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/InManga/source",
+      "id": "6#1",
+      "expression": "//meta[@property=\"og:image\"]/@content",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": "https://assets.intomanga.com~/Content/img/OnMangaLogo.png"
+    },
+    {
+      "fixtureId": "seed/InManga/source",
+      "id": "7#1",
+      "expression": "//div/div[h1]/following-sibling::div[@class=\"panel-body\"]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/InManga/source",
+      "id": "8#1",
+      "expression": "//input[@id=\"Identification\"]/@value",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/InManga/source",
+      "id": "9#1",
+      "expression": "//script[contains(., \"var chapterUrl\")]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/InManga/source",
+      "id": "14#1",
+      "expression": "jn:members(result)",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/InManga/source",
+      "id": "17#1",
+      "expression": "Number",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/InManga/source",
+      "id": "37#1",
+      "expression": "//div[contains(@class,\"PagesContainer\")]/a/img/@id",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/InManga/source",
+      "id": "52#1",
+      "expression": "//a[contains(@class,\"manga-result\")]",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/InManga/source",
+      "id": "56#1",
+      "expression": ".//h4",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": "Capítulos"
+    }
+  ]
+}

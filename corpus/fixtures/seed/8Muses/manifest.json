@@ -1,0 +1,14 @@
+{
+  "moduleId": "d5d532724aba452ea6d4b50663b76326",
+  "module": "8Muses",
+  "capturedAt": "2026-11-13",
+  "entries": [
+    {
+      "fixtureId": "seed/8Muses/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://comics.8muses.com/",
+      "description": "Gallery site"
+    }
+  ]
+}

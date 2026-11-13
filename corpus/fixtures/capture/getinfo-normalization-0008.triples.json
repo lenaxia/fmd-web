@@ -1,0 +1,67 @@
+{
+  "generator" : "fmd_capture",
+  "mode" : "normalize",
+  "fixture" : "corpus/fixtures/capture/getinfo-normalization-0008.json",
+  "moduleId" : "3c4d5e6f77889900aabbccddeeff0008",
+  "internettoolsCommit" : "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit" : "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion" : "3.2.2",
+  "flags" : {
+    "removeHostFromChapterLinks" : true,
+    "optionRemoveMangaNameFromChapter" : false
+  },
+  "triples" : [
+    {
+      "fixtureId" : "capture/getinfo-normalization-0008",
+      "input" : {
+        "title" : "D",
+        "altTitles" : "",
+        "authors" : "",
+        "artists" : "",
+        "genres" : "",
+        "status" : "",
+        "summary" : "",
+        "coverLink" : "",
+        "url" : "https://s.example/m",
+        "link" : "/m",
+        "chapterLinks" : [
+          "/x",
+          "/y",
+          "/X",
+          "/Y",
+          "/z"
+        ],
+        "chapterNames" : [
+          "x1",
+          "y1",
+          "x2",
+          "y2",
+          "z1"
+        ]
+      },
+      "normalized" : {
+        "title" : "D",
+        "altTitles" : "",
+        "authors" : "",
+        "artists" : "",
+        "genres" : "",
+        "status" : "",
+        "summary" : "",
+        "coverLink" : "",
+        "url" : "https://s.example/m",
+        "link" : "/m",
+        "chapterLinks" : [
+          "/X",
+          "/Y",
+          "/z"
+        ],
+        "chapterNames" : [
+          "x2",
+          "y2",
+          "z1"
+        ],
+        "numChapter" : 3
+      }
+    }
+  ]
+}

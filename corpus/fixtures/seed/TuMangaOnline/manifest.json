@@ -1,0 +1,14 @@
+{
+  "moduleId": "9185eb6c49324a849c7d7925a41ef3a3",
+  "module": "TuMangaOnline",
+  "capturedAt": "2026-11-13",
+  "entries": [
+    {
+      "fixtureId": "seed/TuMangaOnline/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://zonatmo.org/",
+      "description": "Spanish aggregator"
+    }
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "generator" : "fmd_capture",
+  "mode" : "normalize",
+  "fixture" : "corpus/fixtures/capture/getinfo-normalization-0028.json",
+  "moduleId" : "3c4d5e6f77889900aabbccddeeff0028",
+  "internettoolsCommit" : "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit" : "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion" : "3.2.2",
+  "flags" : {
+    "removeHostFromChapterLinks" : true,
+    "optionRemoveMangaNameFromChapter" : false
+  },
+  "triples" : [
+    {
+      "fixtureId" : "capture/getinfo-normalization-0028",
+      "input" : {
+        "title" : "L2",
+        "altTitles" : "",
+        "authors" : "",
+        "artists" : "",
+        "genres" : "",
+        "status" : "",
+        "summary" : "",
+        "coverLink" : "",
+        "url" : "https://sub.site.example/p",
+        "link" : "/already/set"
+      },
+      "normalized" : {
+        "title" : "L2",
+        "altTitles" : "",
+        "authors" : "",
+        "artists" : "",
+        "genres" : "",
+        "status" : "",
+        "summary" : "",
+        "coverLink" : "",
+        "url" : "https://sub.site.example/p",
+        "link" : "/already/set",
+        "chapterLinks" : [
+        ],
+        "chapterNames" : [
+        ],
+        "numChapter" : 0
+      }
+    }
+  ]
+}

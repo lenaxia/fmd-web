@@ -1,0 +1,15 @@
+{
+  "moduleId": "29826228ef9e4d1bad17f4c22e8d9951",
+  "module": "MangaKatana",
+  "capturedAt": "2026-11-13",
+  "expressionSource": "modules",
+  "entries": [
+    {
+      "fixtureId": "seed/MangaKatana/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://mangakatana.com/",
+      "description": "Standalone aggregator"
+    }
+  ]
+}

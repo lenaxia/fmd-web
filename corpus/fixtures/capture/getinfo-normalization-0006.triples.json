@@ -1,0 +1,55 @@
+{
+  "generator" : "fmd_capture",
+  "mode" : "normalize",
+  "fixture" : "corpus/fixtures/capture/getinfo-normalization-0006.json",
+  "moduleId" : "3c4d5e6f77889900aabbccddeeff0006",
+  "internettoolsCommit" : "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit" : "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion" : "3.2.2",
+  "flags" : {
+    "removeHostFromChapterLinks" : true,
+    "optionRemoveMangaNameFromChapter" : false
+  },
+  "triples" : [
+    {
+      "fixtureId" : "capture/getinfo-normalization-0006",
+      "input" : {
+        "title" : "T&#x27;itle &amp; Co&#039;s &quot;Test&quot; &lt;a&gt; &gt;b&gt; &#8211; dash &nbsp; x\ny\\nz&#33;",
+        "altTitles" : [
+          " Alt &#39;One&#39; ",
+          "Alt&#8211;B ",
+          "A&#8230;B"
+        ],
+        "authors" : " &nbsp;Author &lt;1&gt; ",
+        "artists" : "<unknown>",
+        "genres" : "Action,&#38;Sci-Fi,&nbsp;Drama",
+        "status" : "Ongoing",
+        "summary" : "L1\nL2\r\nL3\n\n\nL4  \t  L5\r\rL6\\nL7",
+        "coverLink" : "https://cdn.example.com:8080/a//b///c.jpg",
+        "url" : "https://site.example:8080/manga/T",
+        "link" : "",
+        "chapterLinks" : [
+        ],
+        "chapterNames" : [
+        ]
+      },
+      "normalized" : {
+        "title" : "T'itle & Co's \"Test\" <a> >b> - dash   xyz!",
+        "altTitles" : "Alt 'One' , Alt-B , A...B",
+        "authors" : "&nbsp;Author &lt;1&gt;",
+        "artists" : "",
+        "genres" : "Action,&#38;Sci-Fi,&nbsp;Drama",
+        "status" : "Ongoing",
+        "summary" : "L1\nL2\r\nL3\nL4  \t  L5\r\rL6\\nL7",
+        "coverLink" : "https://cdn.example.com:8080/a/b/c.jpg",
+        "url" : "https://site.example:8080/manga/T",
+        "link" : "/manga/T",
+        "chapterLinks" : [
+        ],
+        "chapterNames" : [
+        ],
+        "numChapter" : 0
+      }
+    }
+  ]
+}

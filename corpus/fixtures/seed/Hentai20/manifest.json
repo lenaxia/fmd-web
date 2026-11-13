@@ -1,0 +1,16 @@
+{
+  "moduleId": "f0a8341be1da43daab55ccb6d2a28b21",
+  "module": "Hentai20",
+  "capturedAt": "2026-11-13",
+  "template": "MangaThemesia",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/Hentai20/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://hentai20.io/",
+      "description": "MangaThemesia-based"
+    }
+  ]
+}

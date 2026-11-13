@@ -1,0 +1,15 @@
+{
+  "moduleId": "5eda5ccf87f1488f9dfa7a9a18f2bcf1",
+  "module": "HentaiNexus",
+  "capturedAt": "2026-11-13",
+  "expressionSource": "modules",
+  "entries": [
+    {
+      "fixtureId": "seed/HentaiNexus/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://hentainexus.com/",
+      "description": "Gallery source"
+    }
+  ]
+}

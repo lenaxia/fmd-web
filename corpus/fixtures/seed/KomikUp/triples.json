@@ -1,0 +1,30 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/KomikUp/source.html",
+  "document": "html",
+  "moduleId": "60fc962a67a2420f8381ce0f33b3898d",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/KomikUp/source",
+      "id": "43#1",
+      "expression": "//li[contains(@class, \"wp-manga-chapter\")]//a[not(@href=\"#\")]",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/KomikUp/source",
+      "id": "45#1",
+      "expression": "p",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    }
+  ]
+}

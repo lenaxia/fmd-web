@@ -1,0 +1,15 @@
+{
+  "moduleId": "d2d4a20548a641e4b24ae4c49379ae1f",
+  "module": "CartoonPorn",
+  "capturedAt": "2026-11-13",
+  "expressionSource": "modules",
+  "entries": [
+    {
+      "fixtureId": "seed/CartoonPorn/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://cartoonporn.to/",
+      "description": "Madara-based gallery"
+    }
+  ]
+}

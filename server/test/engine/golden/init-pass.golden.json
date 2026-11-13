@@ -8,6 +8,7 @@
         "rootURL": "https://www.11toon.com",
         "category": "Raw",
         "accountSupport": false,
+        "totalDirectory": 0,
         "options": [],
         "eventHandlers": {
           "GetDirectoryPageNumber": "GetDirectoryPageNumber",
@@ -28,6 +29,7 @@
         "rootURL": "https://18kami.com",
         "category": "H-Sites",
         "accountSupport": false,
+        "totalDirectory": 0,
         "options": [],
         "eventHandlers": {
           "GetDirectoryPageNumber": "GetDirectoryPageNumber",
@@ -48,6 +50,7 @@
         "rootURL": "https://comics.8muses.com",
         "category": "",
         "accountSupport": false,
+        "totalDirectory": 0,
         "options": [],
         "eventHandlers": {
           "GetInfo": "GetInfo",
@@ -67,6 +70,7 @@
         "rootURL": "https://asurascans.com",
         "category": "English-Scanlation",
         "accountSupport": false,
+        "totalDirectory": 0,
         "options": [],
         "eventHandlers": {
           "GetDirectoryPageNumber": "GetDirectoryPageNumber",
@@ -87,6 +91,7 @@
         "rootURL": "https://v3.comicaso.pro",
         "category": "Indonesian",
         "accountSupport": false,
+        "totalDirectory": 0,
         "options": [
           {
             "name": "session",
@@ -114,6 +119,7 @@
         "rootURL": "https://desu.uno",
         "category": "Russian",
         "accountSupport": false,
+        "totalDirectory": 0,
         "options": [],
         "eventHandlers": {
           "GetDirectoryPageNumber": "GetDirectoryPageNumber",
@@ -135,6 +141,7 @@
         "rootURL": "https://dynasty-scans.com",
         "category": "English-Scanlation",
         "accountSupport": false,
+        "totalDirectory": 4,
         "options": [],
         "eventHandlers": {
           "GetNameAndLink": "GetNameAndLink",
@@ -154,6 +161,7 @@
         "rootURL": "https://flamecomics.xyz",
         "category": "English-Scanlation",
         "accountSupport": false,
+        "totalDirectory": 0,
         "options": [],
         "eventHandlers": {
           "GetNameAndLink": "GetNameAndLink",
@@ -173,6 +181,7 @@
         "rootURL": "https://hentai2read.com",
         "category": "H-Sites",
         "accountSupport": false,
+        "totalDirectory": 0,
         "options": [],
         "eventHandlers": {
           "GetDirectoryPageNumber": "GetDirectoryPageNumber",
@@ -193,6 +202,7 @@
         "rootURL": "https://hentaifox.com",
         "category": "H-Sites",
         "accountSupport": false,
+        "totalDirectory": 0,
         "options": [],
         "eventHandlers": {
           "GetInfo": "GetInfo",
@@ -214,6 +224,7 @@
         "rootURL": "https://inmanga.com",
         "category": "Spanish",
         "accountSupport": false,
+        "totalDirectory": 0,
         "options": [],
         "eventHandlers": {
           "GetInfo": "getinfo",
@@ -233,6 +244,7 @@
         "rootURL": "https://www.luscious.net",
         "category": "H-Sites",
         "accountSupport": false,
+        "totalDirectory": 0,
         "options": [],
         "eventHandlers": {
           "GetDirectoryPageNumber": "GetDirectoryPageNumber",
@@ -253,6 +265,7 @@
         "rootURL": "https://manta.net",
         "category": "English",
         "accountSupport": false,
+        "totalDirectory": 0,
         "options": [
           {
             "name": "auth",
@@ -278,6 +291,7 @@
         "rootURL": "https://tcbonepiecechapters.com",
         "category": "English-Scanlation",
         "accountSupport": false,
+        "totalDirectory": 0,
         "options": [],
         "eventHandlers": {
           "GetNameAndLink": "GetNameAndLink",
@@ -297,6 +311,7 @@
         "rootURL": "https://zonatmo.org",
         "category": "Spanish",
         "accountSupport": false,
+        "totalDirectory": 0,
         "options": [],
         "eventHandlers": {
           "GetDirectoryPageNumber": "GetDirectoryPageNumber",
@@ -318,6 +333,7 @@
         "rootURL": "https://web-ace.jp/youngaceup",
         "category": "Raw",
         "accountSupport": false,
+        "totalDirectory": 0,
         "options": [],
         "eventHandlers": {
           "GetNameAndLink": "GetNameAndLink",
@@ -337,6 +353,7 @@
         "rootURL": "https://showcase.example",
         "category": "English",
         "accountSupport": true,
+        "totalDirectory": 0,
         "options": [
           {
             "name": "dark_mode",
@@ -378,6 +395,7 @@
         "rootURL": "https://first.example",
         "category": "",
         "accountSupport": false,
+        "totalDirectory": 0,
         "options": [],
         "eventHandlers": {},
         "sourceFile": "multi-module.lua"
@@ -388,6 +406,7 @@
         "rootURL": "https://second.example",
         "category": "Raw",
         "accountSupport": false,
+        "totalDirectory": 0,
         "options": [],
         "eventHandlers": {
           "GetInfo": "GetInfo"
@@ -405,6 +424,7 @@
         "rootURL": "https://valid.example",
         "category": "",
         "accountSupport": false,
+        "totalDirectory": 0,
         "options": [],
         "eventHandlers": {},
         "sourceFile": "dropped-modules.lua"

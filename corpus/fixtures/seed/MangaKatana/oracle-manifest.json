@@ -1,0 +1,79 @@
+{
+  "fixtureId": "seed/MangaKatana/source",
+  "moduleId": "29826228ef9e4d1bad17f4c22e8d9951",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "54#1",
+      "expression": "//ul[@class=\"uk-pagination\"]/li[last()-1]/a/@href",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "103#1",
+      "expression": "json(*)()",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "65#1",
+      "expression": "//div[@id=\"book_list\"]//h3[@class=\"title\"]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "78#1",
+      "expression": "//h1",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "79#1",
+      "expression": "//div[@class=\"alt_name\"]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "80#1",
+      "expression": "//div[@class=\"cover\"]/img/@src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "81#1",
+      "expression": "//ul[@class=\"meta d-table\"]//a[@class=\"author\"]",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "82#1",
+      "expression": "//ul[@class=\"meta d-table\"]//div[@class=\"genres\"]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "83#1",
+      "expression": "//ul[@class=\"meta d-table\"]/li[(./div=\"Status:\")]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "84#1",
+      "expression": "//div[@class=\"summary\"]/p",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "86#1",
+      "expression": "//div[@class=\"chapters\"]//a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "102#1",
+      "expression": "//script[contains(., \"thzq\")]",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

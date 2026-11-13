@@ -1,0 +1,16 @@
+{
+  "moduleId": "598672e8158d4fd781bea8d426534695",
+  "module": "GourmetScans",
+  "capturedAt": "2026-11-13",
+  "template": "Madara",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/GourmetScans/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://gourmetsupremacy.com/",
+      "description": "Madara-based (French)"
+    }
+  ]
+}

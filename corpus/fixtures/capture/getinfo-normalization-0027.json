@@ -1,0 +1,16 @@
+{
+ "fixtureId": "capture/getinfo-normalization-0027",
+ "moduleId": "3c4d5e6f77889900aabbccddeeff0027",
+ "rawModuleOutput": {
+  "title": "L",
+  "altTitles": "",
+  "authors": "",
+  "artists": "",
+  "genres": "",
+  "status": "",
+  "summary": "",
+  "coverLink": "",
+  "url": "https://sub.site.example:443/path/manga?x=1#f",
+  "link": ""
+ }
+}

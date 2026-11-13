@@ -1,0 +1,79 @@
+{
+  "fixtureId": "seed/MangaNato/source",
+  "moduleId": "fa8bb4d1ceea4c8fa0e98c00755f95d4",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "23#1",
+      "expression": "//div[@class=\"panel_page_number\"]//a[contains(@class, \"page_last\")]/@href",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "62#1",
+      "expression": "json(*).data.chapters()",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "34#1",
+      "expression": "//div[@class=\"list-truyen-item-wrap\"]/h3/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "68#1",
+      "expression": "json(*).data.pagination.total",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "46#1",
+      "expression": "//ul[@class=\"manga-info-text\"]//h1",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "47#1",
+      "expression": "//ul[@class=\"manga-info-text\"]//h2/substring-after(., \"Alternative :\")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "48#1",
+      "expression": "//div[@class=\"manga-info-pic\"]/img/@src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "49#1",
+      "expression": "//ul[@class=\"manga-info-text\"]/li[contains(., \"Author\")]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "50#1",
+      "expression": "//ul[@class=\"manga-info-text\"]/li[contains(., \"Genre\")]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "51#1",
+      "expression": "//ul[@class=\"manga-info-text\"]/li[contains(., \"Status\")]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "52#1",
+      "expression": "//div[@id=\"contentBox\"]/substring-after(., \"your bookmark.\")",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "89#1",
+      "expression": "//div[@class=\"container-chapter-reader\"]/img[@title]/@src",
+      "engine": "xpath",
+      "output": "list"
+    }
+  ]
+}

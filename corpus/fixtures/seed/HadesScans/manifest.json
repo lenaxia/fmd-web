@@ -1,0 +1,16 @@
+{
+  "moduleId": "287f665620664e468d4e05f5d76f5a44",
+  "module": "HadesScans",
+  "capturedAt": "2026-11-13",
+  "template": "Madara",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/HadesScans/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://lectorhades.latamtoon.com/",
+      "description": "Madara-based"
+    }
+  ]
+}

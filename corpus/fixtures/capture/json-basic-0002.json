@@ -1,0 +1,16 @@
+{
+  "data": {
+    "manga": {
+      "title": "JSON Fixture Manga",
+      "altTitles": ["JSON-Fixture", "フィクスチャ"],
+      "status": "ongoing",
+      "genres": ["Action", "Drama"],
+      "chapters": [
+        { "id": 3, "slug": "ch-3", "name": "Chapter 3" },
+        { "id": 2, "slug": "ch-2", "name": "Chapter 2" },
+        { "id": 1, "slug": "ch-1", "name": "Chapter 1" }
+      ]
+    },
+    "total": 3
+  }
+}

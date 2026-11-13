@@ -1,0 +1,79 @@
+{
+  "fixtureId": "seed/HitomiLa/source",
+  "moduleId": "1972cec9c85b43f6b10b11920a7aafef",
+  "document": "json",
+  "expressions": [
+    {
+      "id": "100#1",
+      "expression": "json(substring-after(., \"var galleryinfo = \"))",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "101#1",
+      "expression": "?files(1)?hash",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "156#1",
+      "expression": "json(substring-after(., \"var galleryinfo = \")).files()",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "109#1",
+      "expression": "parodys?*?parody",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "115#1",
+      "expression": "characters?*?character",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "120#1",
+      "expression": "files?*",
+      "engine": "xpath",
+      "output": "count"
+    },
+    {
+      "id": "121#1",
+      "expression": "language",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "128#1",
+      "expression": "title",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "129#1",
+      "expression": "japanese_title",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "136#1",
+      "expression": "string-join((artists?*?artist, groups?*?group), \", \")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "137#1",
+      "expression": "string-join((tags?*?tag, type), \", \")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "140#1",
+      "expression": "galleryurl",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

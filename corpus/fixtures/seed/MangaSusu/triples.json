@@ -1,0 +1,46 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/MangaSusu/source.html",
+  "document": "html",
+  "moduleId": "c69cbc947a6a42e194b2e097bba15047",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/MangaSusu/source",
+      "id": "45#1",
+      "expression": "//div[@class=\"bsx\"]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "list",
+      "result": [
+        "Rooftop Sex KingChapter 877.9",
+        "Teman-teman IbuChapter 118.3",
+        "Common Sense Manipulation ProgramChapter 707.9",
+        "Ibumu adalah yang terbaikChapter 187.7",
+        "MILF Hunting In Another WorldChapter 1448.6",
+        "Wireless OnaholeChapter 1288.1",
+        "Mother and Daughters HomeChapter 537.9",
+        "I Will Teach You Self DefenseChapter 518.2",
+        "I Want To Work QuietlyChapter 447.9",
+        "Like Father Like SonChapter 507.9",
+        "Completed  Panty NoteChapter 201 End6.7",
+        "Mind ControlChapter 527.8",
+        "Regressed Warrior’s Female DominanceChapter 1067.7",
+        "Secret ClassChapter 3237.1",
+        "The Father-In-Law Fucks Them AllChapter 667.9"
+      ]
+    },
+    {
+      "fixtureId": "seed/MangaSusu/source",
+      "id": "46#1",
+      "expression": "//div[@class=\"pagination\"]/a[last()-1]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    }
+  ]
+}

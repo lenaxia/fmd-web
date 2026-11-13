@@ -1,0 +1,46 @@
+{
+  "module": "ComicK",
+  "moduleId": "214e30f0afec420cafddefe22b4d973c",
+  "event": "GetInfo",
+  "url": "https://comick.live/comic/solo-leveling",
+  "fixtureProvenance": "corpus/fixtures/seed/ComicK/source.json is a parked-domain capture (dead site); flow fixtures are committed synthetic bodies grounded in the module API shapes",
+  "result": {
+    "kind": "code",
+    "value": 0,
+    "readBack": {}
+  },
+  "mangaInfo": {
+    "title": "Solo Leveling",
+    "altTitles": "나 혼자만 레벨업, Solamente yo subo de nivel",
+    "authors": "Chugong",
+    "genres": "Action, Fantasy, Shounen, Korean",
+    "status": "1",
+    "coverLink": "https://comick.cc/thumbs/solo-leveling.jpg"
+  },
+  "chapterLinks": [
+    "comic/solo-leveling/a1b2c3-chapter-179-en"
+  ],
+  "chapterNames": [
+    "Ch. 179"
+  ],
+  "httpRequests": [
+    {
+      "method": "GET",
+      "url": "https://comick.live/comic/solo-leveling",
+      "body": "",
+      "mimeType": "",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      }
+    },
+    {
+      "method": "GET",
+      "url": "https://comick.live/api/comics/solo-leveling/chapter-list?chapOrder=asc&page=1&lang=en",
+      "body": "",
+      "mimeType": "",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      }
+    }
+  ]
+}

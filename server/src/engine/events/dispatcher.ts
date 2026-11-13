@@ -1,7 +1,4 @@
-import { readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
 import type {
-  ContractDocument,
   EventBinding,
   EventContext,
   EventDeadlineController,
@@ -14,29 +11,32 @@ import type {
   NetStatusCode,
 } from '@fmd/contract';
 import { GC_STEP_CALL_THRESHOLD, WasmoonLuaEngine } from '../lua/engine.js';
-import { FacadeBridge } from '../lua/facade.js';
+import type { FacadeBridge, FacadeSpec } from '../lua/facade.js';
 import { ModuleBacking } from '../lua/module-facade.js';
+import { makeMangaInfoSpec } from '../lua/mangainfo.js';
 import { makeHTTPSpec, makeTStrings } from '../lua/stubs.js';
+import { TStringsStorageStrings } from '../lua/storage.js';
 import { DEFAULT_EVENT_DEADLINE_MS } from '../lua/worker-pool.js';
+import { EVENT_BINDINGS, type EventGlobalName } from './bindings.js';
 import { createDeadlineController } from './deadline.js';
 
 /**
- * §5.2 event dispatcher — the binding table is DATA from contract.json
- * (§5 implementation rule: never hand-coded): `MODULE` bound for every
- * event, the row's exact globals, the row's status-constant table
- * (net-status for the code rows, account-status for Login/AccountState/
- * CheckSite), return protocol by row kind (codes / booleans / SaveImage
- * string), `PAGENUMBER` the only read-back global, `URL` never read back.
+ * §5.2 event dispatcher — the binding table is GENERATED DATA from
+ * contract.json (§5 implementation rule: never hand-coded, see
+ * bindings.generated.ts): `MODULE` bound for every event, the row's exact
+ * globals, the row's status-constant table (net-status for the code rows,
+ * account-status for Login/AccountState/CheckSite), return protocol by row
+ * kind (codes / booleans / SaveImage string), `PAGENUMBER` the only
+ * read-back global, `URL` never read back.
  */
 
-const require = createRequire(import.meta.url);
-
-function loadContractDocument(): ContractDocument {
-  const path = require.resolve('@fmd/contract/contract.json');
-  return JSON.parse(readFileSync(path, 'utf8')) as ContractDocument;
+/** Optional v0 shim hooks (§5.4/§5.2): real HTTP objects + accounts. */
+export interface DispatcherShims {
+  /** Fresh request-scoped HTTP facade per event call (FMD2 LoadObject). */
+  readonly makeHTTP?: (bridge: FacadeBridge) => FacadeSpec;
+  /** Host-level account credentials reached as MODULE.Account (§5.2). */
+  readonly account?: { readonly enabled: boolean; readonly username: string; readonly password: string };
 }
-
-const CONTRACT_DOCUMENT: ContractDocument = loadContractDocument();
 
 export class EventNotBoundError extends Error {
   constructor(
@@ -67,14 +67,25 @@ const ACCOUNT_STATUS: Readonly<Record<string, number>> = {
 export class ContractEventDispatcher implements EventDispatcher {
   private readonly moduleFacades = new Map<string, { generation: number; facadeId: number }>();
 
+  /** §5.3 shared storage per module id — THE one instance across events.
+   * The Lua-facing contract (TStringsStorage semantics) lives in
+   * lua/storage.ts; the host-side state service (state/module-state.ts)
+   * adapts to it via the StorageStrings seam. */
+  private readonly storageBackings = new Map<string, TStringsStorageStrings>();
+
+  /** Optional v0 shim hooks (§5.4/§5.2) — installed by the shim installer. */
+  private readonly shims: DispatcherShims;
+
   constructor(
     private readonly engine: WasmoonLuaEngine,
     private readonly abort: HttpAbortHandle,
     private readonly deadline: EventDeadlineController,
     private readonly logger: HostLogger,
-    private readonly bindings: readonly EventBinding[] = CONTRACT_DOCUMENT.events,
+    private readonly bindings: readonly EventBinding[] = EVENT_BINDINGS,
     private readonly deadlineMs: number = DEFAULT_EVENT_DEADLINE_MS,
+    shims: DispatcherShims = {},
   ) {
+    this.shims = shims;
     // attach the event environment: abort + interrupt cells + attribution
     engine.env = {
       abort: this.abort,
@@ -164,14 +175,18 @@ export class ContractEventDispatcher implements EventDispatcher {
   ): void {
     const engine = this.engine.innerEngine;
     const g = engine.global;
-    for (const name of binding.globals) {
+    // The generated table guarantees globals ⊆ EventGlobalName; the cast
+    // keeps the switch below exhaustive against the generated union.
+    const boundGlobals = binding.globals as readonly EventGlobalName[];
+    for (const name of boundGlobals) {
       switch (name) {
         case 'MODULE':
           this.bindModule(bridge, descriptor);
           break;
         case 'HTTP':
-          // a fresh request-scoped HTTP object per call (FMD2 LoadObject)
-          bridge.create('HTTP', makeHTTPSpec(() => this.abort, bridge));
+          // a fresh request-scoped HTTP object per call (FMD2 LoadObject);
+          // the §5.4 shim factory (when installed) replaces the inert stub
+          bridge.create('HTTP', this.shims.makeHTTP !== undefined ? this.shims.makeHTTP(bridge) : makeHTTPSpec(() => this.abort, bridge));
           break;
         case 'UPDATELIST':
           bridge.create('UPDATELIST', this.makeUpdateListSpec());
@@ -179,9 +194,13 @@ export class ContractEventDispatcher implements EventDispatcher {
         case 'TASK':
           bridge.create('TASK', this.makeTaskSpec(bridge));
           break;
-        case 'MANGAINFO':
-          bridge.create('MANGAINFO', this.makeMangaInfoSpec(bridge));
+        case 'MANGAINFO': {
+          // §5.5: the exact LuaMangaInfo field set (engine/lua/mangainfo.ts).
+          // The GetInfo host flow harvests the raw module output from that
+          // module's handle and runs the §5.8 pipeline (engine/normalize).
+          bridge.create('MANGAINFO', makeMangaInfoSpec(bridge).spec);
           break;
+        }
         case 'NAMES': {
           const names = makeTStrings(bridge);
           bridge.create('NAMES', names.spec);
@@ -211,8 +230,13 @@ export class ContractEventDispatcher implements EventDispatcher {
         case 'FILENAME':
           g.set('FILENAME', context.fileName ?? '');
           break;
-        default:
-          throw new Error(`unknown event global in contract.json: ${name}`);
+        default: {
+          // Compile-time drift guard: if contract.json grows a global the
+          // dispatcher does not bind, the generated EventGlobalName union
+          // widens and this `never` assignment fails the build.
+          const unhandled: never = name;
+          throw new Error(`unknown event global in contract.json: ${String(unhandled)}`);
+        }
       }
     }
     // status constants per row (§5.2): net-status for code rows,
@@ -238,7 +262,12 @@ export class ContractEventDispatcher implements EventDispatcher {
     if (cached !== undefined && cached.generation === generation) {
       facadeId = cached.facadeId;
     } else {
-      const backing = ModuleBacking.fromDescriptor(descriptor);
+      let storage = this.storageBackings.get(descriptor.id);
+      if (storage === undefined) {
+        storage = new TStringsStorageStrings();
+        this.storageBackings.set(descriptor.id, storage);
+      }
+      const backing = ModuleBacking.fromDescriptor(descriptor, this.shims.account, storage);
       facadeId = bridge.create('MODULE', backing.spec(bridge));
       this.moduleFacades.set(descriptor.id, { generation, facadeId });
     }
@@ -300,38 +329,6 @@ export class ContractEventDispatcher implements EventDispatcher {
         }
         // CurrentDownloadChapterPtr/CurrentMaxFileNameLength/Link are
         // read-only (contract.json taskFields) — writes silently dropped
-      },
-      sub: (k: string | number) => (typeof k === 'string' ? lists[k] : undefined),
-    };
-  }
-
-  private makeMangaInfoSpec(bridge: FacadeBridge) {
-    const strings: Record<string, string> = {
-      URL: '',
-      Title: '',
-      AltTitles: '',
-      Link: '',
-      CoverLink: '',
-      Authors: '',
-      Artists: '',
-      Genres: '',
-      Status: '',
-      Summary: '',
-    };
-    // unknown-property tolerance is behavioral contract: e.g. the
-    // MANGAINFO.Artist typo (OrckuMangas.lua:91) silently no-ops (§5.1)
-    const chapterLinks = makeTStrings(bridge);
-    const chapterNames = makeTStrings(bridge);
-    const lists: Record<string, number> = {
-      ChapterLinks: bridge.create('', chapterLinks.spec),
-      ChapterNames: bridge.create('', chapterNames.spec),
-    };
-    return {
-      get: (k: string | number) => (typeof k === 'string' ? strings[k] : undefined),
-      set: (k: string | number, v: EventGlobalValue) => {
-        if (typeof k === 'string' && k in strings) {
-          strings[k] = typeof v === 'string' ? v : String(v ?? '');
-        }
       },
       sub: (k: string | number) => (typeof k === 'string' ? lists[k] : undefined),
     };
@@ -412,6 +409,7 @@ export function createContractDispatcher(
   deadline?: EventDeadlineController,
   bindings?: readonly EventBinding[],
   deadlineMs?: number,
+  shims?: DispatcherShims,
 ): ContractEventDispatcher {
   const controller = deadline ?? createDeadlineController(engine.env.cells);
   return new ContractEventDispatcher(
@@ -421,5 +419,6 @@ export function createContractDispatcher(
     logger,
     bindings,
     deadlineMs,
+    shims,
   );
 }

@@ -1,0 +1,147 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/TuMangaNet/source.html",
+  "document": "html",
+  "moduleId": "a20f6373158543b0a78ae4eb736e5f31",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/TuMangaNet/source",
+      "id": "22#1",
+      "expression": "//div[@class=\"seriestualt\"]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/TuMangaNet/source",
+      "id": "117#1",
+      "expression": "json(*).sources()[1].images()",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/TuMangaNet/source",
+      "id": "23#1",
+      "expression": "//span[@class=\"alternative\"]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/TuMangaNet/source",
+      "id": "29#1",
+      "expression": "//div[@itemprop=\"image\"]//img/@data-lazy-src",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/TuMangaNet/source",
+      "id": "30#1",
+      "expression": "//div[@itemprop=\"image\"]//img/@data-src",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/TuMangaNet/source",
+      "id": "31#1",
+      "expression": "//div[@itemprop=\"image\"]//img/@src",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/TuMangaNet/source",
+      "id": "32#1",
+      "expression": "//meta[@property=\"og:image\"]/@content",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/TuMangaNet/source",
+      "id": "54#1",
+      "expression": "(//div[@class=\"seriestugenre\"]/a, //td[.=\"Type\"]/following-sibling::td)",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/TuMangaNet/source",
+      "id": "55#1",
+      "expression": "(//span[@class=\"mgen\"]/a, //div[@class=\"imptdt\" and contains(., \"Type\")]/a)",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/TuMangaNet/source",
+      "id": "76#1",
+      "expression": "//div[@class=\"blix\"]//a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/TuMangaNet/source",
+      "id": "88#1",
+      "expression": "//h1[@class=\"entry-title\"]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/TuMangaNet/source",
+      "id": "95#1",
+      "expression": "//div[@itemprop=\"description\"]/*[not(script)]/string-join(text(), \"\r\n\")",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/TuMangaNet/source",
+      "id": "97#1",
+      "expression": "//div[@id=\"chapterlist\"]//div[@class=\"eph-num\"]/a",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/TuMangaNet/source",
+      "id": "99#1",
+      "expression": "span[@class=\"chapternum\"]/normalize-space(.)",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/TuMangaNet/source",
+      "id": "113#1",
+      "expression": "//script[contains(., \"ts_reader\")]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    }
+  ]
+}

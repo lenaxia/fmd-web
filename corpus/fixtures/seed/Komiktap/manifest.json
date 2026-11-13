@@ -1,0 +1,16 @@
+{
+  "moduleId": "f9adee01635a4ff48fdff5164a65d6dd",
+  "module": "Komiktap",
+  "capturedAt": "2026-11-13",
+  "template": "MangaThemesia",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/Komiktap/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://komiktap.info/",
+      "description": "MangaThemesia-based (id_ID)"
+    }
+  ]
+}

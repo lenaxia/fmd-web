@@ -1,0 +1,97 @@
+{
+  "fixtureId": "seed/KomikStation/source",
+  "moduleId": "b5586745030a45bba05d0c360caa6d1a",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "22#1",
+      "expression": "//div[@class=\"seriestualt\"]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "117#1",
+      "expression": "json(*).sources()[1].images()",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "23#1",
+      "expression": "//span[@class=\"alternative\"]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "29#1",
+      "expression": "//div[@itemprop=\"image\"]//img/@data-lazy-src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "30#1",
+      "expression": "//div[@itemprop=\"image\"]//img/@data-src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "31#1",
+      "expression": "//div[@itemprop=\"image\"]//img/@src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "32#1",
+      "expression": "//meta[@property=\"og:image\"]/@content",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "54#1",
+      "expression": "(//div[@class=\"seriestugenre\"]/a, //td[.=\"Type\"]/following-sibling::td)",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "55#1",
+      "expression": "(//span[@class=\"mgen\"]/a, //div[@class=\"imptdt\" and contains(., \"Type\")]/a)",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "76#1",
+      "expression": "//div[@class=\"blix\"]//a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "88#1",
+      "expression": "//h1[@class=\"entry-title\"]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "95#1",
+      "expression": "//div[@itemprop=\"description\"]/*[not(script)]/string-join(text(), \"\r\n\")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "97#1",
+      "expression": "//div[@id=\"chapterlist\"]//div[@class=\"eph-num\"]/a",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "99#1",
+      "expression": "span[@class=\"chapternum\"]/normalize-space(.)",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "113#1",
+      "expression": "//script[contains(., \"ts_reader\")]",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

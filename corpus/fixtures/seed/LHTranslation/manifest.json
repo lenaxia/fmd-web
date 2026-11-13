@@ -1,0 +1,16 @@
+{
+  "moduleId": "37538acb3171418bbf5a52b3e255afb6",
+  "module": "LHTranslation",
+  "capturedAt": "2026-11-13",
+  "template": "Madara",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/LHTranslation/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://lhtranslation.net/",
+      "description": "Madara-based"
+    }
+  ]
+}

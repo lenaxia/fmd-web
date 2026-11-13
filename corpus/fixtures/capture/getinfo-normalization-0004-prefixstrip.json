@@ -1,0 +1,29 @@
+{
+  "fixtureId": "capture/getinfo-normalization-0004-prefixstrip",
+  "moduleId": "4d5e6f77889900aabbccddeeff0304",
+  "kind": "getinfo-normalization",
+  "rawModuleOutput": {
+    "title": "ExampleMan",
+    "altTitles": "",
+    "authors": "Author One,",
+    "artists": "<N/A>",
+    "genres": "Action,",
+    "status": "Completed",
+    "summary": "-",
+    "coverLink": "",
+    "url": "https://site.example/manga/exampleman",
+    "link": "",
+    "chapterLinks": [
+      "https://site.example/manga/exampleman/ch-5",
+      "https://site.example/manga/exampleman/ch-6"
+    ],
+    "chapterNames": [
+      "ExampleMan Ch. 5",
+      "ExampleMan- Ch. 6"
+    ]
+  },
+  "flags": {
+    "removeHostFromChapterLinks": true,
+    "optionRemoveMangaNameFromChapter": true
+  }
+}

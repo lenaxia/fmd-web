@@ -1,0 +1,14 @@
+{
+  "moduleId": "053da85062184626a0a1ff6d57c3c955",
+  "module": "Hentai2Read",
+  "capturedAt": "2026-11-13",
+  "entries": [
+    {
+      "fixtureId": "seed/Hentai2Read/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://hentai2read.com/browse/newest/page-1/",
+      "description": "XPathStringAll list-fill + json() inside expressions"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "moduleId": "7bda2905b61c49d1976777e9f2356361",
+  "module": "3asq",
+  "capturedAt": "2026-11-13",
+  "template": "Madara",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/3asq/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://3asq.online/",
+      "description": "Madara-based (Arabic)"
+    }
+  ]
+}

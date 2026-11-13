@@ -1,0 +1,79 @@
+{
+  "fixtureId": "seed/MangaGo/source",
+  "moduleId": "77c3c3cd38444bd7bb4e5f63f2c5c93c",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "156#1",
+      "expression": "//span[@class=\"title\"]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "157#1",
+      "expression": "//div[@class=\"pagination\"]//li[last()-1]//span",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "169#1",
+      "expression": "//h1",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "170#1",
+      "expression": "//td[./label=\"Alternative:\"]/normalize-space(text())",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "171#1",
+      "expression": "//div[@class=\"left cover\"]/img/@src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "172#1",
+      "expression": "//td[./label=\"Author:\"]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "173#1",
+      "expression": "//td[./label=\"Genre(s):\"]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "174#1",
+      "expression": "//td[./label=\"Status:\"]/span",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "175#1",
+      "expression": "//div[@class=\"manga_summary\"]/string-join(text(), \"\r\n\")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "177#1",
+      "expression": "//table[@id=\"chapter_table\"]//a[not(@style)]",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "191#1",
+      "expression": "//script[contains(., \"imgsrcs\")]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "193#1",
+      "expression": "//script[contains(@src, \"chapter.js\")]/@src",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

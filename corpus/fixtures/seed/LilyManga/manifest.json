@@ -1,0 +1,16 @@
+{
+  "moduleId": "829fe500a3e64b8f9637a3d5ebdb4e11",
+  "module": "LilyManga",
+  "capturedAt": "2026-11-13",
+  "template": "Madara",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/LilyManga/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://lilymanga.net/",
+      "description": "Madara-based"
+    }
+  ]
+}

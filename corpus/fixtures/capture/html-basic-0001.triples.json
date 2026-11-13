@@ -1,0 +1,138 @@
+{
+  "generator" : "fmd_capture",
+  "mode" : "expression",
+  "fixture" : "corpus/fixtures/capture/html-basic-0001.html",
+  "document" : "html",
+  "moduleId" : "1a2b3c4d5e6f77889900aabbccddeeff",
+  "internettoolsCommit" : "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit" : "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion" : "3.2.2",
+  "triples" : [
+    {
+      "fixtureId" : "capture/html-basic-0001",
+      "id" : "title-scalar",
+      "expression" : "string(//h1[@class='title'])",
+      "engine" : "xpath",
+      "output" : "scalar",
+      "resultKind" : "scalar",
+      "result" : "Example Manga"
+    },
+    {
+      "fixtureId" : "capture/html-basic-0001",
+      "id" : "meta-desc",
+      "expression" : "//meta[@name='description']/@content",
+      "engine" : "xpath",
+      "output" : "scalar",
+      "resultKind" : "scalar",
+      "result" : "A & B test fixture"
+    },
+    {
+      "fixtureId" : "capture/html-basic-0001",
+      "id" : "genres-list",
+      "expression" : "//div[@class='genres']/a",
+      "engine" : "xpath",
+      "output" : "list",
+      "resultKind" : "list",
+      "result" : [
+        "Action",
+        "Drama",
+        "Comedy"
+      ]
+    },
+    {
+      "fixtureId" : "capture/html-basic-0001",
+      "id" : "chapter-links",
+      "expression" : "//div[@class='chapter-list']//a/@href",
+      "engine" : "xpath",
+      "output" : "list",
+      "resultKind" : "list",
+      "result" : [
+        "/manga/x/ch-3",
+        "/manga/x/ch-2",
+        "/manga/x/ch-1"
+      ]
+    },
+    {
+      "fixtureId" : "capture/html-basic-0001",
+      "id" : "chapter-count",
+      "expression" : "//div[@class='chapter-list']//a",
+      "engine" : "xpath",
+      "output" : "count",
+      "resultKind" : "count",
+      "result" : 3
+    },
+    {
+      "fixtureId" : "capture/html-basic-0001",
+      "id" : "missing-empty",
+      "expression" : "//div[@class='does-not-exist']/text()",
+      "engine" : "xpath",
+      "output" : "scalar",
+      "resultKind" : "empty",
+      "result" : ""
+    },
+    {
+      "fixtureId" : "capture/html-basic-0001",
+      "id" : "missing-list",
+      "expression" : "//span[@class='nope']",
+      "engine" : "xpath",
+      "output" : "list",
+      "resultKind" : "empty",
+      "result" : [
+      ]
+    },
+    {
+      "fixtureId" : "capture/html-basic-0001",
+      "id" : "join-all",
+      "expression" : "//div[@class='genres']/a",
+      "engine" : "xpath",
+      "output" : "all",
+      "resultKind" : "scalar",
+      "result" : "Action, Drama, Comedy"
+    },
+    {
+      "fixtureId" : "capture/html-basic-0001",
+      "id" : "broken-syntax",
+      "expression" : "///broken(((",
+      "engine" : "xpath",
+      "output" : "scalar",
+      "resultKind" : "empty",
+      "result" : ""
+    },
+    {
+      "fixtureId" : "capture/html-basic-0001",
+      "id" : "css-title",
+      "expression" : ".manga .title",
+      "engine" : "css",
+      "output" : "scalar",
+      "resultKind" : "scalar",
+      "result" : "Example Manga"
+    },
+    {
+      "fixtureId" : "capture/html-basic-0001",
+      "id" : "css-count",
+      "expression" : ".chapter-list .row",
+      "engine" : "css",
+      "output" : "count",
+      "resultKind" : "count",
+      "result" : 3
+    },
+    {
+      "fixtureId" : "capture/html-basic-0001",
+      "id" : "css-missing",
+      "expression" : ".no-such-element",
+      "engine" : "css",
+      "output" : "scalar",
+      "resultKind" : "empty",
+      "result" : ""
+    },
+    {
+      "fixtureId" : "capture/html-basic-0001",
+      "id" : "title-attr-unclosed",
+      "expression" : "string(//title)",
+      "engine" : "xpath",
+      "output" : "scalar",
+      "resultKind" : "scalar",
+      "result" : "Example Manga — Site"
+    }
+  ]
+}

@@ -40,7 +40,10 @@ export class WasmoonLuaEngine implements LuaEngine {
     return this.stateGeneration;
   }
 
-  async loadModule(fileName: string): Promise<void> {
+  async loadModule(
+    fileName: string,
+    preChunkSetup?: (engine: WasmoonEngine, bridge: FacadeBridge) => void,
+  ): Promise<void> {
     const chunk = this.chunkCache.peek(fileName);
     if (chunk === undefined) {
       throw new Error(`chunk not compiled: ${fileName} (call chunkCache.get first)`);
@@ -50,6 +53,9 @@ export class WasmoonLuaEngine implements LuaEngine {
     const engine = await this.factory.createEngine();
     this.bridge = new FacadeBridge(engine);
     installBaseEnvironment(engine, this.bridge, () => this.env);
+    // optional §5.7 shim wiring BEFORE the chunk runs (modules `require`
+    // templates/utils at top level — LuaPackage.pas registers loaders first)
+    preChunkSetup?.(engine, this.bridge);
     loadChunkInto(engine, chunk);
     this.inner = engine;
     this.callCount = 0;

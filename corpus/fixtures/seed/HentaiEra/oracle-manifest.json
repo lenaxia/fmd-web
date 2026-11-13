@@ -1,0 +1,133 @@
+{
+  "fixtureId": "seed/HentaiEra/source",
+  "moduleId": "38f5203c68834cf782620c34b6fef944",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "41#1",
+      "expression": "//ul[@class=\"pagination\"]/li[last()-1]/a",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "52#1",
+      "expression": "//h2[@class=\"gallery_title\"]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "65#1",
+      "expression": "//div[contains(@class, \"gallery_first\")]/h1/text()",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "66#1",
+      "expression": "//div[contains(@class, \"gallery_first\")]//p[contains(@class, \"subtitle\")]/text()",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "67#1",
+      "expression": "//div[contains(@class, \"gallery_first\")]//div[contains(@class, \"left_cover\")]//img/@data-src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "68#1",
+      "expression": "(//span[./text()=\"Artists\"]/following-sibling::div[contains(@class, \"info_tags\")]//span, //span[./text()=\"Groups\"]/following-sibling::div[contains(@class, \"info_tags\")]//span)",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "69#1",
+      "expression": "(//span[./text()=\"Tags\"]/following-sibling::div[contains(@class, \"info_tags\")]//span, //span[./text()=\"Category\"]/following-sibling::div[contains(@class, \"info_tags\")]//span)",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "76#1",
+      "expression": "//span[./text()=\"Parodies\"]/following-sibling::div[contains(@class, \"info_tags\")]//span",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "80#1",
+      "expression": "//span[./text()=\"Characters\"]/following-sibling::div[contains(@class, \"info_tags\")]//span",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "84#1",
+      "expression": "//span[./text()=\"Languages\"]/following-sibling::div[contains(@class, \"info_tags\")]//span[not(contains(text(), \"translated\"))]",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "88#1",
+      "expression": "//button[@id=\"pages_btn\"]/text() ! substring-before(., \" Pages\")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "106#1",
+      "expression": "//div[@class=\"container\"]/div[contains(@class, \"galleries\")]//span[contains(@class, \"search_key\")]/text()",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "107#1",
+      "expression": "(//div[contains(@class, \"thumbs_container\")]//div[@class=\"inner_thumb\"])[1]/a/img/@data-src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "110#1",
+      "expression": "//ul[@class=\"pagination\"]/li[last()-1]/a",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "112#1",
+      "expression": "//div[@class=\"thumb\"]",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "113#1",
+      "expression": "div/div[@class=\"inner_thumb\"]/a/@href",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "114#1",
+      "expression": "div/div[@class=\"g_text\"]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "137#1",
+      "expression": "//input[@id=\"load_server\"]/@value",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "138#1",
+      "expression": "//input[@id=\"load_dir\"]/@value",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "139#1",
+      "expression": "//input[@id=\"load_id\"]/@value",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "149#1",
+      "expression": "//script[contains(., \"var g_th\")]",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

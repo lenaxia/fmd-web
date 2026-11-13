@@ -1,0 +1,14 @@
+{
+  "moduleId": "214e30f0afec420cafddefe22b4d973c",
+  "module": "ComicK",
+  "capturedAt": "2026-11-13",
+  "entries": [
+    {
+      "fixtureId": "seed/ComicK/source",
+      "file": "source.json",
+      "kind": "json",
+      "url": "https://comick.cc/api/search?order_by=user_follow_count&order_direction=desc&type=comic",
+      "description": "JSON API directory (search endpoint, json() expressions; RootURL domain comick.live rotates to comick.cc)"
+    }
+  ]
+}

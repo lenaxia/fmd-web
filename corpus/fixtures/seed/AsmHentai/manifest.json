@@ -1,0 +1,15 @@
+{
+  "moduleId": "845f86020f8b4744824f5eaffc1f278f",
+  "module": "AsmHentai",
+  "capturedAt": "2026-11-13",
+  "expressionSource": "modules",
+  "entries": [
+    {
+      "fixtureId": "seed/AsmHentai/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://asmhentai.com/",
+      "description": "Gallery source"
+    }
+  ]
+}

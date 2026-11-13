@@ -1,0 +1,246 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/Madara/source.html",
+  "document": "html",
+  "moduleId": "0f223613e3cb340df6037d5304d4e6ee",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "29#1",
+      "expression": "//div[@class=\"wp-pagenavi\"]/(a[@class=\"last\" or @class=\"page-numbers\"])[last()]/@href",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "162#1",
+      "expression": "json(*)().src",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "40#1",
+      "expression": "//div[contains(@class, \"post-title\")]/*[self::h3 or self::h2]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "55#1",
+      "expression": "//div[contains(@class, \"post-title\")]/*[self::h5 or self::h3 or self::h2]/a",
+      "engine": "xpath",
+      "output": "count",
+      "resultKind": "count",
+      "result": 0
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "56#1",
+      "expression": "//div[contains(@class, \"post-title\")]/*[self::h5 or self::h3 or self::h2]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "69#1",
+      "expression": "//div[@class=\"post-title\" or @id=\"manga-title\"]/*[self::h1 or self::h3]/text()",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "70#1",
+      "expression": "//div[@class=\"summary-heading\" and contains(./h5, \"Alternativ\") or contains(./h5, \"Judul Lain\") or contains(./h5, \"??? ????\")]/following-sibling::div",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "71#1",
+      "expression": "//div[@class=\"summary_image\"]//img/@data-src",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "72#1",
+      "expression": "//div[@class=\"author-content\"]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "73#1",
+      "expression": "//div[@class=\"artist-content\"]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "74#1",
+      "expression": "//div[@class=\"genres-content\"]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "76#1",
+      "expression": "string-join((//div[contains(@class, \"summary__content\") or @class=\"manga-summary\"])[1]|//div[@class=\"manga-excerpt\"]|//div[@class=\"post-content_item\" and contains(h5, \"Summary\") or contains(h5, \"Sinopsis\")]//p, \"\r\n\")",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "79#1",
+      "expression": "//div[@class=\"summary_image\"]//img/@src",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "91#1",
+      "expression": "//div[contains(@id, \"manga-chapters-holder\")]/@data-id",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "93#1",
+      "expression": "//div[@class=\"li__text\"]/a[not(@href=\"#\") and not(@class=\"reward_ads\")]",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "95#1",
+      "expression": "//li[contains(@class, \"wp-manga-chapter\")]/a[not(@href=\"#\") and not(@class=\"reward_ads\")]",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "113#1",
+      "expression": "//ul[contains(@class, \"volumns\")]/li/a[1]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "114#1",
+      "expression": "//ul[contains(@class, \"volumns\")]/li",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "115#1",
+      "expression": "a",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "126#1",
+      "expression": "//div[@class=\"pagination\"]/span[not(contains(normalize-space(.), \">>\"))][last()]/a",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "143#1",
+      "expression": "//li[contains(@class, \"wp-manga-chapter\")]/a[not(@href=\"#\") and not(@class=\"reward_ads\")]",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "158#1",
+      "expression": "//div[contains(@class, \"page-break\")]/img/@data-src",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "159#1",
+      "expression": "//div[contains(@class, \"page-break\")]/img/@src",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "161#1",
+      "expression": "//script[@id=\"chapter_preloaded_images\"]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "166#1",
+      "expression": "//script[@id=\"chapter-protector-data\"]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Madara/source",
+      "id": "172#1",
+      "expression": "//script[@id=\"chapter-protector-data\"]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "fixtureId": "seed/GenzToons/source",
+  "moduleId": "ef9347dbab424553b9909332c8739f32",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "23#1",
+      "expression": "//div[@id=\"searched_series_page\"]/button/div/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "35#1",
+      "expression": "//h1",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "36#1",
+      "expression": "//div[.=\"Alternative titles\"]/following-sibling::div//span[not(contains(., \"No alternative titles\"))]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "37#1",
+      "expression": "//div[contains(@class, \"photoURL\")]/@style",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "38#1",
+      "expression": "//div[@alt=\"Author\"]/span|//div[@class=\"grid gap-2 h-fit\" and contains(., \"Author\")]/div[2]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "39#1",
+      "expression": "//div[@alt=\"Artist\"]/span|//div[@class=\"grid gap-2 h-fit\" and contains(., \"Artist\")]/div[2]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "40#1",
+      "expression": "(//a[contains(@href, \"genre\")]/span, concat(upper-case(substring(//div[./div/span=\"Type\"]/div[2], 1, 1)), lower-case(substring(//div[./div/span=\"Type\"]/div[2], 2))))",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "41#1",
+      "expression": "//div[@alt=\"Status\"]/span|//div[@class=\"grid gap-2 h-fit\" and contains(., \"Status\")]/div[2]|//a[@title=\"Status\"]/span",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "42#1",
+      "expression": "string-join(//div[@id=\"expand_content\"]/p/text()|//div[@class=\"overflow-hidden\"]/p/text(), \"\r\n\")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "45#1",
+      "expression": "//div[@id=\"chapters\"]//a[not(.//span=\"Upcoming\")]",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "47#1",
+      "expression": "//div[@id=\"chapters\"]//a[not(.//img[@alt=\"Coin\"]) and not(.//span=\"Upcoming\")]",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "61#1",
+      "expression": "//script[contains(., \"realUrl\")]/substring-before(substring-after(., \"realUrl = `\"), \"${uid}\")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "62#1",
+      "expression": "//div[@id=\"pages\"]/img/@uid",
+      "engine": "xpath",
+      "output": "all"
+    }
+  ]
+}

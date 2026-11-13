@@ -1,0 +1,19 @@
+{
+  "fixtureId": "seed/DoujinHentai/source",
+  "moduleId": "5861673c7b1c4f4ba22be78fd599a2d9",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "36#1",
+      "expression": "//ul[@class=\"pagination\"]/li[last()-1]/a",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "47#1",
+      "expression": "//div[@class=\"page-content-listing\"]/div/a",
+      "engine": "xpath",
+      "output": "list"
+    }
+  ]
+}

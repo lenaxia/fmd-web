@@ -1,0 +1,14 @@
+{
+  "moduleId": "f239e87c7a1248d29cdd2ea8a77df36c",
+  "module": "MangaPlus",
+  "capturedAt": "2026-11-13",
+  "entries": [
+    {
+      "fixtureId": "seed/MangaPlus/source",
+      "file": "source.bin",
+      "kind": "protobuf",
+      "url": "https://jumpg-webapi.tokyo-cdn.com/api/title_list/allV2",
+      "description": "pb.decode Response payload — provenance for the pb shim"
+    }
+  ]
+}

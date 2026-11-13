@@ -1,0 +1,67 @@
+{
+  "fixtureId": "seed/HentaiFox/source",
+  "moduleId": "58a2dec76ebf43a5a9e7dc9b453e52e9",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "35#1",
+      "expression": "//ul[@class=\"pagination\"]/li[last()-1]/a",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "46#1",
+      "expression": "//h2[@class=\"g_title\"]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "61#1",
+      "expression": "//div[@class=\"info\"]/h1|//h1[@class=\"tag_info\"]/span",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "62#1",
+      "expression": "//div[@class=\"cover\"]/img/@src|(//div[@class=\"lc_galleries\"]/div[@class=\"thumb\"])[1]//img/@data-src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "63#1",
+      "expression": "//ul[@class=\"artists\"]/li/a/text()",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "64#1",
+      "expression": "//div[@class=\"info\"]/ul[not(@class=\"artists\")]/li/a/text()",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "70#1",
+      "expression": "//ul[@class=\"pagination\"]/li[last()-1]/a",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "72#1",
+      "expression": "//h2[@class=\"g_title\"]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "94#1",
+      "expression": "(//span[@class=\"i_text pages\"])[1]/substring-after(., \": \")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "105#1",
+      "expression": "//img[@id=\"gimg\"]/@data-src",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

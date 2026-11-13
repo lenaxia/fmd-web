@@ -1,0 +1,79 @@
+{
+  "fixtureId": "seed/HentaiHere/source",
+  "moduleId": "66b0b8597daf4839bc7095c10e88039b",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "5#1",
+      "expression": "//h4/a/text()",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "29#1",
+      "expression": "json(*)()",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "6#1",
+      "expression": "//div[@id=\"cover\"]//img/@src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "7#1",
+      "expression": "//div[@id=\"info\"]/div[contains(span, \"Artist\")]/a",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "8#1",
+      "expression": "//div[@id=\"info\"]/div[contains(span, \"Category\")]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "9#1",
+      "expression": "//div[@id=\"info\"]/div[contains(span, \"Status\")]/a",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "10#1",
+      "expression": "//div[@id=\"info\"]/div[contains(span, \"Summary\")]/text()",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "11#1",
+      "expression": "//ul[@class=\"arf-list\"]/li/a",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "15#1",
+      "expression": "./span/text()",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "26#1",
+      "expression": "//script[contains(.,\"rff_imageList\")]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "43#1",
+      "expression": "//div[contains(@class, \"seriesBlock\")]/div/div[2]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "53#1",
+      "expression": "(//ul[contains(@class,\"pagination\")]/li/a)[last()-1]",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "moduleId": "35e1b3ff5dbf428889d0f316c3d881e6",
+  "module": "WestManga",
+  "capturedAt": "2026-11-13",
+  "entries": [
+    {
+      "fixtureId": "seed/WestManga/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://v1.westmanga.my/",
+      "description": "Indonesian source"
+    }
+  ]
+}

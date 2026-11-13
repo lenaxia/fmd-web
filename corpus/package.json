@@ -3,13 +3,33 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Ground-truth corpus (DESIGN.md §13.1): FPC capture harness, recorded fixtures (triples), and the offline replay runner.",
-  "main": "./dist/runner/fixture-loader.js",
-  "types": "./dist/runner/fixture-loader.d.ts",
+  "description": "Ground-truth corpus (DESIGN.md \u00a713.1): FPC capture harness, recorded fixtures (triples), the Lua expression harvester, and the offline replay runner.",
+  "main": "./dist/runner/replay.js",
+  "types": "./dist/runner/replay.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/runner/replay.d.ts",
+      "default": "./dist/runner/replay.js"
+    },
+    "./fixture-loader": {
       "types": "./dist/runner/fixture-loader.d.ts",
       "default": "./dist/runner/fixture-loader.js"
+    },
+    "./corpus-loader": {
+      "types": "./dist/runner/corpus-loader.d.ts",
+      "default": "./dist/runner/corpus-loader.js"
+    },
+    "./runner": {
+      "types": "./dist/runner/replay.d.ts",
+      "default": "./dist/runner/replay.js"
+    },
+    "./mock-engine": {
+      "types": "./dist/runner/mock-engine.d.ts",
+      "default": "./dist/runner/mock-engine.js"
+    },
+    "./harvester": {
+      "types": "./dist/harvester/harvest.d.ts",
+      "default": "./dist/harvester/harvest.js"
     }
   }
 }

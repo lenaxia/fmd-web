@@ -32,12 +32,18 @@ export class WasmoonModuleRegistry implements ModuleRegistry {
     return this.modulesList.find((m) => m.id === id);
   }
 
-  async loadFile(fileName: string, source: string): Promise<readonly LuaModuleDescriptor[]> {
+  async loadFile(
+    fileName: string,
+    source: string,
+    extraSetup?: (engine: WasmoonEngine, bridge: FacadeBridge) => void,
+  ): Promise<readonly LuaModuleDescriptor[]> {
     const chunk = await this.chunkCache.get(fileName, source);
     const engine = await this.factory.createEngine();
     const bridge = new FacadeBridge(engine);
     const env = createIdleEnvironment(this.logger);
     installBaseEnvironment(engine, bridge, () => env);
+    // optional shim wiring (§5.7 require etc.) before the chunk runs
+    extraSetup?.(engine, bridge);
 
     const pending: ModuleBacking[] = [];
     // NewWebsiteModule(): fresh registration + facade per call (:467-470)

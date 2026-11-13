@@ -1,5 +1,5 @@
 # fmd-web local CI gate — thin wrapper over scripts/ci.sh
-.PHONY: ci test coverage lint typecheck build
+.PHONY: ci test coverage lint typecheck build harness
 
 ci:
 	bash scripts/ci.sh
@@ -18,3 +18,6 @@ typecheck:
 
 build:
 	npm run build
+
+harness:
+	bash corpus/harness/build.sh

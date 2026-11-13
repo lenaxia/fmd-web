@@ -1,0 +1,16 @@
+{
+  "moduleId": "21b0dfcb262d4ae28520679165282666",
+  "module": "Rawkuma",
+  "capturedAt": "2026-11-13",
+  "template": "KiruBase",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/Rawkuma/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://rawkuma.net/",
+      "description": "Japanese raw source"
+    }
+  ]
+}

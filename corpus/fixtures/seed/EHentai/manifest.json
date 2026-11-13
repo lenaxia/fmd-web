@@ -1,0 +1,15 @@
+{
+  "moduleId": "2e4294a3de6282b55817e860f970783a",
+  "module": "EHentai",
+  "capturedAt": "2026-11-13",
+  "syntheticId": true,
+  "entries": [
+    {
+      "fixtureId": "seed/EHentai/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://e-hentai.org/",
+      "description": "Account/login module — public gallery list page"
+    }
+  ]
+}

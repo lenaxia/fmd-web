@@ -1,0 +1,13 @@
+{
+  "fixtureId": "seed/Mangacan/source",
+  "moduleId": "ca571825056b4850bd3693e4e1437997",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "50#1",
+      "expression": "//img[@class=\"ts-main-image\"]/@src",
+      "engine": "xpath",
+      "output": "list"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "moduleId": "7103ae6839ea46ec80cdfc2c4b37c803",
+  "module": "AsuraScans",
+  "capturedAt": "2026-11-13",
+  "entries": [
+    {
+      "fixtureId": "seed/AsuraScans/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://asurascans.com/",
+      "description": "Madara-family standalone — homepage list"
+    }
+  ]
+}

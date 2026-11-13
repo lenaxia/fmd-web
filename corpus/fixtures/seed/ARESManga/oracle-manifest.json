@@ -1,0 +1,19 @@
+{
+  "fixtureId": "seed/ARESManga/source",
+  "moduleId": "1fd00c70f0b04a5e91eaf59b3e73de25",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "49#1",
+      "expression": "//script[contains(@src, \"dHNfcmVhZGVyLnJ1bih7\")]/@src/substring-after(., \",\")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "51#1",
+      "expression": "json(*).sources()[1].images()",
+      "engine": "xpath",
+      "output": "list"
+    }
+  ]
+}

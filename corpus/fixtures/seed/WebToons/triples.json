@@ -1,0 +1,138 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/WebToons/source.html",
+  "document": "html",
+  "moduleId": "18f636ec7fdf47fabe95d940ad0b548f",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/WebToons/source",
+      "id": "49#1",
+      "expression": "//div[@class=\"card_wrap genre\"]/ul/li/a",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/WebToons/source",
+      "id": "106#1",
+      "expression": "json(*).result.episodeList()",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/WebToons/source",
+      "id": "50#1",
+      "expression": ".//div[@class=\"Info\"]//p[@class=\"subj\"]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/WebToons/source",
+      "id": "64#1",
+      "expression": "//div[@class=\"challenge_cont_area\"]/div[contains(@class,\"challenge_lst\")]/ul/li/a[contains(@class,\"challenge_item\")]",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/WebToons/source",
+      "id": "65#1",
+      "expression": "./p[@class=\"subj\"]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/WebToons/source",
+      "id": "68#1",
+      "expression": "//div[@class=\"paginate\"]/a[@href=\"#\"]/following-sibling::a/@href",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/WebToons/source",
+      "id": "91#1",
+      "expression": "//meta[@property=\"og:title\"]/@content",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": "WEBTOON"
+    },
+    {
+      "fixtureId": "seed/WebToons/source",
+      "id": "92#1",
+      "expression": "//meta[@property=\"og:image\"]/@content",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": "https://webtoons-static.pstatic.net/image/pc/home/og_en.jpg?dt=2021111201"
+    },
+    {
+      "fixtureId": "seed/WebToons/source",
+      "id": "93#1",
+      "expression": "//div[@class=\"author_area\"]/text()",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/WebToons/source",
+      "id": "94#1",
+      "expression": "//div[@class=\"author_area\"]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/WebToons/source",
+      "id": "95#1",
+      "expression": "//*[self::h2 or self::p][contains(@class, \"genre\")]",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/WebToons/source",
+      "id": "96#1",
+      "expression": "//p[@class=\"day_info\"]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/WebToons/source",
+      "id": "97#1",
+      "expression": "//p[contains(@class, \"summary\")]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/WebToons/source",
+      "id": "121#1",
+      "expression": "//div[@id=\"_imageList\"]/img[@class=\"_images\"]/@data-URL",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    }
+  ]
+}

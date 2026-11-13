@@ -1,0 +1,14 @@
+{
+  "moduleId": "68c51e4148ee471fa221cd2d05cb216a",
+  "module": "NineManga",
+  "capturedAt": "2026-11-13",
+  "entries": [
+    {
+      "fixtureId": "seed/NineManga/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://www.ninemanga.com/",
+      "description": "Multi-language directory"
+    }
+  ]
+}

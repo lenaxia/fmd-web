@@ -1,0 +1,131 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/GenzToons/source.html",
+  "document": "html",
+  "moduleId": "ef9347dbab424553b9909332c8739f32",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/GenzToons/source",
+      "id": "23#1",
+      "expression": "//div[@id=\"searched_series_page\"]/button/div/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/GenzToons/source",
+      "id": "35#1",
+      "expression": "//h1",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/GenzToons/source",
+      "id": "36#1",
+      "expression": "//div[.=\"Alternative titles\"]/following-sibling::div//span[not(contains(., \"No alternative titles\"))]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/GenzToons/source",
+      "id": "37#1",
+      "expression": "//div[contains(@class, \"photoURL\")]/@style",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/GenzToons/source",
+      "id": "38#1",
+      "expression": "//div[@alt=\"Author\"]/span|//div[@class=\"grid gap-2 h-fit\" and contains(., \"Author\")]/div[2]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/GenzToons/source",
+      "id": "39#1",
+      "expression": "//div[@alt=\"Artist\"]/span|//div[@class=\"grid gap-2 h-fit\" and contains(., \"Artist\")]/div[2]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/GenzToons/source",
+      "id": "40#1",
+      "expression": "(//a[contains(@href, \"genre\")]/span, concat(upper-case(substring(//div[./div/span=\"Type\"]/div[2], 1, 1)), lower-case(substring(//div[./div/span=\"Type\"]/div[2], 2))))",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "list",
+      "result": [
+        ""
+      ]
+    },
+    {
+      "fixtureId": "seed/GenzToons/source",
+      "id": "41#1",
+      "expression": "//div[@alt=\"Status\"]/span|//div[@class=\"grid gap-2 h-fit\" and contains(., \"Status\")]/div[2]|//a[@title=\"Status\"]/span",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/GenzToons/source",
+      "id": "42#1",
+      "expression": "string-join(//div[@id=\"expand_content\"]/p/text()|//div[@class=\"overflow-hidden\"]/p/text(), \"\r\n\")",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/GenzToons/source",
+      "id": "45#1",
+      "expression": "//div[@id=\"chapters\"]//a[not(.//span=\"Upcoming\")]",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/GenzToons/source",
+      "id": "47#1",
+      "expression": "//div[@id=\"chapters\"]//a[not(.//img[@alt=\"Coin\"]) and not(.//span=\"Upcoming\")]",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/GenzToons/source",
+      "id": "61#1",
+      "expression": "//script[contains(., \"realUrl\")]/substring-before(substring-after(., \"realUrl = `\"), \"${uid}\")",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/GenzToons/source",
+      "id": "62#1",
+      "expression": "//div[@id=\"pages\"]/img/@uid",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "moduleId": "37fe4058be994eb08e83eeb0136d5ae9",
+  "module": "Raw1001",
+  "capturedAt": "2026-11-13",
+  "template": "Liliana",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/Raw1001/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://raw1001.net/",
+      "description": "Japanese raw source"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "moduleId": "a20f6373158543b0a78ae4eb736e5f31",
+  "module": "TuMangaNet",
+  "capturedAt": "2026-11-13",
+  "template": "MangaThemesia",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/TuMangaNet/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://tumanga.net/",
+      "description": "Spanish source"
+    }
+  ]
+}

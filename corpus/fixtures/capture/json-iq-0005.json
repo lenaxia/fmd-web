@@ -1,0 +1,16 @@
+{
+  "data": {
+    "manga": {
+      "title": "JSON-IQ Fixture Manga",
+      "altTitles": ["IQ-Fixture", "IQフィクスチャ"],
+      "status": "hiatus",
+      "genres": ["Comedy", "Slice of Life"],
+      "chapters": [
+        { "id": 4, "slug": "ch-4", "name": "Chapter 4" },
+        { "id": 3, "slug": "ch-3", "name": "Chapter 3" },
+        { "id": 2, "slug": "ch-2", "name": "Chapter 2" }
+      ]
+    },
+    "total": 9
+  }
+}

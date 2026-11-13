@@ -10,17 +10,44 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   esbuild: { target: 'es2022' },
   resolve: {
-    alias: {
-      // Workspace-source alias so tests never require a prior build:
+    alias: [
+      // Workspace-source aliases so tests never require a prior build:
       // '@fmd/contract' resolves to its TypeScript source in vitest,
       // while tsc -b resolves it through the workspace package exports.
-      '@fmd/contract': fileURLToPath(
-        new URL('./contract/types.ts', import.meta.url),
-      ),
-    },
+      {
+        find: /^@fmd\/contract$/,
+        replacement: fileURLToPath(new URL('./contract/types.ts', import.meta.url)),
+      },
+      // '@fmd/corpus' subpaths resolve to runner source (the live-engine
+      // replay test crosses the server ↔ corpus package boundary).
+      {
+        find: /^@fmd\/corpus$/,
+        replacement: fileURLToPath(new URL('./corpus/runner/replay.ts', import.meta.url)),
+      },
+      {
+        find: /^@fmd\/corpus\/corpus-loader$/,
+        replacement: fileURLToPath(new URL('./corpus/runner/corpus-loader.ts', import.meta.url)),
+      },
+      {
+        find: /^@fmd\/corpus\/fixture-loader$/,
+        replacement: fileURLToPath(new URL('./corpus/runner/fixture-loader.ts', import.meta.url)),
+      },
+      {
+        find: /^@fmd\/corpus\/mock-engine$/,
+        replacement: fileURLToPath(new URL('./corpus/runner/mock-engine.ts', import.meta.url)),
+      },
+      {
+        find: /^@fmd\/corpus\/harvester$/,
+        replacement: fileURLToPath(new URL('./corpus/harvester/harvest.ts', import.meta.url)),
+      },
+    ],
   },
   test: {
     environment: 'node',
+    // Zero-network guard (DESIGN.md §13): every test file in every
+    // workspace runs with the node net stack patched — any outbound
+    // (non-loopback) socket attempt throws and is recorded.
+    setupFiles: ['corpus/test/setup/no-network.ts'],
     include: [
       'contract/test/**/*.test.ts',
       'server/test/**/*.test.ts',
@@ -34,6 +61,7 @@ export default defineConfig({
       include: [
         'contract/tools/**/*.ts',
         'server/src/**/*.ts',
+        'corpus/harvester/**/*.ts',
         'corpus/runner/**/*.ts',
         'web/src/**/*.ts',
       ],

@@ -1,0 +1,15 @@
+{
+  "moduleId": "1fd00c70f0b04a5e91eaf59b3e73de25",
+  "module": "ARESManga",
+  "capturedAt": "2026-11-13",
+  "expressionSource": "modules",
+  "entries": [
+    {
+      "fixtureId": "seed/ARESManga/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://fl-ares.com/",
+      "description": "MangaThemesia-based (Spanish)"
+    }
+  ]
+}

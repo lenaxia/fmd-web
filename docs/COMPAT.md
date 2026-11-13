@@ -33,22 +33,18 @@ silently).
 
 - Engine: **fontoxpath-linkedom** (FontoXPath + linkedom behind the dialect transform)
 - Normalization: **udata-normalize** (§5.8 uData pipeline)
-- Cases: 912 · passed: 905 · failed: 7
-- **Pass rate: 99.23%** (gate: ≥99%)
+- Cases: 912 · passed: 907 · failed: 5
+- **Pass rate: 99.45%** (gate: ≥99%)
 
 ### Per-expression results
 
 | Module | Case | Expression | Status | Expected | Actual | Root cause | Tracking |
 |---|---|---|---|---|---|---|---|
-| AsuraScans | seed/AsuraScans/source#57#1#57#1 | `string-join(//text(), "
-")` | fail | "\nAsura Scans - Read Manga, Manhwa & Manhua Online\n{\"@con | "\nAsura Scans - Read Manga, Manhwa & Manhua Online\n{\"@con | Text-node splitting divergence: InternetTools’ repairing parser emits separate text nodes around decoded entities/tags (e.g. "Manhwa " + "&" + " Manhua"), so string-join(//text(), separator) joins more, shorter segments; linkedom keeps the decoded text in single nodes. | Phase-1 parser-parity story (preprocessing pass where needed, DESIGN.md §5.6) |
-| NicoManga | seed/NicoManga/source#88#1#88#1 | `string-join(//text(), "
-")` | fail | "Read Raw Manga Online with Instant Translation - Nicomanga  | "Read Raw Manga Online with Instant Translation - Nicomanga  | Text-node splitting divergence: InternetTools’ repairing parser emits separate text nodes around decoded entities/tags (e.g. "Manhwa " + "&" + " Manhua"), so string-join(//text(), separator) joins more, shorter segments; linkedom keeps the decoded text in single nodes. | Phase-1 parser-parity story (preprocessing pass where needed, DESIGN.md §5.6) |
-| Zenko | seed/Zenko/source#127#1#127#1 | `(json(*).genres().name, json(*).tags().name, concat(upper-case(substri` | fail | [] | "" | Oracle empty-detection nuance: the parenthesized sequence (json-steps, concat(...)) carries one empty string; the FPC harness recorded the whole result "" as resultKind "empty", while the runner’s empty check also requires an empty list. | Phase-1 (corpus harness encoding; runner semantics intentionally strict) |
-| uData (§5.8) | capture/getinfo-normalization-0004-prefixstrip | normalize | fail | {"title":"ExampleMan","altTitles":"","authors":"Author One", | {"title":"ExampleMan","altTitles":"","authors":"Author One", | §5.8 pipeline sub-behaviors in flight: manga-name prefix strip (OptionRemoveMangaNameFromChapter), Link fallback details and the unicode cleanup set are being converged in the facades story. | tsk-feral-lumber-leaves (Facades: §5.8 post-processing pipeline) |
-| uData (§5.8) | capture/getinfo-normalization-0011 | normalize | fail | {"title":"My Manga","altTitles":"","authors":"","artists":"" | {"title":"My Manga","altTitles":"","authors":"","artists":"" | §5.8 pipeline sub-behaviors in flight: manga-name prefix strip (OptionRemoveMangaNameFromChapter), Link fallback details and the unicode cleanup set are being converged in the facades story. | tsk-feral-lumber-leaves (Facades: §5.8 post-processing pipeline) |
-| uData (§5.8) | capture/getinfo-normalization-0021 | normalize | fail | {"title":"K","altTitles":"","authors":"","artists":"","genre | {"title":"K","altTitles":"","authors":"","artists":"","genre | §5.8 pipeline sub-behaviors in flight: manga-name prefix strip (OptionRemoveMangaNameFromChapter), Link fallback details and the unicode cleanup set are being converged in the facades story. | tsk-feral-lumber-leaves (Facades: §5.8 post-processing pipeline) |
-| uData (§5.8) | capture/getinfo-normalization-0025 | normalize | fail | {"title":"Ünïcode Manga","altTitles":"","authors":"","artist | {"title":"Ünïcode Manga","altTitles":"","authors":"","artist | §5.8 pipeline sub-behaviors in flight: manga-name prefix strip (OptionRemoveMangaNameFromChapter), Link fallback details and the unicode cleanup set are being converged in the facades story. | tsk-feral-lumber-leaves (Facades: §5.8 post-processing pipeline) |
+| AsuraScans | 57#1 | `string-join(//text(), " ")` | fail | "\nAsura Scans - Read Manga, Manhwa & Manhua Online\n{\"@context\":\"h | "\nAsura Scans - Read Manga, Manhwa & Manhua Online\n{\"@context\":\"h | Text-node splitting divergence: InternetTools’ repairing parser emits separate text nodes around decoded entities/tags (e.g. "Manhwa " + "&" + " Manhua"), so string-join(//text(), separator) joins more, shorter segments; linkedom keeps the decoded text in single nodes. | Phase-1 parser-parity story (preprocessing pass where needed, DESIGN.md §5.6) |
+| uData (§5.8) | norm-0004-prefixstrip | normalize | fail | {"title":"ExampleMan","altTitles":"","authors":"Author One","artists": | {"title":"ExampleMan","altTitles":"","authors":"Author One","artists": | §5.8 pipeline sub-behaviors in flight: manga-name prefix strip (OptionRemoveMangaNameFromChapter), Link fallback details and the unicode cleanup set are being converged in the facades story. | tsk-feral-lumber-leaves (Facades: §5.8 post-processing pipeline) |
+| uData (§5.8) | norm-0011 | normalize | fail | {"title":"My Manga","altTitles":"","authors":"","artists":"","genres": | {"title":"My Manga","altTitles":"","authors":"","artists":"","genres": | §5.8 pipeline sub-behaviors in flight: manga-name prefix strip (OptionRemoveMangaNameFromChapter), Link fallback details and the unicode cleanup set are being converged in the facades story. | tsk-feral-lumber-leaves (Facades: §5.8 post-processing pipeline) |
+| uData (§5.8) | norm-0021 | normalize | fail | {"title":"K","altTitles":"","authors":"","artists":"","genres":"","sta | {"title":"K","altTitles":"","authors":"","artists":"","genres":"","sta | §5.8 pipeline sub-behaviors in flight: manga-name prefix strip (OptionRemoveMangaNameFromChapter), Link fallback details and the unicode cleanup set are being converged in the facades story. | tsk-feral-lumber-leaves (Facades: §5.8 post-processing pipeline) |
+| uData (§5.8) | norm-0025 | normalize | fail | {"title":"Ünïcode Manga","altTitles":"","authors":"","artists":"","gen | {"title":"Ünïcode Manga","altTitles":"","authors":"","artists":"","gen | §5.8 pipeline sub-behaviors in flight: manga-name prefix strip (OptionRemoveMangaNameFromChapter), Link fallback details and the unicode cleanup set are being converged in the facades story. | tsk-feral-lumber-leaves (Facades: §5.8 post-processing pipeline) |
 
 ### Known behavioral divergences (v0, documented)
 
@@ -60,3 +56,12 @@ silently).
 ## Seed e2e flows (Phase-0 exit evidence)
 
 Committed goldens under `server/test/engine/golden/e2e/`: comick-getinfo, asurascans-getinfo, hentai2read-getpagenumber (+ PAGENUMBER read-back 1752 on the RECORDED fixture), madara-template-getpagenumber (Duktape JS require + AES decrypt), ehentai-getinfo-login (account constants + MODULE.Account + module-bug parity), tapas-totaldirectory.
+## fmd.crypto compatibility notes (LuaCrypto.pas → `crypto-core.ts`/`crypto-shim.ts`)
+
+**Backends.** `node:crypto` (MD5/SHA*/HMAC, PBKDF2, AES CBC/CFB/CTR/OFB/ECB/GCM,
+CFB8, ECDH P-256), `sodium-native` (X25519 `crypto_scalarmult(_base)`,
+SecretStream pull), pure JS (RC4 — see the OpenSSL note below, MD4 — OpenSSL 3
+dropped it, the synacode encoders/CRCs, DCP's exact CBC/CFB variants, the
+base64 Lua↔JS bridge). Full details and vectors: `docs/evidence-dual-sapling-picnics.md`.
+
+

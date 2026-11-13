@@ -1,0 +1,15 @@
+{
+  "moduleId": "ca571825056b4850bd3693e4e1437997",
+  "module": "Mangacan",
+  "capturedAt": "2026-11-13",
+  "expressionSource": "modules",
+  "entries": [
+    {
+      "fixtureId": "seed/Mangacan/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://mangacanblog.com/",
+      "description": "MangaThemesia-based (id_ID)"
+    }
+  ]
+}

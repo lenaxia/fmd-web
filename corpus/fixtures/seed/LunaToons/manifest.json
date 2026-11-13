@@ -1,0 +1,16 @@
+{
+  "moduleId": "852e92935f864584bc08d687498777e7",
+  "module": "LunaToons",
+  "capturedAt": "2026-11-13",
+  "template": "KeyoApp",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/LunaToons/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://lunatoons.org/",
+      "description": "Toon source"
+    }
+  ]
+}

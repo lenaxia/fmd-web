@@ -1,0 +1,120 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/Zenko/source.html",
+  "document": "html",
+  "moduleId": "2041ccec443f49ddb07bfbcbdac37ac5",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/Zenko/source",
+      "id": "95#1",
+      "expression": "json(*).meta.totalPages",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Zenko/source",
+      "id": "106#1",
+      "expression": "json(*).data()",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Zenko/source",
+      "id": "122#1",
+      "expression": "json(*).name",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Zenko/source",
+      "id": "123#1",
+      "expression": "(json(*).engName, json(*).originalName)",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/Zenko/source",
+      "id": "124#1",
+      "expression": "json(*).coverImg",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Zenko/source",
+      "id": "125#1",
+      "expression": "json(*).writers().name",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/Zenko/source",
+      "id": "126#1",
+      "expression": "json(*).painters().name",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/Zenko/source",
+      "id": "127#1",
+      "expression": "(json(*).genres().name, json(*).tags().name, concat(upper-case(substring(json(*).category, 1, 1)), lower-case(substring(json(*).category, 2))))",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/Zenko/source",
+      "id": "128#1",
+      "expression": "json(*).translationStatus",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Zenko/source",
+      "id": "129#1",
+      "expression": "json(*).description",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Zenko/source",
+      "id": "135#1",
+      "expression": "json(*)()",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Zenko/source",
+      "id": "162#1",
+      "expression": "json(*).pages()",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    }
+  ]
+}

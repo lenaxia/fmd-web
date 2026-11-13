@@ -1,0 +1,102 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/MangaFreak/source.html",
+  "document": "html",
+  "moduleId": "1d6a75911a1b414f89e5cf95c9a7ae4e",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/MangaFreak/source",
+      "id": "6#1",
+      "expression": "//div[@class=\"manga_series_data\"]/h5",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaFreak/source",
+      "id": "8#1",
+      "expression": "//div[@class=\"manga_series_image\"]/img/@src",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaFreak/source",
+      "id": "9#1",
+      "expression": "//div[@class=\"series_sub_genre_list\"]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/MangaFreak/source",
+      "id": "10#1",
+      "expression": "//div[@class=\"manga_series_description\"]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaFreak/source",
+      "id": "11#1",
+      "expression": "//div[@class=\"manga_series_list\"]/table/tbody/tr/td[1]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/MangaFreak/source",
+      "id": "21#1",
+      "expression": "//img[@id=\"gohere\"]/@src",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/MangaFreak/source",
+      "id": "31#1",
+      "expression": "//*[contains(@class, \"list_item_content\")]//div[contains(@class, \"list_item\")]",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaFreak/source",
+      "id": "34#1",
+      "expression": ".//*[contains(@class, \"list_item_info\")]/h3",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaFreak/source",
+      "id": "35#1",
+      "expression": ".//*[contains(@class, \"list_item_info\")]/h3/a/@href",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaFreak/source",
+      "id": "48#1",
+      "expression": "//div[contains(@class,\"pagination\")]/a[contains(@class,\"last_p\")]/@href/substring-after(.,\"All/\")",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    }
+  ]
+}

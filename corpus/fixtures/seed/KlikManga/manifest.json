@@ -1,0 +1,16 @@
+{
+  "moduleId": "8949b01268974dd8a5798fec469deb65",
+  "module": "KlikManga",
+  "capturedAt": "2026-11-13",
+  "template": "Madara",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/KlikManga/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://klikmanga.com/",
+      "description": "Madara-based (id_ID)"
+    }
+  ]
+}

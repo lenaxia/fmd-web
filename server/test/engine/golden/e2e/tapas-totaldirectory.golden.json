@@ -1,0 +1,26 @@
+{
+  "module": "Tapas",
+  "moduleId": "9f2d722f3e90432ba913d5bdddc048b4",
+  "descriptor": {
+    "rootURL": "https://tapas.io",
+    "totalDirectory": 2,
+    "eventHandlers": {
+      "GetNameAndLink": "GetNameAndLink",
+      "GetInfo": "GetInfo",
+      "GetPageNumber": "GetPageNumber"
+    },
+    "options": [
+      {
+        "name": "showpaidchapters",
+        "kind": "checkbox",
+        "defaultValue": false
+      }
+    ]
+  },
+  "hostSemantics": {
+    "noGetDirectoryPageNumberHandler": "event not bound: GetDirectoryPageNumber (module 9f2d722f3e90432ba913d5bdddc048b4 does not bind a handler)",
+    "hostDefaultPageCount": 1,
+    "pagenumberReadBackProvenOn": "ehentai/hentai2read flows (real handlers)"
+  },
+  "httpRequests": []
+}

@@ -1,0 +1,79 @@
+{
+  "fixtureId": "seed/EHentai/source",
+  "moduleId": "2e4294a3de6282b55817e860f970783a",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "87#1",
+      "expression": "//table[@class=\"itg\"]/tbody/tr/td/div/div/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "71#1",
+      "expression": "css(\"table.ptt>tbody>tr>td:nth-last-child(2)>a\")",
+      "engine": "css",
+      "output": "scalar"
+    },
+    {
+      "id": "102#1",
+      "expression": "//*[@id=\"gd1\"]/div/@style",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "103#1",
+      "expression": "//*[@id=\"gn\"]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "104#1",
+      "expression": "//a[starts-with(@id,\"ta_artist\")]",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "105#1",
+      "expression": "//a[starts-with(@id,\"ta_\")and(not(starts-with(@id,\"ta_artist\")))]",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "126#1",
+      "expression": "//div[@id=\"gdt\"]//a",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "128#1",
+      "expression": "img/@title",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "137#1",
+      "expression": "//table[@class=\"ptt\"]//td[last()-1]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "187#1",
+      "expression": "//a/@href[contains(.,\"/fullimg.php\")]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "188#1",
+      "expression": "//*[@id=\"img\"]/@src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "189#1",
+      "expression": "//a/img/@src[not(contains(.,\"ehgt.org/\"))]",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

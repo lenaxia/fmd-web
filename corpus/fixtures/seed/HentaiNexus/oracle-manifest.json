@@ -1,0 +1,79 @@
+{
+  "fixtureId": "seed/HentaiNexus/source",
+  "moduleId": "5eda5ccf87f1488f9dfa7a9a18f2bcf1",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "115#1",
+      "expression": "(//ul[@class=\"pagination-list\"])[1]/li[last()]/a/text()",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "171#1",
+      "expression": "json(*)().image_fallback",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "127#1",
+      "expression": "//div[@class=\"container\"]/div/div/a[contains(@href, \"/view/\")]",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "129#1",
+      "expression": "div/header/@title",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "142#1",
+      "expression": "//h1[@class=\"title\"]/text()",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "143#1",
+      "expression": "(//figure[@class=\"image\"]/img/@src)[1]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "144#1",
+      "expression": "//table[@class=\"view-page-details\"]//a[contains(@href, \"=publisher:\")]/text()",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "145#1",
+      "expression": "//table[@class=\"view-page-details\"]//a[contains(@href, \"=artist:\")]/text()",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "146#1",
+      "expression": "//table[@class=\"view-page-details\"]//a[contains(@href, \"=tag:\")]/substring-before(., \"(\")",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "147#1",
+      "expression": "//table[@class=\"view-page-details\"]//td[contains(., \"Description\")]/following-sibling::td/text()",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "149#1",
+      "expression": "//table[@class=\"view-page-details\"]//a[contains(@href, \"=magazine:\")]/text()",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "170#1",
+      "expression": "//script[contains(., \"initReader\")]",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "moduleId": "f68bb6ee00e442418c8c05eb00759ae1",
+  "module": "BacaKomik",
+  "capturedAt": "2026-11-13",
+  "expressionSource": "modules",
+  "entries": [
+    {
+      "fixtureId": "seed/BacaKomik/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://bacakomik.net/",
+      "description": "MangaThemesia-based (id_ID)"
+    }
+  ]
+}

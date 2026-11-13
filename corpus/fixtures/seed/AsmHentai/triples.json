@@ -1,0 +1,93 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/AsmHentai/source.html",
+  "document": "html",
+  "moduleId": "845f86020f8b4744824f5eaffc1f278f",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/AsmHentai/source",
+      "id": "17#1",
+      "expression": "//*[@class=\"pagination\"]/a[last()-1]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/AsmHentai/source",
+      "id": "27#1",
+      "expression": "//*[@class=\"preview_item\"]/*[@class=\"caption\"]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/AsmHentai/source",
+      "id": "38#1",
+      "expression": "//div[@class=\"info\"]/h1",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/AsmHentai/source",
+      "id": "39#1",
+      "expression": "//div[@class=\"cover\"]//img/@src",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/AsmHentai/source",
+      "id": "40#1",
+      "expression": "//div[@class=\"tags\" and contains(h3, \"Artist\")]/div/a/span/text()",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/AsmHentai/source",
+      "id": "41#1",
+      "expression": "//div[@class=\"tags\" and (contains(h3, \"Tags\") or contains(h3, \"Category\"))]/div/a/span/text()",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/AsmHentai/source",
+      "id": "54#1",
+      "expression": "//*[@id=\"dir\"]/@value",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/AsmHentai/source",
+      "id": "55#1",
+      "expression": "//*[@id=\"id\"]/@value",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/AsmHentai/source",
+      "id": "56#1",
+      "expression": "//*[@id=\"t_pages\"]/@value",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    }
+  ]
+}

@@ -1,19 +1,30 @@
 import type { EventBinding } from '@fmd/contract';
+import {
+  assertGeneratedBindingsSanity,
+  GENERATED_EVENT_BINDINGS,
+  type EventGlobalName,
+  type GeneratedEventBindingRow,
+} from './bindings.generated.js';
 
 /**
- * Event-binding table placeholder (DESIGN.md §11 engine/events).
- *
- * The production table is GENERATED from contract/contract.json and
- * CI-cross-checked against a fresh parse of the Pascal Do* dispatchers
- * (§5 implementation rule, §13.5). Until generation lands, consumers
- * must treat this module as scaffolding only.
+ * §5.2 event-binding table (DESIGN.md §5 implementation rule, §11):
+ * GENERATED from contract/contract.json by server/tools/generate-bindings.ts
+ * — never hand-coded. See bindings.generated.ts (do not edit) and the
+ * golden/drift tests in server/test/engine/events/bindings-golden.test.ts.
  */
 
-export const BINDINGS_ARE_GENERATED: boolean = false;
+export {
+  assertGeneratedBindingsSanity,
+  GENERATED_EVENT_BINDINGS,
+  type EventGlobalName,
+  type GeneratedEventBindingRow,
+};
 
-export function generationNote(): string {
-  return 'binding tables are generated from contract/contract.json in a later story (§5.2 as data)';
-}
+/** The generated table satisfies the §5.2 invariants at module load. */
+assertGeneratedBindingsSanity();
+
+/** The dispatcher's default binding source (§5.2 rows as generated data). */
+export const EVENT_BINDINGS: readonly EventBinding[] = GENERATED_EVENT_BINDINGS;
 
 /** Narrow an unknown value into the EventBinding shape without `any`. */
 export function asEventBinding(value: unknown): EventBinding | undefined {
@@ -25,11 +36,13 @@ export function asEventBinding(value: unknown): EventBinding | undefined {
   const returns: unknown = rec['returns'];
   const globals: unknown = rec['globals'];
   const readBack: unknown = rec['readBack'];
+  const constants: unknown = rec['constants'];
   if (
     typeof event !== 'string' ||
     (returns !== 'code' && returns !== 'boolean' && returns !== 'string') ||
     !Array.isArray(globals) ||
-    !Array.isArray(readBack)
+    !Array.isArray(readBack) ||
+    (constants !== 'net-status' && constants !== 'account-status' && constants !== 'none')
   ) {
     return undefined;
   }
@@ -38,5 +51,6 @@ export function asEventBinding(value: unknown): EventBinding | undefined {
     returns,
     globals: globals.filter((g): g is string => typeof g === 'string'),
     readBack: readBack.filter((g): g is string => typeof g === 'string'),
+    constants,
   };
 }

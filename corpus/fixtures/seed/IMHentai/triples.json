@@ -1,0 +1,162 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/IMHentai/source.html",
+  "document": "html",
+  "moduleId": "67e22e0c766c4c9c990e179350262b3c",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/IMHentai/source",
+      "id": "46#1",
+      "expression": "//ul[@class=\"pagination\"]/li[last()-1]/a",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": "67046"
+    },
+    {
+      "fixtureId": "seed/IMHentai/source",
+      "id": "57#1",
+      "expression": "//h2[@class=\"gallery_title\"]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "list",
+      "result": [
+        "[JAMEArts] Goopy Catch",
+        "[JAMEArts] Sex Ed. Education Going Harder",
+        "Tifa with hentai old man",
+        "[骨カワ] ティフォロス(お題)",
+        "[骨カワ] ホタル(復刻)",
+        "[骨カワ] ノア",
+        "[骨カワ] 葉瞬光(復刻)",
+        "[骨カワ] セリカ",
+        "[骨カワ] ノノミ(復刻)",
+        "[骨カワ] ヒナタ(お題)",
+        "[骨カワ] ヒナタ(復刻)",
+        "[骨カワ] ヴォジャニーツァ(お題)",
+        "[骨カワ] リュシア(復刻)",
+        "[おささ] 雲仙 爆乳化&パイズリ",
+        "[おささ] 秋雲",
+        "[おささ] ソユーズ",
+        "[おささ] 白鳳",
+        "[おささ] 触手に犯されるライム(p14)",
+        "[おささ] ライム デビライズ・トラップ",
+        "[おささ] クイーン・アンズ・リベンジ"
+      ]
+    },
+    {
+      "fixtureId": "seed/IMHentai/source",
+      "id": "72#1",
+      "expression": "//div[contains(@class, \"right_details\")]/h1|//h1[@class=\"sub_title\"]/span",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/IMHentai/source",
+      "id": "73#1",
+      "expression": "//div[contains(@class, \"left_cover\")]//img/@data-src|(//div[@class=\"thumbs_container\"]/div[@class=\"thumb\"])[1]//img/@data-src",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/IMHentai/source",
+      "id": "74#1",
+      "expression": "//ul[@class=\"galleries_info\"]/li[contains(., \"Artists\")]/a/text()",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/IMHentai/source",
+      "id": "75#1",
+      "expression": "//ul[@class=\"galleries_info\"]/li[not(contains(., \"Artists\"))]/a/text()",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/IMHentai/source",
+      "id": "81#1",
+      "expression": "//ul[@class=\"pagination\"]/li[last()-1]/a",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": "67046"
+    },
+    {
+      "fixtureId": "seed/IMHentai/source",
+      "id": "83#1",
+      "expression": "//h2[@class=\"gallery_title\"]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "list",
+      "result": [
+        "[JAMEArts] Goopy Catch",
+        "[JAMEArts] Sex Ed. Education Going Harder",
+        "Tifa with hentai old man",
+        "[骨カワ] ティフォロス(お題)",
+        "[骨カワ] ホタル(復刻)",
+        "[骨カワ] ノア",
+        "[骨カワ] 葉瞬光(復刻)",
+        "[骨カワ] セリカ",
+        "[骨カワ] ノノミ(復刻)",
+        "[骨カワ] ヒナタ(お題)",
+        "[骨カワ] ヒナタ(復刻)",
+        "[骨カワ] ヴォジャニーツァ(お題)",
+        "[骨カワ] リュシア(復刻)",
+        "[おささ] 雲仙 爆乳化&パイズリ",
+        "[おささ] 秋雲",
+        "[おささ] ソユーズ",
+        "[おささ] 白鳳",
+        "[おささ] 触手に犯されるライム(p14)",
+        "[おささ] ライム デビライズ・トラップ",
+        "[おささ] クイーン・アンズ・リベンジ"
+      ]
+    },
+    {
+      "fixtureId": "seed/IMHentai/source",
+      "id": "107#1",
+      "expression": "//input[@id=\"load_dir\"]/@value",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/IMHentai/source",
+      "id": "108#1",
+      "expression": "//input[@id=\"load_id\"]/@value",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/IMHentai/source",
+      "id": "109#1",
+      "expression": "//input[@id=\"load_server\"]/@value",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/IMHentai/source",
+      "id": "110#1",
+      "expression": "//script[contains(., \"var g_th\")]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    }
+  ]
+}

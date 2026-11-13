@@ -1,0 +1,32 @@
+{
+ "fixtureId": "capture/getinfo-normalization-0011",
+ "moduleId": "3c4d5e6f77889900aabbccddeeff0011",
+ "rawModuleOutput": {
+  "title": "My Manga",
+  "altTitles": "",
+  "authors": "",
+  "artists": "",
+  "genres": "",
+  "status": "",
+  "summary": "",
+  "coverLink": "",
+  "url": "https://s.example/m",
+  "link": "",
+  "chapterLinks": [
+   "https://s.example/m/1",
+   "https://other.example/m/2",
+   "https://s.example/m/3"
+  ],
+  "chapterNames": [
+   "My Manga Ch.1",
+   "My Manga- Ch.2",
+   "My Manga",
+   "My Manga Extra 4",
+   "Other- Ch.5"
+  ]
+ },
+ "flags": {
+  "removeHostFromChapterLinks": true,
+  "optionRemoveMangaNameFromChapter": true
+ }
+}

@@ -1,0 +1,21 @@
+{
+  "fixtureId": "capture/json-basic-0002",
+  "moduleId": "2b3c4d5e6f77889900aabbccddeeff01",
+  "document": "json",
+  "documentNote": "FMD2 idiom: JSON responses ride the same HTML tree parser and are unwrapped in-query with json(*) (cf. FMD2 lua/modules/9hentai.lua:22)",
+  "expressions": [
+    { "id": "title", "expression": "json(*).data.manga.title", "engine": "xpath", "output": "scalar" },
+    { "id": "alttitles", "expression": "json(*).data.manga.altTitles()", "engine": "xpath", "output": "list" },
+    { "id": "slugs", "expression": "json(*).data.manga.chapters().slug", "engine": "xpath", "output": "list" },
+    { "id": "chapter-count", "expression": "json(*).data.manga.chapters()", "engine": "xpath", "output": "count" },
+    { "id": "total", "expression": "json(*).data.total", "engine": "xpath", "output": "scalar" },
+    { "id": "names-joined", "expression": "json(*).data.manga.chapters().name", "engine": "xpath", "output": "all" },
+    { "id": "genres-joined", "expression": "json(*).data.manga.genres()", "engine": "xpath", "output": "all" },
+    { "id": "first-chapter-slug", "expression": "json(*).data.manga.chapters()[1].slug", "engine": "xpath", "output": "scalar" },
+    { "id": "alttitles-count", "expression": "json(*).data.manga.altTitles()", "engine": "xpath", "output": "count" },
+    { "id": "missing-key", "expression": "json(*).data.manga.nope", "engine": "xpath", "output": "scalar" },
+    { "id": "missing-deeper", "expression": "json(*).no.such.path", "engine": "xpath", "output": "scalar" },
+    { "id": "broken-syntax", "expression": "json(*).data..[(", "engine": "xpath", "output": "scalar" },
+    { "id": "css-on-json", "expression": "manga", "engine": "css", "output": "scalar" }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "moduleId": "b09c78407f8046bf94cb587541d4cb45",
+  "module": "ManhwaIndo",
+  "capturedAt": "2026-11-13",
+  "template": "MangaThemesia",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/ManhwaIndo/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://manhwaindo.id/",
+      "description": "MangaThemesia-based (id_ID)"
+    }
+  ]
+}

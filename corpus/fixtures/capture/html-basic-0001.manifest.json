@@ -1,0 +1,20 @@
+{
+  "fixtureId": "capture/html-basic-0001",
+  "moduleId": "1a2b3c4d5e6f77889900aabbccddeeff",
+  "document": "html",
+  "expressions": [
+    { "id": "title-scalar", "expression": "string(//h1[@class='title'])", "engine": "xpath", "output": "scalar" },
+    { "id": "meta-desc", "expression": "//meta[@name='description']/@content", "engine": "xpath", "output": "scalar" },
+    { "id": "genres-list", "expression": "//div[@class='genres']/a", "engine": "xpath", "output": "list" },
+    { "id": "chapter-links", "expression": "//div[@class='chapter-list']//a/@href", "engine": "xpath", "output": "list" },
+    { "id": "chapter-count", "expression": "//div[@class='chapter-list']//a", "engine": "xpath", "output": "count" },
+    { "id": "missing-empty", "expression": "//div[@class='does-not-exist']/text()", "engine": "xpath", "output": "scalar" },
+    { "id": "missing-list", "expression": "//span[@class='nope']", "engine": "xpath", "output": "list" },
+    { "id": "join-all", "expression": "//div[@class='genres']/a", "engine": "xpath", "output": "all" },
+    { "id": "broken-syntax", "expression": "///broken(((", "engine": "xpath", "output": "scalar" },
+    { "id": "css-title", "expression": ".manga .title", "engine": "css", "output": "scalar" },
+    { "id": "css-count", "expression": ".chapter-list .row", "engine": "css", "output": "count" },
+    { "id": "css-missing", "expression": ".no-such-element", "engine": "css", "output": "scalar" },
+    { "id": "title-attr-unclosed", "expression": "string(//title)", "engine": "xpath", "output": "scalar" }
+  ]
+}

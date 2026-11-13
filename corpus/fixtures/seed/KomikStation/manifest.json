@@ -1,0 +1,16 @@
+{
+  "moduleId": "b5586745030a45bba05d0c360caa6d1a",
+  "module": "KomikStation",
+  "capturedAt": "2026-11-13",
+  "template": "MangaThemesia",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/KomikStation/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://komikstation.org/",
+      "description": "MangaThemesia-based (id_ID)"
+    }
+  ]
+}

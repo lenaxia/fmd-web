@@ -1,142 +1,145 @@
+import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync, existsSync } from 'node:fs';
+import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import type { HttpAbortHandle } from '@fmd/contract';
 import { toBool, toInteger, toStr } from './base-globals.js';
 import type { FacadeBridge, FacadeSpec } from './facade.js';
+import { PascalTStrings } from './tstrings.js';
 
 /**
  * Offline facade stubs shared by the Init pass and the event dispatcher.
- * The full §5.4 (HTTP/undici) and §5.6 (TXQuery/InternetTools) semantics
- * are their own stories; these stubs expose the exact surface shape with
- * inert behavior, enough for Init and dispatch-protocol tests.
+ * The full §5.4 (HTTP/undici) semantics is its own story; the HTTP stub
+ * exposes the exact surface shape with inert behavior. The TStrings facade
+ * is at FULL contract over `PascalTStrings` (§5.5, FPC TStringList
+ * semantics — see tstrings.ts for the case-by-case documentation).
  */
+
+/** Jailed file IO contract for TStrings LoadFromFile/SaveToFile (§8 jail). */
+export interface TStringsFileIO {
+  /** Read + return the file content; throw on missing/undecodable. */
+  loadFromFile(path: string): string;
+  /** Write the content; throw on failure. */
+  saveToFile(path: string, content: string): void;
+}
 
 export interface TStringsHandle {
   readonly spec: FacadeSpec;
-  readonly values: string[];
+  readonly list: PascalTStrings;
 }
 
 /**
- * TStrings facade stub (§5.5, LuaStrings.pas:216-263): Add/Get/Set[i]/
- * Count/Clear/Delete/IndexOf/Reverse/Sort/GetCount + Text/Values[]/Strings[]
- * bracket access. File-backed methods are inert (job-temp fs jail is a
- * later story). Mutations land in `values` so callers/tests can read them
- * back host-side.
+ * TStrings facade (§5.5, LuaStrings.pas:216-263) over PascalTStrings:
+ * Add/AddText/Get/Set[i]/Count/Clear/Delete/IndexOf/IndexOfName/Reverse/
+ * Sort/GetCount/GetText/SetText + Text/CommaText/DelimitedText/Delimiter/
+ * NameValueSeparator properties + Values[]/Strings[] sub-facades + 0-based
+  * default bracket access. LoadFrom/SaveTo route through the injected
+ * jailed IO (`io`); without one they raise (FMD2 parity: the jail not being
+ * configured is a host setup error, and Pascal LoadFromFile on a missing
+ * file raises too). Mutations land in `handle.list` so callers/tests can
+ * harvest them host-side.
  */
-export function makeTStrings(bridge: FacadeBridge): TStringsHandle {
-  const values: string[] = [];
+export function makeTStrings(bridge: FacadeBridge, io?: TStringsFileIO): TStringsHandle {
+  const list = new PascalTStrings();
 
-  const nameOf = (line: string): string => {
-    const eq = line.indexOf('=');
-    return eq === -1 ? '' : line.slice(0, eq).trim();
-  };
-
-  const valuesSpec: FacadeSpec = {
-    get: (k) => {
-      for (const line of values) {
-        if (nameOf(line) === toStr(k)) {
-          const eq = line.indexOf('=');
-          return eq === -1 ? '' : line.slice(eq + 1);
-        }
-      }
-      return '';
-    },
-    set: (k, v) => {
-      const name = toStr(k);
-      const entry = `${name}=${toStr(v)}`;
-      for (let i = 0; i < values.length; i += 1) {
-        if (nameOf(values[i] ?? '') === name) {
-          values[i] = entry;
-          return;
-        }
-      }
-      values.push(entry);
-    },
-  };
-
-  const stringsSpec: FacadeSpec = {
-    get: (k) => values[toInteger(k)] ?? '',
-    set: (k, v) => {
-      values[toInteger(k)] = toStr(v);
-    },
-  };
-  const valuesFacadeId = bridge.create('', valuesSpec);
-  const stringsFacadeId = bridge.create('', stringsSpec);
-
-  const indexOf = (needle: string): number => {
-    for (let i = 0; i < values.length; i += 1) {
-      if (values[i] === needle) {
-        return i;
-      }
+  const readFile = (path: unknown): string => {
+    if (io === undefined) {
+      throw new Error('LoadFromFile: no jailed file IO configured for this list');
     }
-    return -1;
+    return io.loadFromFile(toStr(path));
   };
+  const writeFile = (path: unknown, content: unknown): void => {
+    if (io === undefined) {
+      throw new Error('SaveToFile: no jailed file IO configured for this list');
+    }
+    io.saveToFile(toStr(path), content === undefined || content === null ? '' : toStr(content));
+  };
+
+  const valuesFacadeId = bridge.create('', {
+    get: (k) => list.getValue(toStr(k)),
+    set: (k, v) => {
+      list.setValue(toStr(k), toStr(v));
+    },
+  });
+  const stringsFacadeId = bridge.create('', {
+    get: (k) => list.get(toInteger(k)),
+    set: (k, v) => {
+      list.set(toInteger(k), toStr(v));
+    },
+  });
 
   const methods: Record<string, (...args: unknown[]) => unknown> = {
     Add: (v: unknown) => {
-      values.push(toStr(v));
-      return undefined;
+      list.add(toStr(v));
+      return undefined; // strings_add: Result := 0 → nil (LuaStrings.pas:67-71)
     },
     AddText: (v: unknown) => {
-      for (const line of toStr(v).split('\n')) {
-        values.push(line);
-      }
+      list.addText(toStr(v));
       return undefined;
     },
-    Get: (i: unknown) => values[toInteger(i)] ?? '',
+    Get: (i: unknown) => list.get(toInteger(i)),
     Set: (i: unknown, v: unknown) => {
-      values[toInteger(i)] = toStr(v);
+      list.set(toInteger(i), toStr(v));
       return undefined;
     },
     Clear: () => {
-      values.length = 0;
+      list.clear();
       return undefined;
     },
     Delete: (i: unknown) => {
-      values.splice(toInteger(i), 1);
+      list.delete(toInteger(i));
       return undefined;
     },
-    IndexOf: (v: unknown) => indexOf(toStr(v)),
-    IndexOfName: (v: unknown) => {
-      for (let i = 0; i < values.length; i += 1) {
-        if (nameOf(values[i] ?? '') === toStr(v)) {
-          return i;
-        }
-      }
-      return -1;
-    },
+    IndexOf: (v: unknown) => list.indexOf(toStr(v)),
+    IndexOfName: (v: unknown) => list.indexOfName(toStr(v)),
     Reverse: () => {
-      values.reverse();
+      list.reverse();
       return undefined;
     },
     Sort: () => {
-      values.sort();
+      list.sort();
       return undefined;
     },
-    GetCount: () => values.length,
-    GetText: () => values.join('\n'),
+    GetCount: () => list.count,
+    GetText: () => list.getText(),
     SetText: (v: unknown) => {
-      values.length = 0;
-      for (const line of toStr(v).split('\n')) {
-        values.push(line);
-      }
+      list.setText(toStr(v));
       return undefined;
     },
-    // fs-backed and stream methods stay inert until the §5.5 story
-    LoadFromFile: noopFn,
-    SaveToFile: noopFn,
-    LoadFromStream: noopFn,
-    SaveToStream: noopFn,
+    LoadFromFile: (path: unknown) => {
+      list.setText(readFile(path));
+      return undefined;
+    },
+    SaveToFile: (path: unknown) => {
+      writeFile(path, list.getText());
+      return undefined;
+    },
+    // stream overloads need the §5.4 stream facade; FMD2 raises on
+    // non-stream userdata too (luaToUserData type check)
+    LoadFromStream: () => {
+      throw new Error('LoadFromStream: stream objects are not available in this build');
+    },
+    SaveToStream: () => {
+      throw new Error('SaveToStream: stream objects are not available in this build');
+    },
   };
 
   const spec: FacadeSpec = {
     get(key) {
       if (typeof key === 'number') {
-        return values[key] ?? '';
+        return list.get(key);
       }
       switch (key) {
         case 'Count':
-          return values.length;
+          return list.count;
         case 'Text':
-          return values.join('\n');
+          return list.getText();
+        case 'CommaText':
+          return list.getCommaText();
+        case 'DelimitedText':
+          return list.getDelimitedText();
+        case 'Delimiter':
+          return list.delimiter;
+        case 'NameValueSeparator':
+          return list.nameValueSeparator;
         default:
           break;
       }
@@ -148,19 +151,32 @@ export function makeTStrings(bridge: FacadeBridge): TStringsHandle {
     },
     set(key, value) {
       if (typeof key === 'number') {
-        values[key] = toStr(value);
+        list.set(key, toStr(value));
         return;
       }
-      if (key === 'Text') {
-        values.length = 0;
-        for (const line of toStr(value).split('\n')) {
-          values.push(line);
-        }
+      switch (key) {
+        case 'Text':
+          list.setText(toStr(value));
+          return;
+        case 'CommaText':
+          list.setCommaText(toStr(value));
+          return;
+        case 'DelimitedText':
+          list.setDelimitedText(toStr(value));
+          return;
+        case 'Delimiter':
+          list.delimiter = toStr(value).slice(0, 1); // String(...)[1]
+          return;
+        case 'NameValueSeparator':
+          list.nameValueSeparator = toStr(value).slice(0, 1);
+          return;
+        default:
+          // unknown keys + read-only Count: silent no-op (LuaClass semantics)
+          return;
       }
-      // unknown keys: silent no-op
     },
     len() {
-      return values.length;
+      return list.count;
     },
     sub(key) {
       if (key === 'Values') {
@@ -173,7 +189,54 @@ export function makeTStrings(bridge: FacadeBridge): TStringsHandle {
     },
   };
 
-  return { spec, values };
+  return { spec, list };
+}
+
+/**
+ * Realpath-jailed TStrings file IO (§8.2): paths must resolve INSIDE
+ * `jailRoot`; symlinks escaping the jail are refused (readlink walk).
+ */
+export function createJailedFileIO(jailRoot: string): TStringsFileIO {
+  const root = realpathSync(jailRoot);
+
+  const jailed = (path: string): string => {
+    const abs = resolve(root, path);
+    const rel = relative(root, abs);
+    if (rel.startsWith('..') || isAbsolute(rel) || rel === '') {
+      throw new Error(`path escapes the jail: ${path}`);
+    }
+    return abs;
+  };
+
+  /** Refuse symlinks that resolve outside the jail (component walk). */
+  const checkReal = (abs: string): void => {
+    let cur = abs;
+    while (true) {
+      if (existsSync(cur) && statSync(cur).isSymbolicLink()) {
+        const target = realpathSync(cur);
+        if (target !== root && !target.startsWith(root + sep)) {
+          throw new Error(`path escapes the jail (symlink): ${cur}`);
+        }
+      }
+      const parent = dirname(cur);
+      if (parent === cur) break;
+      cur = parent;
+    }
+  };
+
+  return {
+    loadFromFile(path: string): string {
+      const abs = jailed(path);
+      checkReal(abs);
+      return readFileSync(abs, 'utf8');
+    },
+    saveToFile(path: string, content: string): void {
+      const abs = jailed(path);
+      checkReal(abs);
+      mkdirSync(dirname(abs), { recursive: true });
+      writeFileSync(abs, content, 'utf8');
+    },
+  };
 }
 
 /**

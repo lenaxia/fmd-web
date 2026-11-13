@@ -1,0 +1,15 @@
+{
+  "moduleId": "f164e6052faf4c8a896a8be3cef7cb61",
+  "module": "RawDEX",
+  "capturedAt": "2026-11-13",
+  "expressionSource": "modules",
+  "entries": [
+    {
+      "fixtureId": "seed/RawDEX/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://rawdex.net/",
+      "description": "Japanese raw source"
+    }
+  ]
+}

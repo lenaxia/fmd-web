@@ -1,0 +1,73 @@
+{
+  "generator" : "fmd_capture",
+  "mode" : "normalize",
+  "fixture" : "corpus/fixtures/capture/getinfo-normalization-0003.json",
+  "moduleId" : "3c4d5e6f77889900aabbccddeeff0203",
+  "internettoolsCommit" : "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit" : "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion" : "3.2.2",
+  "flags" : {
+    "removeHostFromChapterLinks" : true,
+    "optionRemoveMangaNameFromChapter" : false
+  },
+  "triples" : [
+    {
+      "fixtureId" : "capture/getinfo-normalization-0003",
+      "input" : {
+        "title" : "  Example Manga  ",
+        "altTitles" : [
+          "  ExampleMan  ",
+          ""
+        ],
+        "authors" : [
+          " Author One ",
+          "author one "
+        ],
+        "artists" : [
+        ],
+        "genres" : [
+          "Action",
+          " Drama "
+        ],
+        "status" : "Ongoing",
+        "summary" : "A  test summary.\n\nSecond line.",
+        "coverLink" : "https://cdn.site.example//covers/x.jpg",
+        "url" : "https://site.example/manga/x",
+        "link" : "",
+        "chapterLinks" : [
+          "https://site.example/manga/x/ch-1",
+          "https://site.example/manga/x/ch-2",
+          "https://SITE.example/manga/x/ch-2",
+          "  "
+        ],
+        "chapterNames" : [
+          "Chapter 1",
+          "Chapter  2 ",
+          "chapter 2",
+          ""
+        ]
+      },
+      "normalized" : {
+        "title" : "Example Manga",
+        "altTitles" : "ExampleMan  ,",
+        "authors" : "Author One , author one",
+        "artists" : "",
+        "genres" : "Action,  Drama",
+        "status" : "Ongoing",
+        "summary" : "A  test summary.\nSecond line.",
+        "coverLink" : "https://cdn.site.example/covers/x.jpg",
+        "url" : "https://site.example/manga/x",
+        "link" : "/manga/x",
+        "chapterLinks" : [
+          "/manga/x/ch-1",
+          "/manga/x/ch-2"
+        ],
+        "chapterNames" : [
+          "Chapter 1",
+          "chapter 2"
+        ],
+        "numChapter" : 2
+      }
+    }
+  ]
+}

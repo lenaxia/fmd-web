@@ -1,0 +1,15 @@
+{
+  "moduleId": "a25c1b1030ee41e49018e1811bdf7085",
+  "module": "LxHentai",
+  "capturedAt": "2026-11-13",
+  "expressionSource": "modules",
+  "entries": [
+    {
+      "fixtureId": "seed/LxHentai/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://lxmanga.info/",
+      "description": "Vietnamese source"
+    }
+  ]
+}

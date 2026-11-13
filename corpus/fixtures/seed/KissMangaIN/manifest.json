@@ -1,0 +1,16 @@
+{
+  "moduleId": "5d8e32f00a0b4d0da2e5e562b63a5fc3",
+  "module": "KissMangaIN",
+  "capturedAt": "2026-11-13",
+  "template": "Madara",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/KissMangaIN/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://kissmanga.in/",
+      "description": "Madara-based"
+    }
+  ]
+}

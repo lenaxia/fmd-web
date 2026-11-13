@@ -1,0 +1,16 @@
+{
+  "moduleId": "fa3f4089ab44470383852c6cfc7f5b4a",
+  "module": "EmperorScan",
+  "capturedAt": "2026-11-13",
+  "template": "Madara",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/EmperorScan/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://emperorscan.mundoalterno.org/",
+      "description": "Madara-based (Spanish)"
+    }
+  ]
+}

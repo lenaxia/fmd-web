@@ -1,0 +1,15 @@
+{
+  "moduleId": "754d4ad9c2424fffa33b4adcac323a51",
+  "module": "EgoToons",
+  "capturedAt": "2026-11-13",
+  "expressionSource": "modules",
+  "entries": [
+    {
+      "fixtureId": "seed/EgoToons/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://egotoons.com/",
+      "description": "Spanish toon source"
+    }
+  ]
+}

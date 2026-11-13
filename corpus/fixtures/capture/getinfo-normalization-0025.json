@@ -1,0 +1,30 @@
+{
+ "fixtureId": "capture/getinfo-normalization-0025",
+ "moduleId": "3c4d5e6f77889900aabbccddeeff0025",
+ "rawModuleOutput": {
+  "title": "Ünïcode Manga",
+  "altTitles": "",
+  "authors": "",
+  "artists": "",
+  "genres": "",
+  "status": "",
+  "summary": "",
+  "coverLink": "",
+  "url": "https://s.example/m",
+  "link": "",
+  "chapterLinks": [
+   "/1",
+   "/2",
+   "/3"
+  ],
+  "chapterNames": [
+   "Ünïcode Manga - Ch1",
+   "ÜNÏCODE MANGA Ch2",
+   "Ünïcode"
+  ]
+ },
+ "flags": {
+  "removeHostFromChapterLinks": true,
+  "optionRemoveMangaNameFromChapter": true
+ }
+}

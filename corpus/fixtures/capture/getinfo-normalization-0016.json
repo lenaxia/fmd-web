@@ -1,0 +1,22 @@
+{
+ "fixtureId": "capture/getinfo-normalization-0016",
+ "moduleId": "3c4d5e6f77889900aabbccddeeff0016",
+ "rawModuleOutput": {
+  "title": "​W BOM Title ",
+  "altTitles": "T1, T2,",
+  "authors": "A1 , A2 ,",
+  "artists": "R1 ,",
+  "genres": "G1, G2 ,",
+  "status": "",
+  "summary": "S A  B C",
+  "coverLink": "http://c.example/x.jpg",
+  "url": "https://s.example/m",
+  "link": "/m",
+  "chapterLinks": [
+   "/1"
+  ],
+  "chapterNames": [
+   "1"
+  ]
+ }
+}

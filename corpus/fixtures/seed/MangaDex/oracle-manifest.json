@@ -1,0 +1,187 @@
+{
+  "fixtureId": "seed/MangaDex/source",
+  "moduleId": "d07c9c2425764da8ba056505f57cf40c",
+  "document": "json",
+  "expressions": [
+    {
+      "id": "104#1",
+      "expression": "json(*)",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "105#1",
+      "expression": "result",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "106#1",
+      "expression": "json(*).errors().detail",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "123#1",
+      "expression": "id",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "112#1",
+      "expression": "json(*).total",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "124#1",
+      "expression": "attributes/title/*",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "114#1",
+      "expression": "json(*).total",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "208#1",
+      "expression": "result",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "116#1",
+      "expression": "json(*).limit",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "212#1",
+      "expression": "data/attributes/title/*",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "122#1",
+      "expression": "json(*).data()",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "213#1",
+      "expression": "string-join(data/attributes/altTitles?*/*, \", \")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "176#1",
+      "expression": "json(*).data()[1].attributes.newId",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "215#1",
+      "expression": "data/attributes/description/en",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "207#1",
+      "expression": "json(*)",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "218#1",
+      "expression": "data/attributes/status",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "209#1",
+      "expression": "json(*).errors().detail",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "222#1",
+      "expression": "data/attributes/publicationDemographic",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "214#1",
+      "expression": "json(*).data.relationships()[type=\"cover_art\"].attributes.fileName",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "230#1",
+      "expression": "data/attributes/contentRating",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "216#1",
+      "expression": "json(*).data.relationships()[type=\"author\"].attributes.name",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "269#1",
+      "expression": "attributes/externalUrl",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "217#1",
+      "expression": "json(*).data.relationships()[type=\"artist\"].attributes.name",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "280#1",
+      "expression": "id",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "221#1",
+      "expression": "json(*).data.attributes.tags().attributes.name.en",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "284#1",
+      "expression": "attributes/name",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "262#1",
+      "expression": "json(*).data()",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "289#1",
+      "expression": "attributes/volume",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "263#1",
+      "expression": "json(*).total",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "290#1",
+      "expression": "attributes/chapter",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "fixtureId": "seed/Raw1001/source",
+  "moduleId": "37fe4058be994eb08e83eeb0136d5ae9",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "23#1",
+      "expression": "//div[@id=\"blog-pager\"]/span[last()]/a/@href",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "34#1",
+      "expression": "//div[@class=\"text-center\"]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "47#1",
+      "expression": "//h1",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "48#1",
+      "expression": "//img[@class=\"full r2 md-w120\"]/@src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "49#1",
+      "expression": "//div[@class=\"y6x11p\" and ./i[@class=\"fas fa-user\"]]/span/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "50#1",
+      "expression": "//div[@class=\"mt-15\"]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "51#1",
+      "expression": "//div[@class=\"y6x11p\" and ./i[@class=\"fas fa-rss\"]]/span",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "53#1",
+      "expression": "//div[@id=\"syn-target\"]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "55#1",
+      "expression": "//li[@class=\"chapter\"]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "69#1",
+      "expression": "//script[contains(., \"const CHAPTER_ID\")]/substring-before(substring-after(., \"const CHAPTER_ID = \"), \";\")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "75#1",
+      "expression": "//div[@data-index]/a/@href",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "76#1",
+      "expression": "//a/@href",
+      "engine": "xpath",
+      "output": "count"
+    },
+    {
+      "id": "80#1",
+      "expression": "//a/@href",
+      "engine": "xpath",
+      "output": "list"
+    }
+  ]
+}

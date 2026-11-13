@@ -6,6 +6,10 @@
   "description": "Machine-readable FMD2 compatibility contract (DESIGN.md §5): source of generated code and CI drift checks.",
   "main": "./dist/types.js",
   "types": "./dist/types.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "contract:check": "npm run build && node dist/tools/drift-check.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/types.d.ts",

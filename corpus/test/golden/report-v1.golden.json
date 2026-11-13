@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "engine": "mock",
+  "normalization": "mock-normalize",
+  "summary": {
+    "cases": 5,
+    "passed": 5,
+    "failed": 0,
+    "passRate": 1
+  },
+  "modules": [
+    {
+      "module": "GoldenSite",
+      "modules": [
+        "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+        "b2c3d4e5f60718293a4b5c6d7e8f90a1"
+      ],
+      "passed": 4,
+      "failed": 0,
+      "cases": [
+        {
+          "fixtureId": "golden/site/page#title",
+          "expression": {
+            "id": "title",
+            "expression": "string(//h1[@class=\"title\"])",
+            "language": "xpath",
+            "output": "scalar"
+          },
+          "status": "pass",
+          "expected": "Golden",
+          "actual": "Golden"
+        },
+        {
+          "fixtureId": "golden/site/page#links",
+          "expression": {
+            "id": "links",
+            "expression": "//div[@class=\"ch\"]/a/@href",
+            "language": "xpath",
+            "output": "list"
+          },
+          "status": "pass",
+          "expected": [
+            "/c/1",
+            "/c/2"
+          ],
+          "actual": [
+            "/c/1",
+            "/c/2"
+          ]
+        },
+        {
+          "fixtureId": "golden/site/api#count",
+          "expression": {
+            "id": "count",
+            "expression": "json(*).items().url",
+            "language": "json",
+            "output": "scalar"
+          },
+          "status": "pass",
+          "expected": "/i/1",
+          "actual": "/i/1"
+        },
+        {
+          "fixtureId": "golden/site/api#swallowed",
+          "expression": {
+            "id": "swallowed",
+            "expression": "///broken(((",
+            "language": "xpath",
+            "output": "scalar"
+          },
+          "status": "pass",
+          "expected": "",
+          "actual": {
+            "error": "mock: no recorded result for ///broken((("
+          }
+        }
+      ]
+    }
+  ],
+  "normalizations": [
+    {
+      "fixtureId": "golden/normalize-0001",
+      "moduleId": "a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "status": "pass",
+      "expected": {
+        "title": "Padded",
+        "chapterLinks": [
+          "/x/1"
+        ],
+        "numChapter": 1
+      },
+      "actual": {
+        "title": "Padded",
+        "chapterLinks": [
+          "/x/1"
+        ],
+        "numChapter": 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "fixtureId": "seed/MangaFreak/source",
+  "moduleId": "1d6a75911a1b414f89e5cf95c9a7ae4e",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "6#1",
+      "expression": "//div[@class=\"manga_series_data\"]/h5",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "8#1",
+      "expression": "//div[@class=\"manga_series_image\"]/img/@src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "9#1",
+      "expression": "//div[@class=\"series_sub_genre_list\"]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "10#1",
+      "expression": "//div[@class=\"manga_series_description\"]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "11#1",
+      "expression": "//div[@class=\"manga_series_list\"]/table/tbody/tr/td[1]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "21#1",
+      "expression": "//img[@id=\"gohere\"]/@src",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "31#1",
+      "expression": "//*[contains(@class, \"list_item_content\")]//div[contains(@class, \"list_item\")]",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "34#1",
+      "expression": ".//*[contains(@class, \"list_item_info\")]/h3",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "35#1",
+      "expression": ".//*[contains(@class, \"list_item_info\")]/h3/a/@href",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "48#1",
+      "expression": "//div[contains(@class,\"pagination\")]/a[contains(@class,\"last_p\")]/@href/substring-after(.,\"All/\")",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

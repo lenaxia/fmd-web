@@ -11,6 +11,8 @@
     "moduleSurface",
     "taskFields",
     "mangaInfoFields",
+    "facades",
+    "getInfoPipeline",
     "requireShims",
     "capabilities",
     "invariants"
@@ -74,7 +76,11 @@
           "globals": { "type": "array", "items": { "type": "string", "pattern": "^[A-Z][A-Za-z]*$" }, "uniqueItems": true },
           "readBack": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
           "pushOnly": { "type": "boolean" },
-          "accountConstants": { "type": "boolean" }
+          "constants": {
+            "type": "string",
+            "enum": ["net-status", "account-status", "none"],
+            "description": "Which status-constant table the dispatcher binds: net-status (LuaPushNetStatus), account-status (LuaPushAccountStatus), or none."
+          }
         }
       }
     },
@@ -102,6 +108,138 @@
       "items": { "type": "string", "minLength": 1 },
       "uniqueItems": true,
       "minItems": 12
+    },
+    "facades": {
+      "type": "array",
+      "minItems": 9,
+      "maxItems": 9,
+      "description": "§5.3–§5.7 object surfaces: TXQuery, IXQValue, TStrings, MangaInfo, Storage, HTTP, Crypto, ImagePuzzle, Duktape.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "fmd2Unit", "source", "access", "methods", "properties"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "fmd2Unit": { "type": "string", "minLength": 1 },
+          "source": { "type": "string", "minLength": 1 },
+          "access": {
+            "type": "string",
+            "enum": ["global-constructor", "event-global", "module-property", "require-lib", "derived-object"],
+            "description": "How Lua reaches the facade: a global constructor function (CreateTXQuery, TStrings.New), an event-call global (HTTP, MANGAINFO), a property of MODULE (Storage), a require()-able lib (Crypto, ImagePuzzle, Duktape), or a value returned by another facade (IXQValue)."
+          },
+          "constructors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string", "minLength": 1 },
+                "notes": { "type": "string" }
+              }
+            },
+            "uniqueItems": true
+          },
+          "methods": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name"],
+              "properties": {
+                "name": { "type": "string", "minLength": 1 },
+                "notes": { "type": "string" }
+              }
+            },
+            "uniqueItems": true
+          },
+          "properties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "access"],
+              "properties": {
+                "name": { "type": "string", "minLength": 1 },
+                "access": { "type": "string", "enum": ["read-only", "read-write"] },
+                "notes": { "type": "string" }
+              }
+            },
+            "uniqueItems": true
+          },
+          "arrayProperties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "access"],
+              "properties": {
+                "name": { "type": "string", "minLength": 1 },
+                "access": { "type": "string", "enum": ["read-only", "read-write"] },
+                "notes": { "type": "string" }
+              }
+            },
+            "uniqueItems": true
+          },
+          "defaultArrayProperty": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["access"],
+            "properties": {
+              "access": { "type": "string", "enum": ["read-only", "read-write"] },
+              "notes": { "type": "string" }
+            }
+          },
+          "headerSets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "headers"],
+              "properties": {
+                "name": { "type": "string", "minLength": 1 },
+                "headers": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+                "notes": { "type": "string" }
+              }
+            },
+            "uniqueItems": true
+          },
+          "defaults": {
+            "type": "object",
+            "additionalProperties": { "type": ["string", "number", "boolean"] },
+            "description": "Fixed default values the shim must reproduce (e.g. RetryCount=0, MaxRedirect=5)."
+          },
+          "notes": { "type": "string" }
+        }
+      }
+    },
+    "getInfoPipeline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "dedup", "steps"],
+      "properties": {
+        "source": { "type": "string", "minLength": 1 },
+        "dedup": {
+          "type": "string",
+          "const": "last-occurrence-wins",
+          "description": "§5.8 step 4: on case-insensitive duplicate chapters the host deletes the EARLIER index, so the LAST occurrence's link+name survive."
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["order", "name", "description"],
+            "properties": {
+              "order": { "type": "integer", "minimum": 1 },
+              "name": { "type": "string", "minLength": 1 },
+              "description": { "type": "string", "minLength": 1 },
+              "source": { "type": "string" }
+            }
+          }
+        }
+      }
     },
     "requireShims": {
       "type": "array",

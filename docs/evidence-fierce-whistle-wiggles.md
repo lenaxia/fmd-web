@@ -72,6 +72,18 @@ npm run test:coverage           lines 83.93% / branches 79.01% / functions 84.54
 New test files: `server/test/engine/lua/{chunk-cache,init-pass,pascal-strings,facades}.test.ts`,
 `server/test/engine/events/dispatcher.test.ts` (dispatcher + deadline).
 
+## Reviewer verification (in_review, 2026-11-13T02:35Z)
+
+Independently re-verified before approval — no reliance on the table above:
+
+- `npx vitest run server/test/engine` → **5 files, 57 tests, all passing** (chunk-cache 6, init-pass 5, facades 5, pascal-strings 21, dispatcher 20 incl. deadline block).
+- Golden JSON spot-check: 19 files / 20 modules, 6 option entries, combobox `defaultValue: 2` present with `items` — criterion 1 satisfied.
+- Chunk cache (criterion 4, was left unchecked on the board): `chunk-cache.ts` compiles to real Lua 5.4 bytecode via `lua_dump`, caches by (fileName, sha256); tests prove same-SHA reuse (`second).toBe(first)`, `compileCount===1`) and changed-content invalidation/recompile (`compileCount===2`, distinct identity) + explicit `invalidate` + bytecode round-trip into two fresh states. Criterion checked off by the reviewer after this verification.
+- Deadline (criterion 3): `TrackingAbortHandle` records exactly 1 `abort()`, `terminated=true`, `sleep(10000)` interrupted under a 150 ms deadline, within-deadline event cancels the watchdog with 0 aborts.
+- `npm run typecheck` exit 0; `eslint server/src/engine/lua server/src/engine/events server/test/engine` clean.
+
+Verdict: **approve** — all 4 criteria met with evidence.
+
 ## Boundary notes
 
 - `contract/types.ts` gained the Lua-host boundary block (appended);

@@ -1,0 +1,141 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/MangaKatana/source.html",
+  "document": "html",
+  "moduleId": "29826228ef9e4d1bad17f4c22e8d9951",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/MangaKatana/source",
+      "id": "54#1",
+      "expression": "//ul[@class=\"uk-pagination\"]/li[last()-1]/a/@href",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": "https://mangakatana.com/page/1398"
+    },
+    {
+      "fixtureId": "seed/MangaKatana/source",
+      "id": "103#1",
+      "expression": "json(*)()",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/MangaKatana/source",
+      "id": "65#1",
+      "expression": "//div[@id=\"book_list\"]//h3[@class=\"title\"]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "list",
+      "result": [
+        "What I'd Like to do With That Gloomy Girl",
+        "Reincarnated as a Villainous Duke to Be Condemned by My Daughter",
+        "I Took Over the Academy With a Single Sashimi Knife",
+        "I Reincarnated as a Legendary Surgeon",
+        "Haunted Peak",
+        "Reality Quest",
+        "Tales of Demons and Gods",
+        "1-nen A-gumi no Monster",
+        "Paripi Koumei",
+        "Nano Machine",
+        "The New Gate",
+        "Kaifuku Jutsushi no Yarinaoshi",
+        "A Mere Villager Was Reincarnated as a Tyrant Prince Three Hundred Years Ago, That Is Me",
+        "Tokusatsu Gagaga",
+        "Magic Emperor",
+        "A Modern Man Who Got Transmigrated Into the Murim World",
+        "Tonikaku Cawaii",
+        "The Tale of the Skeleton Messenger",
+        "Crimson Reset",
+        "CMYK - Sameda Kazuou Can't Cure His Chuunibyou Syndrome"
+      ]
+    },
+    {
+      "fixtureId": "seed/MangaKatana/source",
+      "id": "78#1",
+      "expression": "//h1",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaKatana/source",
+      "id": "79#1",
+      "expression": "//div[@class=\"alt_name\"]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaKatana/source",
+      "id": "80#1",
+      "expression": "//div[@class=\"cover\"]/img/@src",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaKatana/source",
+      "id": "81#1",
+      "expression": "//ul[@class=\"meta d-table\"]//a[@class=\"author\"]",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/MangaKatana/source",
+      "id": "82#1",
+      "expression": "//ul[@class=\"meta d-table\"]//div[@class=\"genres\"]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/MangaKatana/source",
+      "id": "83#1",
+      "expression": "//ul[@class=\"meta d-table\"]/li[(./div=\"Status:\")]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaKatana/source",
+      "id": "84#1",
+      "expression": "//div[@class=\"summary\"]/p",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaKatana/source",
+      "id": "86#1",
+      "expression": "//div[@class=\"chapters\"]//a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/MangaKatana/source",
+      "id": "102#1",
+      "expression": "//script[contains(., \"thzq\")]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    }
+  ]
+}

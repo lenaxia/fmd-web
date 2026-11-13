@@ -1,0 +1,73 @@
+{
+  "fixtureId": "seed/InManga/source",
+  "moduleId": "03ae42ac9141443fa0711bd401c0203d",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "5#1",
+      "expression": "//h1",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "13#1",
+      "expression": "json(json(*).data)",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "6#1",
+      "expression": "//meta[@property=\"og:image\"]/@content",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "7#1",
+      "expression": "//div/div[h1]/following-sibling::div[@class=\"panel-body\"]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "8#1",
+      "expression": "//input[@id=\"Identification\"]/@value",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "9#1",
+      "expression": "//script[contains(., \"var chapterUrl\")]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "14#1",
+      "expression": "jn:members(result)",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "17#1",
+      "expression": "Number",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "37#1",
+      "expression": "//div[contains(@class,\"PagesContainer\")]/a/img/@id",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "52#1",
+      "expression": "//a[contains(@class,\"manga-result\")]",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "56#1",
+      "expression": ".//h4",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

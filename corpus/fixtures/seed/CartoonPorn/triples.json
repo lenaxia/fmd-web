@@ -1,0 +1,48 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/CartoonPorn/source.html",
+  "document": "html",
+  "moduleId": "d2d4a20548a641e4b24ae4c49379ae1f",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/CartoonPorn/source",
+      "id": "52#1",
+      "expression": "//div[@class=\"post-title\"]/p",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/CartoonPorn/source",
+      "id": "53#1",
+      "expression": "//span[contains(., \"Artists\")]/following-sibling::span/a/span[1]",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/CartoonPorn/source",
+      "id": "54#1",
+      "expression": "//span[contains(., \"Tags\")]/following-sibling::span/a/span[1]",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/CartoonPorn/source",
+      "id": "55#1",
+      "expression": "//div[contains(span, \"Description\")]//div",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    }
+  ]
+}

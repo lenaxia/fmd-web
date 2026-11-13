@@ -1,0 +1,76 @@
+{
+  "module": "EHentai (ExHentai account module)",
+  "moduleId": "17e196ebe84c4042a6fbf4594d25d9e0",
+  "events": [
+    "GetInfo",
+    "Login",
+    "GetDirectoryPageNumber"
+  ],
+  "galleryUrl": "https://e-hentai.org/g/2715593/04b3e2c1aa/",
+  "fixtureProvenance": "corpus/fixtures/seed/EHentai/source.html is the homepage; gallery/login fixtures are committed synthetic bodies grounded in the real gallery DOM shape",
+  "getInfo": {
+    "result": {
+      "kind": "code",
+      "value": 0,
+      "readBack": {}
+    },
+    "mangaInfo": {
+      "title": "Test Gallery Title",
+      "coverLink": "https://ehgt.org/g/cover.jpg",
+      "artists": "Some Artist, Other Artist",
+      "genres": "A Group, female:big tag",
+      "status": "Unknown"
+    }
+  },
+  "login": {
+    "accountStatusBefore": 0,
+    "result": {
+      "kind": "boolean",
+      "value": true
+    },
+    "accountStatusAfter": 2,
+    "postUrl": "https://forums.e-hentai.org/index.php?act=Login&CODE=01",
+    "postBody": "returntype=8&CookieDate=1&b=d&bt=pone&UserName=user%40test.example&PassWord=hunter2&ipb_login_submit=Login%21"
+  },
+  "cookieAfterLogin": "abc123",
+  "directoryPageNumber": {
+    "moduleBugParity": "EHentai.lua:71 `.x` field — errors in FMD2 identically; host default page count = 1",
+    "result": {
+      "kind": "failed",
+      "reason": "modules/EHentai.lua:71: attempt to index a nil value (field 'x')",
+      "timedOut": false
+    },
+    "hostDefaultPageCount": 1
+  },
+  "httpRequests": [
+    {
+      "method": "GET",
+      "url": "https://e-hentai.org/g/2715593/04b3e2c1aa/",
+      "body": "",
+      "mimeType": "",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Cookie": "nw=1"
+      }
+    },
+    {
+      "method": "POST",
+      "url": "https://forums.e-hentai.org/index.php?act=Login&CODE=01",
+      "body": "returntype=8&CookieDate=1&b=d&bt=pone&UserName=user%40test.example&PassWord=hunter2&ipb_login_submit=Login%21",
+      "mimeType": "",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+      }
+    },
+    {
+      "method": "GET",
+      "url": "https://exhentai.org/?f_doujinshi=on&f_manga=on&f_western=on&f_apply=Apply+Filter",
+      "body": "",
+      "mimeType": "",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      }
+    }
+  ]
+}

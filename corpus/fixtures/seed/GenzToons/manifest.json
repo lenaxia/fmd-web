@@ -1,0 +1,16 @@
+{
+  "moduleId": "ef9347dbab424553b9909332c8739f32",
+  "module": "GenzToons",
+  "capturedAt": "2026-11-13",
+  "template": "KeyoApp",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/GenzToons/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://genztoons.org/",
+      "description": "Toon source"
+    }
+  ]
+}

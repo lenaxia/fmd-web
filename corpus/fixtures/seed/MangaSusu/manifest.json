@@ -1,0 +1,15 @@
+{
+  "moduleId": "c69cbc947a6a42e194b2e097bba15047",
+  "module": "MangaSusu",
+  "capturedAt": "2026-11-13",
+  "expressionSource": "modules",
+  "entries": [
+    {
+      "fixtureId": "seed/MangaSusu/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://mangasusuku.com/",
+      "description": "MangaThemesia-based (id_ID)"
+    }
+  ]
+}

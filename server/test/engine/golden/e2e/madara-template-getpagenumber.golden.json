@@ -1,0 +1,33 @@
+{
+  "module": "BrainRotComics (templates.Madara)",
+  "moduleId": "9300f8755204497f998fdb1d831e8b49",
+  "event": "GetPageNumber",
+  "url": "https://brainrotcomics.com/series/test/chapter-1?style=list",
+  "fixtureProvenance": "synthetic chapter page; ciphertext committed from a one-time encrypt with the pinned utils/crypto-js.min.js",
+  "duktapePath": "chapter-protector-data → fmd.duktape.ExecJS → require utils/crypto-js.min.js + utils/cryptojs-aes-format.js",
+  "result": {
+    "kind": "boolean",
+    "value": true
+  },
+  "taskPageLinks": [
+    "https://images.wuxiaworld.site/file/manga-sites/an-manga/ch-001/001.jpg",
+    "https://images.wuxiaworld.site/file/manga-sites/an-manga/ch-001/002.jpg",
+    "https://images.wuxiaworld.site/file/manga-sites/an-manga/ch-001/003.jpg"
+  ],
+  "taskPageNumberReadWrite": 2,
+  "workidBinding": {
+    "beforeDownloadImage": "MODULE/TASK/HTTP/WORKID/URL per contract.json; module binds no handler → EventNotBoundError",
+    "error": "event not bound: BeforeDownloadImage (module 9300f8755204497f998fdb1d831e8b49 does not bind a handler)"
+  },
+  "httpRequests": [
+    {
+      "method": "GET",
+      "url": "https://brainrotcomics.com/series/test/chapter-1?style=list",
+      "body": "",
+      "mimeType": "",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      }
+    }
+  ]
+}

@@ -1,0 +1,163 @@
+{
+  "fixtureId": "seed/HadesScans/source",
+  "moduleId": "287f665620664e468d4e05f5d76f5a44",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "29#1",
+      "expression": "//div[@class=\"wp-pagenavi\"]/(a[@class=\"last\" or @class=\"page-numbers\"])[last()]/@href",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "162#1",
+      "expression": "json(*)().src",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "40#1",
+      "expression": "//div[contains(@class, \"post-title\")]/*[self::h3 or self::h2]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "55#1",
+      "expression": "//div[contains(@class, \"post-title\")]/*[self::h5 or self::h3 or self::h2]/a",
+      "engine": "xpath",
+      "output": "count"
+    },
+    {
+      "id": "56#1",
+      "expression": "//div[contains(@class, \"post-title\")]/*[self::h5 or self::h3 or self::h2]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "69#1",
+      "expression": "//div[@class=\"post-title\" or @id=\"manga-title\"]/*[self::h1 or self::h3]/text()",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "70#1",
+      "expression": "//div[@class=\"summary-heading\" and contains(./h5, \"Alternativ\") or contains(./h5, \"Judul Lain\") or contains(./h5, \"أسم بديل\")]/following-sibling::div",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "71#1",
+      "expression": "//div[@class=\"summary_image\"]//img/@data-src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "72#1",
+      "expression": "//div[@class=\"author-content\"]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "73#1",
+      "expression": "//div[@class=\"artist-content\"]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "74#1",
+      "expression": "//div[@class=\"genres-content\"]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "76#1",
+      "expression": "string-join((//div[contains(@class, \"summary__content\") or @class=\"manga-summary\"])[1]|//div[@class=\"manga-excerpt\"]|//div[@class=\"post-content_item\" and contains(h5, \"Summary\") or contains(h5, \"Sinopsis\")]//p, \"\r\n\")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "79#1",
+      "expression": "//div[@class=\"summary_image\"]//img/@src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "91#1",
+      "expression": "//div[contains(@id, \"manga-chapters-holder\")]/@data-id",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "93#1",
+      "expression": "//div[@class=\"li__text\"]/a[not(@href=\"#\") and not(@class=\"reward_ads\")]",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "95#1",
+      "expression": "//li[contains(@class, \"wp-manga-chapter\")]/a[not(@href=\"#\") and not(@class=\"reward_ads\")]",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "113#1",
+      "expression": "//ul[contains(@class, \"volumns\")]/li/a[1]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "114#1",
+      "expression": "//ul[contains(@class, \"volumns\")]/li",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "115#1",
+      "expression": "a",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "126#1",
+      "expression": "//div[@class=\"pagination\"]/span[not(contains(normalize-space(.), \">>\"))][last()]/a",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "143#1",
+      "expression": "//li[contains(@class, \"wp-manga-chapter\")]/a[not(@href=\"#\") and not(@class=\"reward_ads\")]",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "158#1",
+      "expression": "//div[contains(@class, \"page-break\")]/img/@data-src",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "159#1",
+      "expression": "//div[contains(@class, \"page-break\")]/img/@src",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "161#1",
+      "expression": "//script[@id=\"chapter_preloaded_images\"]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "166#1",
+      "expression": "//script[@id=\"chapter-protector-data\"]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "172#1",
+      "expression": "//script[@id=\"chapter-protector-data\"]",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

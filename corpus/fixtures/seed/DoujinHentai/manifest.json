@@ -1,0 +1,15 @@
+{
+  "moduleId": "5861673c7b1c4f4ba22be78fd599a2d9",
+  "module": "DoujinHentai",
+  "capturedAt": "2026-11-13",
+  "expressionSource": "modules",
+  "entries": [
+    {
+      "fixtureId": "seed/DoujinHentai/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://doujinhentai.net/",
+      "description": "Madara-based gallery"
+    }
+  ]
+}

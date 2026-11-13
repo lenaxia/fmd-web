@@ -1,0 +1,16 @@
+{
+  "moduleId": "6d15a803c5504e91918a9d5f2b1351f8",
+  "module": "WebtoonXYZ",
+  "capturedAt": "2026-11-13",
+  "template": "Madara",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/WebtoonXYZ/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://www.webtoon.xyz/",
+      "description": "Webtoon source"
+    }
+  ]
+}

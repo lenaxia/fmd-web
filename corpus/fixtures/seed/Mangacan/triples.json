@@ -1,0 +1,21 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/Mangacan/source.html",
+  "document": "html",
+  "moduleId": "ca571825056b4850bd3693e4e1437997",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/Mangacan/source",
+      "id": "50#1",
+      "expression": "//img[@class=\"ts-main-image\"]/@src",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    }
+  ]
+}

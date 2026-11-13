@@ -10,7 +10,6 @@ import {
   defaultPoolOptions,
   emptySnapshot,
   findRoute,
-  generationNote,
   isShimName,
   isValidSha,
   isAppDbTable,
@@ -21,6 +20,7 @@ import {
   CATALOG_SCHEMA_COLUMNS,
   APP_DB_TABLES,
   API_ROUTES,
+  GENERATED_EVENT_BINDINGS,
 } from '../src/index.js';
 
 const contractPath = fileURLToPath(
@@ -129,8 +129,9 @@ describe('shim registry (§5.7)', (): void => {
     expect(isShimName('websitebypass')).toBe(false); // host-level, not a require shim (§5.7)
   });
 
-  it('generation placeholder stays honest', (): void => {
-    expect(generationNote()).toContain('contract.json');
+  it('generation stays honest: bindings are generated, not hand-coded', (): void => {
+    expect(GENERATED_EVENT_BINDINGS.length).toBe(loadContract().events.length);
+    expect(GENERATED_EVENT_BINDINGS[0]?.event).toBe('GetDirectoryPageNumber');
   });
 });
 

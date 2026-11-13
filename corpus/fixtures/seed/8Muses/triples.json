@@ -1,0 +1,84 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/8Muses/source.html",
+  "document": "html",
+  "moduleId": "d5d532724aba452ea6d4b50663b76326",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/8Muses/source",
+      "id": "16#1",
+      "expression": "//*[@class=\"gallery\"]/a/div/img/@data-src",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/8Muses/source",
+      "id": "17#1",
+      "expression": "//*[@class=\"top-menu-breadcrumb\"]//li[last()]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/8Muses/source",
+      "id": "21#1",
+      "expression": "//*[@class=\"top-menu-breadcrumb\"]//li[last()-1]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/8Muses/source",
+      "id": "25#1",
+      "expression": "//*[@class=\"gallery\"]/a[@href!=\"\" and ./div[@class=\"image-title\"]]",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "scalar",
+      "result": "Various Authors, MilfToon Comics, Renderotica Comics, Hentai and Manga English, MCC Comics, BE Story Club Comics, Giantess Fan Comics, Locofuria Comics, JAB Comics, ZZZ Comics, ShadBase Comics, Expansionfan Comics, PalComix Comics, IllustratedInterracial.com Comics, Affect3D Comics, PigKing - CrazyDad Comics, Tracy Scops Comics, TG Comics, Giantess Club Comics, Seiren.com.br Comics, MuscleFan Comics, Fansadox Comics, DreamTales Comics, Fred Perry Comics, Everfire Comics, Innocent Dickgirls Comics, Y3DF - Your3DFantasy.com Comics, Cartoon Reality Comics, 8muses Comics, Abimboleb Comics, KAOS Comics, Jay Marvel Comics, 3DMonsterStories.com Comics, Croc Comics, Devin Dickie Comics, Melkormancin.com Comics, JohnPersons.com Comics, OkayOkayOKOk Comics, Witchking00 Comics, Slipshine Comics, The Foxxx Comics, MongoBongo Comics, Vaesark Comics, Moiarte Comics, Tufos Comics, DBComix - Deviant Bondage Comics, Taboolicious.xxx Comics, Transform Fan Comics, Cartoon Valley, Theme Collections, PrismGirls Comics, Interracial-Comics, Blacknwhitecomics.com Comix, Dollproject Comics, Karmagik Comics, SuperHeroineComixxx, Kirtu.com Comics, Expansion Comics, Smudge Comics, DukesHardcoreHoneys.com Comics, Kogeikun Comics, DizzyDills Comics, Bimbo Story Club Comics, ArtOfJaguar Comics, Classic Comics Collection, Arabatos Comics, DarkSoul3D Comics, Stormfeder Comics, Central Comics, Blacknwhite.com Comics, eBluberry Comics, Gary Roberts Comics"
+    },
+    {
+      "fixtureId": "seed/8Muses/source",
+      "id": "34#1",
+      "expression": "//*[@class=\"gallery\"]/a[@href!=\"\" and not(./div[@class=\"image-title\"])]",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/8Muses/source",
+      "id": "52#1",
+      "expression": "//*[@class=\"gallery\"]/a[@href!=\"\" and not(./div[@class=\"image-title\"])]/div/img/@data-src",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/8Muses/source",
+      "id": "56#1",
+      "expression": "//*[@class=\"gallery\"]/a[@href!=\"\"]/@href",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "scalar",
+      "result": "/porn/album/Various-Authors, /porn/album/MilfToon-Comics, /porn/album/Renderotica-Comics, /porn/album/Hentai-and-Manga-English, /porn/album/MCC-Comics, /porn/album/BE-Story-Club-Comics, /porn/album/Giantess-Fan-Comics, /porn/album/Locofuria-Comics, /porn/album/JAB-Comics, /porn/album/ZZZ-Comics, /porn/album/ShadBase-Comics, /porn/album/Expansionfan-Comics, /porn/album/PalComix-Comics, /porn/album/IllustratedInterracial_com-Comics, /porn/album/Affect3D-Comics, /porn/album/PigKing-CrazyDad-Comics, /porn/album/Tracy-Scops-Comics, /porn/album/TG-Comics, /porn/album/Giantess-Club-Comics, /porn/album/Seiren_com_br-Comics, /porn/album/MuscleFan-Comics, /porn/album/Fansadox-Comics, /porn/album/DreamTales-Comics, /porn/album/Fred-Perry-Comics, /porn/album/Everfire-Comics, /porn/album/Innocent-Dickgirls-Comics, /porn/album/Y3DF-Your3DFantasy_com-Comics, /porn/album/Cartoon-Reality-Comics, /porn/album/8muses-Comics, /porn/album/Abimboleb-Comics, /porn/album/KAOS-Comics, /porn/album/Jay-Marvel-Comics, /porn/album/3DMonsterStories_com-Comics, /porn/album/Croc-Comics, /porn/album/Devin-Dickie-Comics, /porn/album/Melkormancin_com-Comics, /porn/album/JohnPersons_com-Comics, /porn/album/OkayOkayOKOk-Comics, /porn/album/Witchking00-Comics, /porn/album/Slipshine-Comics, /porn/album/The-Foxxx-Comics, /porn/album/MongoBongo-Comics, /porn/album/Vaesark-Comics, /porn/album/Moiarte-Comics, /porn/album/Tufos-Comics, /porn/album/DBComix-Deviant-Bondage-Comics, /porn/album/Taboolicious_xxx-Comics, /porn/album/Transform-Fan-Comics, /porn/album/Cartoon-Valley, /porn/album/Theme-Collections, /porn/album/PrismGirls-Comics, /porn/album/Interracial-Comics, /porn/album/Blacknwhitecomics_com-Comix, /porn/album/Dollproject-Comics, /porn/album/Karmagik-Comics, /porn/album/SuperHeroineComixxx, /porn/album/Kirtu_com-Comics, /porn/album/Expansion-Comics, /porn/album/Smudge-Comics, /porn/album/DukesHardcoreHoneys_com-Comics, /porn/album/Kogeikun-Comics, /porn/album/DizzyDills-Comics, /porn/album/Bimbo-Story-Club-Comics, /porn/album/ArtOfJaguar-Comics, /porn/album/Classic-Comics-Collection, /porn/album/Arabatos-Comics, /porn/album/DarkSoul3D-Comics, /porn/album/Stormfeder-Comics, /porn/album/Central-Comics, /porn/album/Blacknwhite_com-Comics, /porn/album/eBluberry-Comics, /porn/album/Gary-Roberts-Comics"
+    },
+    {
+      "fixtureId": "seed/8Muses/source",
+      "id": "69#1",
+      "expression": "string-join((//*[@id=\"imageDir\"]/@value,//*[@id=\"imageName\"]/@value),\"\")",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": ""
+    }
+  ]
+}

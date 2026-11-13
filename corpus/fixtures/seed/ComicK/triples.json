@@ -1,0 +1,147 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/ComicK/source.json",
+  "document": "json",
+  "moduleId": "214e30f0afec420cafddefe22b4d973c",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/ComicK/source",
+      "id": "145#1",
+      "expression": "json(*).data()",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/ComicK/source",
+      "id": "168#1",
+      "expression": "title",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/ComicK/source",
+      "id": "149#1",
+      "expression": "json(*).next_page_url",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/ComicK/source",
+      "id": "169#1",
+      "expression": "string-join(md_titles?*/title, \", \")",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/ComicK/source",
+      "id": "167#1",
+      "expression": "json(//script[@id=\"comic-data\"])",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/ComicK/source",
+      "id": "170#1",
+      "expression": "default_thumbnail",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/ComicK/source",
+      "id": "259#1",
+      "expression": "json(//script[@id=\"sv-data\"]).chapter.images().url",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/ComicK/source",
+      "id": "171#1",
+      "expression": "string-join(authors?*/name, \", \")",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/ComicK/source",
+      "id": "172#1",
+      "expression": "string-join(artists?*/name, \", \")",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/ComicK/source",
+      "id": "173#1",
+      "expression": "string-join(md_comic_md_genres?*/md_genres/name, \", \")",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/ComicK/source",
+      "id": "174#1",
+      "expression": "status",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/ComicK/source",
+      "id": "175#1",
+      "expression": "desc",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/ComicK/source",
+      "id": "177#1",
+      "expression": "demographic_name",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/ComicK/source",
+      "id": "179#1",
+      "expression": "origination",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/ComicK/source",
+      "id": "182#1",
+      "expression": "slug",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import type { LuaModuleDescriptor, ModuleOptionDescriptor } from '@fmd/contract';
 import { toBool, toInteger, toStr } from './base-globals.js';
 import type { FacadeBridge, FacadeSpec } from './facade.js';
+import { makeStorageSpec, TStringsStorageStrings, type StorageStrings } from './storage.js';
 
 /**
  * The `NewWebsiteModule()` object surface (§5.1,
@@ -63,11 +64,13 @@ export class ModuleBacking {
   readonly options = new Map<string, OptionBacking>();
   readonly eventHandlers: Record<string, string> = {};
 
-  readonly storage = new Map<string, string>();
-  storageText = '';
-  storageTag = 0;
-  storageEnable = false;
-  storageStatus = '';
+  /**
+   * §5.3: Storage rides the shared state service — the SAME StorageStrings
+   * across engines/workers for a module id. Modules without a service (the
+   * Init pass / tests) get a private instance with the TStringsStorage
+   * defaults.
+   */
+  storage: StorageStrings;
 
   accountEnabled = false;
   accountUsername = '';
@@ -75,53 +78,13 @@ export class ModuleBacking {
   accountStatus = 0; // asUnknown
   accountCookies = '';
 
+  constructor(storage?: StorageStrings) {
+    this.storage = storage ?? new TStringsStorageStrings();
+  }
+
   /** Build the Lua facade spec backed by this registration. */
   spec(bridge: FacadeBridge): FacadeSpec {
-    const storageFacadeId = bridge.create('', {
-      get: (k) => {
-        if (k === 'Text') {
-          return this.storageText;
-        }
-        if (k === 'Tag') {
-          return this.storageTag;
-        }
-        if (k === 'Enable') {
-          return this.storageEnable;
-        }
-        if (k === 'Status') {
-          return this.storageStatus;
-        }
-        if (k === 'Remove') {
-          return (key: unknown) => {
-            this.storage.delete(toStr(key));
-            return undefined;
-          };
-        }
-        if (k === 'Free' || k === 'Destroy') {
-          return () => undefined;
-        }
-        return this.storage.get(toStr(k)); // string keys are the KV map (§5.3)
-      },
-      set: (k, v) => {
-        if (k === 'Text') {
-          this.storageText = toStr(v);
-          return;
-        }
-        if (k === 'Tag') {
-          this.storageTag = toInteger(v);
-          return;
-        }
-        if (k === 'Enable') {
-          this.storageEnable = toBool(v);
-          return;
-        }
-        if (k === 'Status') {
-          this.storageStatus = toStr(v);
-          return;
-        }
-        this.storage.set(toStr(k), toStr(v));
-      },
-    });
+    const storageFacadeId = bridge.create('', makeStorageSpec(bridge, this.storage));
 
     let accountFacadeId: number | undefined;
     const guardianFacadeId = bridge.create('', { get: () => undefined, set: () => undefined });
@@ -351,13 +314,28 @@ export class ModuleBacking {
   }
 
   /** Rebuild an event-time MODULE backing from an Init-pass descriptor. */
-  static fromDescriptor(descriptor: LuaModuleDescriptor): ModuleBacking {
-    const backing = new ModuleBacking();
+  /**
+   * Rebuild an event-time MODULE backing from an Init-pass descriptor.
+   * `account` seeds host-level account credentials (§5.2: the account is
+   * reached only as MODULE.Account — there is no ACCOUNT global).
+   */
+  static fromDescriptor(
+    descriptor: LuaModuleDescriptor,
+    account?: { readonly enabled: boolean; readonly username: string; readonly password: string },
+    storage?: StorageStrings,
+  ): ModuleBacking {
+    const backing = new ModuleBacking(storage);
     backing.id = descriptor.id;
     backing.name = descriptor.name;
     backing.rootURL = descriptor.rootURL;
     backing.category = descriptor.category;
     backing.accountSupport = descriptor.accountSupport;
+    backing.totalDirectory = descriptor.totalDirectory ?? 0;
+    if (account !== undefined) {
+      backing.accountEnabled = account.enabled;
+      backing.accountUsername = account.username;
+      backing.accountPassword = account.password;
+    }
     for (const option of descriptor.options) {
       backing.options.set(option.name, {
         kind: option.kind,
@@ -393,6 +371,7 @@ export class ModuleBacking {
       rootURL: this.rootURL,
       category: this.category,
       accountSupport: this.accountSupport,
+      totalDirectory: this.totalDirectory,
       options,
       eventHandlers,
       sourceFile,

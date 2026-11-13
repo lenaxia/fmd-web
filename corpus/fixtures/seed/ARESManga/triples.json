@@ -1,0 +1,30 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/ARESManga/source.html",
+  "document": "html",
+  "moduleId": "1fd00c70f0b04a5e91eaf59b3e73de25",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/ARESManga/source",
+      "id": "49#1",
+      "expression": "//script[contains(@src, \"dHNfcmVhZGVyLnJ1bih7\")]/@src/substring-after(., \",\")",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/ARESManga/source",
+      "id": "51#1",
+      "expression": "json(*).sources()[1].images()",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    }
+  ]
+}

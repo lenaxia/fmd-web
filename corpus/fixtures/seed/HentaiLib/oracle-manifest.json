@@ -1,0 +1,109 @@
+{
+  "fixtureId": "seed/HentaiLib/source",
+  "moduleId": "17da8b4f514d418097801bfe9c88feab",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "38#1",
+      "expression": "data?*",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "37#1",
+      "expression": "json(*)",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "45#1",
+      "expression": "meta.has_next_page",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "61#1",
+      "expression": "json(*).data",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "62#1",
+      "expression": "cover?default",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "90#1",
+      "expression": "json(*).data()",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "63#1",
+      "expression": "string-join(authors?*?name, \", \")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "143#1",
+      "expression": "json(*).data.pages()",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "64#1",
+      "expression": "string-join(artists?*?name, \", \")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "65#1",
+      "expression": "string-join((genres?*?name, tags?*?name, type?label), \", \")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "66#1",
+      "expression": "scanlateStatus?label",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "67#1",
+      "expression": "summary",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "69#1",
+      "expression": "name",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "70#1",
+      "expression": "rus_name",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "71#1",
+      "expression": "eng_name",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "96#1",
+      "expression": "branches?*[not(restricted_view) or restricted_view?is_open=true]",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "98#1",
+      "expression": "teams?*?name",
+      "engine": "xpath",
+      "output": "all"
+    }
+  ]
+}

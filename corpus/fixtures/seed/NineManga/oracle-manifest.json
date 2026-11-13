@@ -1,0 +1,19 @@
+{
+  "fixtureId": "seed/NineManga/source",
+  "moduleId": "68c51e4148ee471fa221cd2d05cb216a",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "39#1",
+      "expression": "//li[contains(b, \"Alternative(s):\")]/substring-after(., \"Alternative(s):\")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "40#1",
+      "expression": "//ul[@class=\"message\"]/li[contains(b, \"Status\")]/a[1]",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

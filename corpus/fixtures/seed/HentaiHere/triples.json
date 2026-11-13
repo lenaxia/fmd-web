@@ -1,0 +1,120 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/HentaiHere/source.html",
+  "document": "html",
+  "moduleId": "66b0b8597daf4839bc7095c10e88039b",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/HentaiHere/source",
+      "id": "5#1",
+      "expression": "//h4/a/text()",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/HentaiHere/source",
+      "id": "29#1",
+      "expression": "json(*)()",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/HentaiHere/source",
+      "id": "6#1",
+      "expression": "//div[@id=\"cover\"]//img/@src",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/HentaiHere/source",
+      "id": "7#1",
+      "expression": "//div[@id=\"info\"]/div[contains(span, \"Artist\")]/a",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/HentaiHere/source",
+      "id": "8#1",
+      "expression": "//div[@id=\"info\"]/div[contains(span, \"Category\")]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/HentaiHere/source",
+      "id": "9#1",
+      "expression": "//div[@id=\"info\"]/div[contains(span, \"Status\")]/a",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/HentaiHere/source",
+      "id": "10#1",
+      "expression": "//div[@id=\"info\"]/div[contains(span, \"Summary\")]/text()",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/HentaiHere/source",
+      "id": "11#1",
+      "expression": "//ul[@class=\"arf-list\"]/li/a",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/HentaiHere/source",
+      "id": "15#1",
+      "expression": "./span/text()",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/HentaiHere/source",
+      "id": "26#1",
+      "expression": "//script[contains(.,\"rff_imageList\")]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/HentaiHere/source",
+      "id": "43#1",
+      "expression": "//div[contains(@class, \"seriesBlock\")]/div/div[2]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/HentaiHere/source",
+      "id": "53#1",
+      "expression": "(//ul[contains(@class,\"pagination\")]/li/a)[last()-1]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    }
+  ]
+}

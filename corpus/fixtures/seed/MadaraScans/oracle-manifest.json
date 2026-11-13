@@ -1,0 +1,49 @@
+{
+  "fixtureId": "seed/MadaraScans/source",
+  "moduleId": "397fd25544984834bdd72a60ed33053f",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "41#1",
+      "expression": "//h1[@class=\"lh-title\"]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "42#1",
+      "expression": "//div[@class=\"lh-poster\"]/img/@src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "43#1",
+      "expression": "//div[@class=\"lh-genres\"]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "44#1",
+      "expression": "//span[contains(@class, \"status-badge-lux\")]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "45#1",
+      "expression": "//div[@class=\"lh-story-content\"]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "47#1",
+      "expression": "//div[@class=\"ch-item  free\"]/a",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "49#1",
+      "expression": "div[1]/span[1]",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "moduleId": "17da8b4f514d418097801bfe9c88feab",
+  "module": "HentaiLib",
+  "capturedAt": "2026-11-13",
+  "template": "LibGroup",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/HentaiLib/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://hentailib.me/",
+      "description": "LibGroup-based"
+    }
+  ]
+}

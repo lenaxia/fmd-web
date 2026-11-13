@@ -1,0 +1,31 @@
+{
+  "fixtureId": "seed/CartoonPorn/source",
+  "moduleId": "d2d4a20548a641e4b24ae4c49379ae1f",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "52#1",
+      "expression": "//div[@class=\"post-title\"]/p",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "53#1",
+      "expression": "//span[contains(., \"Artists\")]/following-sibling::span/a/span[1]",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "54#1",
+      "expression": "//span[contains(., \"Tags\")]/following-sibling::span/a/span[1]",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "55#1",
+      "expression": "//div[contains(span, \"Description\")]//div",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

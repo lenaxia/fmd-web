@@ -1,0 +1,16 @@
+{
+  "moduleId": "f31e7a36050c424291c839f0a02d92a4",
+  "module": "ApollComics",
+  "capturedAt": "2026-11-13",
+  "template": "Madara",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/ApollComics/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://apollcomics.es/",
+      "description": "Madara-based"
+    }
+  ]
+}

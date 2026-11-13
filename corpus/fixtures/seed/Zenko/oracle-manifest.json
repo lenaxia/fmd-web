@@ -1,0 +1,79 @@
+{
+  "fixtureId": "seed/Zenko/source",
+  "moduleId": "2041ccec443f49ddb07bfbcbdac37ac5",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "95#1",
+      "expression": "json(*).meta.totalPages",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "106#1",
+      "expression": "json(*).data()",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "122#1",
+      "expression": "json(*).name",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "123#1",
+      "expression": "(json(*).engName, json(*).originalName)",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "124#1",
+      "expression": "json(*).coverImg",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "125#1",
+      "expression": "json(*).writers().name",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "126#1",
+      "expression": "json(*).painters().name",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "127#1",
+      "expression": "(json(*).genres().name, json(*).tags().name, concat(upper-case(substring(json(*).category, 1, 1)), lower-case(substring(json(*).category, 2))))",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "128#1",
+      "expression": "json(*).translationStatus",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "129#1",
+      "expression": "json(*).description",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "135#1",
+      "expression": "json(*)()",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "162#1",
+      "expression": "json(*).pages()",
+      "engine": "xpath",
+      "output": "all"
+    }
+  ]
+}

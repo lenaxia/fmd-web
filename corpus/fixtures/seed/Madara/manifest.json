@@ -1,0 +1,17 @@
+{
+  "moduleId": "0f223613e3cb340df6037d5304d4e6ee",
+  "module": "Madara",
+  "capturedAt": "2026-11-13",
+  "template": "Madara",
+  "expressionSource": "templates",
+  "syntheticId": true,
+  "entries": [
+    {
+      "fixtureId": "seed/Madara/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://wuxiaworld.site/manga/?page=1",
+      "description": "Madara template directory page captured on a live Madara site (Duktape JS require flow)"
+    }
+  ]
+}

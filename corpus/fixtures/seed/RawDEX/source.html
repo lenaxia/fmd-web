@@ -1,0 +1,1501 @@
+<!doctype html>
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <style id="jetpack-boost-critical-css">@media all{*{box-sizing:border-box}html{font-family:sans-serif;line-height:1.15;-webkit-text-size-adjust:100%}article,aside,header,main,nav,section{display:block}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","Liberation Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";font-size:1rem;font-weight:400;line-height:1.5;color:#212529;text-align:left;background-color:#fff}h1,h2,h3{margin-top:0;margin-bottom:.5rem}p{margin-top:0;margin-bottom:1rem}ul{margin-top:0;margin-bottom:1rem}a{color:#007bff;text-decoration:none;background-color:transparent}img{vertical-align:middle;border-style:none}label{display:inline-block;margin-bottom:.5rem}button{border-radius:0}button,input{margin:0;font-family:inherit;font-size:inherit;line-height:inherit}button,input{overflow:visible}button{text-transform:none}[type=button],[type=submit],button{-webkit-appearance:button}input[type=checkbox]{box-sizing:border-box;padding:0}[type=search]{outline-offset:-2px;-webkit-appearance:none}[hidden]{display:none!important}h1,h2,h3{margin-bottom:.5rem;font-weight:500;line-height:1.2}h1{font-size:2.5rem}h2{font-size:2rem}h3{font-size:1.75rem}.fade:not(.show){opacity:0}.nav{display:-ms-flexbox;display:flex;-ms-flex-wrap:wrap;flex-wrap:wrap;padding-left:0;margin-bottom:0;list-style:none}.close{float:right;font-size:1.5rem;font-weight:700;line-height:1;color:#000;text-shadow:0 1px 0#fff;opacity:.5}button.close{padding:0;background-color:transparent;border:0}.modal{position:fixed;top:0;left:0;z-index:1050;display:none;width:100%;height:100%;overflow:hidden;outline:0}.modal-dialog{position:relative;width:auto;margin:.5rem}.modal.fade .modal-dialog{-webkit-transform:translate(0,-50px);transform:translate(0,-50px)}.modal-content{position:relative;display:-ms-flexbox;display:flex;-ms-flex-direction:column;flex-direction:column;width:100%;background-color:#fff;background-clip:padding-box;border:1px solid rgba(0,0,0,.2);border-radius:.3rem;outline:0}.modal-header{display:-ms-flexbox;display:flex;-ms-flex-align:start;align-items:flex-start;-ms-flex-pack:justify;justify-content:space-between;padding:1rem 1rem;border-bottom:1px solid #dee2e6;border-top-left-radius:calc(.3rem - 1px);border-top-right-radius:calc(.3rem - 1px)}.modal-header .close{padding:1rem 1rem;margin:-1rem -1rem -1rem auto}.modal-body{position:relative;-ms-flex:1 1 auto;flex:1 1 auto;padding:1rem}.modal-footer{display:-ms-flexbox;display:flex;-ms-flex-wrap:wrap;flex-wrap:wrap;-ms-flex-align:center;align-items:center;-ms-flex-pack:end;justify-content:flex-end;padding:.75rem;border-top:1px solid #dee2e6;border-bottom-right-radius:calc(.3rem - 1px);border-bottom-left-radius:calc(.3rem - 1px)}@media (min-width:576px){.modal-dialog{max-width:500px;margin:1.75rem auto}}}@media all{:root{--rdx-bg:#111315;--rdx-surface:#1a1d20;--rdx-surface-2:#22262a;--rdx-text:#f5f7f7;--rdx-muted:#a7afb6;--rdx-line:rgba(255,255,255,.09);--rdx-accent:#c8ff32;--rdx-accent-dark:#101400;--rdx-width:1260px}*{box-sizing:border-box}html{scroll-behavior:smooth}body.rawdex-nova{background:var(--rdx-bg);color:var(--rdx-text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}body.rawdex-nova a{color:inherit;text-decoration:none}body.rawdex-nova img{max-width:100%;height:auto}.rdx-header{position:sticky;top:0;z-index:100;background:rgba(17,19,21,.96);border-bottom:1px solid var(--rdx-line);backdrop-filter:blur(12px)}.rdx-header__inner{width:min(var(--rdx-width),calc(100% - 32px));min-height:68px;margin:0 auto;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:16px}.rdx-brand{display:block;width:128px}.rdx-brand img{display:block;width:100%;height:auto;object-fit:contain}.rdx-search{display:flex;width:min(100%,460px);justify-self:center;border:1px solid var(--rdx-line);border-radius:8px;overflow:hidden;background:#171a1d}.rdx-search input{min-width:0;flex:1;border:0;outline:0;padding:11px 13px;color:var(--rdx-text);background:0 0;font:inherit}.rdx-search input::placeholder{color:var(--rdx-muted)}.rdx-search button{border:0;padding:0 14px;background:var(--rdx-accent);color:var(--rdx-accent-dark);font:inherit;font-weight:800}.rdx-header__actions{display:flex;align-items:center;gap:12px;white-space:nowrap}.rdx-link{color:var(--rdx-muted);font-size:.9rem}.rdx-button{display:inline-flex;justify-content:center;align-items:center;min-height:44px;padding:0 20px;border:1px solid var(--rdx-accent);border-radius:8px;background:var(--rdx-accent);color:var(--rdx-accent-dark);font-size:.9rem;font-weight:800}.rdx-button--ghost{min-height:34px;padding:0 13px;background:0 0;color:var(--rdx-accent)}.rdx-menu-toggle{display:none;width:44px;height:44px;border:1px solid var(--rdx-line);border-radius:8px;background:0 0}.rdx-menu-toggle span:not(.screen-reader-text){display:block;width:18px;height:2px;margin:4px auto;background:var(--rdx-text)}.rdx-nav{width:min(var(--rdx-width),calc(100% - 32px));margin:0 auto;border-top:1px solid var(--rdx-line)}.rdx-nav__list{display:flex;align-items:center;gap:26px;min-height:44px;padding:0;margin:0;list-style:none}.rdx-nav__list a{display:inline-flex;min-height:44px;align-items:center;color:var(--rdx-muted);font-size:.8rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase}.rdx-mobile-nav{display:none}body.rawdex-nova input{color:var(--rdx-text);background:var(--rdx-surface);border-color:var(--rdx-line)}body.rawdex-nova button,body.rawdex-nova input[type=submit]{font:inherit}@media (max-width:719px){.rdx-header__inner{min-height:62px;grid-template-columns:1fr auto}.rdx-brand{width:112px}.rdx-header .rdx-search,.rdx-header__actions,.rdx-nav{display:none}.rdx-menu-toggle{display:block}.rdx-mobile-nav[hidden]{display:none}.rdx-mobile-nav{display:block;position:fixed;z-index:99;inset:62px 0 0;background:rgba(0,0,0,.64)}.rdx-mobile-nav__panel{min-height:100%;padding:20px 16px;background:#15181a;box-shadow:12px 0 36px rgba(0,0,0,.35)}.rdx-search--mobile{display:flex;width:100%;max-width:none}}@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}.rdx-home{background:var(--rdx-bg);color:var(--rdx-text)}.rdx-home-shell{width:min(1440px,calc(100% - 44px));margin:0 auto;padding:34px 0 72px}.rdx-home-section{margin-bottom:42px}.rdx-home-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}.rdx-home-heading h1,.rdx-home-heading h2{margin:0;color:var(--rdx-text);font-size:clamp(1.1rem,1.7vw,1.38rem);font-weight:800}.rdx-home-heading h1 span,.rdx-home-heading h2 span{color:var(--rdx-accent)}.rdx-home-heading a{color:var(--rdx-muted);font-size:.75rem;font-weight:750}.rdx-home-rail{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}.rdx-home-card{min-width:0;overflow:hidden;border:1px solid var(--rdx-line);border-radius:8px;background:var(--rdx-surface)}.rdx-home-card__cover{display:block;overflow:hidden;aspect-ratio:2/2.78;background:var(--rdx-surface-2)}.rdx-home-card__cover img{display:block;width:100%;height:100%;object-fit:cover}.rdx-home-card__body{min-height:106px;padding:8px 8px 9px}.rdx-home-card h3{display:-webkit-box;overflow:hidden;margin:0;min-height:34px;color:var(--rdx-text);font-size:.72rem;line-height:1.22;-webkit-box-orient:vertical;-webkit-line-clamp:2}.rdx-home-card h3 a{color:inherit}.rdx-home-card__meta{min-height:18px;margin-top:4px}.rdx-home-card__status{color:#b9e96e;font-size:.62rem;font-weight:800}.rdx-home-card__chapters{display:grid;gap:3px;margin-top:5px}.rdx-home-card__chapters a{display:flex;overflow:hidden;align-items:center;min-height:20px;padding:2px 5px;border-radius:3px;color:var(--rdx-muted);background:rgba(255,255,255,.035);font-size:.6rem;text-overflow:ellipsis;white-space:nowrap}@media (max-width:1120px){.rdx-home-rail{grid-template-columns:repeat(5,minmax(0,1fr))}}@media (max-width:880px){.rdx-home-shell{width:min(920px,calc(100% - 32px));padding-top:28px}.rdx-home-rail{display:flex;overflow-x:auto;gap:11px;padding-bottom:8px;scroll-snap-type:x proximity}.rdx-home-rail .rdx-home-card{flex:0 0 158px;scroll-snap-align:start}}@media (max-width:599px){.rdx-home-shell{width:calc(100% - 24px);padding-top:22px}.rdx-home-section{margin-bottom:32px}.rdx-home-heading{margin-bottom:10px}.rdx-home-heading h1,.rdx-home-heading h2{font-size:1rem}.rdx-home-rail .rdx-home-card{flex-basis:140px}.rdx-home-card__body{min-height:96px;padding:7px}.rdx-home-card h3{font-size:.7rem}.rdx-home-card__chapters a{font-size:.58rem}}.rdx-home-rail{scrollbar-width:none}.rdx-home-rail::-webkit-scrollbar{display:none}.rdx-home-card__cover{aspect-ratio:2/3}.rdx-home-card__cover img{object-fit:cover;object-position:center}.rdx-rating{display:inline-flex;align-items:center;gap:4px;color:#ffb54d;font-size:.67rem;font-weight:800;white-space:nowrap}.rdx-rating__stars{position:relative;display:inline-block;color:rgba(255,255,255,.2);letter-spacing:1px;line-height:1}.rdx-rating__stars::after{position:absolute;inset:0 auto 0 0;width:var(--rdx-rating);overflow:hidden;color:#ffb54d;content:"★★★★★"}.rdx-rating__score{color:var(--rdx-muted);font-size:.64rem}.rdx-home-card__meta{display:flex;align-items:center;gap:7px}.rdx-home .rdx-home-card{display:flex;flex-direction:column;height:100%}.rdx-home .rdx-home-card__cover{flex:0 0 auto;overflow:hidden}.rdx-home .rdx-home-card__cover>img{display:block!important;width:100%!important;min-width:100%!important;height:100%!important;min-height:100%!important;max-height:none!important;object-fit:cover!important;object-position:center center!important}.rdx-home .rdx-home-card__body{display:flex;flex:1 1 auto;flex-direction:column}.rdx-home .rdx-home-card__chapters{margin-top:auto}.rdx-home .rdx-home-card__cover{aspect-ratio:3/4}.rdx-top-card__rank{position:absolute;top:8px;right:8px;display:grid;place-items:center;min-width:34px;height:26px;padding:0 7px;border-radius:7px;background:linear-gradient(135deg,#ffad2e,#f05a24);color:#14100b;font-size:11px;font-weight:900;box-shadow:0 4px 12px rgba(0,0,0,.32)}.rdx-home-card{display:flex;flex-direction:column;min-width:0;height:100%}.rdx-home-card__body{display:flex;flex:1 1 auto;flex-direction:column;min-height:116px}.rdx-home-card__body h3{display:-webkit-box;min-height:2.5em;overflow:hidden;-webkit-box-orient:vertical;-webkit-line-clamp:2}.rdx-home-card__chapters{margin-top:auto}.rdx-home-card h3{margin:0;color:var(--rdx-text);font-size:.72rem;font-weight:700;line-height:1.22}.rdx-home-card h3 a{color:inherit}@media (max-width:700px){.rdx-home-card h3{font-size:.7rem}}.rdx-carousel{position:relative}.rdx-carousel__viewport{overflow:hidden;margin:-4px;padding:4px;border-radius:10px;touch-action:pan-y;scrollbar-width:none}.rdx-carousel__viewport::-webkit-scrollbar{display:none}.rdx-carousel .rdx-carousel__track.rdx-home-rail{display:flex;width:100%;gap:12px;overflow:visible;padding:0;scroll-snap-type:none}.rdx-carousel .rdx-carousel__track .rdx-home-card{flex:0 0 calc((100% - 60px)/ 6);scroll-snap-align:start}.rdx-carousel .rdx-home-card__cover{position:relative}.rdx-carousel__control{position:absolute;z-index:3;top:38%;display:grid;width:36px;height:36px;padding:0 0 3px;place-items:center;border:1px solid rgba(195,255,63,.7);border-radius:50%;color:#11150a;background:var(--rdx-accent);box-shadow:0 5px 18px rgba(0,0,0,.42);font-size:1.7rem;line-height:1;opacity:.96}.rdx-carousel__control--prev{left:-12px;transform:translateY(-50%)}.rdx-carousel__control--next{right:-12px;transform:translateY(-50%)}@media (max-width:1120px){.rdx-carousel .rdx-carousel__track .rdx-home-card{flex-basis:calc((100% - 36px)/ 4)}}@media (max-width:880px){.rdx-carousel .rdx-carousel__track.rdx-home-rail{gap:11px}.rdx-carousel .rdx-carousel__track .rdx-home-card{flex-basis:calc((100% - 22px)/ 3)}}@media (max-width:599px){.rdx-carousel .rdx-carousel__track{gap:10px}.rdx-carousel .rdx-carousel__track .rdx-home-card{flex-basis:calc((100% - 10px)/ 2)}.rdx-carousel__control{top:35%;width:32px;height:32px;font-size:1.45rem}.rdx-carousel__control--prev{left:-8px}.rdx-carousel__control--next{right:-8px}}.rdx-home .rdx-home-card__body{min-height:124px;padding:9px}.rdx-home .rdx-home-card h3{min-height:2.48em;font-size:.8rem;font-weight:800;line-height:1.24}.rdx-home .rdx-home-card__meta{min-height:20px;margin-top:5px;gap:7px}.rdx-home .rdx-home-card__meta .rdx-rating{font-size:.69rem}.rdx-home .rdx-home-card__meta .rdx-rating__score{font-size:.66rem}.rdx-home .rdx-home-card__status{font-size:.66rem}.rdx-home .rdx-home-card__chapters{gap:4px;padding-top:6px}.rdx-home .rdx-home-card__chapters a{min-height:23px;padding:3px 6px;font-size:.66rem}@media (max-width:700px){.rdx-home .rdx-home-card__body{min-height:114px;padding:7px}.rdx-home .rdx-home-card h3{font-size:.75rem}.rdx-home .rdx-home-card__chapters a{min-height:22px;font-size:.62rem}}@media (max-width:460px){.rdx-home .rdx-home-card h3{font-size:.74rem}}.rdx-home .rdx-home-card__chapters a{justify-content:space-between;gap:7px;color:var(--rdx-muted);background:rgba(255,255,255,.035)}.rdx-home .rdx-home-card__chapters a>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rdx-chapter-up{display:inline-grid;width:21px;height:21px;flex:0 0 21px;place-items:center;border-radius:50%;color:#15180c;background:var(--rdx-accent);box-shadow:0 1px 0 rgba(255,255,255,.34) inset;font-size:.56rem;font-weight:900;letter-spacing:-.035em;line-height:1}@media (max-width:700px){.rdx-chapter-up{width:19px;height:19px;flex-basis:19px;font-size:.52rem}}.rdx-ad-slot{display:flex;width:min(100%,1180px);margin:20px auto;padding:0 14px;justify-content:center;text-align:center;overflow:hidden}.rdx-ad-slot>*{max-width:100%}@media (max-width:700px){.rdx-ad-slot{margin:14px auto;padding:0 8px}}}</style><meta name='robots' content='index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1' />
+
+	<!-- This site is optimized with the Yoast SEO plugin v28.6 - https://yoast.com/product/yoast-seo-wordpress/ -->
+	<title>Read Manga, Manhwa &amp; Webtoon Raw Online | RawDEX</title>
+	<meta name="description" content="Read manga, manhwa and webtoon raws online for free on RawDEX. Explore the latest Korean and Japanese raw chapters with daily updates and high-quality images." />
+	<link rel="canonical" href="https://rawdex.net/" />
+	<meta property="og:locale" content="en_US" />
+	<meta property="og:type" content="website" />
+	<meta property="og:title" content="Read Manga, Manhwa &amp; Webtoon Raw Online | RawDEX" />
+	<meta property="og:description" content="Read manga, manhwa and webtoon raws online for free on RawDEX. Explore the latest Korean and Japanese raw chapters with daily updates and high-quality images." />
+	<meta property="og:url" content="https://rawdex.net/" />
+	<meta property="og:site_name" content="RawDEX" />
+	<meta property="article:modified_time" content="2026-05-12T08:36:15+00:00" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<script data-jetpack-boost="ignore" type="application/ld+json" class="yoast-schema-graph">{"@context":"https:\/\/schema.org","@graph":[{"@type":"WebPage","@id":"https:\/\/rawdex.net\/","url":"https:\/\/rawdex.net\/","name":"Read Manga, Manhwa & Webtoon Raw Online | RawDEX","isPartOf":{"@id":"https:\/\/rawdex.net\/#website"},"about":{"@id":"https:\/\/rawdex.net\/#organization"},"datePublished":"2024-05-27T22:16:15+00:00","dateModified":"2026-05-12T08:36:15+00:00","description":"Read manga, manhwa and webtoon raws online for free on RawDEX. Explore the latest Korean and Japanese raw chapters with daily updates and high-quality images.","breadcrumb":{"@id":"https:\/\/rawdex.net\/#breadcrumb"},"inLanguage":"en-US","potentialAction":[{"@type":"ReadAction","target":["https:\/\/rawdex.net\/"]}]},{"@type":"BreadcrumbList","@id":"https:\/\/rawdex.net\/#breadcrumb","itemListElement":[{"@type":"ListItem","position":1,"name":"Home"}]},{"@type":"WebSite","@id":"https:\/\/rawdex.net\/#website","url":"https:\/\/rawdex.net\/","name":"RawDEX","description":"Read manga, manhwa and webtoon raws online for free on RawDEX. Explore the latest Korean and Japanese raw chapters with daily updates and high-quality images.","publisher":{"@id":"https:\/\/rawdex.net\/#organization"},"potentialAction":[{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"https:\/\/rawdex.net\/?s={search_term_string}"},"query-input":{"@type":"PropertyValueSpecification","valueRequired":true,"valueName":"search_term_string"}}],"inLanguage":"en-US"},{"@type":"Organization","@id":"https:\/\/rawdex.net\/#organization","name":"RawDEX","url":"https:\/\/rawdex.net\/","logo":{"@type":"ImageObject","@id":"https:\/\/rawdex.net\/#\/schema\/logo\/image\/","url":"https:\/\/rawdex.net\/wp-content\/uploads\/2024\/05\/logorawdex.png","contentUrl":"https:\/\/rawdex.net\/wp-content\/uploads\/2024\/05\/logorawdex.png","caption":"RawDEX"},"image":{"@id":"https:\/\/rawdex.net\/#\/schema\/logo\/image\/"}}]}</script>
+	<meta name="google-site-verification" content="hvsffsZg7IctZKoSAQOuIu1xKRUfJqAAHAwjOH4IZY0" />
+	<!-- / Yoast SEO plugin. -->
+
+
+<link rel='preconnect' href='//i0.wp.com' />
+<link rel="alternate" type="application/rss+xml" title="RawDEX &raquo; Feed" href="https://rawdex.net/feed/" />
+<link rel="alternate" type="application/rss+xml" title="RawDEX &raquo; Comments Feed" href="https://rawdex.net/comments/feed/" />
+<link rel="alternate" title="oEmbed (JSON)" type="application/json+oembed" href="https://rawdex.net/wp-json/oembed/1.0/embed?url=https%3A%2F%2Frawdex.net%2F" />
+<link rel="alternate" title="oEmbed (XML)" type="text/xml+oembed" href="https://rawdex.net/wp-json/oembed/1.0/embed?url=https%3A%2F%2Frawdex.net%2F&#038;format=xml" />
+<style id="wp-img-auto-sizes-contain-inline-css">
+img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
+/*# sourceURL=wp-img-auto-sizes-contain-inline-css */
+</style>
+<style id="wp-emoji-styles-inline-css">
+
+	img.wp-smiley, img.emoji {
+		display: inline !important;
+		border: none !important;
+		box-shadow: none !important;
+		height: 1em !important;
+		width: 1em !important;
+		margin: 0 0.07em !important;
+		vertical-align: -0.1em !important;
+		background: none !important;
+		padding: 0 !important;
+	}
+/*# sourceURL=wp-emoji-styles-inline-css */
+</style>
+<style id="wp-block-library-inline-css">
+:root{--wp-block-synced-color:#7a00df;--wp-block-synced-color--rgb:122,0,223;--wp-bound-block-color:var(--wp-block-synced-color);--wp-editor-canvas-background:#ddd;--wp-admin-theme-color:#007cba;--wp-admin-theme-color--rgb:0,124,186;--wp-admin-theme-color-darker-10:#006ba1;--wp-admin-theme-color-darker-10--rgb:0,107,160.5;--wp-admin-theme-color-darker-20:#005a87;--wp-admin-theme-color-darker-20--rgb:0,90,135;--wp-admin-border-width-focus:2px}@media (min-resolution:192dpi){:root{--wp-admin-border-width-focus:1.5px}}.wp-element-button{cursor:pointer}:root .has-very-light-gray-background-color{background-color:#eee}:root .has-very-dark-gray-background-color{background-color:#313131}:root .has-very-light-gray-color{color:#eee}:root .has-very-dark-gray-color{color:#313131}:root .has-vivid-green-cyan-to-vivid-cyan-blue-gradient-background{background:linear-gradient(135deg,#00d084,#0693e3)}:root .has-purple-crush-gradient-background{background:linear-gradient(135deg,#34e2e4,#4721fb 50%,#ab1dfe)}:root .has-hazy-dawn-gradient-background{background:linear-gradient(135deg,#faaca8,#dad0ec)}:root .has-subdued-olive-gradient-background{background:linear-gradient(135deg,#fafae1,#67a671)}:root .has-atomic-cream-gradient-background{background:linear-gradient(135deg,#fdd79a,#004a59)}:root .has-nightshade-gradient-background{background:linear-gradient(135deg,#330968,#31cdcf)}:root .has-midnight-gradient-background{background:linear-gradient(135deg,#020381,#2874fc)}:root{--wp--preset--font-size--normal:16px;--wp--preset--font-size--huge:42px}.has-regular-font-size{font-size:1em}.has-larger-font-size{font-size:2.625em}.has-normal-font-size{font-size:var(--wp--preset--font-size--normal)}.has-huge-font-size{font-size:var(--wp--preset--font-size--huge)}:root .has-text-align-center{text-align:center}:root .has-text-align-left{text-align:left}:root .has-text-align-right{text-align:right}.has-fit-text{white-space:nowrap!important}#end-resizable-editor-section{display:none}.aligncenter{clear:both}.items-justified-left{justify-content:flex-start}.items-justified-center{justify-content:center}.items-justified-right{justify-content:flex-end}.items-justified-space-between{justify-content:space-between}.screen-reader-text{word-wrap:normal!important;border:0;clip-path:inset(50%);height:1px;margin:-1px;overflow:hidden;padding:0;position:absolute;width:1px;word-break:normal!important}.screen-reader-text:focus{background-color:#ddd;clip-path:none;color:#444;display:block;font-size:1em;height:auto;left:5px;line-height:normal;padding:15px 23px 14px;text-decoration:none;top:5px;width:auto;z-index:100000}html :where(.has-border-color){border-style:solid}html :where([style^=border-color],[style*=";border-color"],[style*="; border-color"]){border-style:solid}html :where([style^=border-top-color],[style*=";border-top-color"],[style*="; border-top-color"]){border-top-style:solid}html :where([style^=border-right-color],[style*=";border-right-color"],[style*="; border-right-color"]){border-right-style:solid}html :where([style^=border-bottom-color],[style*=";border-bottom-color"],[style*="; border-bottom-color"]){border-bottom-style:solid}html :where([style^=border-left-color],[style*=";border-left-color"],[style*="; border-left-color"]){border-left-style:solid}html :where([style^=border-width],[style*=";border-width"],[style*="; border-width"]){border-style:solid}html :where([style^=border-top-width],[style*=";border-top-width"],[style*="; border-top-width"]){border-top-style:solid}html :where([style^=border-right-width],[style*=";border-right-width"],[style*="; border-right-width"]){border-right-style:solid}html :where([style^=border-bottom-width],[style*=";border-bottom-width"],[style*="; border-bottom-width"]){border-bottom-style:solid}html :where([style^=border-left-width],[style*=";border-left-width"],[style*="; border-left-width"]){border-left-style:solid}html :where(img[class*=wp-image-]){height:auto;max-width:100%}:where(figure){margin:0 0 1em}html :where(.is-position-sticky){--wp-admin--admin-bar--position-offset:var(--wp-admin--admin-bar--height,0px)}@media screen and (max-width:600px){html :where(.is-position-sticky){--wp-admin--admin-bar--position-offset:0px}}
+
+/*# sourceURL=/wp-includes/css/dist/block-library/common.min.css */
+</style>
+<style id="classic-theme-styles-inline-css">
+/*! This file is auto-generated */
+.wp-block-button__link{color:#fff;background-color:#32373c;border-radius:9999px;box-shadow:none;text-decoration:none;padding:calc(.667em + 2px) calc(1.333em + 2px);font-size:1.125em}.wp-block-file__button{background:#32373c;color:#fff;text-decoration:none}
+/*# sourceURL=/wp-includes/css/classic-themes.min.css */
+</style>
+
+
+<noscript><link rel='stylesheet' id='rawdex-partner-spotlight-css' href='https://rawdex.net/wp-content/plugins/rawdex-partner-spotlight/assets/partner-spotlight.css?ver=1788410718' media='all' />
+</noscript><link data-media="all" onload="this.media=this.dataset.media; delete this.dataset.media; this.removeAttribute( &apos;onload&apos; );" rel='stylesheet' id='rawdex-partner-spotlight-css' href='https://rawdex.net/wp-content/plugins/rawdex-partner-spotlight/assets/partner-spotlight.css?ver=1788410718' media="not all" />
+<noscript><link rel='stylesheet' id='ct-shortcode-css' href='https://rawdex.net/wp-content/plugins/wp-manga-shortcodes/shortcodes/css/shortcodes.css?ver=7.1.2' media='all' />
+</noscript><link data-media="all" onload="this.media=this.dataset.media; delete this.dataset.media; this.removeAttribute( &apos;onload&apos; );" rel='stylesheet' id='ct-shortcode-css' href='https://rawdex.net/wp-content/plugins/wp-manga-shortcodes/shortcodes/css/shortcodes.css?ver=7.1.2' media="not all" />
+<noscript><link rel='stylesheet' id='fontawesome-css' href='https://rawdex.net/wp-content/themes/madara/app/lib/fontawesome/web-fonts-with-css/css/all.min.css?ver=5.15.3' media='all' />
+</noscript><link data-media="all" onload="this.media=this.dataset.media; delete this.dataset.media; this.removeAttribute( &apos;onload&apos; );" rel='stylesheet' id='fontawesome-css' href='https://rawdex.net/wp-content/themes/madara/app/lib/fontawesome/web-fonts-with-css/css/all.min.css?ver=5.15.3' media="not all" />
+<noscript><link rel='stylesheet' id='ionicons-css' href='https://rawdex.net/wp-content/themes/madara/css/fonts/ionicons/css/ionicons.min.css?ver=4.5.10' media='all' />
+</noscript><link data-media="all" onload="this.media=this.dataset.media; delete this.dataset.media; this.removeAttribute( &apos;onload&apos; );" rel='stylesheet' id='ionicons-css' href='https://rawdex.net/wp-content/themes/madara/css/fonts/ionicons/css/ionicons.min.css?ver=4.5.10' media="not all" />
+<noscript><link rel='stylesheet' id='madara-icons-css' href='https://rawdex.net/wp-content/themes/madara/css/fonts/ct-icon/ct-icon.css?ver=7.1.2' media='all' />
+</noscript><link data-media="all" onload="this.media=this.dataset.media; delete this.dataset.media; this.removeAttribute( &apos;onload&apos; );" rel='stylesheet' id='madara-icons-css' href='https://rawdex.net/wp-content/themes/madara/css/fonts/ct-icon/ct-icon.css?ver=7.1.2' media="not all" />
+<noscript><link rel='stylesheet' id='bootstrap-css' href='https://rawdex.net/wp-content/themes/madara/css/bootstrap.min.css?ver=4.3.1' media='all' />
+</noscript><link data-media="all" onload="this.media=this.dataset.media; delete this.dataset.media; this.removeAttribute( &apos;onload&apos; );" rel='stylesheet' id='bootstrap-css' href='https://rawdex.net/wp-content/themes/madara/css/bootstrap.min.css?ver=4.3.1' media="not all" />
+<noscript><link rel='stylesheet' id='slick-css' href='https://rawdex.net/wp-content/themes/madara/js/slick/slick.css?ver=1.9.0' media='all' />
+</noscript><link data-media="all" onload="this.media=this.dataset.media; delete this.dataset.media; this.removeAttribute( &apos;onload&apos; );" rel='stylesheet' id='slick-css' href='https://rawdex.net/wp-content/themes/madara/js/slick/slick.css?ver=1.9.0' media="not all" />
+<noscript><link rel='stylesheet' id='slick-theme-css' href='https://rawdex.net/wp-content/themes/madara/js/slick/slick-theme.css?ver=7.1.2' media='all' />
+</noscript><link data-media="all" onload="this.media=this.dataset.media; delete this.dataset.media; this.removeAttribute( &apos;onload&apos; );" rel='stylesheet' id='slick-theme-css' href='https://rawdex.net/wp-content/themes/madara/js/slick/slick-theme.css?ver=7.1.2' media="not all" />
+<noscript><link rel='stylesheet' id='loaders-css' href='https://rawdex.net/wp-content/themes/madara/css/loaders.min.css?ver=7.1.2' media='all' />
+</noscript><link data-media="all" onload="this.media=this.dataset.media; delete this.dataset.media; this.removeAttribute( &apos;onload&apos; );" rel='stylesheet' id='loaders-css' href='https://rawdex.net/wp-content/themes/madara/css/loaders.min.css?ver=7.1.2' media="not all" />
+<noscript><link rel='stylesheet' id='madara-css-css' href='https://rawdex.net/wp-content/themes/rawdex-nova/style.css?ver=2.5' media='all' />
+</noscript><link data-media="all" onload="this.media=this.dataset.media; delete this.dataset.media; this.removeAttribute( &apos;onload&apos; );" rel='stylesheet' id='madara-css-css' href='https://rawdex.net/wp-content/themes/rawdex-nova/style.css?ver=2.5' media="not all" />
+<style id="madara-css-inline-css">
+:root{ --madara-main-color: #eb3349; }
+			#pageloader.spinners{
+				position:fixed;
+				top:0;
+				left:0;
+				width:100%;
+				height:100%;
+				z-index:99999;
+				background:#222
+			}
+		
+			p.madara-unyson{
+				color: #FF0000;
+			}
+		
+			.table.table-hover.list-bookmark tr:last-child td{
+				text-align: center;
+			}
+		#adminmenu .wp-submenu li.current { display: none !important;}.show_tgmpa_version{ float: right; padding: 0em 1.5em 0.5em 0; }.tgmpa > h2{ font-size: 23px; font-weight: 400; line-height: 29px; margin: 0; padding: 9px 15px 4px 0;}.update-php{ width: 100%; height: 98%; min-height: 850px; padding-top: 1px; }.c-blog-post .entry-content .entry-content_wrap .read-container img.alignleft { margin: 10px 30px 10px 0 !important; } .c-blog-post .entry-content .entry-content_wrap .read-container img.alignright { margin: 10px 0px 10px 30px !important; } .read-container i.fas.fa-spinner.fa-spin{ font-size: 31px; color: #888; }.c-blog-post .entry-content .entry-content_wrap .read-container img{ cursor : pointer; }.choose-avatar .loading-overlay {
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background-color: rgba(255, 255, 255, 0.72);
+			z-index: 1;
+			display: none;
+		}
+
+		.choose-avatar .loading-overlay i.fas.fa-spinner {
+			font-size: 40px;
+			color: #ec3348;
+		}
+
+		.choose-avatar .loading-overlay .loading-icon {
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%,-50%);
+		}
+
+		.choose-avatar.uploading .loading-overlay {
+			display: block;
+		}.site-header .c-sub-header-nav .entry-header {
+			display: none;
+			margin-bottom: 15px;
+		}
+
+		.site-header .c-sub-header-nav.sticky .entry-header {
+			display: block;
+		}
+
+		.site-header .c-sub-header-nav.hide-sticky-menu.sticky .c-sub-nav_wrap{
+			display:none;
+		}
+		.site-header .c-sub-header-nav.hide-sticky-menu .entry-header{
+			margin-top:15px;
+		}
+		@media (max-width: 480px) {.c-blog-post .entry-content .entry-content_wrap .reading-content{margin-left:-15px;margin-right:-15px}}
+
+/*# sourceURL=madara-css-inline-css */
+</style>
+<noscript><link rel='stylesheet' id='rawdex-nova-base-css' href='https://rawdex.net/wp-content/themes/rawdex-nova/style.css?ver=0.1.0' media='all' />
+</noscript><link data-media="all" onload="this.media=this.dataset.media; delete this.dataset.media; this.removeAttribute( &apos;onload&apos; );" rel='stylesheet' id='rawdex-nova-base-css' href='https://rawdex.net/wp-content/themes/rawdex-nova/style.css?ver=0.1.0' media="not all" />
+<noscript><link rel='stylesheet' id='rawdex-nova-ui-css' href='https://rawdex.net/wp-content/themes/rawdex-nova/assets/css/rawdex-nova.css?ver=1787080645-9f3951a1db' media='all' />
+</noscript><link data-media="all" onload="this.media=this.dataset.media; delete this.dataset.media; this.removeAttribute( &apos;onload&apos; );" rel='stylesheet' id='rawdex-nova-ui-css' href='https://rawdex.net/wp-content/themes/rawdex-nova/assets/css/rawdex-nova.css?ver=1787080645-9f3951a1db' media="not all" />
+
+
+<link rel="https://api.w.org/" href="https://rawdex.net/wp-json/" /><link rel="alternate" title="JSON" type="application/json" href="https://rawdex.net/wp-json/wp/v2/pages/18" /><link rel="EditURI" type="application/rsd+xml" title="RSD" href="https://rawdex.net/xmlrpc.php?rsd" />
+<meta name="generator" content="WordPress 7.1.2" />
+<link rel='shortlink' href='https://rawdex.net/' />
+<link rel="icon" href="https://i0.wp.com/rawdex.net/wp-content/uploads/2024/05/cropped-iconerawdex.png?fit=32%2C32&#038;ssl=1" sizes="32x32" />
+<link rel="icon" href="https://i0.wp.com/rawdex.net/wp-content/uploads/2024/05/cropped-iconerawdex.png?fit=192%2C192&#038;ssl=1" sizes="192x192" />
+<link rel="apple-touch-icon" href="https://i0.wp.com/rawdex.net/wp-content/uploads/2024/05/cropped-iconerawdex.png?fit=180%2C180&#038;ssl=1" />
+<meta name="msapplication-TileImage" content="https://i0.wp.com/rawdex.net/wp-content/uploads/2024/05/cropped-iconerawdex.png?fit=270%2C270&#038;ssl=1" />
+<meta property="og:image" content="https://rawdex.net/wp-content/uploads/2024/05/logorawdex.png"/>
+<meta property="og:site_name" content="RawDEX"/>
+<meta property="fb:app_id" content="" />
+<meta property="og:title" content="RawDEX"/>
+<meta property="og:description" content="Read manga, manhwa and webtoon raws online for free on RawDEX. Explore the latest Korean and Japanese raw chapters with daily updates and high-quality images."/>
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:site" content="@RawDEX" />
+<meta name="twitter:title" content="RawDEX" />
+<meta name="twitter:description" content="Read manga, manhwa and webtoon raws online for free on RawDEX. Explore the latest Korean and Japanese raw chapters with daily updates and high-quality images." />
+<meta name="twitter:image" content="https://rawdex.net/wp-content/uploads/2024/05/logorawdex.png" />
+<meta name="description" content="Read manga, manhwa and webtoon raws online for free on RawDEX. Explore the latest Korean and Japanese raw chapters with daily updates and high-quality images." /><meta name="generator" content="Powered by Madara - A powerful manga, novel theme from Mangabooth.com" />
+			<style>
+			@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Special+Gothic+Expanded+One&family=Winky+Rough:ital,wght@0,300..900;1,300..900&display=swap');
+			</style>
+			</head>
+<body class="home wp-singular page-template page-template-page-templates page-template-front-page page-template-page-templatesfront-page-php page page-id-18 wp-embed-responsive wp-theme-madara wp-child-theme-rawdex-nova rawdex-nova header-style-1 text-ui-dark">
+<div class="rdx-shell" id="top">
+            <header class="rdx-header">
+            <div class="rdx-header__inner">
+                <a class="rdx-brand" href="https://rawdex.net/" aria-label="RawDEX home">
+                    <img src="https://rawdex.net/wp-content/uploads/2024/05/logorawdex.png" alt="RawDEX" width="150" height="42" decoding="async">
+                </a>
+
+                <div class="rdx-mobile-quick-actions" aria-label="Quick actions">
+                    <button class="rdx-mobile-header-icon" type="button" data-rdx-mobile-search-trigger aria-controls="rdx-mobile-nav" aria-expanded="false" aria-label="Search titles" title="Search">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="m16 16 4.3 4.3"></path></svg>
+                    </button>
+                                            <a class="rdx-mobile-header-icon rdx-mobile-header-icon--account" href="https://rawdex.net/wp-login.php" aria-label="Sign in or sign up" title="Sign in or sign up">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.3"></circle><path d="M4.8 21a7.2 7.2 0 0 1 14.4 0"></path></svg>
+                        </a>
+                                    </div>
+
+                <form class="rdx-search" method="get" action="https://rawdex.net/" role="search">
+                    <label class="screen-reader-text" for="rdx-search-input">Search titles</label>
+                    <input id="rdx-search-input" type="search" name="s" value="" placeholder="Search titles..." autocomplete="off">
+                    <button type="submit" aria-label="Search">Search</button>
+                </form>
+
+                <div class="rdx-header__actions">
+                                            <a class="rdx-link" href="https://rawdex.net/wp-login.php">Sign in</a>
+                        <a class="rdx-button rdx-button--ghost" href="https://rawdex.net/wp-login.php?action=register">Sign up</a>
+                                    </div>
+
+                <button class="rdx-menu-toggle" type="button" aria-expanded="false" aria-controls="rdx-mobile-nav">
+                    <span class="screen-reader-text">Open menu</span><span></span><span></span><span></span>
+                </button>
+            </div>
+
+            <nav class="rdx-nav" aria-label="Primary navigation">
+                <ul class="rdx-nav__list"><li><a href="https://rawdex.net/">Home</a></li><li><a href="https://rawdex.net/manga/">Manhwa list</a></li><li class="rdx-menu-top-manhwa"><a href="https://rawdex.net/top-manhwa/week/">Top Manhwa</a></li><li class="rdx-menu-random"><a href="https://rawdex.net/?random_manga=1">Random</a></li></ul>            </nav>
+        </header>
+
+        <aside class="rdx-mobile-nav" id="rdx-mobile-nav" hidden>
+            <div class="rdx-mobile-nav__panel">
+                <form class="rdx-search rdx-search--mobile" method="get" action="https://rawdex.net/" role="search">
+                    <label class="screen-reader-text" for="rdx-mobile-search">Search titles</label>
+                    <input id="rdx-mobile-search" type="search" name="s" placeholder="Search titles...">
+                    <button type="submit">Search</button>
+                </form>
+                                    <div class="rdx-mobile-auth-actions">
+                        <a href="https://rawdex.net/wp-login.php"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5"></path><path d="M15 12H3"></path><path d="M21 19V5a2 2 0 0 0-2-2h-7"></path></svg><span>Sign in</span></a>
+                        <a href="https://rawdex.net/wp-login.php?action=register"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.2"></circle><path d="M5 21a7 7 0 0 1 14 0"></path><path d="M19 4v4M17 6h4"></path></svg><span>Sign up</span></a>
+                    </div>
+                                <ul class="rdx-nav__list"><li><a href="https://rawdex.net/">Home</a></li><li><a href="https://rawdex.net/manga/">Manhwa list</a></li><li class="rdx-menu-top-manhwa"><a href="https://rawdex.net/top-manhwa/week/">Top Manhwa</a></li><li class="rdx-menu-random"><a href="https://rawdex.net/?random_manga=1">Random</a></li></ul>            </div>
+        </aside>
+        <div class="rdx-ad-slot rdx-ad-slot--before_content"> 
+ <ins class="eas6a97888e2" data-zoneid="4810922"></ins> 
+ 
+
+<!-- JuicyAds v3.0 -->
+
+<ins id="969230" data-width="300" data-height="250"></ins>
+
+<!--JuicyAds END--></div>        <main class="rdx-main" id="content">
+<main class="rdx-home" id="primary">
+    <div class="rdx-home-shell">
+                    <section class="rdx-home-section rdx-home-section--rail" aria-labelledby="popular-title">
+                <header class="rdx-home-heading">
+                    <h1 id="popular-title"><span>Popular</span> this week</h1>
+                    <a href="https://rawdex.net/top-manhwa/week/">View all</a>
+                </header>
+                                    <div class="rdx-carousel" data-carousel data-autoplay="6000">
+                        <button class="rdx-carousel__control rdx-carousel__control--prev" type="button" data-carousel-prev aria-label="Show previous popular titles" aria-controls="popular-carousel">‹</button>
+                        <div class="rdx-carousel__viewport" id="popular-carousel" data-carousel-viewport tabindex="0" aria-label="Popular titles carousel">
+                            <div class="rdx-home-rail rdx-carousel__track" data-carousel-track>
+                                    <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/wireless-onahole-030ff47a/" aria-label="Open Wireless Onahole">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2025/03/Wireless-Onahole.jpg?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" fetchpriority="high" loading="eager" decoding="async">
+            <span class="rdx-top-card__rank" aria-label="All time rank 6">#6</span>        </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/wireless-onahole-030ff47a/">Wireless Onahole</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="4.5 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:90.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">4.5 (39)</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/wireless-onahole-030ff47a/128/">
+                        <span>Chapter 128</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/wireless-onahole-030ff47a/127/">
+                        <span>Chapter 127</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/my-girlfriends-corruption/" aria-label="Open My Girlfriend&#8217;s Corruption">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/01/My-Girlfriend-Was-Already-Fully-Trained.jpg?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" fetchpriority="high" loading="eager" decoding="async">
+            <span class="rdx-top-card__rank" aria-label="All time rank 39">#39</span>        </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/my-girlfriends-corruption/">My Girlfriend&#8217;s Corruption</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="4.4 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:88.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">4.4 (6)</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/my-girlfriends-corruption/49/">
+                        <span>Chapter 49</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/my-girlfriends-corruption/48/">
+                        <span>Chapter 48</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/love-quest-qrq-b6e039fe/" aria-label="Open Love Quest (QRQ)">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/03/Love-Quest.webp?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" fetchpriority="high" loading="eager" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/love-quest-qrq-b6e039fe/">Love Quest (QRQ)</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="4.7 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:94.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">4.7 (2)</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/love-quest-qrq-b6e039fe/39/">
+                        <span>Chapter 39</span>
+                                            </a>
+                                    <a href="https://rawdex.net/manga/love-quest-qrq-b6e039fe/38/">
+                        <span>Chapter 38</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/keep-likes-private/" aria-label="Open Keep &#8216;Likes&#8217; Private">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/09/Keep-Likes-Private.png?fit=225%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+            <span class="rdx-top-card__rank" aria-label="All time rank 82">#82</span>        </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/keep-likes-private/">Keep &#8216;Likes&#8217; Private</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="4.8 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:96.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">4.8</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/keep-likes-private/5/">
+                        <span>Chapter 5</span>
+                                            </a>
+                                    <a href="https://rawdex.net/manga/keep-likes-private/4/">
+                        <span>Chapter 4</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/lustful-games-b60d532c/" aria-label="Open Lustful Games">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2024/06/Lustful-Games-1.jpg?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+            <span class="rdx-top-card__rank" aria-label="All time rank 1">#1</span>        </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/lustful-games-b60d532c/">Lustful Games</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="4.2 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:84.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">4.2 (33)</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/lustful-games-b60d532c/155/">
+                        <span>Chapter 155</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/lustful-games-b60d532c/154/">
+                        <span>Chapter 154</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/cherry-trap/" aria-label="Open Cherry Trap">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/11/i542149.jpg?fit=206%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/cherry-trap/">Cherry Trap</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="5.0 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:100.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">5.0</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/cherry-trap/12/">
+                        <span>Chapter 12</span>
+                                            </a>
+                                    <a href="https://rawdex.net/manga/cherry-trap/11/">
+                        <span>Chapter 11</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/isekai-ntr-jp/" aria-label="Open Isekai NTR (JP)">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/03/Isekai-NTR-JP.jpg?fit=211%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+            <span class="rdx-top-card__rank" aria-label="All time rank 69">#69</span>        </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/isekai-ntr-jp/">Isekai NTR (JP)</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="4.2 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:84.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">4.2 (1)</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/isekai-ntr-jp/72/">
+                        <span>Chapter 72</span>
+                                            </a>
+                                    <a href="https://rawdex.net/manga/isekai-ntr-jp/71/">
+                        <span>Chapter 71</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/milf-hunter-in-another-world-rawz/" aria-label="Open MILF Hunter in Another World">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2025/04/MILF-Hunting-In-Another-World.jpg?fit=206%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+            <span class="rdx-top-card__rank" aria-label="All time rank 22">#22</span>        </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/milf-hunter-in-another-world-rawz/">MILF Hunter in Another World</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="4.3 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:86.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">4.3 (36)</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/milf-hunter-in-another-world-rawz/144/">
+                        <span>Chapter 144</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/milf-hunter-in-another-world-rawz/143/">
+                        <span>Chapter 143</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/i-became-the-manager-of-a-sponsored-idol/" aria-label="Open I Became the Manager of a Sponsored Idol">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/10/i540942.jpg?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/i-became-the-manager-of-a-sponsored-idol/">I Became the Manager of a Sponsored Idol</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="5.0 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:100.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">5.0</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/i-became-the-manager-of-a-sponsored-idol/9/">
+                        <span>Chapter 9</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/i-became-the-manager-of-a-sponsored-idol/8/">
+                        <span>Chapter 8</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/childhood-friend-yuwol/" aria-label="Open Childhood Friend (Yuwol)">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/11/i515968.jpg?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/childhood-friend-yuwol/">Childhood Friend (Yuwol)</a></h3>
+            <div class="rdx-home-card__meta">
+                                <span class="rdx-home-card__status">end</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/childhood-friend-yuwol/30/">
+                        <span>Chapter 30</span>
+                                            </a>
+                                    <a href="https://rawdex.net/manga/childhood-friend-yuwol/29/">
+                        <span>Chapter 29</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/hypnotist-security-guard-b6e039fe/" aria-label="Open Hypnotist Security Guard">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2024/09/Hypnotic-Security-Guard.jpg?fit=212%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+            <span class="rdx-top-card__rank" aria-label="All time rank 5">#5</span>        </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/hypnotist-security-guard-b6e039fe/">Hypnotist Security Guard</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="4.3 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:86.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">4.3 (69)</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/hypnotist-security-guard-b6e039fe/120/">
+                        <span>Chapter 120</span>
+                                            </a>
+                                    <a href="https://rawdex.net/manga/hypnotist-security-guard-b6e039fe/119/">
+                        <span>Chapter 119</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/please-fix-it-young-master/" aria-label="Open Please Fix It, Young Master!">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/11/i541827.png?fit=206%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/please-fix-it-young-master/">Please Fix It, Young Master!</a></h3>
+            <div class="rdx-home-card__meta">
+                                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/please-fix-it-young-master/7/">
+                        <span>Chapter 7</span>
+                                            </a>
+                                    <a href="https://rawdex.net/manga/please-fix-it-young-master/6/">
+                        <span>Chapter 6</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+                                </div>
+                        </div>
+                        <button class="rdx-carousel__control rdx-carousel__control--next" type="button" data-carousel-next aria-label="Show next popular titles" aria-controls="popular-carousel">›</button>
+                    </div>
+                            </section>
+
+            <section class="rdx-home-section rdx-home-section--rail" aria-labelledby="new-title">
+                <header class="rdx-home-heading">
+                    <h2 id="new-title"><span>New</span> manhwa</h2>
+                    <a href="https://rawdex.net/manga/">View all</a>
+                </header>
+                                    <div class="rdx-carousel" data-carousel data-autoplay="6000">
+                        <button class="rdx-carousel__control rdx-carousel__control--prev" type="button" data-carousel-prev aria-label="Show previous new titles" aria-controls="new-carousel">‹</button>
+                        <div class="rdx-carousel__viewport" id="new-carousel" data-carousel-viewport tabindex="0" aria-label="New titles carousel">
+                            <div class="rdx-home-rail rdx-carousel__track" data-carousel-track>
+                                    <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/the-wicked-shaman/" aria-label="Open The Wicked Shaman">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/11/i542345.jpg?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/the-wicked-shaman/">The Wicked Shaman</a></h3>
+            <div class="rdx-home-card__meta">
+                                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/the-wicked-shaman/6/">
+                        <span>Chapter 6</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/the-wicked-shaman/5/">
+                        <span>Chapter 5</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/ahjummas-secret-employment/" aria-label="Open Ahjumma&#8217;s Secret Employment">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/11/i542135.jpg?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/ahjummas-secret-employment/">Ahjumma&#8217;s Secret Employment</a></h3>
+            <div class="rdx-home-card__meta">
+                                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/ahjummas-secret-employment/6/">
+                        <span>Chapter 6</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/ahjummas-secret-employment/5/">
+                        <span>Chapter 5</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/dangerous-younger-sibling-friend/" aria-label="Open Dangerous Younger Sibling Friend">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/11/i542527.jpg?fit=226%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/dangerous-younger-sibling-friend/">Dangerous Younger Sibling Friend</a></h3>
+            <div class="rdx-home-card__meta">
+                                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/dangerous-younger-sibling-friend/10/">
+                        <span>Chapter 10</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/dangerous-younger-sibling-friend/9/">
+                        <span>Chapter 9</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/act-out-han-yi-rim/" aria-label="Open Act Out (Han Yi Rim)">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/11/i542211.jpg?fit=206%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/act-out-han-yi-rim/">Act Out (Han Yi Rim)</a></h3>
+            <div class="rdx-home-card__meta">
+                                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/act-out-han-yi-rim/13/">
+                        <span>Chapter 13</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/act-out-han-yi-rim/12/">
+                        <span>Chapter 12</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/innocent-childhood-friend/" aria-label="Open Innocent Childhood Friend">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/11/i542195.jpg?fit=206%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/innocent-childhood-friend/">Innocent Childhood Friend</a></h3>
+            <div class="rdx-home-card__meta">
+                                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/innocent-childhood-friend/10/">
+                        <span>Chapter 10</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/innocent-childhood-friend/9/">
+                        <span>Chapter 9</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/dirty-campus/" aria-label="Open Dirty Campus">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/11/i542154.jpg?fit=300%2C203&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/dirty-campus/">Dirty Campus</a></h3>
+            <div class="rdx-home-card__meta">
+                                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/dirty-campus/1/">
+                        <span>Chapter 1</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/reverse-try/" aria-label="Open Reverse Try">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/11/i540521.png?fit=226%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/reverse-try/">Reverse Try</a></h3>
+            <div class="rdx-home-card__meta">
+                                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/reverse-try/7/">
+                        <span>Chapter 7</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/reverse-try/6/">
+                        <span>Chapter 6</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/o-tree-of-many-years/" aria-label="Open O Tree of Many Years">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/11/i539119.jpg?fit=206%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/o-tree-of-many-years/">O Tree of Many Years</a></h3>
+            <div class="rdx-home-card__meta">
+                                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/o-tree-of-many-years/24/">
+                        <span>Chapter 24</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/o-tree-of-many-years/23/">
+                        <span>Chapter 23</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/childhood-friend-yuwol/" aria-label="Open Childhood Friend (Yuwol)">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/11/i515968.jpg?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/childhood-friend-yuwol/">Childhood Friend (Yuwol)</a></h3>
+            <div class="rdx-home-card__meta">
+                                <span class="rdx-home-card__status">end</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/childhood-friend-yuwol/30/">
+                        <span>Chapter 30</span>
+                                            </a>
+                                    <a href="https://rawdex.net/manga/childhood-friend-yuwol/29/">
+                        <span>Chapter 29</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/living-with-my-friends-older-brother/" aria-label="Open Living With My Friend&#8217;s Older Brother">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/11/i542148.jpg?fit=206%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/living-with-my-friends-older-brother/">Living With My Friend&#8217;s Older Brother</a></h3>
+            <div class="rdx-home-card__meta">
+                                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/living-with-my-friends-older-brother/8/">
+                        <span>Chapter 8</span>
+                                            </a>
+                                    <a href="https://rawdex.net/manga/living-with-my-friends-older-brother/7/">
+                        <span>Chapter 7</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/cherry-trap/" aria-label="Open Cherry Trap">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/11/i542149.jpg?fit=206%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/cherry-trap/">Cherry Trap</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="5.0 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:100.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">5.0</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/cherry-trap/12/">
+                        <span>Chapter 12</span>
+                                            </a>
+                                    <a href="https://rawdex.net/manga/cherry-trap/11/">
+                        <span>Chapter 11</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/not-sober/" aria-label="Open Not Sober">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/11/i528939.jpg?fit=300%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/not-sober/">Not Sober</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="4.5 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:90.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">4.5</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/not-sober/25/">
+                        <span>Chapter 25</span>
+                                            </a>
+                                    <a href="https://rawdex.net/manga/not-sober/24/">
+                        <span>Chapter 24</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+                                </div>
+                        </div>
+                        <button class="rdx-carousel__control rdx-carousel__control--next" type="button" data-carousel-next aria-label="Show next new titles" aria-controls="new-carousel">›</button>
+                    </div>
+                            </section>
+        
+        <section class="rdx-home-section rdx-home-section--latest" aria-labelledby="latest-title">
+            <header class="rdx-home-heading">
+                <h2 id="latest-title"><span>Latest</span> releases</h2>
+                <a href="https://rawdex.net/manga/">Browse library</a>
+            </header>
+                            <div class="rdx-home-grid">
+                                            <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/i-drank-the-love-potion-instead-of-my-husband/" aria-label="Open I Drank the Love Potion Instead of My Husband">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/08/I-Drank-the-Love-Potion-Instead-of-My-Husband.png?fit=225%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/i-drank-the-love-potion-instead-of-my-husband/">I Drank the Love Potion Instead of My Husband</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="5.0 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:100.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">5.0</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/i-drank-the-love-potion-instead-of-my-husband/34/">
+                        <span>Chapter 34</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/i-drank-the-love-potion-instead-of-my-husband/33/">
+                        <span>Chapter 33</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/the-wicked-shaman/" aria-label="Open The Wicked Shaman">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/11/i542345.jpg?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/the-wicked-shaman/">The Wicked Shaman</a></h3>
+            <div class="rdx-home-card__meta">
+                                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/the-wicked-shaman/6/">
+                        <span>Chapter 6</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/the-wicked-shaman/5/">
+                        <span>Chapter 5</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/ahjummas-secret-employment/" aria-label="Open Ahjumma&#8217;s Secret Employment">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/11/i542135.jpg?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/ahjummas-secret-employment/">Ahjumma&#8217;s Secret Employment</a></h3>
+            <div class="rdx-home-card__meta">
+                                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/ahjummas-secret-employment/6/">
+                        <span>Chapter 6</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/ahjummas-secret-employment/5/">
+                        <span>Chapter 5</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/dangerous-younger-sibling-friend/" aria-label="Open Dangerous Younger Sibling Friend">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/11/i542527.jpg?fit=226%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/dangerous-younger-sibling-friend/">Dangerous Younger Sibling Friend</a></h3>
+            <div class="rdx-home-card__meta">
+                                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/dangerous-younger-sibling-friend/10/">
+                        <span>Chapter 10</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/dangerous-younger-sibling-friend/9/">
+                        <span>Chapter 9</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/act-out-han-yi-rim/" aria-label="Open Act Out (Han Yi Rim)">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/11/i542211.jpg?fit=206%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/act-out-han-yi-rim/">Act Out (Han Yi Rim)</a></h3>
+            <div class="rdx-home-card__meta">
+                                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/act-out-han-yi-rim/13/">
+                        <span>Chapter 13</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/act-out-han-yi-rim/12/">
+                        <span>Chapter 12</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/glorious-return-b6e039fe/" aria-label="Open Glorious Return">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2025/11/Glorious-Return-Manhwa.jpg?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/glorious-return-b6e039fe/">Glorious Return</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="4.4 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:88.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">4.4 (6)</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/glorious-return-b6e039fe/79/">
+                        <span>Chapter 79</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/glorious-return-b6e039fe/78/">
+                        <span>Chapter 78</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/new-town-massage/" aria-label="Open New Town Massage">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/05/New-Town-Massage.webp?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/new-town-massage/">New Town Massage</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="5.0 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:100.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">5.0</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/new-town-massage/35/">
+                        <span>Chapter 35</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/new-town-massage/34/">
+                        <span>Chapter 34</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/taming-my-stepsister/" aria-label="Open Taming My Stepsister">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/05/Taming-My-Stepsister.webp?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/taming-my-stepsister/">Taming My Stepsister</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="4.8 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:96.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">4.8</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/taming-my-stepsister/38/">
+                        <span>Chapter 38</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/taming-my-stepsister/37/">
+                        <span>Chapter 37</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/secret-class-bb1a3397/" aria-label="Open Secret Class">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2024/05/Secret-Class.jpg?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/secret-class-bb1a3397/">Secret Class</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="4.2 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:84.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">4.2 (37)</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/secret-class-bb1a3397/324/">
+                        <span>Chapter 324</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/secret-class-bb1a3397/323/">
+                        <span>Chapter 323</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/capitalist-harem/" aria-label="Open Capitalist Harem">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/08/cover_097d38d1.webp?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/capitalist-harem/">Capitalist Harem</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="5.0 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:100.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">5.0</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/capitalist-harem/20/">
+                        <span>Chapter 20</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/capitalist-harem/19/">
+                        <span>Chapter 19</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/milf-exchange-plan-b6e039fe/" aria-label="Open MILF Exchange Plan">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2025/02/MILF-Exchange-Plan.jpg?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/milf-exchange-plan-b6e039fe/">MILF Exchange Plan</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="3.6 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:72.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">3.6 (35)</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/milf-exchange-plan-b6e039fe/97/">
+                        <span>Chapter 97</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/milf-exchange-plan-b6e039fe/96/">
+                        <span>Chapter 96</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/love-and-risk/" aria-label="Open Love and Risk">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/08/i536658.jpg?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/love-and-risk/">Love and Risk</a></h3>
+            <div class="rdx-home-card__meta">
+                                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/love-and-risk/18/">
+                        <span>Chapter 18</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/love-and-risk/17/">
+                        <span>Chapter 17</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/gear-thats-way-too-good/" aria-label="Open Gear That&#8217;s Way Too Good">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/08/cover_9895d60d.webp?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/gear-thats-way-too-good/">Gear That&#8217;s Way Too Good</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="4.7 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:94.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">4.7</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/gear-thats-way-too-good/23/">
+                        <span>Chapter 23</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/gear-thats-way-too-good/22/">
+                        <span>Chapter 22</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/chained-to-poverty/" aria-label="Open Chained to Poverty">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/01/Chained-to-Poverty.jpg?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/chained-to-poverty/">Chained to Poverty</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="5.0 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:100.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">5.0 (1)</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/chained-to-poverty/46/">
+                        <span>Chapter 46</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/chained-to-poverty/45/">
+                        <span>Chapter 45</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/raise-diary/" aria-label="Open Raise Diary">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/10/i539717.jpg?fit=225%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/raise-diary/">Raise Diary</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="5.0 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:100.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">5.0</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/raise-diary/30/">
+                        <span>Chapter 30</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/raise-diary/29/">
+                        <span>Chapter 29</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/the-principal-wife/" aria-label="Open The Principal Wife">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/10/i539106.jpg?fit=225%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/the-principal-wife/">The Principal Wife</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="5.0 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:100.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">5.0</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/the-principal-wife/12/">
+                        <span>Chapter 12</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/the-principal-wife/11/">
+                        <span>Chapter 11</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/if-youre-being-held-hostage-wiggle-the-carrot/" aria-label="Open If You&#8217;re Being Held Hostage, Wiggle the Carrot!">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/10/i526419.jpg?fit=212%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/if-youre-being-held-hostage-wiggle-the-carrot/">If You&#8217;re Being Held Hostage, Wiggle the Carrot!</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="5.0 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:100.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">5.0</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/if-youre-being-held-hostage-wiggle-the-carrot/37/">
+                        <span>Chapter 37</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/if-youre-being-held-hostage-wiggle-the-carrot/36/">
+                        <span>Chapter 36</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/dirty-approach/" aria-label="Open Dirty Approach">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/09/i536117.jpg?fit=212%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/dirty-approach/">Dirty Approach</a></h3>
+            <div class="rdx-home-card__meta">
+                                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/dirty-approach/27/">
+                        <span>Chapter 27</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/dirty-approach/26/">
+                        <span>Chapter 26</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/my-husband-never-wanted-a-child/" aria-label="Open My Husband Never Wanted a Child">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/08/My-Husband-Never-Wanted-a-Child.png?fit=225%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/my-husband-never-wanted-a-child/">My Husband Never Wanted a Child</a></h3>
+            <div class="rdx-home-card__meta">
+                                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/my-husband-never-wanted-a-child/35/">
+                        <span>Chapter 35</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/my-husband-never-wanted-a-child/34/">
+                        <span>Chapter 34</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/anthill/" aria-label="Open Anthill">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2026/08/Anthill.png?fit=225%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/anthill/">Anthill</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="5.0 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:100.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">5.0</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/anthill/45/">
+                        <span>Chapter 45</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/anthill/44/">
+                        <span>Chapter 44</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/im-a-vampire-b6e039fe/" aria-label="Open I&#8217;m a Vampire">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2025/12/Im-a-Vampire-Manhwa.jpg?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/im-a-vampire-b6e039fe/">I&#8217;m a Vampire</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="4.4 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:88.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">4.4 (8)</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/im-a-vampire-b6e039fe/51/">
+                        <span>Chapter 51</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/im-a-vampire-b6e039fe/50/">
+                        <span>Chapter 50</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/moby-dick-raw/" aria-label="Open Moby Dick">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2024/06/Moby-Dick.jpg?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/moby-dick-raw/">Moby Dick</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="4.0 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:80.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">4.0 (21)</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/moby-dick-raw/111/">
+                        <span>Chapter 111</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/moby-dick-raw/110/">
+                        <span>Chapter 110</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/a-dangerous-deal-and-the-woman-next-door-b6e039fe/" aria-label="Open A Dangerous Deal, and the Woman Next Door">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2025/09/A-Dangerous-Deal-and-the-Woman-Next-Door-Raw.jpg?fit=225%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/a-dangerous-deal-and-the-woman-next-door-b6e039fe/">A Dangerous Deal, and the Woman Next Door</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="3.9 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:78.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">3.9 (30)</span></span>                <span class="rdx-home-card__status">on-going</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/a-dangerous-deal-and-the-woman-next-door-b6e039fe/72/">
+                        <span>Chapter 72</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/a-dangerous-deal-and-the-woman-next-door-b6e039fe/71/">
+                        <span>Chapter 71</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+        <article class="rdx-home-card">
+        <a class="rdx-home-card__cover" href="https://rawdex.net/manga/quiet-in-the-office/" aria-label="Open Quiet in the Office!">
+            <img src="https://i0.wp.com/rawdex.net/wp-content/uploads/2024/06/Quiet-in-the-Office.jpg?fit=214%2C300&#038;ssl=1" alt="" width="300" height="420" loading="lazy" decoding="async">
+                    </a>
+        <div class="rdx-home-card__body">
+            <h3><a href="https://rawdex.net/manga/quiet-in-the-office/">Quiet in the Office!</a></h3>
+            <div class="rdx-home-card__meta">
+                <span class="rdx-rating" aria-label="4.3 out of 5 stars"><span class="rdx-rating__stars" style="--rdx-rating:86.00%" aria-hidden="true">★★★★★</span><span class="rdx-rating__score">4.3 (7)</span></span>                <span class="rdx-home-card__status">end</span>            </div>
+            <div class="rdx-home-card__chapters">
+                                    <a href="https://rawdex.net/manga/quiet-in-the-office/117/">
+                        <span>Chapter 117</span>
+                        <span class="rdx-chapter-up" aria-label="Updated in the last 72 hours">UP</span>                    </a>
+                                    <a href="https://rawdex.net/manga/quiet-in-the-office/116/">
+                        <span>Chapter 116</span>
+                                            </a>
+                            </div>
+        </div>
+    </article>
+                    </div>
+                                    <nav class="rdx-home-pagination" aria-label="Latest releases pages">
+                        <ul class="page-numbers">
+	<li><span aria-current="page" class="page-numbers current">1</span></li>
+	<li><a class="page-numbers" href="https://rawdex.net/page/2/">2</a></li>
+	<li><a class="page-numbers" href="https://rawdex.net/page/3/">3</a></li>
+	<li><span class="page-numbers dots">&hellip;</span></li>
+	<li><a class="page-numbers" href="https://rawdex.net/page/70/">70</a></li>
+	<li><a class="next page-numbers" href="https://rawdex.net/page/2/">›</a></li>
+</ul>
+                    </nav>
+                                    </section>
+    </div>
+</main>
+
+    </main>
+            <div class="rdx-ad-slot rdx-ad-slot--after_content"><div id="frame" style="width: 300px;margin: auto;z-index: 99998;height: auto">
+          <iframe data-aa='2416165' src='//ad.a-ads.com/2416165/?size=300x250'
+                            style='border:0; padding:0; width:300px; height:250px; overflow:hidden;display: block;margin: auto'></iframe>
+        </div>
+
+ 
+ <ins class="eas6a97888e10" data-zoneid="4810920"></ins> 
+ </div>        <footer class="rdx-footer">
+        <div class="rdx-footer__inner">
+            <p>&copy; 2026 RawDEX. Read responsibly.</p>
+            <a href="#top" class="rdx-footer__top">Back to top</a>
+        </div>
+    </footer>
+    <div class="rdx-ad-slot rdx-ad-slot--footer">
+</div></div>
+<div class="rdx-live-visitor-counter" hidden aria-hidden="true"></div>
+
+
+<!-- Modal -->
+<div class="wp-manga-section">
+    <input type="hidden" name="bookmarking" value="0"/>
+    <div class="modal fade" id="form-login" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <div id="login" class="login">
+                        <h3>
+                            <a href="https://rawdex.net/" title="RawDEX" tabindex="-1">Sign in</a>
+                        </h3>
+                        <p class="message login"></p>
+						<meta name='robots' content='index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1' />
+<link rel='preconnect' href='//i0.wp.com' />
+<style id="global-styles-inline-css">
+:root{--wp--preset--aspect-ratio--square: 1;--wp--preset--aspect-ratio--4-3: 4/3;--wp--preset--aspect-ratio--3-4: 3/4;--wp--preset--aspect-ratio--3-2: 3/2;--wp--preset--aspect-ratio--2-3: 2/3;--wp--preset--aspect-ratio--16-9: 16/9;--wp--preset--aspect-ratio--9-16: 9/16;--wp--preset--color--black: #000000;--wp--preset--color--cyan-bluish-gray: #abb8c3;--wp--preset--color--white: #ffffff;--wp--preset--color--pale-pink: #f78da7;--wp--preset--color--vivid-red: #cf2e2e;--wp--preset--color--luminous-vivid-orange: #ff6900;--wp--preset--color--luminous-vivid-amber: #fcb900;--wp--preset--color--light-green-cyan: #7bdcb5;--wp--preset--color--vivid-green-cyan: #00d084;--wp--preset--color--pale-cyan-blue: #8ed1fc;--wp--preset--color--vivid-cyan-blue: #0693e3;--wp--preset--color--vivid-purple: #9b51e0;--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple: linear-gradient(135deg,rgb(6,147,227) 0%,rgb(155,81,224) 100%);--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan: linear-gradient(135deg,rgb(122,220,180) 0%,rgb(0,208,130) 100%);--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange: linear-gradient(135deg,rgb(252,185,0) 0%,rgb(255,105,0) 100%);--wp--preset--gradient--luminous-vivid-orange-to-vivid-red: linear-gradient(135deg,rgb(255,105,0) 0%,rgb(207,46,46) 100%);--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray: linear-gradient(135deg,rgb(238,238,238) 0%,rgb(169,184,195) 100%);--wp--preset--gradient--cool-to-warm-spectrum: linear-gradient(135deg,rgb(74,234,220) 0%,rgb(151,120,209) 20%,rgb(207,42,186) 40%,rgb(238,44,130) 60%,rgb(251,105,98) 80%,rgb(254,248,76) 100%);--wp--preset--gradient--blush-light-purple: linear-gradient(135deg,rgb(255,206,236) 0%,rgb(152,150,240) 100%);--wp--preset--gradient--blush-bordeaux: linear-gradient(135deg,rgb(254,205,165) 0%,rgb(254,45,45) 50%,rgb(107,0,62) 100%);--wp--preset--gradient--luminous-dusk: linear-gradient(135deg,rgb(255,203,112) 0%,rgb(199,81,192) 50%,rgb(65,88,208) 100%);--wp--preset--gradient--pale-ocean: linear-gradient(135deg,rgb(255,245,203) 0%,rgb(182,227,212) 50%,rgb(51,167,181) 100%);--wp--preset--gradient--electric-grass: linear-gradient(135deg,rgb(202,248,128) 0%,rgb(113,206,126) 100%);--wp--preset--gradient--midnight: linear-gradient(135deg,rgb(2,3,129) 0%,rgb(40,116,252) 100%);--wp--preset--font-size--small: 13px;--wp--preset--font-size--medium: 20px;--wp--preset--font-size--large: 36px;--wp--preset--font-size--x-large: 42px;--wp--preset--spacing--20: 0.44rem;--wp--preset--spacing--30: 0.67rem;--wp--preset--spacing--40: 1rem;--wp--preset--spacing--50: 1.5rem;--wp--preset--spacing--60: 2.25rem;--wp--preset--spacing--70: 3.38rem;--wp--preset--spacing--80: 5.06rem;--wp--preset--shadow--natural: 6px 6px 9px rgba(0, 0, 0, 0.2);--wp--preset--shadow--deep: 12px 12px 50px rgba(0, 0, 0, 0.4);--wp--preset--shadow--sharp: 6px 6px 0px rgba(0, 0, 0, 0.2);--wp--preset--shadow--outlined: 6px 6px 0px -3px rgb(255, 255, 255), 6px 6px rgb(0, 0, 0);--wp--preset--shadow--crisp: 6px 6px 0px rgb(0, 0, 0);}.wp-block-button{--wp--preset--dimension--25: 25%;--wp--preset--dimension--50: 50%;--wp--preset--dimension--75: 75%;--wp--preset--dimension--100: 100%;}:where(body) { margin: 0; }:where(.is-layout-flex){gap: 0.5em;}:where(.is-layout-grid){gap: 0.5em;}body .is-layout-flex{display: flex;}.is-layout-flex{flex-wrap: wrap;align-items: center;}.is-layout-flex > :is(*, div){margin: 0;}body .is-layout-grid{display: grid;}.is-layout-grid > :is(*, div){margin: 0;}body{padding-top: 0px;padding-right: 0px;padding-bottom: 0px;padding-left: 0px;}:root :where(.wp-element-button, .wp-block-button__link){background-color: #32373c;border-width: 0;color: #fff;font-family: inherit;font-size: inherit;font-style: inherit;font-weight: inherit;letter-spacing: inherit;line-height: inherit;padding-top: calc(0.667em + 2px);padding-right: calc(1.333em + 2px);padding-bottom: calc(0.667em + 2px);padding-left: calc(1.333em + 2px);text-decoration: none;text-transform: inherit;}.has-black-color{color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-color{color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-color{color: var(--wp--preset--color--white) !important;}.has-pale-pink-color{color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-color{color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-color{color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-color{color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-color{color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-color{color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-color{color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-color{color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-color{color: var(--wp--preset--color--vivid-purple) !important;}.has-black-background-color{background-color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-background-color{background-color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-background-color{background-color: var(--wp--preset--color--white) !important;}.has-pale-pink-background-color{background-color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-background-color{background-color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-background-color{background-color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-background-color{background-color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-background-color{background-color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-background-color{background-color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-background-color{background-color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-background-color{background-color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-background-color{background-color: var(--wp--preset--color--vivid-purple) !important;}.has-black-border-color{border-color: var(--wp--preset--color--black) !important;}.has-cyan-bluish-gray-border-color{border-color: var(--wp--preset--color--cyan-bluish-gray) !important;}.has-white-border-color{border-color: var(--wp--preset--color--white) !important;}.has-pale-pink-border-color{border-color: var(--wp--preset--color--pale-pink) !important;}.has-vivid-red-border-color{border-color: var(--wp--preset--color--vivid-red) !important;}.has-luminous-vivid-orange-border-color{border-color: var(--wp--preset--color--luminous-vivid-orange) !important;}.has-luminous-vivid-amber-border-color{border-color: var(--wp--preset--color--luminous-vivid-amber) !important;}.has-light-green-cyan-border-color{border-color: var(--wp--preset--color--light-green-cyan) !important;}.has-vivid-green-cyan-border-color{border-color: var(--wp--preset--color--vivid-green-cyan) !important;}.has-pale-cyan-blue-border-color{border-color: var(--wp--preset--color--pale-cyan-blue) !important;}.has-vivid-cyan-blue-border-color{border-color: var(--wp--preset--color--vivid-cyan-blue) !important;}.has-vivid-purple-border-color{border-color: var(--wp--preset--color--vivid-purple) !important;}.has-vivid-cyan-blue-to-vivid-purple-gradient-background{background: var(--wp--preset--gradient--vivid-cyan-blue-to-vivid-purple) !important;}.has-light-green-cyan-to-vivid-green-cyan-gradient-background{background: var(--wp--preset--gradient--light-green-cyan-to-vivid-green-cyan) !important;}.has-luminous-vivid-amber-to-luminous-vivid-orange-gradient-background{background: var(--wp--preset--gradient--luminous-vivid-amber-to-luminous-vivid-orange) !important;}.has-luminous-vivid-orange-to-vivid-red-gradient-background{background: var(--wp--preset--gradient--luminous-vivid-orange-to-vivid-red) !important;}.has-very-light-gray-to-cyan-bluish-gray-gradient-background{background: var(--wp--preset--gradient--very-light-gray-to-cyan-bluish-gray) !important;}.has-cool-to-warm-spectrum-gradient-background{background: var(--wp--preset--gradient--cool-to-warm-spectrum) !important;}.has-blush-light-purple-gradient-background{background: var(--wp--preset--gradient--blush-light-purple) !important;}.has-blush-bordeaux-gradient-background{background: var(--wp--preset--gradient--blush-bordeaux) !important;}.has-luminous-dusk-gradient-background{background: var(--wp--preset--gradient--luminous-dusk) !important;}.has-pale-ocean-gradient-background{background: var(--wp--preset--gradient--pale-ocean) !important;}.has-electric-grass-gradient-background{background: var(--wp--preset--gradient--electric-grass) !important;}.has-midnight-gradient-background{background: var(--wp--preset--gradient--midnight) !important;}.has-small-font-size{font-size: var(--wp--preset--font-size--small) !important;}.has-medium-font-size{font-size: var(--wp--preset--font-size--medium) !important;}.has-large-font-size{font-size: var(--wp--preset--font-size--large) !important;}.has-x-large-font-size{font-size: var(--wp--preset--font-size--x-large) !important;}
+/*# sourceURL=global-styles-inline-css */
+</style>
+<link rel="icon" href="https://i0.wp.com/rawdex.net/wp-content/uploads/2024/05/cropped-iconerawdex.png?fit=32%2C32&#038;ssl=1" sizes="32x32" />
+<link rel="icon" href="https://i0.wp.com/rawdex.net/wp-content/uploads/2024/05/cropped-iconerawdex.png?fit=192%2C192&#038;ssl=1" sizes="192x192" />
+<link rel="apple-touch-icon" href="https://i0.wp.com/rawdex.net/wp-content/uploads/2024/05/cropped-iconerawdex.png?fit=180%2C180&#038;ssl=1" />
+<meta name="msapplication-TileImage" content="https://i0.wp.com/rawdex.net/wp-content/uploads/2024/05/cropped-iconerawdex.png?fit=270%2C270&#038;ssl=1" />
+						    <style id="rawdex-nova-login-screen">
+        html, body.login { min-height: 100%; }
+        body.login {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 28px 16px;
+            background: #111315;
+            color: #f5f7f7;
+            font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        body.login::before {
+            position: fixed;
+            z-index: 0;
+            inset: 0;
+            pointer-events: none;
+            content: "";
+            opacity: .5;
+            background: radial-gradient(circle at 82% 12%, rgba(200,255,50,.13), transparent 30%), radial-gradient(circle at 10% 86%, rgba(200,255,50,.07), transparent 28%), linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+            background-size: auto, auto, 34px 34px, 34px 34px;
+        }
+        #login { position: relative; z-index: 1; width: min(100%, 390px); padding: 0; }
+        #login h1 { margin: 0 0 24px; }
+        #login h1 a {
+            width: min(230px, 100%);
+            height: 62px;
+            margin: 0 auto;
+            background-image: url('https://rawdex.net/wp-content/uploads/2024/05/logorawdex.png');
+            background-position: center;
+            background-size: contain;
+            background-repeat: no-repeat;
+        }
+        .login form, .login #loginform, .login #registerform, .login #lostpasswordform {
+            margin-top: 0;
+            padding: 25px;
+            border: 1px solid rgba(255,255,255,.1);
+            border-radius: 14px;
+            box-shadow: 0 20px 58px rgba(0,0,0,.36);
+            background: #1a1d20;
+        }
+        .login form .forgetmenot { margin-top: 4px; }
+        .login label { color: #a7afb6; font-size: .82rem; font-weight: 700; }
+        .login form .input, .login input[type="text"], .login input[type="password"], .login input[type="email"] {
+            min-height: 44px;
+            margin-top: 7px;
+            border: 1px solid rgba(255,255,255,.12);
+            border-radius: 8px;
+            box-shadow: none;
+            color: #f5f7f7;
+            background: #111315;
+            font-size: .95rem;
+        }
+        .login form .input:focus, .login input[type="text"]:focus, .login input[type="password"]:focus, .login input[type="email"]:focus {
+            border-color: #c8ff32;
+            box-shadow: 0 0 0 3px rgba(200,255,50,.13);
+        }
+        .login .button.wp-hide-pw { color: #a7afb6; }
+        .login .button.wp-hide-pw:focus { box-shadow: none; }
+        .login input[type="checkbox"] { border-color: rgba(255,255,255,.22); border-radius: 4px; background: #111315; }
+        .login input[type="checkbox"]:checked { border-color: #c8ff32; background-color: #c8ff32; }
+        .login .button-primary {
+            min-height: 42px;
+            padding: 0 18px;
+            border: 0 !important;
+            border-radius: 8px;
+            box-shadow: none !important;
+            text-shadow: none !important;
+            background: #c8ff32 !important;
+            color: #101400 !important;
+            font-weight: 800;
+        }
+        .login .button-primary:hover, .login .button-primary:focus { background: #d7ff62 !important; color: #101400 !important; box-shadow: none !important; }
+        .login #nav, .login #backtoblog { margin: 17px 0 0; text-align: center; }
+        .login #nav a, .login #backtoblog a, .login .privacy-policy-page-link a { color: #a7afb6; font-size: .82rem; }
+        .login #nav a:hover, .login #backtoblog a:hover, .login .privacy-policy-page-link a:hover { color: #c8ff32; }
+        .login .message, .login .success, .login #login_error {
+            margin: 0 0 16px;
+            padding: 12px 14px;
+            border: 1px solid rgba(200,255,50,.34);
+            border-radius: 9px;
+            box-shadow: none;
+            color: #e8f6d0;
+            background: rgba(200,255,50,.08);
+        }
+        .login #login_error { border-color: rgba(255,81,95,.42); color: #ffd7da; background: rgba(255,81,95,.1); }
+        .login .message a, .login #login_error a { color: inherit; }
+        .login .privacy-policy-page-link { margin-top: 20px; color: #a7afb6; text-align: center; }
+        .login .language-switcher { display: none; }
+        @media (max-width: 480px) {
+            body.login { align-items: flex-start; padding-top: 40px; }
+            #login h1 { margin-bottom: 20px; }
+            .login form, .login #loginform, .login #registerform, .login #lostpasswordform { padding: 20px; }
+        }
+    </style>
+    						                        <form name="loginform" id="loginform" method="post">
+                            <p>
+                                <label>Username or Email Address *                                    <br> <input type="text" name="log" class="input user_login" value="" size="20">
+                                </label>
+                            </p>
+                            <p>
+                                <label>Password *                                    <br> <input type="password" autocomplete="" name="pwd" class="input user_pass" value="" size="20">
+                                </label>
+                            </p>
+                            <p>
+								                                
+                            </p>
+                            <p class="forgetmenot">
+                                <label>
+                                    <input name="rememberme" type="checkbox" id="rememberme" value="forever">Remember Me                                 </label>
+                            </p>
+                            <p class="submit">
+								<input type="submit" name="wp-submit" class="button button-primary button-large wp-submit" value="Log In">                                <input type="hidden" name="redirect_to" value="https://rawdex.net/wp-admin/">
+                                <input type="hidden" name="testcookie" value="1">
+                            </p>
+                        </form>
+                        <p class="nav">
+                            <a href="javascript:avoid(0)" class="to-reset">Lost your password?</a>
+                        </p>
+                        <p class="backtoblog">
+                            <a href="javascript:void(0)">&larr; Back to RawDEX</a>
+                        </p>
+                    </div>
+                </div>
+                <div class="modal-footer"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="form-sign-up" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <div id="sign-up" class="login">
+                        <h3>
+                            <a href="https://rawdex.net/" title="RawDEX" tabindex="-1">Sign Up</a>
+                        </h3>
+                        <p class="message register">Register For This Site.</p>
+                        <form name="registerform" id="registerform" novalidate="novalidate">
+                            <p>
+                                <label>Username *                                    <br>
+                                    <input type="text" name="user_sign-up" class="input user_login" value="" size="20">
+                                </label>
+                            </p>
+                            <p>
+                                <label>Email Address *                                    <br>
+                                    <input type="email" name="email_sign-up" class="input user_email" value="" size="20">
+                                </label>
+                            </p>
+                            <p>
+                                <label>Password *<br>
+                                    <input type="password" name="pass_sign-up" autocomplete="" class="input user_pass" value="" size="25">
+                                </label>
+                            </p>
+                            <p class="action">
+								                            </p>
+
+                            <input type="hidden" name="redirect_to" value="">
+                            <p class="submit">
+                                <input type="submit" name="wp-submit" class="button button-primary button-large wp-submit" value="Register">
+                            </p>
+                        </form>
+                        <p class="nav">
+                            <a href="javascript:void(0)" class="to-login">Log in</a>
+                            |
+                            <a href="javascript:void(0)" class="to-reset">Lost your password?</a>
+                        </p>
+                        <p class="backtoblog">
+                            <a href="javascript:void(0)">&larr; Back to RawDEX</a>
+                        </p>
+                    </div>
+                </div>
+                <div class="modal-footer"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="form-reset" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <div id="reset" class="login">
+                        <h3>
+                            <a href="javascript:void(0)" class="to-reset">Lost your password?</a>
+                        </h3>
+                        <p class="message reset">Please enter your username or email address. You will receive a link to create a new password via email.</p>
+                        <form name="resetform" id="resetform" method="post">
+                            <p>
+                                <label>Username or Email Address                                    <br>
+                                    <input type="text" name="user_reset" id="user_reset" class="input" value="" size="20">
+                                </label>
+                            </p>
+                                                        <p class="submit">
+                                <input type="submit" name="wp-submit" class="button button-primary button-large wp-submit" value="Get New Password">
+                                <input type="hidden" name="testcookie" value="1">
+                            </p>
+                        </form>
+                        <p>
+                            <a class="backtoblog" href="javascript:void(0)">&larr; Back to  RawDEX</a>
+                        </p>
+                    </div>
+                </div>
+                <div class="modal-footer"></div>
+            </div>
+        </div>
+    </div>
+
+    
+</div>
+		
+		
+
+
+
+
+
+
+
+
+
+
+
+
+
+<script data-jetpack-boost="ignore" id="wp-emoji-settings" type="application/json">
+{"baseUrl":"https://s.w.org/images/core/emoji/17.0.2/72x72/","ext":".png","svgUrl":"https://s.w.org/images/core/emoji/17.0.2/svg/","svgExt":".svg","source":{"concatemoji":"https://rawdex.net/wp-includes/js/wp-emoji-release.min.js?ver=7.1.2"}}
+</script>
+
+<script id="jquery-core-js" src="https://rawdex.net/wp-includes/js/jquery/jquery.min.js?ver=3.7.1"></script><script type='text/javascript' src='https://rawdex.net/wp-includes/js/jquery/jquery-migrate.min.js?m=1686250164'></script><script async type="application/javascript" src="https://a.magsrv.com/ad-provider.js"></script><script>(AdProvider = window.AdProvider || []).push({"serve": {}});</script><script type="text/javascript" data-cfasync="false" async src="https://poweredby.jads.co/js/jads.js"></script><script type="text/javascript" data-cfasync="false" async>(adsbyjuicy = window.adsbyjuicy || []).push({'adzone':969230});</script><script src="https://rawdex.net/wp-content/themes/rawdex-nova/assets/js/carousel.js?ver=1786708153" defer></script><script async type="application/javascript" src="https://a.magsrv.com/ad-provider.js"></script><script>(AdProvider = window.AdProvider || []).push({"serve": {}});</script><script type="application/javascript">
+(function() {
+    function randStr(e,t){for(var n="",r=t||"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",o=0;o<e;o++)n+=r.charAt(Math.floor(Math.random()*r.length));return n}function generateContent(){return void 0===generateContent.val&&(generateContent.val="document.dispatchEvent("+randStr(4*Math.random()+3)+");"),generateContent.val}try{Object.defineProperty(document.currentScript,"innerHTML",{get:generateContent}),Object.defineProperty(document.currentScript,"textContent",{get:generateContent})}catch(e){};
+
+    //version 9.0.0
+
+    var adConfig = {
+    "ads_host": "a.pemsrv.com",
+    "syndication_host": "s.pemsrv.com",
+    "idzone": 5115510,
+    "popup_fallback": false,
+    "popup_force": false,
+    "chrome_enabled": true,
+    "new_tab": false,
+    "frequency_period": 30,
+    "frequency_count": 3,
+    "trigger_method": 3,
+    "trigger_class": "",
+    "trigger_delay": 300,
+    "capping_enabled": true,
+    "tcf_enabled": true,
+    "only_inline": false
+};
+
+window.document.querySelectorAll||(document.querySelectorAll=document.body.querySelectorAll=Object.querySelectorAll=function(e,o,t,i,n){var r=document,a=r.createStyleSheet();for(n=r.all,o=[],t=(e=e.replace(/\[for\b/gi,"[htmlFor").split(",")).length;t--;){for(a.addRule(e[t],"k:v"),i=n.length;i--;)n[i].currentStyle.k&&o.push(n[i]);a.removeRule(0)}return o});var popMagic={version:9,cookie_name:"",url:"",config:{},open_count:0,top:null,browser:null,venor_loaded:!1,venor:!1,tcfData:null,remoteLicensedDomains:["exdynsrv.com","exosrv.com","exoclick.com","opoxv.com","exacdn.com","pemsrv.com"],configTpl:{ads_host:"",syndication_host:"",idzone:"",frequency_period:720,frequency_count:1,trigger_method:1,trigger_class:"",popup_force:!1,popup_fallback:!1,chrome_enabled:!0,new_tab:!1,cat:"",tags:"",el:"",sub:"",sub2:"",sub3:"",block_ad_types:"",only_inline:!1,trigger_delay:0,capping_enabled:!0,tcf_enabled:!1,cookieconsent:!0,should_fire:function(){return!0},on_redirect:null},isAdsDomainLicensed:function(){for(var e=this.config.ads_host,o=this.remoteLicensedDomains.concat([".local","localhost","127.0.0.1"]),t=0;t<o.length;t++){var i=o[t];if("string"==typeof i)if("."===i.charAt(0)){var n=i,r=i.substring(1);if(e.slice(-n.length)===n||e===r)return!0}else{var a=e===i,c="."+i,p=e.slice(-c.length)===c;if(a||p)return!0}}return!1},init:function(e){if(void 0!==e.idzone&&e.idzone){void 0===e.customTargeting&&(e.customTargeting=[]),window.customTargeting=e.customTargeting||null;var o=Object.keys(e.customTargeting).filter(function(e){return e.search("ex_")>=0});for(var t in o.length&&o.forEach(function(e){return this.configTpl[e]=null}.bind(this)),this.configTpl)Object.prototype.hasOwnProperty.call(this.configTpl,t)&&(void 0!==e[t]?this.config[t]=e[t]:this.config[t]=this.configTpl[t]);if(void 0!==this.config.idzone&&""!==this.config.idzone){!0!==this.config.only_inline&&this.isAdsDomainLicensed()&&this.loadHosted();var i=this;this.checkTCFConsent(function(){"complete"===document.readyState?i.preparePopWait():i.addEventToElement(window,"load",i.preparePop)})}}},getCountFromCookie:function(){if(!this.config.cookieconsent)return 0;var e=popMagic.getCookie(popMagic.cookie_name),o=void 0===e?0:parseInt(e);return isNaN(o)&&(o=0),o},getLastOpenedTimeFromCookie:function(){var e=popMagic.getCookie(popMagic.cookie_name),o=null;if(e){var t=parseInt(e.split(";")[1]);o=t>0?t:0}return isNaN(o)&&(o=null),o},shouldShow:function(e){if(e=e||!1,!popMagic.config.capping_enabled){var o=!0,t=popMagic.config.should_fire;try{e||"function"!=typeof t||(o=Boolean(t()))}catch(e){console.error("Error executing should fire callback function:",e)}return o&&0===popMagic.open_count}if(popMagic.open_count>=popMagic.config.frequency_count)return!1;var i=popMagic.getCountFromCookie(),n=popMagic.getLastOpenedTimeFromCookie(),r=Math.floor(Date.now()/1e3),a=n+popMagic.config.trigger_delay;return!(n&&a>r)&&(popMagic.open_count=i,!(i>=popMagic.config.frequency_count))},venorShouldShow:function(){return popMagic.venor_loaded&&"0"===popMagic.venor},setAsOpened:function(e){var o=e?e.target||e.srcElement:null,t={id:"",tagName:"",classes:"",text:"",href:"",elm:""};void 0!==o&&null!=o&&(t={id:void 0!==o.id&&null!=o.id?o.id:"",tagName:void 0!==o.tagName&&null!=o.tagName?o.tagName:"",classes:void 0!==o.classList&&null!=o.classList?o.classList:"",text:void 0!==o.outerText&&null!=o.outerText?o.outerText:"",href:void 0!==o.href&&null!=o.href?o.href:"",elm:o});var i=new CustomEvent("creativeDisplayed-"+popMagic.config.idzone,{detail:t});if(document.dispatchEvent(i),popMagic.config.capping_enabled){var n=1;n=0!==popMagic.open_count?popMagic.open_count+1:popMagic.getCountFromCookie()+1;var r=Math.floor(Date.now()/1e3);popMagic.config.cookieconsent&&popMagic.setCookie(popMagic.cookie_name,n+";"+r,popMagic.config.frequency_period)}else++popMagic.open_count},loadHosted:function(){var e=document.createElement("script");for(var o in e.type="application/javascript",e.async=!0,e.src="//"+this.config.ads_host+"/popunder1000.js",e.id="popmagicldr",this.config)Object.prototype.hasOwnProperty.call(this.config,o)&&"ads_host"!==o&&"syndication_host"!==o&&e.setAttribute("data-exo-"+o,this.config[o]);var t=document.getElementsByTagName("body").item(0);t.firstChild?t.insertBefore(e,t.firstChild):t.appendChild(e)},preparePopWait:function(){setTimeout(popMagic.preparePop,400)},preparePop:function(){if("object"!=typeof exoJsPop101||!Object.prototype.hasOwnProperty.call(exoJsPop101,"add")){if(popMagic.top=self,popMagic.top!==self)try{top.document.location.toString()&&(popMagic.top=top)}catch(e){}if(popMagic.cookie_name="zone-cap-"+popMagic.config.idzone,popMagic.config.capping_enabled||(document.cookie=popMagic.cookie_name+"=;expires=Thu, 01 Jan 1970 00:00:01 GMT; path=/"),popMagic.shouldShow(!0)){var e=new XMLHttpRequest;e.onreadystatechange=function(){e.readyState==XMLHttpRequest.DONE&&(popMagic.venor_loaded=!0,200==e.status?popMagic.venor=e.responseText:popMagic.venor="0")};var o="https:"!==document.location.protocol&&"http:"!==document.location.protocol?"https:":document.location.protocol;e.open("GET",o+"//"+popMagic.config.syndication_host+"/venor.php",!0);try{e.send()}catch(e){popMagic.venor_loaded=!0}}if(popMagic.buildUrl(),popMagic.browser=popMagic.browserDetector.getBrowserInfo(),popMagic.config.chrome_enabled||!popMagic.browser.isChrome){var t=popMagic.getPopMethod(popMagic.browser);popMagic.addEvent("click",t)}}},getPopMethod:function(e){return popMagic.config.popup_force||popMagic.config.popup_fallback&&e.isChrome&&e.version>=68&&!e.isMobile?popMagic.methods.popup:e.isMobile?popMagic.methods.default:e.isChrome?popMagic.methods.chromeTab:popMagic.methods.default},checkTCFConsent:function(e){if(this.config.tcf_enabled&&"function"==typeof window.__tcfapi){var o=this;window.__tcfapi("addEventListener",2,function(t,i){i&&(o.tcfData=t,"tcloaded"!==t.eventStatus&&"useractioncomplete"!==t.eventStatus||(window.__tcfapi("removeEventListener",2,function(){},t.listenerId),e()))})}else e()},buildUrl:function(){var e,o="https:"!==document.location.protocol&&"http:"!==document.location.protocol?"https:":document.location.protocol,t=top===self?document.URL:document.referrer,i={type:"inline",name:"popMagic",ver:this.version},n="";customTargeting&&Object.keys(customTargeting).length&&("object"==typeof customTargeting?Object.keys(customTargeting):customTargeting).forEach(function(o){"object"==typeof customTargeting?e=customTargeting[o]:Array.isArray(customTargeting)&&(e=scriptEl.getAttribute(o));var t=o.replace("data-exo-","");n+="&"+t+"="+e});var r=this.tcfData&&this.tcfData.gdprApplies&&!0===this.tcfData.gdprApplies?1:0;this.url=o+"//"+this.config.syndication_host+"/v1/link.php?cat="+this.config.cat+"&idzone="+this.config.idzone+"&type=8&p="+encodeURIComponent(t)+"&sub="+this.config.sub+(""!==this.config.sub2?"&sub2="+this.config.sub2:"")+(""!==this.config.sub3?"&sub3="+this.config.sub3:"")+"&block=1&el="+this.config.el+"&tags="+this.config.tags+(""!==this.config.block_ad_types?"&block_ad_types="+this.config.block_ad_types:"")+"&scr_info="+function(e){var o=e.type+"|"+e.name+"|"+e.ver;return encodeURIComponent(btoa(o))}(i)+n+"&gdpr="+r+"&cb="+Math.floor(1e9*Math.random()),this.tcfData&&this.tcfData.tcString?this.url+="&gdpr_consent="+encodeURIComponent(this.tcfData.tcString):this.url+="&cookieconsent="+this.config.cookieconsent},addSuvtValueToUrl:function(e){var o=popMagic.getCookie("__suvt");if(o){var t=-1!==e.indexOf("?")?"&":"?";return e+t+"suvt="+o}return e},isAgegoAvailable:function(){return"undefined"!=typeof Promise&&void 0!==window.AGEGO},addAgeGoToken:function(e){return popMagic.isAgegoAvailable()?Promise.race([window.AGEGO("getVerificationToken"),new Promise(function(e){o=setTimeout(function(){e(null)},500)})]).then(function(t){if(clearTimeout(o),t&&t.token){var i=-1===e.indexOf("?")?"?":"&";return e+i+"ag_token="+encodeURIComponent(t.token)}return e}).catch(function(){return clearTimeout(o),e}):Promise.resolve(e);var o},addEventToElement:function(e,o,t){e.addEventListener?e.addEventListener(o,t,!1):e.attachEvent?(e["e"+o+t]=t,e[o+t]=function(){e["e"+o+t](window.event)},e.attachEvent("on"+o,e[o+t])):e["on"+o]=e["e"+o+t]},getTriggerClasses:function(){var e,o=[];-1===popMagic.config.trigger_class.indexOf(",")?e=popMagic.config.trigger_class.split(" "):e=popMagic.config.trigger_class.replace(/\s/g,"").split(",");for(var t=0;t<e.length;t++)""!==e[t]&&o.push("."+e[t]);return o},addEvent:function(e,o){var t;if("3"!=popMagic.config.trigger_method)if("2"!=popMagic.config.trigger_method||""==popMagic.config.trigger_class)if("4"!=popMagic.config.trigger_method||""==popMagic.config.trigger_class)if("5"!=popMagic.config.trigger_method||""==popMagic.config.trigger_class)popMagic.addEventToElement(document,e,o);else{var i="a"+popMagic.getTriggerClasses().map(function(e){return":not("+e+")"}).join("");t=document.querySelectorAll(i);for(var n=0;n<t.length;n++)popMagic.addEventToElement(t[n],e,o)}else{var r=popMagic.getTriggerClasses();popMagic.addEventToElement(document,e,function(e){r.some(function(o){return null!==e.target.closest(o)})||o.call(e.target,e)})}else{var a=popMagic.getTriggerClasses();for(t=document.querySelectorAll(a.join(", ")),n=0;n<t.length;n++)popMagic.addEventToElement(t[n],e,o)}else for(t=document.querySelectorAll("a"),n=0;n<t.length;n++)popMagic.addEventToElement(t[n],e,o)},setCookie:function(e,o,t){if(!this.config.cookieconsent)return!1;t=parseInt(t,10);var i=new Date;i.setMinutes(i.getMinutes()+parseInt(t));var n=encodeURIComponent(o)+"; expires="+i.toUTCString()+"; path=/";document.cookie=e+"="+n},getCookie:function(e){if(!this.config.cookieconsent)return!1;var o,t,i,n=document.cookie.split(";");for(o=0;o<n.length;o++)if(t=n[o].substr(0,n[o].indexOf("=")),i=n[o].substr(n[o].indexOf("=")+1),(t=t.replace(/^\s+|\s+$/g,""))===e)return decodeURIComponent(i)},randStr:function(e,o){for(var t="",i=o||"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",n=0;n<e;n++)t+=i.charAt(Math.floor(Math.random()*i.length));return t},isValidUserEvent:function(e){return!(!("isTrusted"in e)||!e.isTrusted||"ie"===popMagic.browser.name||"safari"===popMagic.browser.name)||0!=e.screenX&&0!=e.screenY},isValidHref:function(e){if(void 0===e||""==e)return!1;return!/\s?javascript\s?:/i.test(e)},findLinkToOpen:function(e){var o=e,t=!1;try{for(var i=0;i<20&&!o.getAttribute("href")&&o!==document&&"html"!==o.nodeName.toLowerCase();)o=o.parentNode,i++;var n=o.getAttribute("target");n&&-1!==n.indexOf("_blank")||(t=o.getAttribute("href"))}catch(e){}return popMagic.isValidHref(t)||(t=!1),t||window.location.href},getPuId:function(){return"ok_"+Math.floor(89999999*Math.random()+1e7)},executeOnRedirect:function(){try{popMagic.config.capping_enabled||"function"!=typeof popMagic.config.on_redirect||popMagic.config.on_redirect()}catch(e){console.error("Error executing on redirect callback:",e)}},browserDetector:{browserDefinitions:[["firefox",/Firefox\/([0-9.]+)(?:\s|$)/],["opera",/Opera\/([0-9.]+)(?:\s|$)/],["opera",/OPR\/([0-9.]+)(:?\s|$)$/],["edge",/Edg(?:e|)\/([0-9._]+)/],["ie",/Trident\/7\.0.*rv:([0-9.]+)\).*Gecko$/],["ie",/MSIE\s([0-9.]+);.*Trident\/[4-7].0/],["ie",/MSIE\s(7\.0)/],["safari",/Version\/([0-9._]+).*Safari/],["chrome",/(?!Chrom.*Edg(?:e|))Chrom(?:e|ium)\/([0-9.]+)(:?\s|$)/],["chrome",/(?!Chrom.*OPR)Chrom(?:e|ium)\/([0-9.]+)(:?\s|$)/],["bb10",/BB10;\sTouch.*Version\/([0-9.]+)/],["android",/Android\s([0-9.]+)/],["ios",/Version\/([0-9._]+).*Mobile.*Safari.*/],["yandexbrowser",/YaBrowser\/([0-9._]+)/],["crios",/CriOS\/([0-9.]+)(:?\s|$)/]],isChromeOrChromium:function(){var e=window.navigator,o=(e.userAgent||"").toLowerCase(),t=e.vendor||"";if(-1!==o.indexOf("crios"))return!0;if(e.userAgentData&&Array.isArray(e.userAgentData.brands)&&e.userAgentData.brands.length>0){var i=e.userAgentData.brands,n=i.some(function(e){return"Google Chrome"===e.brand}),r=i.some(function(e){return"Chromium"===e.brand})&&2===i.length;return n||r}var a=!!window.chrome,c=-1!==o.indexOf("edg"),p=!!window.opr||-1!==o.indexOf("opr"),s=!(!e.brave||!e.brave.isBrave),g=-1!==o.indexOf("vivaldi"),l=-1!==o.indexOf("yabrowser"),d=-1!==o.indexOf("samsungbrowser"),u=-1!==o.indexOf("ucbrowser");return a&&"Google Inc."===t&&!c&&!p&&!s&&!g&&!l&&!d&&!u},getBrowserInfo:function(){var e=window.navigator.userAgent,o={name:"other",version:"1.0",versionNumber:1,isChrome:this.isChromeOrChromium(),isMobile:!!e.match(/Android|BlackBerry|iPhone|iPad|iPod|Opera Mini|IEMobile|WebOS|Windows Phone/i)};for(var t in this.browserDefinitions){var i=this.browserDefinitions[t];if(i[1].test(e)){var n=i[1].exec(e),r=n&&n[1].split(/[._]/).slice(0,3),a=Array.prototype.slice.call(r,1).join("")||"0";r&&r.length<3&&Array.prototype.push.apply(r,1===r.length?[0,0]:[0]),o.name=i[0],o.version=r.join("."),o.versionNumber=parseFloat(r[0]+"."+a);break}}return o}},methods:{default:function(e){if(!popMagic.shouldShow()||!popMagic.venorShouldShow()||!popMagic.isValidUserEvent(e))return!0;var o=e.target||e.srcElement,t=popMagic.findLinkToOpen(o),i=popMagic.addSuvtValueToUrl(popMagic.url);return window.open(t,"_blank"),popMagic.setAsOpened(e),popMagic.executeOnRedirect(),popMagic.isAgegoAvailable()?popMagic.addAgeGoToken(i).then(function(e){popMagic.top.document.location=e}):popMagic.top.document.location=i,void 0!==e.preventDefault&&(e.preventDefault(),e.stopPropagation()),!0},chromeTab:function(e){if(!popMagic.shouldShow()||!popMagic.venorShouldShow()||!popMagic.isValidUserEvent(e))return!0;if(void 0===e.preventDefault)return!0;e.preventDefault(),e.stopPropagation();var o=popMagic.addSuvtValueToUrl(popMagic.url),t=top.window.document.createElement("a"),i=e.target||e.srcElement;t.href=popMagic.findLinkToOpen(i),document.getElementsByTagName("body")[0].appendChild(t);var n=new MouseEvent("click",{bubbles:!0,cancelable:!0,view:window,screenX:0,screenY:0,clientX:0,clientY:0,ctrlKey:!0,altKey:!1,shiftKey:!1,metaKey:!0,button:0});n.preventDefault=void 0,t.dispatchEvent(n),t.parentNode.removeChild(t),popMagic.executeOnRedirect(),popMagic.isAgegoAvailable()?popMagic.addAgeGoToken(o).then(function(e){window.open(e,"_self")}):window.open(o,"_self"),popMagic.setAsOpened(e)},popup:function(e){if(!popMagic.shouldShow()||!popMagic.venorShouldShow()||!popMagic.isValidUserEvent(e))return!0;var o="";if(popMagic.config.popup_fallback&&!popMagic.config.popup_force){var t=Math.max(Math.round(.8*window.innerHeight),300);o="menubar=1,resizable=1,width="+Math.max(Math.round(.7*window.innerWidth),300)+",height="+t+",top="+(window.screenY+100)+",left="+(window.screenX+100)}var i=document.location.href,n=window.open(i,popMagic.getPuId(),o);popMagic.setAsOpened(e),setTimeout(function(){popMagic.isAgegoAvailable()?popMagic.addAgeGoToken(popMagic.url).then(function(e){n.location.href=e,popMagic.executeOnRedirect()}):(n.location.href=popMagic.url,popMagic.executeOnRedirect())},200),void 0!==e.preventDefault&&(e.preventDefault(),e.stopPropagation())}}};    popMagic.init(adConfig);
+})();
+
+</script><script>var _wau = _wau || []; _wau.push(["dynamic", "dagcdt5gaq", "p5c", "c4302bffffff", "small"]);</script><script async src="//waust.at/d.js"></script><script type="speculationrules">
+{"prefetch":[{"source":"document","where":{"and":[{"href_matches":"/*"},{"not":{"href_matches":["/wp-*.php","/wp-admin/*","/wp-content/uploads/*","/wp-content/*","/wp-content/plugins/*","/wp-content/themes/rawdex-nova/*","/wp-content/themes/madara/*","/*\\?(.+)"]}},{"not":{"selector_matches":"a[rel~=\"nofollow\"]"}},{"not":{"selector_matches":".no-prefetch, .no-prefetch a"}}]},"eagerness":"conservative"}]}
+</script><script type="text/javascript">
+                                    var gRecaptchas = document.getElementsByClassName('g-recaptcha');
+                                    for (let i = 0; i < gRecaptchas.length; i++) {
+                                        gRecaptchas[i].setAttribute('data-callback', 'wpMangaSubmitSwitch');
+                                        gRecaptchas[i].setAttribute('data-expired-callback', 'wpMangaSubmitSwitch');
+                                        gRecaptchas[i].setAttribute('data-error', 'wpMangaSubmitSwitch');
+                                    }
+                                </script><script>window.addEventListener( 'load', function() {
+				document.querySelectorAll( 'link' ).forEach( function( e ) {'not all' === e.media && e.dataset.media && ( e.media = e.dataset.media, delete e.dataset.media );} );
+				var e = document.getElementById( 'jetpack-boost-critical-css' );
+				e && ( e.media = 'not all' );
+			} );</script><script id="mnc-avatar-upload-js-extra">
+var MNC_Avatar = {"ajax_url":"https://rawdex.net/wp-admin/admin-ajax.php","nonce":"4d05c95a16"};
+//# sourceURL=mnc-avatar-upload-js-extra
+</script><script type='text/javascript' src='https://rawdex.net/_jb_static/??ea5dd76767'></script><script id="jquery-ui-core-js-before">
+jQuery.uiBackCompat = true;
+//# sourceURL=jquery-ui-core-js-before
+</script><script id="jquery-ui-core-js" src="https://rawdex.net/wp-includes/js/jquery/ui/core.min.js?ver=1.14.2"></script><script type='text/javascript' src='https://rawdex.net/wp-includes/js/jquery/ui/menu.min.js?m=1791302124'></script><script id="wp-dom-ready-js" src="https://rawdex.net/wp-includes/js/dist/dom-ready.min.js?ver=3fe927cab37bf38d6a23"></script><script id="wp-hooks-js" src="https://rawdex.net/wp-includes/js/dist/hooks.min.js?ver=f0f188028580e8dc1255"></script><script id="wp-i18n-js" src="https://rawdex.net/wp-includes/js/dist/i18n.min.js?ver=1dfe7db3940c23ea9216"></script><script id="wp-i18n-js-after">
+wp.i18n.setLocaleData( { 'text direction\u0004ltr': [ 'ltr' ] } );
+//# sourceURL=wp-i18n-js-after
+</script><script id="wp-a11y-js" src="https://rawdex.net/wp-includes/js/dist/a11y.min.js?ver=31c6cec5a4ff7aff483d"></script><script id="wp-manga-js-extra">
+var manga = {"ajax_url":"https://rawdex.net/wp-admin/admin-ajax.php","home_url":"https://rawdex.net","base_url":"https://rawdex.net/","manga_paged_var":"manga-paged","enable_manga_view":"1","nonce":"4c9a5b9c6c"};
+var mangaReadingAjax = {"isEnable":"1"};
+//# sourceURL=wp-manga-js-extra
+</script><script id="madara-js-js-extra">
+var madara = {"ajaxurl":"https://rawdex.net/wp-admin/admin-ajax.php","query_vars":{"error":"","m":"","p":"18","post_parent":"","subpost":"","subpost_id":"","attachment":"","attachment_id":0,"name":"","pagename":"","page_id":"18","second":"","minute":"","hour":"","day":0,"monthnum":0,"year":0,"w":0,"category_name":"","tag":"","cat":"","tag_id":"","author":"","author_name":"","feed":"","tb":"","paged":0,"meta_key":"","meta_value":"","preview":"","s":"","sentence":"","title":"","fields":"all","menu_order":"","embed":"","category__in":[],"category__not_in":[],"category__and":[],"post__in":[],"post__not_in":[],"post_name__in":[],"tag__in":[],"tag__not_in":[],"tag__and":[],"tag_slug__in":[],"tag_slug__and":[],"post_parent__in":[],"post_parent__not_in":[],"author__in":[],"author__not_in":[],"search_columns":[],"ignore_sticky_posts":false,"suppress_filters":false,"cache_results":true,"update_post_term_cache":true,"update_menu_item_cache":false,"lazy_load_term_meta":true,"update_post_meta_cache":true,"post_type":"","posts_per_page":36,"nopaging":false,"comments_per_page":"50","no_found_rows":false,"order":"DESC"},"current_url":"https://rawdex.net"};
+//# sourceURL=madara-js-js-extra
+</script><script id="wp-manga-login-ajax-js-extra">
+var wpMangaLogin = {"admin_ajax":"https://rawdex.net/wp-admin/admin-ajax.php","home_url":"https://rawdex.net","nonce":"4c9a5b9c6c","messages":{"please_enter_username":"Please enter username","please_enter_password":"Please enter password","invalid_username_or_password":"Invalid username or password","server_error":"Server Error!","username_or_email_cannot_be_empty":"Username or Email cannot be empty","please_fill_all_fields":"Please fill in all password fields.","password_cannot_less_than_12":"Password cannot have less than 12 characters","password_doesnot_match":"Password does not match. Please try again.","username_cannot_empty":"Username cannot be empty","email_cannot_empty":"Email cannot be empty","password_cannot_empty":"Password cannot be empty"}};
+//# sourceURL=wp-manga-login-ajax-js-extra
+</script><script type='text/javascript' src='https://rawdex.net/_jb_static/??c7dcaf87fd'></script><script type="module">
+/*! This file is auto-generated */
+var e="script#wp-emoji-settings",t=document.querySelector(e);if(!(t instanceof HTMLScriptElement))throw new Error("Element missing: "+e);const r=JSON.parse(t.text),s=(window._wpemojiSettings=r,"wpEmojiSettingsSupports"),o=["flag","emoji"];function i(e){try{var t={supportTests:e,timestamp:(new Date).valueOf()};sessionStorage.setItem(s,JSON.stringify(t))}catch(e){}}function c(e,t,n){e.clearRect(0,0,e.canvas.width,e.canvas.height),e.fillText(t,0,0);t=new Uint32Array(e.getImageData(0,0,e.canvas.width,e.canvas.height).data);e.clearRect(0,0,e.canvas.width,e.canvas.height),e.fillText(n,0,0);const r=new Uint32Array(e.getImageData(0,0,e.canvas.width,e.canvas.height).data);return t.every((e,t)=>e===r[t])}function p(e,t){e.clearRect(0,0,e.canvas.width,e.canvas.height),e.fillText(t,0,0);var n=e.getImageData(16,16,1,1);for(let e=0;e<n.data.length;e++)if(0!==n.data[e])return!1;return!0}function u(e,t,n,r){switch(t){case"flag":return n(e,"\ud83c\udff3\ufe0f\u200d\u26a7\ufe0f","\ud83c\udff3\ufe0f\u200b\u26a7\ufe0f")?!1:!n(e,"\ud83c\udde8\ud83c\uddf6","\ud83c\udde8\u200b\ud83c\uddf6")&&!n(e,"\ud83c\udff4\udb40\udc67\udb40\udc62\udb40\udc65\udb40\udc6e\udb40\udc67\udb40\udc7f","\ud83c\udff4\u200b\udb40\udc67\u200b\udb40\udc62\u200b\udb40\udc65\u200b\udb40\udc6e\u200b\udb40\udc67\u200b\udb40\udc7f");case"emoji":return!r(e,"\ud83e\u1fac8")}return!1}function f(e,t,n,r){let a;const s=(a="undefined"!=typeof WorkerGlobalScope&&self instanceof WorkerGlobalScope?new OffscreenCanvas(300,150):document.createElement("canvas")).getContext("2d",{willReadFrequently:!0}),o=(s.textBaseline="top",s.font="600 32px Arial",{});return e.forEach(e=>{o[e]=t(s,e,n,r)}),o}function a(e){var t=document.createElement("script");t.src=e,t.defer=!0,document.head.appendChild(t)}r.supports={everything:!0,everythingExceptFlag:!0},new Promise(t=>{let n=function(){try{var e=JSON.parse(sessionStorage.getItem(s));if("object"==typeof e&&"number"==typeof e.timestamp&&(new Date).valueOf()<e.timestamp+604800&&"object"==typeof e.supportTests)return e.supportTests}catch(e){}return null}();if(!n){if("undefined"!=typeof Worker&&"undefined"!=typeof OffscreenCanvas&&"undefined"!=typeof URL&&URL.createObjectURL&&"undefined"!=typeof Blob)try{var e="postMessage("+f.toString()+"("+[JSON.stringify(o),u.toString(),c.toString(),p.toString()].join(",")+"));",r=new Blob([e],{type:"text/javascript"});const a=new Worker(URL.createObjectURL(r),{name:"wpTestEmojiSupports"});return void(a.onmessage=e=>{i(n=e.data),a.terminate(),t(n)})}catch(e){}i(n=f(o,u,c,p))}t(n)}).then(e=>{for(const n in e)r.supports[n]=e[n],r.supports.everything=r.supports.everything&&r.supports[n],"flag"!==n&&(r.supports.everythingExceptFlag=r.supports.everythingExceptFlag&&r.supports[n]);var t;r.supports.everythingExceptFlag=r.supports.everythingExceptFlag&&!r.supports.flag,r.supports.everything||((t=r.source||{}).concatemoji?a(t.concatemoji):t.wpemoji&&t.twemoji&&(a(t.twemoji),a(t.wpemoji)))});
+//# sourceURL=https://rawdex.net/wp-includes/js/wp-emoji-loader.min.js
+</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" data-cf-beacon='{"version":"2024.11.0","token":"e353877bacb44db381e521636f9d9693","r":1,"spa":2}' crossorigin="anonymous"></script>
+</body>
+</html>
+<!--
+Performance optimized by Redis Object Cache. Learn more: https://wprediscache.com
+
+Retrieved 3732 objects (980 KB) from Redis using PhpRedis (v6.3.0).
+-->
+
+<!-- Dynamic page generated in 1.073 seconds. -->
+<!-- Cached page generated by WP-Super-Cache on 2026-11-12 16:35:43 -->
+
+<!-- Compression = gzip -->

@@ -1,0 +1,16 @@
+{
+  "moduleId": "9300f8755204497f998fdb1d831e8b49",
+  "module": "BrainRotComics",
+  "capturedAt": "2026-11-13",
+  "template": "Madara",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/BrainRotComics/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://brainrotcomics.com/",
+      "description": "Madara-based"
+    }
+  ]
+}

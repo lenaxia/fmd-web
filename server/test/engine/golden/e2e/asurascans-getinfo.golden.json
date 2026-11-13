@@ -1,0 +1,46 @@
+{
+  "module": "AsuraScans",
+  "moduleId": "7103ae6839ea46ec80cdfc2c4b37c803",
+  "event": "GetInfo",
+  "url": "https://api.asurascans.com/api/series/solo-leveling",
+  "fixtureProvenance": "corpus/fixtures/seed/AsuraScans/source.html is the homepage; flow fixtures are committed synthetic bodies grounded in the module API shapes",
+  "result": {
+    "kind": "code",
+    "value": 0,
+    "readBack": {}
+  },
+  "mangaInfo": {
+    "title": "Solo Leveling",
+    "altTitles": "나 혼자만 레벨업",
+    "coverLink": "https://api.asurascans.com/cover/sl.jpg",
+    "authors": "Chugong",
+    "artists": "D-U",
+    "genres": "Action, Fantasy, Manhwa",
+    "status": "1",
+    "summary": "E-Rank hunter.\nLevels up."
+  },
+  "chapterLinks": [
+    "solo-leveling/chapters/177",
+    "solo-leveling/chapters/179"
+  ],
+  "httpRequests": [
+    {
+      "method": "GET",
+      "url": "https://api.asurascans.com/api/series/solo-leveling",
+      "body": "",
+      "mimeType": "",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      }
+    },
+    {
+      "method": "GET",
+      "url": "https://api.asurascans.com/api/series/solo-leveling/chapters",
+      "body": "",
+      "mimeType": "",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      }
+    }
+  ]
+}

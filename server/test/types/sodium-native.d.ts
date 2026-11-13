@@ -32,6 +32,7 @@ declare module 'sodium-native' {
 }
 
 declare module 'aes-js' {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- declared for the typeof reference below
   namespace ModeOfOperation {
     class cfb {
       constructor(key: Buffer | Uint8Array, iv: Buffer | Uint8Array, segmentSize?: number);

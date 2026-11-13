@@ -1,0 +1,30 @@
+{
+ "fixtureId": "capture/getinfo-normalization-0021",
+ "moduleId": "3c4d5e6f77889900aabbccddeeff0021",
+ "rawModuleOutput": {
+  "title": "K",
+  "altTitles": "",
+  "authors": "",
+  "artists": "",
+  "genres": "",
+  "status": "",
+  "summary": "",
+  "coverLink": "",
+  "url": "https://s.example/m",
+  "link": "",
+  "chapterLinks": [
+   "https://a.example/1",
+   "https://A.example/1",
+   "https://b.example/2"
+  ],
+  "chapterNames": [
+   "x",
+   "y",
+   "z"
+  ]
+ },
+ "flags": {
+  "removeHostFromChapterLinks": false,
+  "optionRemoveMangaNameFromChapter": false
+ }
+}

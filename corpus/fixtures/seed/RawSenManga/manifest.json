@@ -1,0 +1,15 @@
+{
+  "moduleId": "8461acb310df4019a6154ad7b3623a42",
+  "module": "RawSenManga",
+  "capturedAt": "2026-11-13",
+  "expressionSource": "modules",
+  "entries": [
+    {
+      "fixtureId": "seed/RawSenManga/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://raw.senmanga.com/",
+      "description": "Japanese raw source"
+    }
+  ]
+}

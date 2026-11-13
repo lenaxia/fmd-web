@@ -1,0 +1,84 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/BacaKomik/source.html",
+  "document": "html",
+  "moduleId": "f68bb6ee00e442418c8c05eb00759ae1",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/BacaKomik/source",
+      "id": "33#1",
+      "expression": "//div[@class=\"jdlbar\"]//a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/BacaKomik/source",
+      "id": "43#1",
+      "expression": "//span[contains(b, \"Author\")]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/BacaKomik/source",
+      "id": "44#1",
+      "expression": "//span[contains(b, \"Artis\")]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/BacaKomik/source",
+      "id": "45#1",
+      "expression": "//div[@class=\"genre-info\"]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/BacaKomik/source",
+      "id": "46#1",
+      "expression": "//span[contains(b, \"Status\")]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/BacaKomik/source",
+      "id": "47#1",
+      "expression": "//div[@itemprop=\"description\"]/normalize-space(.)",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/BacaKomik/source",
+      "id": "49#1",
+      "expression": "//span[@class=\"lchx\"]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/BacaKomik/source",
+      "id": "59#1",
+      "expression": "//div[@id=\"anjay_ini_id_kh\"]//img/@data-lazy-src",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    }
+  ]
+}

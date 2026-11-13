@@ -1,0 +1,14 @@
+{
+  "moduleId": "03ae42ac9141443fa0711bd401c0203d",
+  "module": "InManga",
+  "capturedAt": "2026-11-13",
+  "entries": [
+    {
+      "fixtureId": "seed/InManga/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://inmanga.com/",
+      "description": "Spanish source"
+    }
+  ]
+}

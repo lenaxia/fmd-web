@@ -1,0 +1,14 @@
+{
+  "moduleId": "1d6a75911a1b414f89e5cf95c9a7ae4e",
+  "module": "MangaFreak",
+  "capturedAt": "2026-11-13",
+  "entries": [
+    {
+      "fixtureId": "seed/MangaFreak/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://w11.mangafreak.net/",
+      "description": "Aggregator"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "moduleId": "4ac85000451741f990569381e0e10752",
+  "module": "LectorHentai",
+  "capturedAt": "2026-11-13",
+  "expressionSource": "modules",
+  "entries": [
+    {
+      "fixtureId": "seed/LectorHentai/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://lectorhentai.com/",
+      "description": "Gallery source (Spanish)"
+    }
+  ]
+}

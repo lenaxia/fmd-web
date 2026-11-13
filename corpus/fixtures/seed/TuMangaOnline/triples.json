@@ -1,0 +1,158 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/TuMangaOnline/source.html",
+  "document": "html",
+  "moduleId": "9185eb6c49324a849c7d7925a41ef3a3",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/TuMangaOnline/source",
+      "id": "36#1",
+      "expression": "//a[@rel=\"next\"]/@href",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/TuMangaOnline/source",
+      "id": "41#1",
+      "expression": "//a[@rel=\"next\"]/@href",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/TuMangaOnline/source",
+      "id": "55#1",
+      "expression": "//div[@id=\"library-grid\"]/div/a",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/TuMangaOnline/source",
+      "id": "57#1",
+      "expression": ".//h4",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": "La Ventura Del Caballero BlancoCodename AnastasiaSolo LevelingEl Único Final De La Villana Es La MuerteEl Mejor Ingeniero del MundoEl orco y el elfoCamino a ver a mi madreMairimashita! Iruma-kunLa Basura De La Familia Del Conde¿Cómo me convertí en princesa?En Está Vida Seré La MatriarcaTensei Shitara Slime Datta KenGachiakutaDandadanONE PUNCH-MANBlue LockMe convertí en la hija adoptiva del protagonista masculino¡Padre, No Quiero Casarme!BerserkSuper no Ura de Yani Sū FutariSono Bisque Doll wa Koi wo SuruLas Flores Son CeboClases SecretasOyasumi PunpunKimi no koto ga Dai Dai Dai Dai Daisuki na 100-nin no KanojoLa mamá de mi amigo es míaTensei Colosseum - Saijaku Skill de Saikyou no Onna-tachi o Kouryaku shite Dorei Harem TsukurimasuDeja de fumarIsekai Meikyuu de Harem woAbrázame FuerteTales of Demons and GodsVagabondMato Seihei no SlaveCircles¡Odio que seamos amigos de la infancia!Estoy Siendo Criada Por VillanosJinxMarea baja en el CrepúsculoVecinos intimosLa seducción de la serpiente sagradaRosas Y ChampañaSuhwaBJ AlexPintor NocturnoSmyrna & CapriTú eres mi mundoNuestros días soleadosBesame si puedesLa granja del señor ADefine La Relación19 DíasBajo la Luz VerdeGarritas al ataqueTrabajo diario a tiempo parcialLa Ventura Del Caballero BlancoJinxMarea baja en el CrepúsculoVecinos intimosLa seducción de la serpiente sagradaRosas Y ChampañaSuhwaBJ AlexCodename AnastasiaPintor NocturnoSolo LevelingSmyrna & CapriTú eres mi mundoNuestros días soleadosEl Único Final De La Villana Es La MuerteBesame si puedesLa granja del señor AEl Mejor Ingeniero del MundoYoukai Shoujo ―Monsuga―World TriggerSuper no Ura de Yani Sū FutariBerserkEn realidad, ser una consorte imperial es un buen trabajoI Randomly Have A New Career Every WeekSono Bisque Doll wa Koi wo SuruLas Flores Son CeboClases SecretasIsekai Nonbiri NoukaOyasumi PunpunKimi no koto ga Dai Dai Dai Dai Daisuki na 100-nin no Kanojo¡Criminal!La mamá de mi amigo es míaTensei Colosseum - Saijaku Skill de Saikyou no Onna-tachi o Kouryaku shite Dorei Harem TsukurimasuDeja de fumarIsekai Meikyuu de Harem woAbrázame FuerteJinxMarea baja en el CrepúsculoVecinos intimosLa seducción de la serpiente sagradaRosas Y ChampañaSuhwaBJ AlexPintor NocturnoSmyrna & CapriTú eres mi mundoNuestros días soleadosBesame si puedesLa granja del señor ADefine La Relación19 DíasBajo la Luz VerdeGarritas al ataqueTrabajo diario a tiempo parcial¡Criminal!Desvio InesperadoMikaJuuou Mujin no FafnirHinako NoteGUNNM: Kasei SenkiGrimoire of ZeroFAIRY TAIL - Blue · MistralDeath March kara Hajimaru Isekai KyousoukyokuDead TubeAmor Es Cuando Cesa La LluviaAmagi Brilliant ParkThe New GateMi juventud comienza en el andén de la estación con la gyaru de más alto nivel de otra escuelaYamagami-sama to Okiniiri[Cuento breve sobre adicción a las relaciones] Punto de convergencia[Antología de historias cortas sobre la adicción aViolencia benevolenteEl mundo en el que desapareció la amada hermanaEl mundo en el que desapareció la amada hermanaEl mundo en el que desapareció la amada hermanaEl mundo en el que desapareció la amada hermanaLas flores azules y el bosque de cerámicaComo sobrevivir en la novela de terror que escribiEl mundo en el que desapareció la amada hermanaEl mundo en el que desapareció la amada hermanaEl mundo en el que desapareció la amada hermanaEl mundo en el que desapareció la amada hermanaImpure Sisters Do Not RepentEl mundo en el que desapareció la amada hermanaEl mundo en el que desapareció la amada hermanaEl mundo en el que desapareció la amada hermanaMiyakura Botan no ScandalEl mundo en el que desapareció la amada hermanaEl mundo en el que desapareció la amada hermana¿Un novio así no es tu tipo?El mundo en el que desapareció la amada hermanaEl mundo en el que desapareció la amada hermanaEl mundo en el que desapareció la amada hermanaVive conmigoKoibito Ijou Yuujin Miman¡Criminal!¡Un amor contra el destino!"
+    },
+    {
+      "fixtureId": "seed/TuMangaOnline/source",
+      "id": "70#1",
+      "expression": "//h1[contains(@class, \"element-title\")]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/TuMangaOnline/source",
+      "id": "71#1",
+      "expression": "//p[@class=\"element-alternative-title\"]/span",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/TuMangaOnline/source",
+      "id": "72#1",
+      "expression": "//img[contains(@class,\"book-thumbnail\")]/@src",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/TuMangaOnline/source",
+      "id": "73#1",
+      "expression": "//div[@class=\"staff-card\"]//a[contains(@href, \"author\")]",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/TuMangaOnline/source",
+      "id": "74#1",
+      "expression": "//div[@class=\"staff-card\"]//a[contains(@href, \"artist\")]",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/TuMangaOnline/source",
+      "id": "75#1",
+      "expression": "(//a[contains(@class, \"badge\")], //div[contains(@class, \"demography\")], upper-case(substring(//h1[contains(@class, \"book-type\")], 1, 1)) || lower-case(substring(//h1[contains(@class, \"book-type\")], 2)))",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "list",
+      "result": [
+        ""
+      ]
+    },
+    {
+      "fixtureId": "seed/TuMangaOnline/source",
+      "id": "76#1",
+      "expression": "//span[contains(@class, \"book-status\")]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/TuMangaOnline/source",
+      "id": "77#1",
+      "expression": "//p[@id=\"manga-synopsis\"]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/TuMangaOnline/source",
+      "id": "79#1",
+      "expression": "//ul[@class=\"list-group list-chapters\"]/li",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/TuMangaOnline/source",
+      "id": "80#1",
+      "expression": ".//a[contains(@class, \"btn-primary\")]/@href",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": "https://zonatmo.org/bibliotecahttps://zonatmo.org/bibliotecahttps://zonatmo.org/bibliotecahttps://zonatmo.org/ultimas-subidashttps://zonatmo.org/registerhttps://zonatmo.org/biblioteca?sort=weeklyhttps://zonatmo.org/biblioteca?sort=monthlyhttps://zonatmo.org/listshttps://zonatmo.org/lists"
+    },
+    {
+      "fixtureId": "seed/TuMangaOnline/source",
+      "id": "81#1",
+      "expression": ".//span[contains(@class, \"chapter-number\")]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/TuMangaOnline/source",
+      "id": "97#1",
+      "expression": "//div[@class=\"reader-img-wrap\"]/img/@src",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    }
+  ]
+}

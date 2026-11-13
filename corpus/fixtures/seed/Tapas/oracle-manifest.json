@@ -1,0 +1,79 @@
+{
+  "fixtureId": "seed/Tapas/source",
+  "moduleId": "9f2d722f3e90432ba913d5bdddc048b4",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "35#1",
+      "expression": "//a[@class=\"nav-button ga-tracking\"]/@href",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "19#1",
+      "expression": "json(*).data.items()",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "45#1",
+      "expression": "//a[@class=\"title\"]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "23#1",
+      "expression": "json(*).meta.pagination.totalCount",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "46#1",
+      "expression": "//a[@class=\"thumb js-thumbnail\"]/img/@src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "23#2",
+      "expression": "json(*).meta.pagination.size",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "47#1",
+      "expression": "//ul[@class=\"row-body creator-section\"]//a[@class=\"name js-fb-tracking\"]",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "70#1",
+      "expression": "json(*).data.pagination.has_next",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "48#1",
+      "expression": "//div[@class=\"info-detail__row\"]/a",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "49#1",
+      "expression": "//span[@id=\"description__body\"]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "51#1",
+      "expression": "//meta[@property=\"al:android:url\"]/@content",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "86#1",
+      "expression": "//img[@class=\"content__img js-lazy\"]/@data-src",
+      "engine": "xpath",
+      "output": "list"
+    }
+  ]
+}

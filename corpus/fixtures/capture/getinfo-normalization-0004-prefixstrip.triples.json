@@ -1,0 +1,59 @@
+{
+  "generator" : "fmd_capture",
+  "mode" : "normalize",
+  "fixture" : "corpus/fixtures/capture/getinfo-normalization-0004-prefixstrip.json",
+  "moduleId" : "4d5e6f77889900aabbccddeeff0304",
+  "internettoolsCommit" : "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit" : "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion" : "3.2.2",
+  "flags" : {
+    "removeHostFromChapterLinks" : true,
+    "optionRemoveMangaNameFromChapter" : true
+  },
+  "triples" : [
+    {
+      "fixtureId" : "capture/getinfo-normalization-0004-prefixstrip",
+      "input" : {
+        "title" : "ExampleMan",
+        "altTitles" : "",
+        "authors" : "Author One,",
+        "artists" : "<N/A>",
+        "genres" : "Action,",
+        "status" : "Completed",
+        "summary" : "-",
+        "coverLink" : "",
+        "url" : "https://site.example/manga/exampleman",
+        "link" : "",
+        "chapterLinks" : [
+          "https://site.example/manga/exampleman/ch-5",
+          "https://site.example/manga/exampleman/ch-6"
+        ],
+        "chapterNames" : [
+          "ExampleMan Ch. 5",
+          "ExampleMan- Ch. 6"
+        ]
+      },
+      "normalized" : {
+        "title" : "ExampleMan",
+        "altTitles" : "",
+        "authors" : "Author One",
+        "artists" : "",
+        "genres" : "Action",
+        "status" : "Completed",
+        "summary" : "",
+        "coverLink" : "",
+        "url" : "https://site.example/manga/exampleman",
+        "link" : "/manga/exampleman",
+        "chapterLinks" : [
+          "/manga/exampleman/ch-5",
+          "/manga/exampleman/ch-6"
+        ],
+        "chapterNames" : [
+          "Ch. 5",
+          "Ch. 6"
+        ],
+        "numChapter" : 2
+      }
+    }
+  ]
+}

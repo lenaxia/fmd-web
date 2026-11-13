@@ -1,0 +1,66 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/VerMangasPorno/source.html",
+  "document": "html",
+  "moduleId": "c3a863e704054a1a86eeafbbaae67513",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/VerMangasPorno/source",
+      "id": "15#1",
+      "expression": "//div[@class=\"wp-pagenavi\"]/a[last()]/@href",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/VerMangasPorno/source",
+      "id": "24#1",
+      "expression": "//h2[@class=\"information\"]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/VerMangasPorno/source",
+      "id": "35#1",
+      "expression": "//h1",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/VerMangasPorno/source",
+      "id": "36#1",
+      "expression": "//div[@class=\"wp-content\"]/p[contains(img/@src, \"http\")][1]/img[1]/@src",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/VerMangasPorno/source",
+      "id": "37#1",
+      "expression": "//div[@class=\"tax_box\"]//a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/VerMangasPorno/source",
+      "id": "50#1",
+      "expression": "//div[@class=\"wp-content\"]/p/img/@src",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    }
+  ]
+}

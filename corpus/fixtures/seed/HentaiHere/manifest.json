@@ -1,0 +1,15 @@
+{
+  "moduleId": "66b0b8597daf4839bc7095c10e88039b",
+  "module": "HentaiHere",
+  "capturedAt": "2026-11-13",
+  "expressionSource": "modules",
+  "entries": [
+    {
+      "fixtureId": "seed/HentaiHere/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://hentaihere.com/",
+      "description": "Standalone"
+    }
+  ]
+}

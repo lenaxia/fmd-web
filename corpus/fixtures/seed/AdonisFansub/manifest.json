@@ -1,0 +1,16 @@
+{
+  "moduleId": "baeb4d0c63d9456dbc8da6f1d29faf60",
+  "module": "AdonisFansub",
+  "capturedAt": "2026-11-13",
+  "template": "MangaThemesia",
+  "expressionSource": "templates",
+  "entries": [
+    {
+      "fixtureId": "seed/AdonisFansub/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://manga.adonisfansub.com/",
+      "description": "MangaThemesia-based (Spanish)"
+    }
+  ]
+}

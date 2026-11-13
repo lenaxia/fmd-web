@@ -1,0 +1,55 @@
+{
+  "fixtureId": "seed/LectorHentai/source",
+  "moduleId": "4ac85000451741f990569381e0e10752",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "23#1",
+      "expression": "//div[@class=\"listupd\"]//div[@class=\"bsx\"]/a",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "25#1",
+      "expression": ".//div[@class=\"tt\"]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "29#1",
+      "expression": "//div[@class=\"hpage\"]/a[contains(@class,\"r\")]/@href",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "50#1",
+      "expression": "//b[contains(.,\"Título\")]/following-sibling::span",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "51#1",
+      "expression": "//div[@class=\"bigcover\"]//img/@src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "52#1",
+      "expression": "//b[contains(.,\"Artista\")]/following-sibling::span",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "53#1",
+      "expression": "//b[contains(.,\"Generos\")]/following-sibling::span/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "57#1",
+      "expression": "//a[contains(@class,\"leer\")]/@href",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

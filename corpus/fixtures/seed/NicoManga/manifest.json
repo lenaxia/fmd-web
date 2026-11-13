@@ -1,0 +1,15 @@
+{
+  "moduleId": "cc9b87e0e2fe4da5b6e8eb7500c3f8c2",
+  "module": "NicoManga",
+  "capturedAt": "2026-11-13",
+  "expressionSource": "modules",
+  "entries": [
+    {
+      "fixtureId": "seed/NicoManga/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://nicomanga.com/",
+      "description": "Japanese source"
+    }
+  ]
+}

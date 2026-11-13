@@ -1,0 +1,91 @@
+{
+  "fixtureId": "seed/Hentai2Read/source",
+  "moduleId": "053da85062184626a0a1ff6d57c3c955",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "44#1",
+      "expression": "book?title",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "17#1",
+      "expression": "json(//script[@data-page=\"app\"]).props.books.lastPage",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "45#1",
+      "expression": "book?alt",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "28#1",
+      "expression": "json(//script[@data-page=\"app\"]).props.books.data()",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "46#1",
+      "expression": "book?cover",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "43#1",
+      "expression": "parse-json(//script[@data-page=\"app\"]).props",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "47#1",
+      "expression": "string-join(book?groups?*[type=\"artist\"]?tags?*?name, \", \")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "86#1",
+      "expression": "json(//script[@data-page=\"app\"]).props.images()",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "48#1",
+      "expression": "string-join((book?tags?*?name, book?type?label), \", \")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "49#1",
+      "expression": "book?status?label",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "50#1",
+      "expression": "book?description",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "56#1",
+      "expression": "book?groups?*[type=\"parody\"]?tags?*?name",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "60#1",
+      "expression": "book?groups?*[type=\"character\"]?tags?*?name",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "68#1",
+      "expression": "chapters?*",
+      "engine": "xpath",
+      "output": "all"
+    }
+  ]
+}

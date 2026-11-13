@@ -1,0 +1,30 @@
+{
+ "fixtureId": "capture/getinfo-normalization-0008",
+ "moduleId": "3c4d5e6f77889900aabbccddeeff0008",
+ "rawModuleOutput": {
+  "title": "D",
+  "altTitles": "",
+  "authors": "",
+  "artists": "",
+  "genres": "",
+  "status": "",
+  "summary": "",
+  "coverLink": "",
+  "url": "https://s.example/m",
+  "link": "/m",
+  "chapterLinks": [
+   "/x",
+   "/y",
+   "/X",
+   "/Y",
+   "/z"
+  ],
+  "chapterNames": [
+   "x1",
+   "y1",
+   "x2",
+   "y2",
+   "z1"
+  ]
+ }
+}

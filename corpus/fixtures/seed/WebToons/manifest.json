@@ -1,0 +1,14 @@
+{
+  "moduleId": "18f636ec7fdf47fabe95d940ad0b548f",
+  "module": "WebToons",
+  "capturedAt": "2026-11-13",
+  "entries": [
+    {
+      "fixtureId": "seed/WebToons/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://www.webtoons.com/",
+      "description": "Webtoons (Naver)"
+    }
+  ]
+}

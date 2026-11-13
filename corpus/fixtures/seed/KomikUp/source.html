@@ -1,0 +1,2964 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <!-- Clarity tracking code -->
+    <script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+        c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+        t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+        y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "nnh3a3l3de");
+    </script>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZJ5SSY9FBH"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-ZJ5SSY9FBH');
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>KomikUp - Baca Komik Manga, Manhwa, Manhua Bahasa Indonesia Sub Indo</title>
+    <meta name="description" content="Baca Komik Manga, Manhwa, dan Manhua Bahasa Indonesia terlengkap dan terupdate tanpa iklan mengganggu di KomikUp. Update chapter terbaru setiap hari!">
+    <meta name="keywords" content="komik, baca komik, manga, manhwa, manhua, komik indo, sub indo, komikup">
+    
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="KomikUp - Baca Komik Indonesia Sub Indo">
+    <meta property="og:description" content="Baca Komik Manga, Manhwa, dan Manhua Bahasa Indonesia terlengkap dan gratis.">
+    <meta property="og:image" content="https://www.komikup.com/favicon.ico">
+    <meta property="og:url" content="https://www.komikup.com/">
+    <meta property="og:site_name" content="KomikUp">
+
+    <script type="application/ld+json" id="schema-json"></script>
+    <link rel="dns-prefetch" href="https://img.komikup.com">
+    <link rel="dns-prefetch" href="https://apikomik-dun.vercel.app">
+    <link rel="dns-prefetch" href="https://api.komikup.com">
+    <link rel="preconnect" href="https://www.komikup.com" crossorigin>
+    <link rel="dns-prefetch" href="https://www.komikup.com">
+    
+    <style>
+        :root { 
+            --primary: #ff4757; 
+            --primary-hover: #ff6b81;
+            --bg: #0d0f12; 
+            --surface: #15181e; 
+            --surface-hover: #1c2028; 
+            --card: #13161c; 
+            --text: #e6edf3; 
+            --text-muted: #8c95a2; 
+            --border: #21262d; 
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.45);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background: var(--bg); 
+            color: var(--text); 
+            padding-bottom: 75px; 
+            min-height: 100vh; 
+            line-height: 1.5; 
+            -webkit-font-smoothing: antialiased;
+        }
+        a { text-decoration: none; color: inherit; transition: 0.15s ease; cursor: pointer; }
+
+        .container { max-width: 1400px; margin: 0 auto; padding: 0 20px; }
+
+        .svg-icon {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            display: inline-block;
+            vertical-align: middle;
+            flex-shrink: 0;
+        }
+
+        /* HEADER */
+        header { 
+            background: rgba(13, 15, 18, 0.88); 
+            padding: 12px 0; 
+            border-bottom: 1px solid var(--border); 
+            backdrop-filter: blur(14px); 
+            position: sticky; 
+            top: 0; 
+            z-index: 100; 
+            transition: transform 0.25s ease;
+        }
+        header.header-hidden { transform: translateY(-100%); }
+        .nav-bar { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            gap: 16px; 
+        }
+        .logo { 
+            font-size: 18px; 
+            font-weight: 800; 
+            color: var(--primary); 
+            letter-spacing: -0.3px; 
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .nav-menu { display: flex; gap: 6px; align-items: center; flex: 1; min-width: 0; }
+        .nav-menu a { 
+            font-size: 13px; 
+            font-weight: 600; 
+            color: var(--text-muted); 
+            padding: 8px 12px; 
+            border-radius: var(--radius-sm);
+            white-space: nowrap; 
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .nav-menu a:hover { color: #fff; background: var(--surface); }
+        .nav-menu a.active { color: #fff; background: var(--surface); border: 1px solid var(--border); }
+
+        .search-item { position: relative; flex: 1; min-width: 150px; max-width: 100%; }
+        .search-input { 
+            width: 100%; 
+            background: var(--surface); 
+            border: 1px solid var(--border); 
+            color: #fff; 
+            padding: 8px 14px 8px 34px; 
+            border-radius: var(--radius-sm); 
+            font-size: 13px; 
+            outline: none; 
+            transition: border-color 0.2s ease, background 0.2s ease;
+        }
+        .search-input:focus { border-color: var(--primary); background: #191c24; }
+        .search-icon-pos {
+            position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+            color: var(--text-muted); pointer-events: none;
+        }
+
+        /* AUTH NAV & USER BADGE */
+        .auth-nav-box { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+        .btn-auth-header {
+            background: var(--primary); color: #fff; padding: 7px 14px;
+            border-radius: var(--radius-sm); font-size: 12px; font-weight: 700;
+            display: inline-flex; align-items: center; gap: 6px; border: none; cursor: pointer;
+        }
+        .btn-auth-header:hover { background: var(--primary-hover); }
+
+        .user-profile-badge {
+            display: flex; align-items: center; gap: 8px; background: var(--surface);
+            border: 1px solid var(--border); padding: 4px 10px 4px 6px;
+            border-radius: 50px; font-size: 12px; font-weight: 600;
+        }
+        .user-avatar {
+            width: 26px; height: 26px; border-radius: 50%; background: var(--primary);
+            color: #fff; display: flex; align-items: center; justify-content: center;
+            font-size: 11px; font-weight: 800; overflow: hidden;
+        }
+        .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .level-chip {
+            background: rgba(255, 71, 87, 0.15); color: var(--primary);
+            font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px;
+            border: 1px solid rgba(255, 71, 87, 0.3); text-transform: uppercase;
+        }
+
+        .menu-toggle-btn {
+            display: none; background: var(--surface); border: 1px solid var(--border);
+            color: var(--text); padding: 8px 12px; border-radius: var(--radius-sm); cursor: pointer;
+        }
+
+        /* SECTION TITLE */
+        .section-title { 
+            font-size: 16px; font-weight: 700; margin: 26px 0 16px; 
+            display: flex; align-items: center; gap: 10px;
+            letter-spacing: -0.2px; color: var(--text);
+        }
+        .section-title::before {
+            content: ""; display: inline-block; width: 4px; height: 16px;
+            background: var(--primary); border-radius: 2px;
+        }
+
+        /* GRID & CARDS */
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr)); gap: 16px; }
+        .card { 
+            background: var(--card); border-radius: var(--radius-md); overflow: hidden; 
+            position: relative; border: 1px solid var(--border); display: flex; 
+            flex-direction: column; transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+        .card:hover { transform: translateY(-3px); border-color: #30363d; box-shadow: var(--shadow-soft); }
+
+        .card-link { display: block; position: relative; padding-top: 142%; overflow: hidden; background: #15181e; }
+        .card-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; transition: transform 0.25s ease; }
+        .card:hover .card-img { transform: scale(1.03); }
+
+        .badge-type { 
+            position: absolute; top: 8px; left: 8px; padding: 3px 8px; 
+            font-size: 10px; font-weight: 700; border-radius: 4px; 
+            text-transform: uppercase; letter-spacing: 0.3px; backdrop-filter: blur(6px); z-index: 2; 
+        }
+        .Manhwa { background: rgba(52, 152, 219, 0.85); color: #fff; } 
+        .Manhua { background: rgba(155, 89, 182, 0.85); color: #fff; } 
+        .Manga { background: rgba(255, 71, 87, 0.9); color: #fff; }
+
+        .card-info { padding: 12px; display: flex; flex-direction: column; gap: 8px; flex-grow: 1; }
+        .card-title { 
+            font-size: 13.5px; font-weight: 600; line-height: 1.4; color: #f0f6fc; 
+            overflow: hidden; text-overflow: ellipsis; display: -webkit-box; 
+            -webkit-line-clamp: 2; -webkit-box-orient: vertical; min-height: 2.8em; 
+        }
+        .card-title:hover { color: var(--primary); }
+
+        .chapter-mini-list { display: flex; flex-direction: column; gap: 5px; margin-top: auto; }
+        .chap-chip { 
+            display: flex; justify-content: space-between; background: var(--surface); 
+            padding: 6px 10px; border-radius: var(--radius-sm); font-size: 11px; 
+            color: var(--text-muted); border: 1px solid rgba(255, 255, 255, 0.03); transition: 0.15s;
+        }
+        .chap-chip:hover { color: #fff; border-color: var(--border); }
+
+        .history-banner { 
+            background: var(--surface); border: 1px solid var(--border); color: var(--text); 
+            padding: 12px 16px; border-radius: var(--radius-sm); margin-bottom: 18px; 
+            display: flex; justify-content: space-between; align-items: center; 
+            font-size: 13px; font-weight: 500; 
+        }
+        .history-banner a { 
+            background: var(--primary); color: white; padding: 6px 14px; 
+            border-radius: 6px; font-weight: 600; font-size: 12px;
+        }
+
+        /* READER UI */
+        .reader-header, .reader-footer { display: none; }
+        body.reader-mode header { display: none !important; }
+        .reader-container { width: 100%; max-width: 800px; margin: 0 auto; background: #000; min-height: 100vh;}
+        .reader-container img { 
+            width: 100% !important; height: auto !important; display: block; 
+            background: #111; margin: 0 !important; padding: 0 !important; 
+            border: none !important; vertical-align: bottom; 
+        }
+
+        body.reader-mode .reader-header, body.reader-mode .reader-footer {
+            display: flex; position: fixed; left: 0; right: 0; background: rgba(13, 15, 18, 0.94); 
+            z-index: 9999; backdrop-filter: blur(12px); transition: opacity 0.25s ease; 
+            opacity: 0; pointer-events: none;
+        }
+        body.reader-mode .reader-header.show, body.reader-mode .reader-footer.show { 
+            opacity: 1; pointer-events: auto; 
+        }
+
+        .reader-header { 
+            top: 0; justify-content: space-between; align-items: center; 
+            border-bottom: 1px solid var(--border); height: 56px; padding: 0 16px;
+        }
+        #readerTitle {
+            font-size: 14px; font-weight: 700; color: #fff; max-width: 65%; 
+            overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: center;
+        }
+
+        .reader-footer { 
+            bottom: 0; justify-content: space-between; align-items: center; 
+            border-top: 1px solid var(--border); height: 64px; padding: 0 16px; gap: 12px;
+        }
+
+        .nav-action-btn {
+            background: var(--surface); border: 1px solid var(--border); color: #fff; 
+            height: 44px; padding: 0 16px; border-radius: var(--radius-sm); cursor: pointer; 
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px; 
+            font-size: 13px; font-weight: 600; user-select: none;
+        }
+        .nav-action-btn:hover { border-color: var(--primary); color: var(--primary); background: #1a1e26; }
+        .nav-action-btn.center-btn { flex: 1; max-width: 220px; background: var(--surface-hover); }
+
+        .control-btn-icon {
+            background: var(--surface); border: 1px solid var(--border); color: #fff; 
+            cursor: pointer; width: 40px; height: 40px; border-radius: var(--radius-sm); 
+            display: flex; align-items: center; justify-content: center;
+        }
+        .control-btn-icon:hover { border-color: var(--primary); color: var(--primary); }
+
+        /* BOTTOM SHEET */
+        .bottom-sheet { 
+            position: fixed; bottom: -100%; left: 50%; transform: translateX(-50%); 
+            width: 100%; max-width: 580px; background: #14171d; z-index: 10000; 
+            border-radius: 16px 16px 0 0; transition: bottom 0.25s cubic-bezier(0.4, 0, 0.2, 1); 
+            max-height: 75vh; display: flex; flex-direction: column; border: 1px solid var(--border); border-bottom: none;
+        }
+        .bottom-sheet.active { display: flex !important; bottom: 0 !important; }
+        .overlay-bg.active { display: block !important; position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); z-index: 9998; }
+
+        .sheet-header { padding: 16px 18px 14px; border-bottom: 1px solid var(--border); background: #14171d; position: sticky; top: 0; z-index: 2; border-radius: 16px 16px 0 0; }
+        .sheet-title { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 10px; text-align: center; }
+        .sheet-search { width: 100%; background: var(--surface); border: 1px solid var(--border); color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 13px; outline: none; }
+        .sheet-search:focus { border-color: var(--primary); background: #1a1e26; }
+
+        #sheetContent { overflow-y: auto; flex-grow: 1; padding: 12px 16px 30px; }
+        .sheet-chapter-item { 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 12px 14px; margin-bottom: 8px; background: var(--surface); 
+            border-radius: 8px; border: 1px solid var(--border); font-size: 13.5px; 
+            font-weight: 600; color: #d1d7e0; min-height: 44px;
+        }
+        .sheet-chapter-item:hover { background: #1c2028; color: #fff; border-color: #3b4150; }
+        .sheet-chapter-item.current-active { background: rgba(255, 71, 87, 0.12); color: var(--primary); border-color: var(--primary); }
+        .sheet-chapter-item.current-active::after { content: "Sedang Dibaca"; font-size: 10px; background: var(--primary); color: #fff; padding: 3px 8px; border-radius: 4px; font-weight: 700; }
+        .sheet-chapter-item.already-read { background: #0b0d10; color: #666; border-color: #161a20; opacity: 0.8; }
+
+        /* DETAIL WRAPPER & CHAPTER CARDS */
+        .detail-wrap { 
+            display: flex; gap: 28px; background: var(--card); padding: 28px; 
+            border-radius: var(--radius-lg); margin-top: 20px; border: 1px solid var(--border); 
+        }
+        .detail-cover { 
+            width: 190px; height: 275px; border-radius: var(--radius-md); object-fit: cover; 
+            background: #1a1e26; box-shadow: var(--shadow-soft); flex-shrink: 0;
+        }
+        .detail-text h1 { font-size: 20px; font-weight: 800; margin-bottom: 10px; letter-spacing: -0.3px; line-height: 1.35; }
+        .meta-info { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+        .meta-tag { 
+            background: var(--surface); padding: 4px 10px; border-radius: 6px; 
+            border: 1px solid var(--border); font-size: 12px; color: var(--text-muted); 
+            display: flex; align-items: center; gap: 5px;
+        }
+
+        .btn-bookmark { 
+            background: var(--surface); border: 1px solid var(--border); color: #fff; 
+            padding: 9px 18px; border-radius: 8px; cursor: pointer; font-weight: 600; 
+            font-size: 13px; margin-bottom: 14px; transition: all 0.15s ease;
+            display: inline-flex; align-items: center; gap: 7px;
+        }
+        .btn-bookmark:hover { border-color: var(--primary); color: var(--primary); }
+        .btn-bookmark.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+        .recommendation-title { font-size: 15px; font-weight: 700; border-left: 3px solid var(--primary); padding-left: 10px; margin: 28px 0 14px; }
+        
+        .chapter-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); gap: 10px; margin-top: 14px; }
+        .chapter-card { 
+            background: var(--surface); padding: 10px 12px; border-radius: var(--radius-sm); 
+            text-align: center; border: 1px solid var(--border); font-size: 12px; font-weight: 600; 
+            transition: 0.15s ease; min-height: 42px; display: flex; align-items: center; justify-content: center; gap: 4px;
+        }
+        .chapter-card:hover { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+        /* USER PROFILE DASHBOARD */
+        .profile-container { max-width: 800px; margin: 30px auto; display: flex; flex-direction: column; gap: 24px; }
+        .profile-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px; box-shadow: var(--shadow-soft); }
+        .profile-header-info { display: flex; align-items: center; gap: 18px; margin-bottom: 20px; }
+        .profile-big-avatar { 
+            width: 72px; height: 72px; border-radius: 50%; background: var(--primary); 
+            color: #fff; display: flex; align-items: center; justify-content: center; 
+            font-size: 28px; font-weight: 800; overflow: hidden; border: 2px solid var(--border);
+        }
+        .profile-big-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .xp-bar-box { background: #101217; border-radius: 10px; height: 12px; width: 100%; overflow: hidden; border: 1px solid var(--border); margin: 8px 0 4px; }
+        .xp-bar-fill { background: linear-gradient(90deg, var(--primary), #ffa502); height: 100%; width: 0%; transition: width 0.3s ease; }
+
+        /* COMMENT SECTION STYLES (CHAPTER READER) */
+        .comment-section-reader {
+            max-width: 800px;
+            margin: 40px auto 20px auto;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+        }
+        .comment-input-box { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+        .comment-textarea { 
+            width: 100%; background: var(--surface); border: 1px solid var(--border); 
+            color: #fff; padding: 12px 14px; border-radius: var(--radius-sm); 
+            font-size: 13px; resize: vertical; min-height: 80px; outline: none; font-family: inherit;
+        }
+        .comment-textarea:focus { border-color: var(--primary); }
+        .comment-list { display: flex; flex-direction: column; gap: 12px; }
+        .comment-card { 
+            background: var(--surface); border: 1px solid var(--border); 
+            border-radius: var(--radius-sm); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px;
+        }
+        .comment-header { display: flex; align-items: center; gap: 8px; }
+        .comment-user-avatar { 
+            width: 30px; height: 30px; border-radius: 50%; background: var(--primary); 
+            color: #fff; display: flex; align-items: center; justify-content: center; 
+            font-size: 11px; font-weight: 700; overflow: hidden; flex-shrink: 0;
+        }
+        .comment-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .comment-body { font-size: 13px; color: var(--text); line-height: 1.5; word-break: break-word; }
+        .btn-load-more-comments { 
+            background: var(--surface); border: 1px solid var(--border); color: var(--text-muted); 
+            padding: 10px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; 
+            width: 100%; cursor: pointer; margin-top: 14px;
+        }
+        .btn-load-more-comments:hover { color: #fff; border-color: var(--primary); }
+
+        /* AUTH FORMS */
+        .auth-container { 
+            max-width: 420px; margin: 40px auto; background: var(--card); 
+            border: 1px solid var(--border); border-radius: var(--radius-lg); 
+            padding: 32px 26px; box-shadow: var(--shadow-soft);
+        }
+        .auth-title { font-size: 20px; font-weight: 800; color: #fff; margin-bottom: 6px; text-align: center; }
+        .auth-desc { font-size: 12.5px; color: var(--text-muted); text-align: center; margin-bottom: 22px; }
+        .auth-form-group { margin-bottom: 16px; display: flex; flex-direction: column; gap: 6px; text-align: left; }
+        .auth-form-group label { font-size: 12px; font-weight: 600; color: var(--text); }
+        .auth-form-input { 
+            background: var(--surface); border: 1px solid var(--border); color: #fff; 
+            padding: 10px 14px; border-radius: var(--radius-sm); font-size: 13px; outline: none;
+        }
+        .auth-form-input:focus { border-color: var(--primary); }
+        .btn-auth-submit { 
+            background: var(--primary); color: #fff; padding: 12px; border-radius: var(--radius-sm); 
+            font-size: 13.5px; font-weight: 700; border: none; cursor: pointer; width: 100%; margin-top: 8px;
+        }
+        .btn-auth-submit:hover { background: var(--primary-hover); }
+        .auth-divider { display: flex; align-items: center; text-align: center; margin: 18px 0; color: var(--text-muted); font-size: 11px; }
+        .auth-divider::before, .auth-divider::after { content: ''; flex: 1; border-bottom: 1px solid var(--border); }
+        .auth-divider:not(:empty)::before { margin-right: .5em; }
+        .auth-divider:not(:empty)::after { margin-left: .5em; }
+        .btn-google-auth { 
+            background: var(--surface); border: 1px solid var(--border); color: #fff; 
+            padding: 10px 14px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; 
+            width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer;
+        }
+        .btn-google-auth:hover { background: var(--surface-hover); border-color: #3b4252; }
+        .auth-footer-links { text-align: center; font-size: 12px; color: var(--text-muted); margin-top: 18px; }
+        .auth-footer-links a { color: var(--primary); font-weight: 600; }
+
+        /* OFFERWALL & POPUP */
+        .offerwall-overlay { 
+            background: #14171d; border: 1px solid var(--border); border-radius: var(--radius-lg); 
+            padding: 44px 24px; text-align: center; max-width: 520px; width: 90%; 
+            margin: 40px auto; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6); 
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .offerwall-icon { 
+            margin-bottom: 14px; color: var(--primary); display: inline-flex; align-items: center; 
+            justify-content: center; width: 64px; height: 64px; background: rgba(255, 71, 87, 0.08); 
+            border: 1px solid rgba(255, 71, 87, 0.2); border-radius: 50%;
+        }
+        .offerwall-title { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+        .offerwall-desc { font-size: 13px; color: var(--text-muted); line-height: 1.6; margin-bottom: 24px; max-width: 380px; }
+        .offerwall-btn { 
+            background: var(--primary); color: #fff; font-size: 14px; font-weight: 700; 
+            padding: 13px 28px; border-radius: var(--radius-sm); border: none; cursor: pointer; 
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; max-width: 260px;
+        }
+        .offerwall-btn:hover { background-color: var(--primary-hover); transform: translateY(-2px); }
+        .offerwall-badge { 
+            display: inline-flex; align-items: center; gap: 6px; background: var(--surface); 
+            color: var(--text-muted); font-size: 11px; padding: 5px 14px; border-radius: 20px; margin-top: 18px; border: 1px solid var(--border);
+        }
+
+        .kcopa-overlay { 
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
+            background-color: rgba(10, 12, 16, 0.96); z-index: 999999999; 
+            display: flex; align-items: center; justify-content: center; 
+            backdrop-filter: blur(8px); padding: 20px; box-sizing: border-box;
+        }
+        .kcopa-card { 
+            background: var(--card); border: 1px solid var(--border); color: #ffffff; 
+            padding: 28px 20px; border-radius: var(--radius-md); text-align: center; max-width: 420px; width: 100%;
+        }
+        .kcopa-btn { 
+            display: inline-block; background-color: var(--primary); color: #fff; 
+            padding: 10px 22px; border-radius: 6px; font-weight: 600; font-size: 13px;
+        }
+
+        .top-section { margin-top: 36px; padding-top: 18px; border-top: 1px solid var(--border); }
+        .top-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .top-tabs { display: flex; gap: 4px; background: var(--surface); padding: 3px; border-radius: 6px; border: 1px solid var(--border); }
+        .top-tab-btn { 
+            background: transparent; border: none; color: var(--text-muted); 
+            padding: 5px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer;
+        }
+        .top-tab-btn.active { background: var(--primary); color: #fff; }
+
+        .top-list-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+        .top-list-item { 
+            display: flex; align-items: center; gap: 12px; background: var(--card); 
+            border: 1px solid var(--border); padding: 8px 12px; border-radius: var(--radius-sm);
+        }
+        .top-list-item:hover { border-color: #353c48; transform: translateX(2px); }
+        .top-rank-num { font-size: 14px; font-weight: 700; width: 22px; text-align: center; color: var(--text-muted); flex-shrink: 0; }
+        .top-rank-num.rank-1 { color: #f1c40f; }
+        .top-rank-num.rank-2 { color: #bdc3c7; }
+        .top-rank-num.rank-3 { color: #e67e22; }
+
+        .top-list-img { width: 44px; height: 58px; object-fit: cover; border-radius: 4px; background: #222; flex-shrink: 0; }
+        .top-list-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex-grow: 1; }
+        .top-list-title { font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .top-list-item:hover .top-list-title { color: var(--primary); }
+
+        .pagination { display: flex; justify-content: center; align-items: center; gap: 8px; margin: 30px 0; }
+        .page-btn { 
+            display: inline-flex; align-items: center; justify-content: center; padding: 0 18px; 
+            height: 40px; background: var(--surface); color: #fff; border: 1px solid var(--border); 
+            border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; min-width: 95px; gap: 6px;
+        }
+        .page-btn:hover { background: var(--primary); border-color: var(--primary); }
+        .page-btn.disabled { opacity: 0.3; background: #0c0e12; border-color: #171b22; cursor: not-allowed; }
+        .page-num { background: var(--surface); padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--text-muted); border: 1px solid var(--border); }
+
+        .alphabet-container { display: flex; flex-wrap: wrap; gap: 5px; margin: 14px 0 22px 0; justify-content: center; background: var(--card); padding: 10px; border-radius: 8px; border: 1px solid var(--border); }
+        .alpha-btn { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; background: var(--surface); color: #ccc; border: 1px solid var(--border); border-radius: 5px; font-size: 12px; font-weight: 600; text-transform: uppercase; cursor: pointer; }
+        .alpha-btn:hover, .alpha-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .alpha-btn.btn-all { width: auto; padding: 0 10px; }
+
+        @media (max-width: 860px) {
+            .menu-toggle-btn { display: flex; align-items: center; justify-content: center; }
+            .nav-menu {
+                display: none; position: absolute; top: 100%; left: 0; right: 0; 
+                background: #111419; border-bottom: 1px solid var(--border); 
+                flex-direction: column; align-items: stretch; padding: 10px 16px; gap: 4px;
+            }
+            .nav-menu.open { display: flex; }
+            .search-item { width: 100%; margin-bottom: 6px; }
+            .grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+            .detail-wrap { flex-direction: column; align-items: center; text-align: center; padding: 18px; }
+            .detail-cover { width: 160px; height: 230px; }
+            .reader-footer { height: 60px; padding: 0 10px; }
+            .nav-action-btn { height: 42px; padding: 0 12px; font-size: 12px; }
+            .offerwall-overlay { width: 92%; padding: 36px 20px; margin: calc(50vh - 220px) auto 40px auto; }
+            .offerwall-title { font-size: 17px; }
+            .offerwall-desc { font-size: 12.5px; }
+            .offerwall-btn { max-width: 100%; font-size: 14px; padding: 14px 20px; }
+        }
+        /* LEADERBOARD USER */
+.user-rank-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    transition: 0.15s ease;
+}
+.user-rank-item:hover { border-color: #353c48; transform: translateX(2px); }
+.user-rank-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 800;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+.user-rank-avatar img { width: 100%; height: 100%; object-fit: cover; }
+/* 1. Kontainer Luar: Menjamin posisi SELALU di tengah secara horizontal & vertikal */
+.ad-container {
+    display: flex;
+    justify-content: center; /* Center horizontal */
+    align-items: center;     /* Center vertikal */
+    width: 100%;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+/* 2. Slot Iklan Dasar: Otomatis responsif & tidak melebihi layar hp */
+.ad-slot {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: var(--surface, #15181e);
+    border: 1px dashed var(--border, #2b313a);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 0 auto;
+    transition: all 0.2s ease;
+}
+
+/* Tipe A: Persegi Panjang / Banner Standar (Contoh: Banner 728x90 desktop / 320x50 mobile) */
+.ad-slot.ad-banner {
+    max-width: 728px;
+    aspect-ratio: 728 / 90; /* Otomatis menjaga rasio persegi panjang */
+    min-height: 90px;
+}
+
+/* Tipe B: Kotak / Persegi Sama Sisi (1:1 Square) */
+.ad-slot.ad-square {
+    max-width: 300px;
+    aspect-ratio: 1 / 1;    /* Otomatis selalu berbentuk kotak sempurna */
+}
+
+/* Tipe C: Persegi Panjang Sedang (Medium Rectangle / 300x250) */
+.ad-slot.ad-rectangle {
+    max-width: 336px;
+    aspect-ratio: 300 / 250;
+    min-height: 250px;
+}
+
+/* 3. Isi Konten Iklan / Gambar di Dalamnya agar Fit Sempurna */
+.ad-content {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #8c95a2;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Jika iklannya berupa gambar (img / banner custom), buat selalu fit tanpa gepeng */
+.ad-slot img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain; /* Gambar pas di dalam kotak tanpa terpotong */
+    display: block;
+}
+
+/* 4. Optimasi Layar HP (Mobile) */
+@media (max-width: 600px) {
+    .ad-container {
+        padding: 10px 0;
+    }
+    
+    .ad-slot.ad-banner {
+        max-width: 320px;
+        aspect-ratio: 320 / 50; /* Otomatis menyesuaikan rasio mobile banner 320x50 */
+        min-height: 50px;
+    }
+
+    .ad-slot.ad-square {
+        max-width: 250px;
+    }
+}
+    </style>
+</head>
+<body>
+
+<header id="mainHeader">
+    <div class="container">
+        <div class="nav-bar">
+            <a class="logo" href="./" aria-label="KomikUp Home">
+                <span>KomikUp</span>
+            </a>
+            
+            <nav class="nav-menu" id="navMenu" aria-label="Main Navigation">
+                <div class="search-item">
+                    <svg class="svg-icon search-icon-pos" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                    <input class="search-input" id="searchInput" placeholder="Cari komik..." type="search" aria-label="Cari Komik">
+                </div>
+
+                <a href="./" id="menu-home">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    Home
+                </a>
+                <a href="?page=type&type=manga" id="menu-manga">Manga</a>
+                <a href="?page=type&type=manhwa" id="menu-manhwa">Manhwa</a>
+                <a href="?page=type&type=manhua" id="menu-manhua">Manhua</a>
+                <a href="?page=bookmarks" id="menu-bookmarks">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    Bookmark
+                </a>
+                <!-- Link Menu Khusus Profil & Level -->
+                <a href="?page=profile" id="menu-profile">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    Profil
+                </a>
+            </nav>
+
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <div id="headerAuthContainer" class="auth-nav-box">
+                    <a href="?page=login" class="btn-auth-header">Masuk</a>
+                </div>
+
+                <button class="menu-toggle-btn" id="menuToggleBtn" aria-label="Toggle Menu">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</header>
+
+<div class="reader-header" id="readerHeader">
+    <button class="control-btn-icon" onclick="history.back()" aria-label="Kembali">
+        <svg class="svg-icon" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+    </button>
+    <h3 id="readerTitle">Memuat...</h3>
+    <button class="control-btn-icon" onclick="location.href='./'" aria-label="Ke Home">
+        <svg class="svg-icon" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+    </button>
+</div>
+
+<div class="reader-footer" id="readerFooter">
+    <button class="nav-action-btn" id="prevBtn" aria-label="Chapter Sebelumnya">
+        <svg class="svg-icon" viewBox="0 0 24 24"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" x2="5" y1="19" y2="5"/></svg>
+        <span>Prev</span>
+    </button>
+    <button class="nav-action-btn center-btn" onclick="toggleChapterList(event)" aria-label="Daftar Chapter">
+        <svg class="svg-icon" viewBox="0 0 24 24"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>
+        <span id="footerChapterCount">Chapter</span>
+    </button>
+    <button class="nav-action-btn" id="nextBtn" aria-label="Chapter Selanjutnya">
+        <span>Next</span>
+        <svg class="svg-icon" viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" x2="19" y1="5" y2="19"/></svg>
+    </button>
+</div>
+
+<div class="overlay-bg" id="overlayBg" onclick="toggleChapterList()"></div>
+<div class="bottom-sheet" id="chapterSheet">
+    <div class="sheet-header">
+        <div class="sheet-title" id="sheetChapterHeaderTitle">Pilih Chapter</div>
+        <input type="text" id="chapterSearchInput" class="sheet-search" placeholder="Cari nomor chapter..." oninput="filterChapters(this.value)">
+    </div>
+    <div id="sheetContent"></div>
+</div>
+
+<main class="container" id="mainContainer">
+    <div id="content-area"></div>
+</main>
+
+<script>
+    // ==========================================
+    // 1. FIREBASE CONFIGURATION
+    // ==========================================
+    const firebaseConfig = {
+        apiKey: "AIzaSyDfy87uITLHVVjwHADaXxCpKnc1wJ64NMc",
+        authDomain: "komikup-92a55.firebaseapp.com",
+        projectId: "komikup-92a55",
+        storageBucket: "komikup-92a55.firebasestorage.app",
+        messagingSenderId: "294981658434",
+        appId: "1:294981658434:web:aa66e3c69d113318b1cadb",
+        measurementId: "G-W7BGHZC27Q"
+    };
+
+    let auth = null;
+    let db = null;
+    let currentUser = null;
+    let firebaseInitPromise = null; // Menyimpan status loading agar bisa di-await bersama
+
+    function loadScriptAsync(src) {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = src;
+            script.async = true;
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    }
+
+    function sanitizeStoredAvatarDomain(user) {
+        try {
+            // 1. Bersihkan LocalStorage jika masih ada format .co
+            const cached = getStorage('komikup_cached_profile');
+            if (cached && cached.photoURL && (cached.photoURL.includes('ibb.co/') || cached.photoURL.includes('://ibb.co.com/'))) {
+                cached.photoURL = normalizeImgbbUrl(cached.photoURL);
+                setStorage('komikup_cached_profile', cached);
+            }
+
+            // 2. Perbaiki profil Firebase Auth jika URL akun user masih berdomain .co
+            if (user && user.photoURL && (user.photoURL.includes('ibb.co/') || user.photoURL.includes('://ibb.co.com/'))) {
+                const fixedUrl = normalizeImgbbUrl(user.photoURL);
+                user.updateProfile({ photoURL: fixedUrl }).catch(() => {});
+                
+                if (typeof db !== 'undefined' && db) {
+                    db.collection('users').doc(user.uid).set({
+                        photoURL: fixedUrl
+                    }, { merge: true }).catch(() => {});
+                }
+            }
+        } catch (e) {
+            console.warn("Gagal sanitasi avatar domain:", e);
+        }
+    }
+
+    function initFirebase() {
+        // Jika sudah siap, langsung resolve
+        if (auth && db) return Promise.resolve(true);
+
+        // Jika sedang proses unduh, kembalikan antrean promise yang sama
+        if (firebaseInitPromise) return firebaseInitPromise;
+
+        firebaseInitPromise = (async () => {
+            try {
+                // 1. Muat App Core terlebih dahulu
+                await loadScriptAsync("https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js");
+
+                // 2. Muat Auth & Firestore secara paralel
+                await Promise.all([
+                    loadScriptAsync("https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"),
+                    loadScriptAsync("https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js")
+                ]);
+
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(firebaseConfig);
+                }
+
+                auth = firebase.auth();
+                db = firebase.firestore();
+
+                // 3. Pasang listener auth state
+                auth.onAuthStateChanged(async (user) => {
+                    currentUser = user;
+                    updateHeaderUserInterface(user);
+
+                    if (user) {
+                        sanitizeStoredAvatarDomain(user);
+                        await syncLocalBookmarksToFirestore(user.uid);
+                        await syncUserStatsFromFirestore(user.uid);
+                    }
+                    updateHeaderUserInterface(user);
+                    // Jika user sedang berada di halaman profil, render ulang otomatis
+                    const params = new URLSearchParams(window.location.search);
+                    if (params.get('page') === 'profile') {
+                        renderProfilePage();
+                    }
+                });
+
+                return true;
+            } catch (err) {
+                console.warn("Gagal inisialisasi Firebase:", err);
+                firebaseInitPromise = null; // Reset agar bisa dicoba ulang bila gagal
+                return false;
+            }
+        })();
+
+        return firebaseInitPromise;
+    }
+
+    // Tetap muat di background saat idle
+    if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(() => initFirebase());
+    } else {
+        setTimeout(initFirebase, 1500);
+    }
+
+    function getStorage(key) { return JSON.parse(localStorage.getItem(key) || '{}'); }
+    function setStorage(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+
+    // ==========================================
+    // 2. LEVELING & READING STATS (BACA LANGSUNG DARI KOMIKUP_HISTORY)
+    // ==========================================
+    function calculateUserLevel(xp = 0) {
+        const level = Math.floor(Math.sqrt(xp / 10)) + 1;
+        const currentLevelBaseXP = Math.pow(level - 1, 2) * 10;
+        const nextLevelBaseXP = Math.pow(level, 2) * 10;
+        const progressPercent = Math.min(100, Math.max(0, ((xp - currentLevelBaseXP) / (nextLevelBaseXP - currentLevelBaseXP)) * 100));
+        return {
+            level: level,
+            xp: xp,
+            progress: Math.round(progressPercent),
+            nextXP: nextLevelBaseXP
+        };
+    }
+
+    function getReadChaptersList() {
+        return JSON.parse(localStorage.getItem('komikup_read_chapters') || '[]');
+    }
+
+    // Membaca langsung riwayat komikup_history di localStorage
+    function getUserStats() {
+        const readList = getReadChaptersList();
+        const savedStats = getStorage('komikup_user_stats');
+
+        // Total membaca diambil dari jumlah riwayat unik chapter ATAU nilai tertinggi yang tersimpan
+        const totalChapters = Math.max(readList.length, savedStats.chaptersRead || 0);
+        const totalXP = totalChapters * 10;
+
+        return {
+            xp: totalXP,
+            chaptersRead: totalChapters
+        };
+    }
+
+    // Tambah XP hanya jika chapter ini belum pernah dibaca sebelumnya
+    function addReadingExperience(comicId, chapEp) {
+        const cleanEp = cleanEndpoint(chapEp);
+        let readList = getReadChaptersList();
+
+        // Cek apakah chapter ini benar-benar belum pernah dibuka
+        if (!readList.includes(cleanEp)) {
+            readList.push(cleanEp);
+            localStorage.setItem('komikup_read_chapters', JSON.stringify(readList));
+
+            // Hitung ulang statistik secara instan
+            const newTotalRead = Math.max(readList.length, (getUserStats().chaptersRead + 1));
+            const newStats = {
+                chaptersRead: newTotalRead,
+                xp: newTotalRead * 10
+            };
+
+            setStorage('komikup_user_stats', newStats);
+            localStorage.setItem('komikup_pending_stats_sync', 'true');
+        }
+
+        // Langsung perbarui UI di layar
+        if (currentUser) {
+            updateHeaderUserInterface(currentUser);
+        }
+    }
+
+    function recalculateExistingHistory() {
+        let readList = getReadChaptersList();
+        const historyObj = getStorage('komikup_history');
+
+        // Kumpulkan semua chapter dari komikup_history jika belum ada di komikup_read_chapters
+        let updated = false;
+        Object.values(historyObj).forEach(item => {
+            if (item && item.ep) {
+                const ep = cleanEndpoint(item.ep);
+                if (!readList.includes(ep)) {
+                    readList.push(ep);
+                    updated = true;
+                }
+            }
+        });
+
+        if (updated) {
+            localStorage.setItem('komikup_read_chapters', JSON.stringify(readList));
+        }
+
+        // Perbarui stats berdasarkan akumulasi yang valid
+        const currentStats = getStorage('komikup_user_stats');
+        const finalChapters = Math.max(readList.length, currentStats.chaptersRead || 0);
+        
+        setStorage('komikup_user_stats', {
+            chaptersRead: finalChapters,
+            xp: finalChapters * 10
+        });
+    }
+
+    // Jalankan rekalkulasi saat script dimuat
+    recalculateExistingHistory();
+
+    async function flushPendingStatsToFirestore() {
+        if (!currentUser || !db) return;
+        const hasPending = localStorage.getItem('komikup_pending_stats_sync');
+        if (!hasPending) return;
+
+        try {
+            const stats = getUserStats();
+            const userLevelInfo = calculateUserLevel(stats.xp);
+
+            // Simpan hanya angka ringkasan ke Firestore (ukuran < 100 bytes)
+            await db.collection('users').doc(currentUser.uid).set({
+                xp: stats.xp,
+                level: userLevelInfo.level,
+                chaptersRead: stats.chaptersRead,
+                lastActive: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+
+            // Pastikan local storage konsisten dengan apa yang dikirim ke cloud
+            setStorage('komikup_user_stats', stats);
+            localStorage.removeItem('komikup_pending_stats_sync');
+        } catch (e) {
+            console.warn("Gagal flush stats:", e);
+        }
+    }
+
+    async function syncUserStatsFromFirestore(uid) {
+        if (!db) return;
+        try {
+            const doc = await db.collection('users').doc(uid).get();
+            const localStats = getUserStats();
+
+            if (doc.exists) {
+                const cloudData = doc.data();
+                const cloudXP = cloudData.xp || 0;
+                const cloudRead = cloudData.chaptersRead || 0;
+
+                // Jika data lokal lebih tinggi dari cloud (user baru selesai baca offline/sebelum sync)
+                if (localStats.xp > cloudXP) {
+                    localStorage.setItem('komikup_pending_stats_sync', 'true');
+                    await flushPendingStatsToFirestore();
+                } else {
+                    // Jika data di cloud lebih tinggi (misal habis baca di perangkat lain)
+                    setStorage('komikup_user_stats', {
+                        xp: cloudXP,
+                        chaptersRead: cloudRead
+                    });
+                }
+            } else {
+                // Dokumen user baru, unggah stats lokal pertama kali
+                localStorage.setItem('komikup_pending_stats_sync', 'true');
+                await flushPendingStatsToFirestore();
+            }
+
+            updateHeaderUserInterface(currentUser);
+        } catch (e) {
+            console.warn("Gagal sync user stats:", e);
+        }
+    }
+
+    function updateHeaderUserInterface(user) {
+        const container = document.getElementById('headerAuthContainer');
+        if (!container) return;
+
+        const stats = getUserStats();
+        const levelInfo = calculateUserLevel(stats.xp);
+
+        if (user) {
+            const cachedProfile = getStorage('komikup_cached_profile');
+            const displayName = user.displayName || cachedProfile.displayName || user.email.split('@')[0];
+            const photo = user.photoURL || cachedProfile.photoURL || '';
+            const initial = displayName.charAt(0).toUpperCase();
+            
+            const avatarHtml = photo 
+                ? `<img src="${photo}" alt="${displayName}">`
+                : initial;
+
+            container.innerHTML = `
+                <a href="?page=profile" class="user-profile-badge" title="Lihat Profil & Level">
+                    <div class="user-avatar">${avatarHtml}</div>
+                    <span style="max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${displayName}</span>
+                    <span class="level-chip">Lv.${levelInfo.level}</span>
+                </a>
+            `;
+        } else {
+            container.innerHTML = `
+                <a href="?page=profile" class="user-profile-badge" style="cursor: pointer;" title="Lihat Level Anda">
+                    <span class="level-chip">Lv.${levelInfo.level}</span>
+                </a>
+                <a href="?page=login" class="btn-auth-header">Masuk</a>
+            `;
+        }
+    }
+
+    // ==========================================
+    // 3. BOOKMARK SYNC
+    // ==========================================
+    async function syncLocalBookmarksToFirestore(uid) {
+        try {
+            const userDocRef = db.collection('users').doc(uid);
+            const doc = await userDocRef.get();
+
+            let cloudBookmarks = {};
+            if (doc.exists && doc.data().bookmarks) {
+                cloudBookmarks = doc.data().bookmarks;
+            }
+
+            const localBookmarks = getStorage('komikup_bookmarks');
+            const mergedBookmarks = { ...cloudBookmarks, ...localBookmarks };
+
+            await userDocRef.set({
+                bookmarks: mergedBookmarks,
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+
+            setStorage('komikup_bookmarks', mergedBookmarks);
+
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('page') === 'bookmarks') {
+                renderBookmarkPage();
+            }
+        } catch (err) {
+            console.warn("Gagal sinkronisasi bookmark:", err);
+        }
+    }
+
+    async function toggleBookmark(comicData) {
+        let bookmarks = getStorage('komikup_bookmarks');
+        if (bookmarks[comicData.id]) {
+            delete bookmarks[comicData.id];
+        } else {
+            bookmarks[comicData.id] = comicData;
+        }
+        setStorage('komikup_bookmarks', bookmarks);
+
+        if (currentUser && db) {
+            try {
+                await db.collection('users').doc(currentUser.uid).set({
+                    bookmarks: bookmarks,
+                    lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            } catch (e) {
+                console.warn("Gagal simpan bookmark cloud:", e);
+            }
+        }
+
+        fetchDetail(comicData.id); 
+    }
+
+    async function logoutUser() {
+        if (confirm("Apakah Anda yakin ingin keluar?")) {
+            await flushPendingStatsToFirestore();
+            await auth.signOut();
+            window.location.href = './';
+        }
+    }
+
+
+    async function renderProfilePage() {
+        updateSEO("Profil & Status Pembaca - KomikUp", "Lihat level membaca, pengalaman, dan bookmark Anda.");
+        const box = document.getElementById('content-area');
+
+        // Tampilkan indikator memuat sebentar jika Firebase masih loading di background
+        if (!auth) {
+            box.innerHTML = `
+                <div style="text-align: center; padding: 60px 20px; color: var(--text-muted); font-size: 13px;">
+                    <div style="margin-bottom: 10px;">Memuat data akun...</div>
+                </div>
+            `;
+            await initFirebase();
+        }
+
+        const stats = getUserStats();
+        const levelInfo = calculateUserLevel(stats.xp);
+        const bookmarks = Object.values(getStorage('komikup_bookmarks'));
+
+        // Ambil user aktif dari auth Firebase secara langsung bila currentUser belum terisi
+        const activeUser = currentUser || (auth ? auth.currentUser : null);
+
+        let displayName = "Pembaca Tamu";
+        let emailText = "Masuk akun untuk menyimpan progress secara permanen di cloud.";
+        let avatarHtml = `<svg class="svg-icon" style="width: 32px; height: 32px;" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>`;
+
+        if (activeUser) {
+            displayName = activeUser.displayName || activeUser.email.split('@')[0];
+            emailText = activeUser.email;
+            avatarHtml = activeUser.photoURL 
+                ? `<img src="${activeUser.photoURL}" alt="${displayName}">`
+                : displayName.charAt(0).toUpperCase();
+        }
+
+        box.innerHTML = `
+            <div class="profile-container">
+                <div class="profile-card">
+                    <div class="profile-header-info">
+                        <div class="profile-big-avatar">${avatarHtml}</div>
+                        <div style="flex: 1; min-width: 0;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <h2 style="font-size: 18px; font-weight: 800; color: #fff;">${displayName}</h2>
+                                <span class="level-chip">Level ${levelInfo.level}</span>
+                            </div>
+                            <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">${emailText}</p>
+                            
+                            <div class="xp-bar-box">
+                                <div class="xp-bar-fill" style="width: ${levelInfo.progress}%;"></div>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted);">
+                                <span>${levelInfo.xp} XP (10 XP / Chapter)</span>
+                                <span>${levelInfo.progress}% menuju Level ${levelInfo.level + 1}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; border-top: 1px solid var(--border); padding-top: 18px;">
+                        <div style="flex: 1; background: var(--surface); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); text-align: center;">
+                            <span style="font-size: 18px; font-weight: 800; color: #fff;">${stats.chaptersRead}</span>
+                            <p style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Chapter Selesai Dibaca</p>
+                        </div>
+                        <div style="flex: 1; background: var(--surface); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); text-align: center;">
+                            <span style="font-size: 18px; font-weight: 800; color: var(--primary);">${bookmarks.length}</span>
+                            <p style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">Bookmark Tersimpan</p>
+                        </div>
+                    </div>
+                </div>
+
+                ${activeUser ? `
+                <div class="profile-card">
+                    <h3 style="font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 14px;">Pengaturan Akun</h3>
+                    <form onsubmit="handleUpdateProfile(event)">
+                        <!-- Input Ganti Foto Avatar -->
+                        <div class="auth-form-group">
+                            <label>Foto Profil (Maks. 2MB)</label>
+                            <input type="file" id="editAvatarInput" class="auth-form-input" accept="image/png, image/jpeg, image/webp" style="padding: 8px;">
+                            <span id="uploadProgressText" style="font-size: 11px; color: var(--text-muted); margin-top: 4px;"></span>
+                        </div>
+
+                        <!-- Input Ganti Username -->
+                        <div class="auth-form-group">
+                            <label>Nama Tampilan / Username</label>
+                            <input type="text" id="editUsernameInput" class="auth-form-input" value="${displayName}" required>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
+                            <button type="submit" class="btn-auth-header" id="btnSaveProfile">Simpan Perubahan</button>
+                            <button type="button" onclick="logoutUser()" style="background: transparent; border: 1px solid var(--border); color: #ff6b81; padding: 7px 14px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; cursor: pointer;">Keluar Akun</button>
+                        </div>
+                    </form>
+                </div>
+                ` : `
+                <div class="profile-card" style="text-align: center;">
+                    <h3 style="font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 8px;">Simpan Level & Bookmark ke Cloud</h3>
+                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">Masuk atau buat akun agar level dan komik favoritmu tidak terhapus saat membersihkan cache browser.</p>
+                    <a href="?page=login" class="btn-auth-header" style="justify-content: center; width: auto; display: inline-flex;">Masuk / Daftar Akun</a>
+                </div>
+                `}
+
+                <div>
+                    <h3 class="section-title">Koleksi Bookmark</h3>
+                    ${bookmarks.length === 0 ? '<p style="color: var(--text-muted); font-size: 13px;">Belum ada komik yang Anda bookmark.</p>' : ''}
+                    <div class="grid">
+                        ${bookmarks.map(item => `
+                            <div class="card">
+                                <a href="?page=detail&ep=${item.id}" class="card-link">
+                                    <span class="badge-type ${item.type}">${item.type}</span>
+                                    <img class="card-img" src="${PROXY_COMPRESS + item.thumb}" alt="${item.title}" width="200" height="300">
+                                </a>
+                                <div class="card-info"><a href="?page=detail&ep=${item.id}" class="card-title">${item.title}</a></div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+   // GANTI DENGAN API KEY ANDA DARI api.imgbb.com
+    const IMGBB_API_KEY = "d689ec8542c1249a14a3077a8e2970cf";
+
+  function normalizeImgbbUrl(url) {
+    if (!url || typeof url !== 'string') return '';
+    let clean = url.trim();
+
+    // 1. Ubah domain landing page (ibb.co / ibb.co.com) ke direct image (i.ibb.co.com)
+    clean = clean.replace(/:\/\/(i\.)?ibb\.co\//gi, '://i.ibb.co.com/');
+    clean = clean.replace(/:\/\/ibb\.co\.com\//gi, '://i.ibb.co.com/');
+
+    return clean;
+}
+
+async function handleUpdateProfile(e) {
+    e.preventDefault();
+    if (!currentUser) return;
+
+    const newName = document.getElementById('editUsernameInput').value.trim();
+    const avatarFile = document.getElementById('editAvatarInput').files[0];
+    const btn = document.getElementById('btnSaveProfile');
+    const progressText = document.getElementById('uploadProgressText');
+
+    btn.disabled = true;
+    btn.innerText = "Menyimpan...";
+
+    // Ambil URL lama dan normalisasi langsung jika masih berformat .co
+    let uploadedPhotoUrl = normalizeImgbbUrl(currentUser.photoURL || '');
+
+    try {
+        // 1. Upload ke ImgBB jika ada file gambar dipilih
+        if (avatarFile) {
+            if (avatarFile.size > 2 * 1024 * 1024) {
+                throw new Error("Ukuran foto maksimal 2 MB!");
+            }
+
+            if (progressText) progressText.innerText = "Mengunggah foto...";
+
+            const formData = new FormData();
+            formData.append('image', avatarFile);
+
+            const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            if (!result.success || !result.data) {
+                throw new Error(result.error ? result.error.message : "Gagal mengunggah foto.");
+            }
+
+            // Prioritaskan file gambar langsung (direct file)
+            let directImageUrl = '';
+            if (result.data.image && result.data.image.url) {
+                directImageUrl = result.data.image.url;
+            } else if (result.data.display_url) {
+                directImageUrl = result.data.display_url;
+            } else {
+                directImageUrl = result.data.url || '';
+            }
+
+            // Normalisasi URL hasil upload baru ke i.ibb.co.com
+            uploadedPhotoUrl = normalizeImgbbUrl(directImageUrl);
+        }
+
+        // 2. Simpan ke Firebase Auth Profile
+        await currentUser.updateProfile({
+            displayName: newName,
+            photoURL: uploadedPhotoUrl
+        });
+
+        // 3. Simpan ke Firestore users collection
+        if (typeof db !== 'undefined' && db) {
+            await db.collection('users').doc(currentUser.uid).set({
+                displayName: newName,
+                photoURL: uploadedPhotoUrl,
+                lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+        }
+
+        // 4. Update LocalStorage Cache (Bersihkan juga data yang sudah ada sebelumnya)
+        let cachedUser = getStorage('komikup_cached_profile') || {};
+        cachedUser.displayName = newName;
+        cachedUser.photoURL = uploadedPhotoUrl;
+        setStorage('komikup_cached_profile', cachedUser);
+
+        if (progressText) progressText.innerText = "";
+        alert("Profil dan foto berhasil diperbarui!");
+
+        updateHeaderUserInterface(currentUser);
+        renderProfilePage();
+
+    } catch (err) {
+        console.error("Gagal update profil:", err);
+        alert("Terjadi kesalahan: " + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "Simpan Perubahan";
+        if (progressText) progressText.innerText = "";
+    }
+}
+
+    // ==========================================
+    // 5. SISTEM KOMENTAR CHAPTER HEMAT RESOURCE
+    // ==========================================
+    let lastCommentDoc = null;
+    let activeCommentKey = null;
+
+    async function loadInitialComments(key) {
+        activeCommentKey = key;
+        lastCommentDoc = null;
+        const commentList = document.getElementById('commentList');
+        const loadMoreBtn = document.getElementById('btnLoadMoreComments');
+        if (!commentList) return;
+
+        await initFirebase();
+        if (!db) {
+            commentList.innerHTML = `<p style="color: var(--text-muted); font-size: 12px;">Fitur komentar sedang dimuat...</p>`;
+            return;
+        }
+
+        try {
+            const snapshot = await db.collection('comments')
+                .where('key', '==', key)
+                .limit(5)
+                .get();
+
+            if (snapshot.empty) {
+                commentList.innerHTML = `<p style="color: var(--text-muted); font-size: 12.5px;">Belum ada komentar untuk chapter ini. Tulis tanggapanmu!</p>`;
+                if (loadMoreBtn) loadMoreBtn.style.display = 'none';
+                return;
+            }
+
+            lastCommentDoc = snapshot.docs[snapshot.docs.length - 1];
+            commentList.innerHTML = '';
+            
+            const comments = [];
+            snapshot.forEach(doc => {
+                const d = doc.data();
+                d._id = doc.id;
+                comments.push(d);
+            });
+            comments.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)); 
+            comments.forEach(data => appendCommentToDOM(data, data._id));
+
+            if (loadMoreBtn) {
+                loadMoreBtn.style.display = snapshot.docs.length === 5 ? 'block' : 'none';
+            }
+        } catch (err) {
+            console.warn("Gagal memuat komentar:", err);
+            commentList.innerHTML = `<p style="color: var(--text-muted); font-size: 12px;">Gagal memuat komentar.</p>`;
+        }
+    }
+
+    async function loadMoreComments() {
+        if (!lastCommentDoc || !activeCommentKey || !db) return;
+        const loadMoreBtn = document.getElementById('btnLoadMoreComments');
+        loadMoreBtn.innerText = "Memuat...";
+
+        try {
+            const snapshot = await db.collection('comments')
+                .where('key', '==', activeCommentKey)
+                .startAfter(lastCommentDoc)
+                .limit(5)
+                .get();
+
+            if (snapshot.empty) {
+                loadMoreBtn.style.display = 'none';
+                return;
+            }
+
+            lastCommentDoc = snapshot.docs[snapshot.docs.length - 1];
+            const comments = [];
+            snapshot.forEach(doc => comments.push(doc.data()));
+            comments.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+            comments.forEach(data => appendCommentToDOM(data));
+
+            loadMoreBtn.innerText = "Muat Lebih Banyak";
+            if (snapshot.docs.length < 5) {
+                loadMoreBtn.style.display = 'none';
+            }
+        } catch (e) {
+            loadMoreBtn.innerText = "Gagal memuat";
+        }
+    }
+
+    // Render Komentar dengan Tombol Reply & Kotak Balasan
+    function appendCommentToDOM(data, commentId = '') {
+        const commentList = document.getElementById('commentList');
+        if (!commentList) return;
+
+        const id = commentId || ('temp_' + Math.random().toString(36).substr(2, 9));
+        const initial = (data.userName || 'U').charAt(0).toUpperCase();
+        const avatarHtml = data.userAvatar 
+            ? `<img src="${data.userAvatar}" alt="${data.userName}">` 
+            : initial;
+
+        const timeStr = data.createdAt ? new Date(data.createdAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : 'Baru saja';
+        const isReply = !!data.replyTo;
+
+        const commentEl = document.createElement('div');
+        commentEl.className = 'comment-card';
+        if (isReply) {
+            commentEl.style.marginLeft = '28px';
+            commentEl.style.borderLeft = '3px solid var(--primary)';
+        }
+
+        commentEl.id = `comment-${id}`;
+        commentEl.innerHTML = `
+            <div class="comment-header">
+                <div class="comment-user-avatar">${avatarHtml}</div>
+                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%;">
+                    <span style="font-size: 13px; font-weight: 700; color: #fff;">${escapeHtml(data.userName)}</span>
+                    <span class="level-chip">Lv.${data.userLevel || 1}</span>
+                    <span style="font-size: 11px; color: var(--text-muted); margin-left: auto;">${timeStr}</span>
+                </div>
+            </div>
+            <div class="comment-body">
+                ${data.replyTo ? `<span style="color: var(--primary); font-weight: 600; font-size: 12px; margin-right: 4px;">@${escapeHtml(data.replyTo)}</span>` : ''}
+                ${escapeHtml(data.text)}
+            </div>
+            <div style="display: flex; justify-content: flex-end;">
+                <button onclick="toggleReplyBox('${id}', '${escapeHtml(data.userName)}')" style="background: none; border: none; color: var(--text-muted); font-size: 11px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 2px 6px;">
+                    <svg class="svg-icon" style="width: 12px; height: 12px;" viewBox="0 0 24 24"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+                    Balas
+                </button>
+            </div>
+            <div id="reply-box-${id}" style="display: none; margin-top: 8px;">
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" id="reply-input-${id}" class="auth-form-input" style="flex: 1; padding: 6px 10px; font-size: 12px;" placeholder="Balas @${escapeHtml(data.userName)}...">
+                    <button onclick="submitReply('${id}', '${escapeHtml(data.userName)}')" class="btn-auth-header" style="padding: 6px 12px; font-size: 11px;">Kirim</button>
+                </div>
+            </div>
+        `;
+
+        commentList.appendChild(commentEl);
+    }
+
+    function toggleReplyBox(id, targetUser) {
+        if (!currentUser && (!auth || !auth.currentUser)) {
+            alert("Silakan masuk akun terlebih dahulu untuk membalas komentar!");
+            window.location.href = '?page=login';
+            return;
+        }
+        const box = document.getElementById(`reply-box-${id}`);
+        if (!box) return;
+        box.style.display = box.style.display === 'none' ? 'block' : 'none';
+        if (box.style.display === 'block') {
+            document.getElementById(`reply-input-${id}`)?.focus();
+        }
+    }
+
+    async function submitReply(parentId, targetUserName) {
+        const input = document.getElementById(`reply-input-${parentId}`);
+        const text = input ? input.value.trim() : '';
+        if (!text || !activeCommentKey) return;
+
+        const activeUser = currentUser || auth.currentUser;
+        if (!activeUser) return;
+
+        try {
+            await initFirebase();
+            const stats = getUserStats();
+            const levelInfo = calculateUserLevel(stats.xp);
+
+            const replyData = {
+                key: activeCommentKey,
+                userId: activeUser.uid,
+                userName: activeUser.displayName || activeUser.email.split('@')[0],
+                userAvatar: activeUser.photoURL || '',
+                userLevel: levelInfo.level,
+                text: text,
+                replyTo: targetUserName,
+                parentId: parentId,
+                createdAt: Date.now()
+            };
+
+            await db.collection('comments').add(replyData);
+            input.value = '';
+            document.getElementById(`reply-box-${parentId}`).style.display = 'none';
+            appendCommentToDOM(replyData);
+        } catch (err) {
+            alert("Gagal membalas: " + err.message);
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.innerText = text;
+        return div.innerHTML;
+    }
+
+    async function handlePostComment(e, key) {
+        e.preventDefault();
+        if (!currentUser) {
+            alert("Silakan masuk akun terlebih dahulu untuk memberikan komentar!");
+            window.location.href = '?page=login';
+            return;
+        }
+
+        const input = document.getElementById('commentTextInput');
+        const text = input.value.trim();
+        const btn = document.getElementById('btnSubmitComment');
+        if (!text) return;
+
+        btn.disabled = true;
+        btn.innerText = "Mengirim...";
+
+        try {
+            await initFirebase();
+            const stats = getUserStats();
+            const levelInfo = calculateUserLevel(stats.xp);
+
+            const newComment = {
+                key: key,
+                userId: currentUser.uid,
+                userName: currentUser.displayName || currentUser.email.split('@')[0],
+                userAvatar: currentUser.photoURL || '',
+                userLevel: levelInfo.level,
+                text: text,
+                createdAt: Date.now()
+            };
+
+            await db.collection('comments').add(newComment);
+            input.value = '';
+            
+            const commentList = document.getElementById('commentList');
+            if (commentList && commentList.innerText.includes('Belum ada komentar')) {
+                commentList.innerHTML = '';
+            }
+            appendCommentToDOM(newComment);
+        } catch (err) {
+            alert("Gagal mengirim komentar: " + err.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "Kirim";
+        }
+    }
+
+    // ==========================================
+    // 6. ROUTER & AUTH HANDLERS
+    // ==========================================
+    function renderLoginPage() {
+        updateSEO("Masuk Akun - KomikUp", "Masuk ke akun KomikUp untuk sinkronisasi bookmark favorit Anda.");
+        const box = document.getElementById('content-area');
+        box.innerHTML = `
+            <div class="auth-container">
+                <h1 class="auth-title">Selamat Datang</h1>
+                <p class="auth-desc">Masuk untuk menyimpan dan menyinkronkan bookmark & level.</p>
+
+                <form onsubmit="handleEmailLogin(event)">
+                    <div class="auth-form-group">
+                        <label>Email</label>
+                        <input type="email" id="loginEmail" class="auth-form-input" placeholder="nama@email.com" required>
+                    </div>
+                    <div class="auth-form-group">
+                        <label>Password</label>
+                        <input type="password" id="loginPassword" class="auth-form-input" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="btn-auth-submit" id="btnSubmitLogin">Masuk</button>
+                </form>
+
+                <div class="auth-divider">atau masuk dengan</div>
+
+                <button class="btn-google-auth" onclick="handleGoogleAuth()">
+                    <svg style="width:16px; height:16px;" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2s.7 5.5 1.9 7.9l3.7-2.9c-.3-.8-.5-1.6-.5-2.4z"/><path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16.5C3.7 20.3 7.5 23.5 12 23.5z"/></svg>
+                    Google
+                </button>
+
+                <div class="auth-footer-links">
+                    Belum punya akun? <a href="?page=register">Daftar sekarang</a>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderRegisterPage() {
+        updateSEO("Daftar Akun Baru - KomikUp", "Daftar akun KomikUp gratis sekarang.");
+        const box = document.getElementById('content-area');
+        box.innerHTML = `
+            <div class="auth-container">
+                <h1 class="auth-title">Daftar Akun</h1>
+                <p class="auth-desc">Simpan komik favorit Anda di berbagai perangkat.</p>
+
+                <form onsubmit="handleEmailRegister(event)">
+                    <div class="auth-form-group">
+                        <label>Nama Lengkap / Username</label>
+                        <input type="text" id="regName" class="auth-form-input" placeholder="Nama Anda" required>
+                    </div>
+                    <div class="auth-form-group">
+                        <label>Email</label>
+                        <input type="email" id="regEmail" class="auth-form-input" placeholder="nama@email.com" required>
+                    </div>
+                    <div class="auth-form-group">
+                        <label>Password</label>
+                        <input type="password" id="regPassword" class="auth-form-input" placeholder="Minimal 6 karakter" minlength="6" required>
+                    </div>
+                    <button type="submit" class="btn-auth-submit" id="btnSubmitReg">Daftar</button>
+                </form>
+
+                <div class="auth-divider">atau daftar dengan</div>
+
+                <button class="btn-google-auth" onclick="handleGoogleAuth()">
+                    <svg style="width:16px; height:16px;" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.4 9 5 12 5z"/><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/><path fill="#FBBC05" d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2s.7 5.5 1.9 7.9l3.7-2.9c-.3-.8-.5-1.6-.5-2.4z"/><path fill="#34A853" d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.4-6.4-5.2L1.9 16.5C3.7 20.3 7.5 23.5 12 23.5z"/></svg>
+                    Google
+                </button>
+
+                <div class="auth-footer-links">
+                    Sudah memiliki akun? <a href="?page=login">Masuk di sini</a>
+                </div>
+            </div>
+        `;
+    }
+
+    async function handleEmailLogin(e) {
+        e.preventDefault();
+        const btn = document.getElementById('btnSubmitLogin');
+        btn.disabled = true;
+        btn.innerText = "Memproses...";
+        await initFirebase();
+        const email = document.getElementById('loginEmail').value;
+        const pass = document.getElementById('loginPassword').value;
+        try {
+            await auth.signInWithEmailAndPassword(email, pass);
+            window.location.href = './';
+        } catch (error) {
+            alert("Gagal masuk: " + error.message);
+            btn.disabled = false;
+            btn.innerText = "Masuk";
+        }
+    }
+
+    async function handleEmailRegister(e) {
+        e.preventDefault();
+        const btn = document.getElementById('btnSubmitReg');
+        btn.disabled = true;
+        btn.innerText = "Mendaftarkan...";
+        await initFirebase();
+        const name = document.getElementById('regName').value;
+        const email = document.getElementById('regEmail').value;
+        const pass = document.getElementById('regPassword').value;
+
+        try {
+            const userCredential = await auth.createUserWithEmailAndPassword(email, pass);
+            await userCredential.user.updateProfile({ displayName: name });
+            window.location.href = './';
+        } catch (error) {
+            alert("Gagal mendaftar: " + error.message);
+            btn.disabled = false;
+            btn.innerText = "Daftar";
+        }
+    }
+
+    async function handleGoogleAuth() {
+        await initFirebase();
+        const provider = new firebase.auth.GoogleAuthProvider();
+        try {
+            await auth.signInWithPopup(provider);
+            window.location.href = './';
+        } catch (error) {
+            alert("Google Sign-in gagal: " + error.message);
+        }
+    }
+
+    // ==========================================
+    // 7. CORE ROUTER & DATA LOGIC
+    // ==========================================
+    const PRIMARY_API = 'https://api.komikup.com/api';
+    const FALLBACK_API = 'https://api2.komikup.com/api';
+
+    let isServerImpaired = false;
+    let PROXY_COMPRESS = 'https://serveproxy.com/?url='; 
+    let detailThumb = 'https://serveproxy.com/?url=';
+    let chapterImage = 'https://serveproxy.com/?url=';
+    
+    function updateProxyUrl() {
+        if (isServerImpaired) {
+            PROXY_COMPRESS = 'https://serveproxy.com/?url=';
+            detailThumb = 'https://serveproxy.com/?url=';
+            chapterImage = 'https://serveproxy.com/?url=';
+        }
+    }
+
+    let lastScrollY = window.scrollY;
+    window.addEventListener('scroll', () => {
+        const header = document.getElementById('mainHeader');
+        if (!header || document.body.classList.contains('reader-mode')) return;
+        
+        const currentScrollY = window.scrollY;
+        if (currentScrollY > lastScrollY && currentScrollY > 70) {
+            header.classList.add('header-hidden');
+        } else {
+            header.classList.remove('header-hidden');
+        }
+        lastScrollY = currentScrollY;
+    }, { passive: true });
+
+    document.getElementById('menuToggleBtn')?.addEventListener('click', () => {
+        document.getElementById('navMenu')?.classList.toggle('open');
+    });
+
+    function router() {
+        const params = new URLSearchParams(window.location.search);
+        const q = params.get('q');
+        const ep = params.get('ep');
+        const page = params.get('page');
+        const type = params.get('type');
+        const huruf = params.get('huruf') || params.get('h') || '';
+        const p = params.get('p') || params.get('page_num') || 1;
+
+        cleanupReaderMode();
+        document.querySelectorAll('.nav-menu a').forEach(a => a.classList.remove('active'));
+        document.getElementById('navMenu')?.classList.remove('open');
+
+        flushPendingStatsToFirestore();
+
+        if (applyKcopaLock()) return;
+
+        if (q) {
+            fetchSearch(q);
+        } else if (page === 'login') {
+            renderLoginPage();
+        } else if (page === 'register') {
+            renderRegisterPage();
+        } else if (page === 'profile') {
+            document.getElementById('menu-profile')?.classList.add('active');
+            renderProfilePage();
+        } else if (page === 'bookmarks') { 
+            document.getElementById('menu-bookmarks')?.classList.add('active'); 
+            renderBookmarkPage(); 
+        } else if (page === 'type') { 
+            const activeNav = document.getElementById(`menu-${type}`);
+            if (activeNav) activeNav.classList.add('active');
+            fetchType(type, p, huruf); 
+        } else if (page === 'detail') {
+            fetchDetail(ep);
+        } else if (page === 'read') { 
+            setupReaderMode(); 
+            fetchChapter(ep); 
+        } else { 
+            document.getElementById('menu-home')?.classList.add('active'); 
+            fetchHome(p); 
+        }
+    }
+
+    window.addEventListener('popstate', router);
+    document.addEventListener('DOMContentLoaded', router);
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            const params = new URLSearchParams(window.location.search);
+            const page = params.get('page');
+            const ep = params.get('ep');
+
+            if (page === 'read' && ep) {
+                const cleanEp = cleanEndpoint(ep);
+                ensureChaptersCached(cleanEp).then(() => {
+                    updateNavigation(cleanEp);
+                });
+            }
+        } else {
+            flushPendingStatsToFirestore();
+        }
+    });
+
+    setInterval(() => {
+        flushPendingStatsToFirestore();
+    }, 180000);
+
+    document.getElementById('searchInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && e.target.value.trim() !== '') {
+            const query = encodeURIComponent(e.target.value.trim());
+            window.history.pushState({}, '', `?q=${query}`);
+            router(); 
+        }
+    });
+
+    function saveHistory(comicId, chapTitle, chapEp) {
+        let history = getStorage('komikup_history');
+        history[comicId] = { title: chapTitle, ep: chapEp, time: Date.now() };
+        setStorage('komikup_history', history);
+    }
+
+    function showServerWarningBanner() {
+        if (document.getElementById('serverWarningBanner')) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.id = 'serverWarningBanner';
+        wrapper.style.cssText = `width: 100%; height: 34px; overflow: hidden; transition: height 0.25s ease, opacity 0.25s ease;`;
+
+        const banner = document.createElement('div');
+        banner.style.cssText = `background: #241417; color: #ff6b81; border-bottom: 1px solid #ff4757; text-align: center; padding: 6px 14px; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;`;
+        banner.innerHTML = '<svg class="svg-icon" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 1 1.73-3Z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg> Server utama mengalami kendala, beralih ke server cadangan.';
+        
+        wrapper.appendChild(banner);
+        const body = document.body;
+        if (body) body.insertBefore(wrapper, body.firstChild);
+
+        setTimeout(() => {
+            wrapper.style.height = '0px';
+            wrapper.style.opacity = '0';
+            setTimeout(() => { wrapper.remove(); }, 250);
+        }, 3000);
+    }
+
+    async function getData(endpoint) {
+        const contentArea = document.getElementById('content-area');
+        contentArea.style.opacity = "0.5";
+        
+        let res = null;
+        let usedApi = PRIMARY_API;
+
+        try {
+            res = await fetch(PRIMARY_API + endpoint);
+            if (!res.ok) throw new Error(`Primary status: ${res.status}`);
+            if (isServerImpaired) {
+                isServerImpaired = false;
+                updateProxyUrl();
+            }
+        } catch (err) {
+            console.warn("API Utama gagal, beralih ke server cadangan...", err);
+            isServerImpaired = true;
+            updateProxyUrl();
+            showServerWarningBanner();
+
+            try {
+                usedApi = FALLBACK_API;
+                res = await fetch(FALLBACK_API + endpoint);
+                if (!res.ok) throw new Error(`Fallback status: ${res.status}`);
+            } catch (fallbackErr) {
+                console.error("Semua API gagal diakses:", fallbackErr);
+                contentArea.style.opacity = "1";
+                
+                const isReaderActive = document.body.classList.contains('reader-mode') || document.getElementById('readerContainerBox');
+                if (isReaderActive) return null;
+
+                contentArea.innerHTML = `
+                    <div style="text-align: center; padding: 60px 20px; max-width: 440px; margin: 0 auto; color: #fff;">
+                        <svg class="svg-icon" style="width: 40px; height: 40px; color: var(--primary); margin-bottom: 12px;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+                        <h1 style="font-size: 16px; font-weight: 700; margin-bottom: 8px;">Koneksi Server Terputus</h1>
+                        <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 18px;">
+                            Tidak dapat menjangkau server API. Silakan periksa jaringan dan coba beberapa saat lagi.
+                        </p>
+                        <button onclick="location.reload()" style="background: var(--primary); color: #fff; border: none; padding: 8px 18px; border-radius: 6px; font-weight: 600; font-size: 12px; cursor: pointer;">
+                            Muat Ulang Halaman
+                        </button>
+                    </div>
+                `;
+                return null;
+            }
+        }
+
+        try {
+            const json = await res.json();
+            contentArea.style.opacity = "1";
+            return json;
+        } catch (jsonErr) {
+            console.error("Gagal parse JSON:", jsonErr);
+            contentArea.style.opacity = "1";
+            return null;
+        }
+    }
+
+    function updateSEO(title, description, image = "", schemaData = null) {
+        document.title = title;
+        
+        const setMeta = (attr, key, val) => {
+            let meta = document.querySelector(`meta[${attr}="${key}"]`);
+            if (meta) meta.setAttribute('content', val);
+        };
+
+        setMeta('name', 'description', description);
+        setMeta('property', 'og:title', title);
+        setMeta('property', 'og:description', description);
+        
+        const canonicalUrl = window.location.href;
+        let canonicalTag = document.querySelector('link[rel="canonical"]');
+        if (canonicalTag) canonicalTag.setAttribute('href', canonicalUrl);
+        setMeta('property', 'og:url', canonicalUrl);
+
+        if (image) {
+            setMeta('property', 'og:image', image);
+        } else {
+            setMeta('property', 'og:image', 'https://www.komikup.com/favicon.ico');
+        }
+
+        let canonical = document.querySelector('link[rel="canonical"]');
+        if (!canonical) {
+            canonical = document.createElement('link');
+            canonical.setAttribute('rel', 'canonical');
+            document.head.appendChild(canonical);
+        }
+        canonical.setAttribute('href', window.location.origin + window.location.pathname + window.location.search);
+
+        const schemaContainer = document.getElementById('schema-json');
+        if (schemaData) {
+            schemaContainer.textContent = JSON.stringify(schemaData);
+        } else {
+            schemaContainer.textContent = JSON.stringify({
+                "@context": "https://schema.org",
+                "@type": "WebSite",
+                "name": "KomikUp",
+                "url": "https://www.komikup.com/",
+                "potentialAction": {
+                    "@type": "SearchAction",
+                    "target": "https://www.komikup.com/?q={search_term_string}",
+                    "query-input": "required name=search_term_string"
+                }
+            });
+        }
+    }
+
+    function cleanEndpoint(url) {
+        if (!url) return "";
+        if (url.startsWith("http")) {
+            try { return new URL(url).pathname; } catch (e) { return url; }
+        }
+        return url.startsWith("/") ? url : "/" + url;
+    }
+
+    async function fetchHome(page) {
+        const data = await getData(`/comic/newest/page/${page}`);
+        const box = document.getElementById('content-area');
+        if (data && data.data) {
+            updateSEO(
+                "KomikUp - Baca Komik Manga, Manhwa, Manhua Bahasa Indonesia (Sub Indo)", 
+                "Baca semua komik Manga, Manhwa, dan Manhua Bahasa Indonesia terlengkap dan terupdate gratis di KomikUp."
+            );
+            
+            const validComics = data.data.filter(item => !isBlockedComic(item));
+
+
+            let html = `<h1 class="section-title">Update Terbaru</h1><div class="grid">`;
+
+            validComics.forEach(item => {
+                const ep = cleanEndpoint(item.endpoint);
+                html += `
+                <article class="card">
+                    <a href="?page=detail&ep=${ep}" class="card-link" aria-label="Baca ${item.title}">
+                        <span class="badge-type ${item.type}">${item.type}</span>
+                        <img class="card-img" src="${PROXY_COMPRESS + item.image}" alt="Komik ${item.title} Sub Indo" width="200" height="300" loading="lazy">
+                    </a>
+                    <div class="card-info">
+                        <a href="?page=detail&ep=${ep}" class="card-title">${item.title}</a>
+                        <div class="chapter-mini-list">
+                            ${item.chapters ? item.chapters.slice(0,2).map(c => `<a href="?page=read&ep=${cleanEndpoint(c.endpoint)}" class="chap-chip"><span>${c.title}</span></a>`).join('') : ''}
+                        </div>
+                    </div>
+                </article>`;
+            });
+            html += `</div>`;
+
+            html += `
+            <div class="pagination">
+                <a href="?p=${parseInt(page)-1}" class="page-btn ${page <= 1 ? 'disabled' : ''}">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg> Prev
+                </a>
+                <div class="page-num">Hal. ${page}</div>
+                <a href="?p=${parseInt(page)+1}" class="page-btn">
+                    Next <svg class="svg-icon" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+                </a>
+            </div>`;
+
+            // html += `
+            // <div class="ad-container">
+            //     <div class="ad-slot ad-banner">
+            //        <ins style="width: 320px;height:50px" data-width="320" data-height="50" class="s8325037b2b" data-domain="//data527.click" data-affquery="/0734ee1bcb977e73f649/8325037b2b/?placementName=komik"></ins>
+            //     </div>
+            // </div>`; 
+           html += `
+            <section class="top-section">
+                <div class="top-header">
+                    <h2 class="section-title" id="topSectionTitle" style="margin: 0;">Top Terpopuler</h2>
+                    <div class="top-tabs">
+                        <button class="top-tab-btn active" onclick="switchBottomTopTab('daily')">Hari Ini</button>
+                        <button class="top-tab-btn" onclick="switchBottomTopTab('weekly')">Minggu Ini</button>
+                        <button class="top-tab-btn" onclick="switchBottomTopTab('monthly')">Bulan Ini</button>
+                        <button class="top-tab-btn" onclick="switchBottomTopTab('users')">🏆 Top Pembaca</button>
+                    </div>
+                </div>
+                <div class="top-list-container" id="bottomTopList">Memuat data...</div>
+            </section>`;
+
+            box.innerHTML = html;
+            loadBottomTopComics('daily');
+        }
+    }
+
+    async function fetchType(type, page = 1, huruf = '') {
+        let queryParams = [`filter=${encodeURIComponent(type)}`];
+        if (huruf) queryParams.push(`huruf=${encodeURIComponent(huruf)}`);
+        if (page) queryParams.push(`page=${encodeURIComponent(page)}`);
+
+        const data = await getData(`/comic/list?${queryParams.join('&')}`);
+        const box = document.getElementById('content-area');
+
+        const typeFormatted = type.toUpperCase();
+        let pageTitle = `Daftar ${typeFormatted}`;
+        if (huruf) pageTitle += ` - Abjad ${huruf.toUpperCase()}`;
+
+        updateSEO(
+            `${pageTitle} - KomikUp`, 
+            `Baca daftar komik ${typeFormatted} Bahasa Indonesia (Sub Indo) terbaru dan terlengkap di KomikUp.`
+        );
+
+        let alphaHtml = `<div class="alphabet-container">`;
+        const isAllActive = !huruf ? 'active' : '';
+        alphaHtml += `<a href="?page=type&type=${type}" class="alpha-btn btn-all ${isAllActive}">Semua</a>`;
+
+        const alphabets = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
+        alphabets.forEach(char => {
+            const isActive = (huruf.toUpperCase() === char) ? 'active' : '';
+            alphaHtml += `<a href="?page=type&type=${type}&huruf=${char}" class="alpha-btn ${isActive}">${char}</a>`;
+        });
+        alphaHtml += `</div>`;
+
+        let html = `<h1 class="section-title">${pageTitle}</h1>` + alphaHtml;
+
+        if (data && data.data && data.data.length > 0) {
+            const validComics = data.data.filter(item => !isBlockedComic(item));
+
+            if (validComics.length > 0) {
+                html += `<div class="grid">`;
+                validComics.forEach(item => {
+                    const ep = cleanEndpoint(item.endpoint);
+                    const comicType = item.type || type.toUpperCase();
+                    html += `
+                    <article class="card">
+                        <a href="?page=detail&ep=${ep}" class="card-link" aria-label="Baca ${item.title}">
+                            <span class="badge-type ${comicType}">${comicType}</span>
+                            <img class="card-img" src="${PROXY_COMPRESS + item.image}" alt="Komik ${item.title}" width="200" height="300" loading="lazy">
+                        </a>
+                        <div class="card-info">
+                            <a href="?page=detail&ep=${ep}" class="card-title">${item.title}</a>
+                        </div>
+                    </article>`;
+                });
+                html += `</div>`;
+            }
+
+            const currentPage = parseInt(page) || 1;
+            const prevPage = currentPage - 1;
+            const nextPage = currentPage + 1;
+            const letterParam = huruf ? `&huruf=${encodeURIComponent(huruf)}` : '';
+
+            html += `
+            <div class="pagination">
+                <a href="?page=type&type=${type}${letterParam}&p=${prevPage}" class="page-btn ${currentPage <= 1 ? 'disabled' : ''}">
+                    <svg class="svg-icon" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg> Prev
+                </a>
+                <div class="page-num">Hal. ${currentPage}</div>
+                <a href="?page=type&type=${type}${letterParam}&p=${nextPage}" class="page-btn">
+                    Next <svg class="svg-icon" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+                </a>
+            </div>`;
+        } else {
+            html += `
+            <div style="text-align:center; padding: 40px 20px; color: #888;">
+                <p style="font-size: 13px; margin-bottom: 8px;">Komik tidak ditemukan.</p>
+                <a href="?page=type&type=${type}" style="color: var(--primary); font-weight: 600; font-size: 12px;">Lihat Semua ${type.toUpperCase()}</a>
+            </div>`;
+        }
+
+        box.innerHTML = html;
+    }
+
+    function isBlockedComic(item) {
+        if (!item) return false;
+        const title = (item.title || '').toLowerCase();
+        const endpoint = (item.endpoint || item.slug || '').toLowerCase();
+
+        return KCOPA_REDIRECT_COMICS.some(blocked => {
+            const key = blocked.keyword.toLowerCase();
+            const keyNoDash = key.replace(/-/g, ' ');
+            return endpoint.includes(key) || title.includes(key) || title.includes(keyNoDash);
+        });
+    }
+
+    async function fetchSearch(query) {
+        const decodedQ = decodeURIComponent(query);
+        updateSEO(
+            `Hasil Pencarian "${decodedQ}" - KomikUp`, 
+            `Cari dan baca komik ${decodedQ} Bahasa Indonesia (Sub Indo) gratis di KomikUp.`
+        );
+        
+        const data = await getData(`/comic/search/${query}`);
+        const box = document.getElementById('content-area');
+
+        if (data && data.data && data.data.length > 0) {
+            const filteredList = data.data.filter(item => !isBlockedComic(item));
+
+            if (filteredList.length === 0) {
+                box.innerHTML = `
+                    <h1 class="section-title">Hasil Pencarian: "${decodedQ}"</h1>
+                    <p style="text-align:center; padding:40px; color:#888; font-size: 13px;">Komik tidak ditemukan.</p>
+                `;
+                return;
+            }
+
+            let html = `<h1 class="section-title">Hasil Pencarian: "${decodedQ}"</h1><div class="grid">`;
+            filteredList.forEach(item => {
+                const ep = cleanEndpoint(item.endpoint);
+                html += `
+                <article class="card">
+                    <a href="?page=detail&ep=${ep}" class="card-link" aria-label="Baca ${item.title}">
+                        <span class="badge-type ${item.type || 'Manga'}">${item.type || 'Manga'}</span>
+                        <img class="card-img" src="${PROXY_COMPRESS + item.image}" alt="Komik ${item.title}" width="200" height="300" loading="lazy">
+                    </a>
+                    <div class="card-info">
+                        <a href="?page=detail&ep=${ep}" class="card-title">${item.title}</a>
+                    </div>
+                </article>`;
+            });
+            box.innerHTML = html + '</div>';
+        } else {
+            box.innerHTML = `
+                <h1 class="section-title">Hasil Pencarian: "${decodedQ}"</h1>
+                <p style="text-align:center; padding:40px; color:#888; font-size: 13px;">Komik tidak ditemukan.</p>
+            `;
+        }
+    }
+
+    function renderBookmarkPage() {
+        updateSEO("Bookmark Saya - KomikUp", "Daftar komik favorit tersimpan di KomikUp.");
+        const bookmarks = Object.values(getStorage('komikup_bookmarks'));
+        const box = document.getElementById('content-area');
+        if (bookmarks.length === 0) {
+            box.innerHTML = `<h1 class="section-title">Bookmark Saya</h1><p style="text-align:center; padding:40px; color:#888; font-size: 13px;">Belum ada komik yang disimpan.</p>`;
+            return;
+        }
+        let html = `<h1 class="section-title">Bookmark Saya</h1><div class="grid">`;
+        bookmarks.forEach(item => {
+            html += `<div class="card">
+                <a href="?page=detail&ep=${item.id}" class="card-link">
+                    <span class="badge-type ${item.type}">${item.type}</span>
+                    <img class="card-img" src="${PROXY_COMPRESS + item.thumb}" alt="${item.title}" width="200" height="300">
+                </a>
+                <div class="card-info"><a href="?page=detail&ep=${item.id}" class="card-title">${item.title}</a></div>
+            </div>`;
+        });
+        box.innerHTML = html + '</div>';
+    }
+
+    async function fetchDetail(endpoint) {
+        const data = await getData(`/comic/info${endpoint}`);
+        if (data && data.data) {
+            const info = data.data;
+            const chapters = info.chapter_list || info.chapters || [];
+            
+            let baseSlug = endpoint.replace(/^\/|\/$/g, '').split('/').pop();
+            if (baseSlug) {
+                localStorage.setItem('cached_chapters_' + baseSlug, JSON.stringify(chapters));
+            }
+            sessionStorage.setItem('cachedChapters', JSON.stringify(chapters));
+            sessionStorage.setItem('currentComicThumb', info.thumbnail);
+            sessionStorage.setItem('currentComicTitle', info.title);
+            sessionStorage.setItem('currentComicId', endpoint);
+            
+            const cleanDesc = (info.description || "").replace(/"/g, "'").slice(0, 150);
+            const seoTitle = `Baca Komik ${info.title} Sub Indo - KomikUp`;
+            const seoDesc = `Baca Komik ${info.title} Bahasa Indonesia gratis dan lengkap. ${cleanDesc}...`;
+
+            const schemaComic = {
+                "@context": "https://schema.org",
+                "@type": "Book",
+                "name": info.title,
+                "author": {
+                    "@type": "Person",
+                    "name": info.author || "Unknown"
+                },
+                "image": info.thumbnail,
+                "description": cleanDesc,
+                "genre": info.genre ? info.genre : "Comic"
+            };
+
+            updateSEO(seoTitle, seoDesc, info.thumbnail, schemaComic);
+
+            const isBookmarked = getStorage('komikup_bookmarks')[endpoint];
+            const history = getStorage('komikup_history')[endpoint];
+            let genresHtml = info.genre ? (Array.isArray(info.genre) ? info.genre : info.genre.split(',')).map(g => `<span class="meta-tag">${g.trim()}</span>`).join("") : "-";
+
+            let html = `
+                <article class="detail-wrap">
+                    <img class="detail-cover" src="${detailThumb + info.thumbnail}" alt="Cover ${info.title}" width="200" height="300" fetchpriority="high">
+                    <div class="detail-text" style="flex: 1;">
+                        <h1>${info.title}</h1>
+                        <div class="meta-info">
+                            <span class="meta-tag">
+                                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                ${info.author || 'Unknown'}
+                            </span>
+                            <span class="meta-tag">
+                                <svg class="svg-icon" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                                ${info.status || info.rating || '-'}
+                            </span>
+                            <span class="meta-tag">
+                                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/></svg>
+                                ${info.type}
+                            </span>
+                        </div>
+                        <div style="margin-bottom:12px;">${genresHtml}</div>
+                        <button class="btn-bookmark ${isBookmarked ? 'active' : ''}" onclick='toggleBookmark({id: "${endpoint}", title: "${info.title.replace(/'/g, "\\'")}", thumb: "${info.thumbnail}", type: "${info.type}"})'>
+                            <svg class="svg-icon" viewBox="0 0 24 24"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+                            ${isBookmarked ? 'Tersimpan' : 'Simpan Bookmark'}
+                        </button>
+                        <p style="color: var(--text-muted); font-size: 13.5px; line-height: 1.6;">${info.description || "Tidak ada sinopsis."}</p>
+                    </div>
+                </article>`;
+
+            if (history) {
+                html += `<div class="history-banner" style="margin-top:16px;">
+                    <span>Terakhir dibaca: ${history.title}</span>
+                    <a href="?page=read&ep=${history.ep}">Lanjut Baca</a>
+                </div>`;
+            }
+
+            // html += `
+            // <div class="ad-container">
+            //     <div class="ad-slot ad-rectangle">
+            //         <div id="ad-6ae4cc85d4a8af48010fef40" data-adxad-v3="6ae4cc85d4a8af48010fef40" style="width:300px;height:250px"></div>
+            //     </div>
+            // </div>
+            // `;
+
+            const readHistory = getStorage('komikup_history');
+
+            html += `<h2 class="section-title">Daftar Chapter (${chapters.length})</h2><div class="chapter-list">
+                    ${chapters.map(ch => {
+                        const chEp = cleanEndpoint(ch.endpoint);
+                        const isRead = Object.values(readHistory).some(h => cleanEndpoint(h.ep) === chEp);
+                        const historyStyle = isRead ? 'style="background: #0d0f12; color: #555; border-color: #1a1e24;"' : '';
+                        const checkMark = isRead ? ' <svg class="svg-icon" style="width: 12px; height: 12px; stroke: var(--primary);" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>' : '';
+
+                        return `<a class="chapter-card" href="?page=read&ep=${chEp}" ${historyStyle}>${ch.name || ch.title}${checkMark}</a>`;
+                    }).join('')}
+                </div>
+                
+                <section class="recommendation-section">
+                    <h2 class="recommendation-title">Rekomendasi Terkait</h2>
+                    <div class="grid" id="rec-box">Memuat...</div>
+                </section>`;
+            
+            document.getElementById('content-area').innerHTML = html;
+            fetchRecommendations();
+        }
+    }
+
+    async function fetchRecommendations() {
+        const data = await getData(`/comic/newest/page/1`);
+        const recBox = document.getElementById('rec-box');
+        if (data && data.data) {
+            const validComics = data.data.filter(item => !isBlockedComic(item));
+            let items = validComics.sort(() => 0.5 - Math.random()).slice(0, 6);
+            recBox.innerHTML = items.map(item => `
+                <div class="card">
+                    <a href="?page=detail&ep=${cleanEndpoint(item.endpoint)}" class="card-link">
+                        <img class="card-img" src="${PROXY_COMPRESS + item.image}" alt="Komik ${item.title}" loading="lazy" width="200" height="300">
+                    </a>
+                    <div class="card-info"><a href="?page=detail&ep=${cleanEndpoint(item.endpoint)}" class="card-title" style="font-size:12px;">${item.title}</a></div>
+                </div>`).join('');
+        }
+    }
+
+    let bottomTopData = null;
+
+    async function loadBottomTopComics(period = 'daily') {
+        const listContainer = document.getElementById('bottomTopList');
+        if (!listContainer) return;
+
+        if (!bottomTopData) {
+            try {
+                let res = null;
+                try {
+                    res = await fetch(`${PRIMARY_API}/comic/top`);
+                    if (!res.ok) throw new Error(`Primary status: ${res.status}`);
+                } catch (errPrimary) {
+                    res = await fetch(`${FALLBACK_API}/comic/top`);
+                    if (!res.ok) throw new Error(`Fallback status: ${res.status}`);
+                }
+
+                const json = await res.json();
+                if (json && json.status === 'success') {
+                    bottomTopData = json;
+                }
+            } catch (e) {
+                console.error("Gagal ambil top comic:", e);
+            }
+        }
+
+        if (!bottomTopData || !bottomTopData[period]) {
+            listContainer.innerHTML = `<p style="grid-column: 1/-1; text-align:center; color:#888; padding: 14px; font-size: 12px;">Gagal memuat top komik.</p>`;
+            return;
+        }
+
+        renderBottomTopList(period);
+    }
+
+    function switchBottomTopTab(period) {
+        document.querySelectorAll('.top-tab-btn').forEach(btn => btn.classList.remove('active'));
+        if (event && event.target) {
+            event.target.classList.add('active');
+        }
+
+        const title = document.getElementById('topSectionTitle');
+        if (period === 'users') {
+            if (title) title.innerText = "🏆 Peringkat Pembaca Teratas";
+            loadTopUsers();
+        } else {
+            if (title) title.innerText = "Top Terpopuler";
+            renderBottomTopList(period);
+        }
+    }
+
+    let cachedTopUsers = null;
+
+    const LEADERBOARD_CACHE_DURATION = 60 * 60 * 1000; 
+
+    async function loadTopUsers() {
+        const listContainer = document.getElementById('bottomTopList');
+        if (!listContainer) return;
+
+        // 1. Cek memory RAM browser (0 Read Firestore)
+        if (cachedTopUsers && cachedTopUsers.length > 0) {
+            renderTopUsersList(cachedTopUsers);
+            return;
+        }
+
+        listContainer.innerHTML = `<p style="grid-column: 1/-1; text-align:center; color:#888; padding: 14px; font-size: 12px;">Memuat peringkat pembaca...</p>`;
+
+        await initFirebase();
+        if (!db) {
+            listContainer.innerHTML = `<p style="grid-column: 1/-1; text-align:center; color:#888; padding: 14px; font-size: 12px;">Layanan peringkat sedang offline.</p>`;
+            return;
+        }
+
+        let doc = null;
+        try {
+            const cacheDocRef = db.collection('leaderboard').doc('top_users');
+            doc = await cacheDocRef.get(); // Cukup 1 Read untuk ribuan user
+            const now = Date.now();
+
+            // Cek validitas dokumen cache di Firestore (< 1 jam)
+            if (doc.exists && doc.data().list && (now - (doc.data().updatedAt || 0) < LEADERBOARD_CACHE_DURATION)) {
+                cachedTopUsers = doc.data().list;
+                renderTopUsersList(cachedTopUsers);
+                return;
+            }
+
+            // 2. Jika cache belum ada / sudah kedaluwarsa, ambil 10 user teratas dari koleksi users
+            const snapshot = await db.collection('users')
+                .orderBy('chaptersRead', 'desc')
+                .limit(10)
+                .get();
+
+            if (snapshot.empty) {
+                listContainer.innerHTML = `<p style="grid-column: 1/-1; text-align:center; color:#888; padding: 14px; font-size: 12px;">Belum ada data peringkat pembaca.</p>`;
+                return;
+            }
+
+            const freshList = [];
+            snapshot.forEach(d => {
+                const u = d.data();
+                freshList.push({
+                    displayName: (u.displayName && u.displayName.trim() !== '') ? u.displayName.trim() : 'Anonim',
+                    chaptersRead: Number(u.chaptersRead) || 0,
+                    level: Number(u.level) || 1,
+                    photoURL: (u.photoURL && typeof u.photoURL === 'string') ? u.photoURL.trim() : ''
+                });
+            });
+
+            // 3. Simpan ke dokumen agregat leaderboard/top_users
+            await cacheDocRef.set({
+                list: freshList,
+                updatedAt: now
+            });
+
+            cachedTopUsers = freshList;
+            renderTopUsersList(cachedTopUsers);
+
+        } catch (err) {
+            console.warn("Gagal memuat ranking user:", err);
+            // Fallback: Tampilkan cache lama jika ada saat terjadi kendala jaringan/write
+            if (doc && doc.exists && doc.data().list) {
+                renderTopUsersList(doc.data().list);
+            } else {
+                listContainer.innerHTML = `<p style="grid-column: 1/-1; text-align:center; color:#888; padding: 14px; font-size: 12px;">Gagal memuat data peringkat.</p>`;
+            }
+        }
+    }
+
+    function renderTopUsersList(users) {
+        const listContainer = document.getElementById('bottomTopList');
+        if (!listContainer) return;
+
+        listContainer.innerHTML = users.map((u, idx) => {
+            const displayRank = idx + 1;
+            let rankClass = '';
+            if (displayRank === 1) rankClass = 'rank-1';
+            else if (displayRank === 2) rankClass = 'rank-2';
+            else if (displayRank === 3) rankClass = 'rank-3';
+
+            const initial = (u.displayName || 'A').charAt(0).toUpperCase();
+            const avatarHtml = u.photoURL 
+                ? `<img src="${u.photoURL}" alt="${u.displayName}">` 
+                : initial;
+
+            return `
+            <div class="user-rank-item">
+                <span class="top-rank-num ${rankClass}">${displayRank}</span>
+                <div class="user-rank-avatar">${avatarHtml}</div>
+                <div class="top-list-info">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span class="top-list-title">${escapeHtml(u.displayName)}</span>
+                        <span class="level-chip">Lv.${u.level}</span>
+                    </div>
+                    <span style="font-size: 11px; color: var(--text-muted);">
+                        📖 ${Number(u.chaptersRead).toLocaleString('id-ID')} Chapter
+                    </span>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function renderBottomTopList(period) {
+        const listContainer = document.getElementById('bottomTopList');
+        if (!listContainer || !bottomTopData) return;
+
+        const list = (bottomTopData[period] || [])
+            .filter(item => !isBlockedComic(item))
+            .slice(0, 15);
+
+        listContainer.innerHTML = list.map((item, idx) => {
+            const ep = cleanEndpoint(`${item.slug}/`);
+            const displayRank = idx + 1;
+            
+            let rankClass = '';
+            if (displayRank === 1) rankClass = 'rank-1';
+            else if (displayRank === 2) rankClass = 'rank-2';
+            else if (displayRank === 3) rankClass = 'rank-3';
+
+            const coverSrc = item.cover ? (PROXY_COMPRESS + item.cover) : 'https://www.komikup.com/favicon.ico';
+
+            return `
+            <a href="?page=detail&ep=${ep}" class="top-list-item" title="${item.title}">
+                <span class="top-rank-num ${rankClass}">${displayRank}</span>
+                <img class="top-list-img" src="${coverSrc}" alt="${item.title}" width="44" height="58" loading="lazy">
+                <div class="top-list-info">
+                    <span class="top-list-title">${item.title}</span>
+                </div>
+            </a>`;
+        }).join('');
+    }
+
+    // --- FUNGSI FETCH CHAPTER UTAMA (DENGAN FALLBACK ENDPOINT /baca/) ---
+    async function fetchChapter(endpoint) {
+        const cleanEp = cleanEndpoint(endpoint);
+        
+        // 1. Request percobaan pertama
+        let data = await getData(`/comic/chapter${cleanEp}`);
+
+        // 2. Fallback: Jika gagal atau gambar kosong, coba variasi endpoint dengan/tanpa /baca/
+        if (!data || !data.data || !data.data.image || data.data.image.length === 0) {
+            let fallbackEp = cleanEp;
+            
+            if (cleanEp.startsWith('/baca/')) {
+                // Jika sudah ada /baca/, coba versi tanpa /baca/
+                fallbackEp = cleanEp.replace(/^\/baca/, '');
+            } else {
+                // Jika belum ada /baca/, sisipkan /baca di depannya
+                fallbackEp = '/baca' + (cleanEp.startsWith('/') ? cleanEp : '/' + cleanEp);
+            }
+
+            console.warn(`[Fallback Chapter] Mencoba rute alternatif: /comic/chapter${fallbackEp}`);
+            const fallbackData = await getData(`/comic/chapter${fallbackEp}`);
+            
+            if (fallbackData && fallbackData.data) {
+                data = fallbackData;
+            }
+        }
+
+        if (!data || !data.data) {
+            console.error("Gagal memuat chapter setelah mencoba fallback endpoint.");
+            return;
+        }
+
+        const chap = data.data;
+        updateSEO(
+            `Baca Komik ${chap.title} Sub Indo - KomikUp`, 
+            `Baca komik ${chap.title} Bahasa Indonesia gratis di KomikUp.`
+        );
+        
+        const rTitle = document.getElementById('readerTitle');
+        if (rTitle) rTitle.innerText = chap.title;
+        
+        let baseSlug = '';
+        try {
+            baseSlug = cleanEp.replace(/(-chapter-.*|\/chapter-.*)/i, '').replace(/^\/|\/$/g, '').split('/').pop();
+            const comicPathId = '/manga/' + baseSlug + '/';
+
+            addReadingExperience(comicPathId, cleanEp);
+
+            saveHistory(comicPathId, chap.title, cleanEp);
+        } catch (e) {
+            console.warn("Gagal simpan riwayat:", e);
+        }
+
+        const isUnlocked = hasValidAccess();
+        let html = '';
+
+        // 1. OFFERWALL LOCKER
+        html += `
+        <div id="offerwallLocker" class="offerwall-overlay" style="display: ${isUnlocked ? 'none' : 'block'};">
+            <div class="offerwall-icon">
+                <svg class="svg-icon" style="width: 32px; height: 32px;" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <h2 class="offerwall-title">Buka Akses Membaca</h2>
+            <p class="offerwall-desc">
+                Klik tombol di bawah ini untuk membuka akses semua halaman chapter.
+            </p>
+            <button class="offerwall-btn" onclick="unlockAccessAndOpen('${cleanEp}')">
+                <svg class="svg-icon" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+                Buka Akses
+            </button>
+            <br>
+            <span class="offerwall-badge">Akses aktif untuk semua chapter</span>
+        </div>`;
+
+        // 2. KONTEN GAMBAR CHAPTER OPTIMAL (FAST RENDER)
+        html += `<div class="reader-container" id="readerContainerBox" style="display: ${isUnlocked ? 'block' : 'none'};">`;
+
+        (chap.image || []).forEach((img, index) => {
+            const raw = typeof img === 'string' ? img : (img.url || img.image || '');
+            const imgUrl = raw.startsWith('http') ? raw : (chapterImage + raw);
+
+            if (index < 3) {
+                html += `<img src="${chapterImage + imgUrl}" 
+                             fetchpriority="high" 
+                             decoding="async"
+                             alt="Komik ${chap.title} - Halaman ${index + 1}" 
+                             referrerpolicy="no-referrer"
+                             style="width: 100% !important; height: auto !important; display: block; margin: 0; padding: 0; border: 0; min-height: 250px; background: #111;">`;
+            } else {
+                html += `<img src="${chapterImage + imgUrl}" 
+                             loading="lazy" 
+                             decoding="async"
+                             alt="Komik ${chap.title} - Halaman ${index + 1}" 
+                             referrerpolicy="no-referrer"
+                             class="lazy-chapter"
+                             style="width: 100% !important; height: auto !important; display: block; margin: 0; padding: 0; border: 0; min-height: 250px; background: #111;">`;
+            }
+        });
+        
+        html += `</div>`;
+
+        // 3. KOLOM KOMENTAR DI DALAM CHAPTER
+        const chapterCleanKey = cleanEp.replace(/^\/|\/$/g, '').replace(/[^a-zA-Z0-9_-]/g, '_');
+        html += `
+            <div class="comment-section-reader">
+                <h3 class="section-title" style="margin-top: 0;">Komentar Chapter Ini</h3>
+                <form class="comment-input-box" onsubmit="handlePostComment(event, '${chapterCleanKey}')">
+                    <textarea id="commentTextInput" class="comment-textarea" placeholder="Tulis tanggapan atau komentar untuk chapter ini..." required></textarea>
+                    <div style="display: flex; justify-content: flex-end;">
+                        <button type="submit" class="btn-auth-header" id="btnSubmitComment">Kirim</button>
+                    </div>
+                </form>
+                <div class="comment-list" id="commentList">
+                    <p style="color: var(--text-muted); font-size: 12px;">Memuat komentar...</p>
+                </div>
+                <button class="btn-load-more-comments" id="btnLoadMoreComments" style="display: none;" onclick="loadMoreComments()">
+                    Muat Lebih Banyak
+                </button>
+            </div>
+        `;
+        
+        document.getElementById('content-area').innerHTML = html;
+
+        if (isUnlocked) {
+            initChapterLazyLoad();
+        }
+        
+        window.scrollTo({top: 0});
+
+        await ensureChaptersCached(cleanEp);
+        updateNavigation(cleanEp);
+        
+        loadInitialComments(chapterCleanKey);
+    }
+
+    async function ensureChaptersCached(currentEndpoint) {
+        const cleanEp = cleanEndpoint(currentEndpoint); 
+        let raw = cleanEp.replace(/(-chapter-.*|\/chapter-.*)/i, '').replace(/^\/|\/$/g, '');
+        let baseSlug = raw.split('/').pop();
+
+        if (!baseSlug) return;
+
+        let storageKey = 'cached_chapters_' + baseSlug;
+        let cached = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        
+        if (cached.length > 0) {
+            sessionStorage.setItem('cachedChapters', JSON.stringify(cached));
+            return; 
+        }
+
+        const targetUrl = `/comic/info/manga/${baseSlug}/`;
+
+        try {
+            let res = null;
+            try {
+                res = await fetch(`${PRIMARY_API}${targetUrl}`);
+                if (!res.ok) throw new Error(`Primary status: ${res.status}`);
+            } catch (errPrimary) {
+                res = await fetch(`${FALLBACK_API}${targetUrl}`);
+                if (!res.ok) throw new Error(`Fallback status: ${res.status}`);
+            }
+
+            const infoData = await res.json();
+            const rawChapters = infoData?.data?.chapter_list || infoData?.data?.chapters || [];
+
+            if (rawChapters.length > 0) {
+                localStorage.setItem(storageKey, JSON.stringify(rawChapters));
+                sessionStorage.setItem('cachedChapters', JSON.stringify(rawChapters));
+                sessionStorage.setItem('currentComicTitle', infoData.data.title || '');
+                sessionStorage.setItem('currentComicThumb', infoData.data.thumbnail || '');
+            }
+        } catch (err) {
+            console.warn("Gagal ambil info komik:", err);
+        }
+    }
+
+    function initChapterLazyLoad() {
+        const lazyImages = document.querySelectorAll('.lazy-chapter');
+
+        const imageObserver = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    const realSrc = img.getAttribute('data-src');
+
+                    if (realSrc) {
+                        img.decoding = "async";
+                        img.src = realSrc;
+                        img.removeAttribute('data-src');
+                    }
+
+                    observer.unobserve(img);
+                }
+            });
+        }, {
+            root: null,
+            rootMargin: "0px 0px 3000px 0px", 
+            threshold: 0
+        });
+
+        lazyImages.forEach(image => imageObserver.observe(image));
+    }
+
+
+    function setupReaderMode() {
+        document.body.classList.add('reader-mode');
+        document.getElementById('mainContainer').style.maxWidth = '100%';
+        document.getElementById('mainContainer').style.padding = '0';
+        document.addEventListener('click', handleReaderClick);
+    }
+
+    function cleanupReaderMode() {
+        document.body.classList.remove('reader-mode');
+        document.getElementById('mainContainer').style.maxWidth = '1400px';
+        document.getElementById('mainContainer').style.padding = '0 20px';
+        document.removeEventListener('click', handleReaderClick);
+    }
+
+    function handleReaderClick(e) {
+        if (e.target.closest('.nav-action-btn') || e.target.closest('.control-btn-icon') || e.target.closest('.bottom-sheet') || e.target.closest('.comment-section-reader')) return;
+        document.getElementById('readerHeader').classList.toggle('show');
+        document.getElementById('readerFooter').classList.toggle('show');
+    }
+
+    function toggleChapterList(e) {
+        if (e) {
+            e.stopPropagation();
+            e.preventDefault();
+        }
+        document.getElementById('chapterSheet').classList.toggle('active');
+        document.getElementById('overlayBg').classList.toggle('active');
+    }
+
+    function updateNavigation(currentEp) {
+        const cleanCurrent = cleanEndpoint(currentEp).replace(/^\/|\/$/g, "").toLowerCase();
+        
+        let chapters = JSON.parse(sessionStorage.getItem('cachedChapters') || '[]');
+        if (chapters.length === 0) {
+            let baseSlug = cleanCurrent.replace(/(-chapter-.*|\/chapter-.*)/i, '').split('/').pop();
+            chapters = JSON.parse(localStorage.getItem('cached_chapters_' + baseSlug) || '[]');
+        }
+
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const sheetContent = document.getElementById('sheetContent');
+        const footerCount = document.getElementById('footerChapterCount');
+
+        if (chapters.length === 0) {
+            if (prevBtn) { prevBtn.style.opacity = "0.3"; prevBtn.onclick = null; }
+            if (nextBtn) { nextBtn.style.opacity = "0.3"; nextBtn.onclick = null; }
+            if (footerCount) footerCount.innerText = "Daftar Chapter";
+            if (sheetContent) {
+                sheetContent.innerHTML = `<p style="text-align:center; padding:24px; color:#888; font-size:13px;">Daftar chapter belum tersedia.</p>`;
+            }
+            return;
+        }
+
+        const extractChapterKey = (url) => {
+            const match = url.match(/chapter-(\d+[\.-]?\d*)/i);
+            if (match) return match[1];
+            const parts = url.replace(/^\/|\/$/g, "").split('/');
+            return parts[parts.length - 1].toLowerCase();
+        };
+
+        const currentKey = extractChapterKey(cleanCurrent);
+        
+        const idx = chapters.findIndex(c => {
+            const chEp = cleanEndpoint(c.endpoint || '').replace(/^\/|\/$/g, "").toLowerCase();
+            return chEp === cleanCurrent || extractChapterKey(chEp) === currentKey;
+        });
+
+        if (idx !== -1) {
+            let isLatestOnTop = true;
+            if (chapters.length > 1) {
+                const firstNum = parseFloat(chapters[0].endpoint.match(/chapter-(\d+[\.-]?\d*)/i)?.[1] || 0);
+                const lastNum = parseFloat(chapters[chapters.length - 1].endpoint.match(/chapter-(\d+[\.-]?\d*)/i)?.[1] || 0);
+                if (firstNum < lastNum) isLatestOnTop = false;
+            }
+
+            const nextIdx = isLatestOnTop ? idx - 1 : idx + 1;
+            const prevIdx = isLatestOnTop ? idx + 1 : idx - 1;
+
+            if (prevIdx >= 0 && prevIdx < chapters.length) {
+                prevBtn.onclick = () => location.href = `?page=read&ep=${cleanEndpoint(chapters[prevIdx].endpoint)}`;
+                prevBtn.style.opacity = "1";
+            } else {
+                prevBtn.style.opacity = "0.3";
+                prevBtn.onclick = null;
+            }
+
+            if (nextIdx >= 0 && nextIdx < chapters.length) {
+                nextBtn.onclick = () => location.href = `?page=read&ep=${cleanEndpoint(chapters[nextIdx].endpoint)}`;
+                nextBtn.style.opacity = "1";
+            } else {
+                nextBtn.style.opacity = "0.3";
+                nextBtn.onclick = null;
+            }
+
+            const activeChapterName = chapters[idx].name || chapters[idx].title || `Ch. ${currentKey}`;
+            if (footerCount) {
+                footerCount.innerText = activeChapterName;
+            }
+        } else {
+            if (prevBtn) { prevBtn.style.opacity = "0.3"; prevBtn.onclick = null; }
+            if (nextBtn) { nextBtn.style.opacity = "0.3"; nextBtn.onclick = null; }
+            if (footerCount) footerCount.innerText = `Pilih (${chapters.length})`;
+        }
+
+        const sheetTitle = document.getElementById('sheetChapterHeaderTitle');
+        if (sheetTitle) {
+            sheetTitle.innerText = `Pilih Chapter (${chapters.length} Tersedia)`;
+        }
+
+        const readHistory = getStorage('komikup_history');
+        if (sheetContent) {
+            sheetContent.innerHTML = chapters.map(ch => {
+                const chEp = cleanEndpoint(ch.endpoint);
+                const isCurrent = (idx !== -1 && ch.endpoint === chapters[idx].endpoint);
+                const isAlreadyRead = Object.values(readHistory).some(h => cleanEndpoint(h.ep) === chEp);
+                
+                let historyClass = '';
+                if (isCurrent) historyClass = 'current-active';
+                else if (isAlreadyRead) historyClass = 'already-read';
+                
+                return `
+                    <a href="?page=read&ep=${chEp}" class="sheet-chapter-item ${historyClass}">
+                        <span>${ch.name || ch.title}</span>
+                    </a>`;
+            }).join('');
+
+            const activeItem = sheetContent.querySelector('.sheet-chapter-item.current-active');
+            if (activeItem) {
+                setTimeout(() => {
+                    activeItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+            }
+        }
+    }
+
+    function filterChapters(keyword) {
+        const cleanKeyword = keyword.toLowerCase().trim();
+        const items = document.querySelectorAll('.sheet-chapter-item');
+        
+        items.forEach(item => {
+            const text = item.innerText.toLowerCase();
+            if (text.includes(cleanKeyword)) {
+                item.style.display = 'flex';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
+</script>
+
+<div id="kcopa-block-overlay" class="kcopa-overlay" style="display: none;">
+  <div class="kcopa-card">
+    <div style="font-size: 36px; font-weight: 800; color: var(--primary); margin-bottom: 4px;">404</div>
+    <h2 style="color: #fff; font-size: 15px; margin-bottom: 8px;">Halaman Tidak Ditemukan</h2>
+    <p style="font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 18px;">
+      Maaf, konten yang Anda cari tidak tersedia atau telah dihapus.
+    </p>
+    <a href="./" class="kcopa-btn">Kembali ke Beranda</a>
+  </div>
+</div>
+
+<div id="histats_counter" style="display: none;"></div>
+<script type="text/javascript">var _Hasync= _Hasync|| [];
+_Hasync.push(['Histats.start', '1,4887267,4,2,120,55,00000100']);
+_Hasync.push(['Histats.fasi', '1']);
+_Hasync.push(['Histats.track_hits', '']);
+(function() {
+var hs = document.createElement('script'); hs.type = 'text/javascript'; hs.async = true;
+hs.src = ('//s10.histats.com/js15_as.js');
+(document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(hs);
+})();</script>
+<noscript><a href="/" target="_blank"><img src="//sstatic1.histats.com/0.gif?4887267&101" alt="" border="0"></a></noscript>
+
+<script>
+const KCOPA_REDIRECT_COMICS = [
+    { keyword: 'nano-machine' },
+    { keyword: 'solo-max-level-newbie' },
+    { keyword: 'villain-to-kill' },
+    { keyword: 'the-world-after-the-fall' },
+    { keyword: 'regressor-of-the-fallen-family' },
+    { keyword: 'i-became-the-tyrant-of-a-defense-game' },
+    { keyword: 'return-of-the-mad-demon' },
+    { keyword: 'absolute-sword-sense' },
+    { keyword: 'absolute-regression' }
+];
+
+function getKcopaTarget() {
+    const currentUrl = decodeURIComponent(window.location.href.toLowerCase());
+    for (let i = 0; i < KCOPA_REDIRECT_COMICS.length; i++) {
+        const key = KCOPA_REDIRECT_COMICS[i].keyword.toLowerCase();
+        const keyNoDash = key.replace(/-/g, ' ');
+        if (currentUrl.indexOf(key) !== -1 || currentUrl.indexOf(keyNoDash) !== -1) {
+            return KCOPA_REDIRECT_COMICS[i];
+        }
+    }
+    return null;
+}
+
+const OFFERWALL_LINKS = [
+    'https://s.shopee.co.id/LlMjYYKka',
+    'https://s.shopee.co.id/LlMjYYKka'
+];
+
+const ACCESS_DURATION = 0.5 * 60 * 60 * 1000;
+const ACCESS_STORAGE_KEY = 'komikup_pass_time';
+const OFFERWALL_INDEX_KEY = 'komikup_offerwall_link_index';
+
+function hasValidAccess() {
+    if (getKcopaTarget() !== null) return false;
+    const accessTime = localStorage.getItem(ACCESS_STORAGE_KEY);
+    if (!accessTime) return false;
+    return (Date.now() - parseInt(accessTime, 10)) < ACCESS_DURATION;
+}
+
+function getNextOfferwallTarget() {
+    let lastIndex = parseInt(localStorage.getItem(OFFERWALL_INDEX_KEY));
+    if (isNaN(lastIndex)) {
+        lastIndex = 0;
+    } else {
+        lastIndex = (lastIndex + 1) % OFFERWALL_LINKS.length;
+    }
+    return {
+        url: OFFERWALL_LINKS[lastIndex],
+        index: lastIndex
+    };
+}
+
+function unlockAccessAndOpen(passedEp = '') {
+    const target = getNextOfferwallTarget();
+
+    localStorage.setItem(ACCESS_STORAGE_KEY, Date.now());
+    localStorage.setItem(OFFERWALL_INDEX_KEY, target.index);
+
+    try {
+        if (typeof Histats_variables === 'undefined') window.Histats_variables = [];
+        window.Histats_variables.push("KomikUp_Offerwall_Unlock", target.index.toString());
+        if (window._Hasync) window._Hasync.push(['Histats.track_hits', '']);
+    } catch (e) {}
+
+    window.open(target.url, '_blank');
+    
+    const locker = document.getElementById('offerwallLocker');
+    const readerBox = document.getElementById('readerContainerBox');
+    if (locker) locker.style.display = 'none';
+    if (readerBox) {
+        readerBox.style.display = 'block';
+        if (typeof initChapterLazyLoad === 'function') initChapterLazyLoad();
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const activeEp = passedEp || params.get('ep') || '';
+    if (activeEp) {
+        ensureChaptersCached(activeEp).then(() => {
+            updateNavigation(activeEp);
+        });
+    }
+}
+
+function applyKcopaLock() {
+    const kcopaItem = getKcopaTarget();
+    const overlay = document.getElementById('kcopa-block-overlay');
+
+    if (kcopaItem) {
+        document.title = "404 Halaman Tidak Ditemukan - KomikUp";
+
+        const contentArea = document.getElementById('content-area');
+        if (contentArea) contentArea.innerHTML = '';
+
+        const readerBox = document.getElementById('readerContainerBox');
+        if (readerBox) {
+            readerBox.innerHTML = '';
+            readerBox.style.display = 'none';
+        }
+
+        const offerwall = document.getElementById('offerwallLocker');
+        if (offerwall) offerwall.style.display = 'none';
+
+        if (overlay) overlay.style.display = 'flex';
+        return true;
+    } else {
+        if (overlay) overlay.style.display = 'none';
+        return false;
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyKcopaLock);
+} else {
+    applyKcopaLock();
+}
+</script>
+<script>window.__CF$cv$params={r:'a59b11409d89b74e',t:'MTc5NDU0NDUwMQ==',u:'01a1d330048871d98d7d5e1459bb8880',ut:'KkTNRpeLdCtAhvKOO1qEMufJnznDE9uEZVCz82FiZ3M-1794544501-1.2.1.1-YbGpe1zQxJZsi5THUdPGemXxfmQfjEQbbYiVMgQyKvL_vNTrvz2fxtOHH8b1ZbDsKL8kVZgcI0hxPwK.Q_TbXk.HwLdLCb62H0knp12.t9E',i:60};(function(){if(!document.body)return;var l=window.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/precursor/main.js?ray=a59b11409d89b74e',s=document.createElement('script');s.src=o?new URL(u,o).href:u;document.head.appendChild(s);})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/vce701823e78c4301a35b7e07294d87301792088814092" integrity="sha512-UKNk8GbxkABxKcXYuLkO16EleLGUkcvJWtpSNmExE0Too3ZaFAxTscNWEc1OdAv5/BikHawapSCaiD2XCmp+Bw==" data-cf-beacon='{"version":"2024.11.0","token":"4e6d444c9c8d4859a77482c92bdd3db1","r":1,"spa":2}' crossorigin="anonymous"></script>
+</body> 
+</html>

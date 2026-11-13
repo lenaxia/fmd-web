@@ -1,0 +1,138 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/Hentai2Read/source.html",
+  "document": "html",
+  "moduleId": "053da85062184626a0a1ff6d57c3c955",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/Hentai2Read/source",
+      "id": "44#1",
+      "expression": "book?title",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Hentai2Read/source",
+      "id": "17#1",
+      "expression": "json(//script[@data-page=\"app\"]).props.books.lastPage",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": "1752"
+    },
+    {
+      "fixtureId": "seed/Hentai2Read/source",
+      "id": "45#1",
+      "expression": "book?alt",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Hentai2Read/source",
+      "id": "28#1",
+      "expression": "json(//script[@data-page=\"app\"]).props.books.data()",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Hentai2Read/source",
+      "id": "46#1",
+      "expression": "book?cover",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Hentai2Read/source",
+      "id": "43#1",
+      "expression": "parse-json(//script[@data-page=\"app\"]).props",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Hentai2Read/source",
+      "id": "47#1",
+      "expression": "string-join(book?groups?*[type=\"artist\"]?tags?*?name, \", \")",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Hentai2Read/source",
+      "id": "86#1",
+      "expression": "json(//script[@data-page=\"app\"]).props.images()",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/Hentai2Read/source",
+      "id": "48#1",
+      "expression": "string-join((book?tags?*?name, book?type?label), \", \")",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Hentai2Read/source",
+      "id": "49#1",
+      "expression": "book?status?label",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Hentai2Read/source",
+      "id": "50#1",
+      "expression": "book?description",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Hentai2Read/source",
+      "id": "56#1",
+      "expression": "book?groups?*[type=\"parody\"]?tags?*?name",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Hentai2Read/source",
+      "id": "60#1",
+      "expression": "book?groups?*[type=\"character\"]?tags?*?name",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/Hentai2Read/source",
+      "id": "68#1",
+      "expression": "chapters?*",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    }
+  ]
+}

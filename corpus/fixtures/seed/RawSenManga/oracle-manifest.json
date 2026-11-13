@@ -1,0 +1,19 @@
+{
+  "fixtureId": "seed/RawSenManga/source",
+  "moduleId": "8461acb310df4019a6154ad7b3623a42",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "34#1",
+      "expression": "json(*).series()",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "77#1",
+      "expression": "json(*).pages()",
+      "engine": "xpath",
+      "output": "list"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "corpus/fixtures/seed/MangaPlus/source.bin",
+  "document": "protobuf",
+  "moduleId": "f239e87c7a1248d29cdd2ea8a77df36c",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "triples": []
+}

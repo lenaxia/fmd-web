@@ -1,0 +1,65 @@
+{
+  "generator" : "fmd_capture",
+  "mode" : "normalize",
+  "fixture" : "corpus/fixtures/capture/getinfo-normalization-0011.json",
+  "moduleId" : "3c4d5e6f77889900aabbccddeeff0011",
+  "internettoolsCommit" : "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit" : "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion" : "3.2.2",
+  "flags" : {
+    "removeHostFromChapterLinks" : true,
+    "optionRemoveMangaNameFromChapter" : true
+  },
+  "triples" : [
+    {
+      "fixtureId" : "capture/getinfo-normalization-0011",
+      "input" : {
+        "title" : "My Manga",
+        "altTitles" : "",
+        "authors" : "",
+        "artists" : "",
+        "genres" : "",
+        "status" : "",
+        "summary" : "",
+        "coverLink" : "",
+        "url" : "https://s.example/m",
+        "link" : "",
+        "chapterLinks" : [
+          "https://s.example/m/1",
+          "https://other.example/m/2",
+          "https://s.example/m/3"
+        ],
+        "chapterNames" : [
+          "My Manga Ch.1",
+          "My Manga- Ch.2",
+          "My Manga",
+          "My Manga Extra 4",
+          "Other- Ch.5"
+        ]
+      },
+      "normalized" : {
+        "title" : "My Manga",
+        "altTitles" : "",
+        "authors" : "",
+        "artists" : "",
+        "genres" : "",
+        "status" : "",
+        "summary" : "",
+        "coverLink" : "",
+        "url" : "https://s.example/m",
+        "link" : "/m",
+        "chapterLinks" : [
+          "/m/1",
+          "/m/2",
+          "/m/3"
+        ],
+        "chapterNames" : [
+          "Ch.1",
+          "Ch.2",
+          "My Manga"
+        ],
+        "numChapter" : 3
+      }
+    }
+  ]
+}

@@ -1,0 +1,282 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/MangaDex/source.json",
+  "document": "json",
+  "moduleId": "d07c9c2425764da8ba056505f57cf40c",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "104#1",
+      "expression": "json(*)",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "105#1",
+      "expression": "result",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "106#1",
+      "expression": "json(*).errors().detail",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "123#1",
+      "expression": "id",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "112#1",
+      "expression": "json(*).total",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "124#1",
+      "expression": "attributes/title/*",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "114#1",
+      "expression": "json(*).total",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "208#1",
+      "expression": "result",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "116#1",
+      "expression": "json(*).limit",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "212#1",
+      "expression": "data/attributes/title/*",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "122#1",
+      "expression": "json(*).data()",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "213#1",
+      "expression": "string-join(data/attributes/altTitles?*/*, \", \")",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "176#1",
+      "expression": "json(*).data()[1].attributes.newId",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "215#1",
+      "expression": "data/attributes/description/en",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "207#1",
+      "expression": "json(*)",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "218#1",
+      "expression": "data/attributes/status",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "209#1",
+      "expression": "json(*).errors().detail",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "222#1",
+      "expression": "data/attributes/publicationDemographic",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "214#1",
+      "expression": "json(*).data.relationships()[type=\"cover_art\"].attributes.fileName",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "230#1",
+      "expression": "data/attributes/contentRating",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "216#1",
+      "expression": "json(*).data.relationships()[type=\"author\"].attributes.name",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "269#1",
+      "expression": "attributes/externalUrl",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "217#1",
+      "expression": "json(*).data.relationships()[type=\"artist\"].attributes.name",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "280#1",
+      "expression": "id",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "221#1",
+      "expression": "json(*).data.attributes.tags().attributes.name.en",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "284#1",
+      "expression": "attributes/name",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "262#1",
+      "expression": "json(*).data()",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "289#1",
+      "expression": "attributes/volume",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "263#1",
+      "expression": "json(*).total",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "id": "290#1",
+      "expression": "attributes/chapter",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    }
+  ]
+}

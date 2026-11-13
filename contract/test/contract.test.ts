@@ -104,7 +104,7 @@ describe('contract.json — §5.2 event-binding invariants', (): void => {
 
   it('binds account-status constants for Login/AccountState/CheckSite only', (): void => {
     const withAccount = events
-      .filter((e): boolean => e.accountConstants === true)
+      .filter((e): boolean => e.constants === 'account-status')
       .map((e): string => e.event);
     expect(withAccount.sort()).toEqual(['AccountState', 'CheckSite', 'Login'].sort());
   });

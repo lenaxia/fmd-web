@@ -1,0 +1,47 @@
+{
+  "module": "Hentai2Read",
+  "moduleId": "053da85062184626a0a1ff6d57c3c955",
+  "event": "GetPageNumber",
+  "url": "https://hentai2read.com/chapter-page-1/",
+  "fixtureProvenance": "corpus/fixtures/seed/Hentai2Read/source.html (browse page; chapter page is a synthetic sibling)",
+  "result": {
+    "kind": "boolean",
+    "value": true
+  },
+  "taskPageLinks": [
+    "https://images.hentai2read.com/a/1.jpg",
+    "https://images.hentai2read.com/a/2.jpg",
+    "https://images.hentai2read.com/a/3.jpg"
+  ],
+  "directoryPageNumber": {
+    "result": {
+      "kind": "code",
+      "value": 0,
+      "readBack": {
+        "PAGENUMBER": 1752
+      }
+    },
+    "pagenumberReadBack": 1752,
+    "fixture": "corpus/fixtures/seed/Hentai2Read/source.html (RECORDED)"
+  },
+  "httpRequests": [
+    {
+      "method": "GET",
+      "url": "https://hentai2read.com/chapter-page-1/",
+      "body": "",
+      "mimeType": "",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      }
+    },
+    {
+      "method": "GET",
+      "url": "https://hentai2read.com/browse/newest/page-1",
+      "body": "",
+      "mimeType": "",
+      "headers": {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "moduleId": "60fc962a67a2420f8381ce0f33b3898d",
+  "module": "KomikUp",
+  "capturedAt": "2026-11-13",
+  "expressionSource": "modules",
+  "entries": [
+    {
+      "fixtureId": "seed/KomikUp/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://komikup.com/",
+      "description": "Madara-based (id_ID)"
+    }
+  ]
+}

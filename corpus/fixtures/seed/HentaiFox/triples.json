@@ -1,0 +1,144 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/HentaiFox/source.html",
+  "document": "html",
+  "moduleId": "58a2dec76ebf43a5a9e7dc9b453e52e9",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/HentaiFox/source",
+      "id": "35#1",
+      "expression": "//ul[@class=\"pagination\"]/li[last()-1]/a",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": "8156"
+    },
+    {
+      "fixtureId": "seed/HentaiFox/source",
+      "id": "46#1",
+      "expression": "//h2[@class=\"g_title\"]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "list",
+      "result": [
+        "Yamada gets tangled up with a dangerous old man in the neighborhood",
+        "I'm Sorry for the Onaho, Even Though You Raised Me Carefully as a Human",
+        "Welcome to the Pleasure Sokubaikai",
+        "Pregnant Office Lady in 100 Days! 2",
+        "The Netorare Partner Was My Wife's Ex-Boyfriend",
+        "Paradiso Guardian Comics 2",
+        "Nanja Kono Holo!?",
+        "Dosukebe Ajin Ch 3 Isekai Teni de Ajin to Tanetsuke Koubi",
+        "Slut-Only Car ~BITCH ONLY~",
+        "The story of how the perverts seduced the older female ninja - sakura, ino, tenten Hen",
+        "Futanari Kanojo no Haramibukuro Kareshi",
+        "Haetate Futanari 2 Natsu, Mankitsu-chuu",
+        "My Two Wives 2",
+        "Mesugaki Testament Form-chan o Wakarasetai",
+        "Netori Otoko o Mesu ni suru",
+        "SlapStickStrike] Watashi no Mamono Musume o Shoukai Shimasu! EX Monpara Soushuuhen | Introducing My Monster Girl! EX Paradox Compilation",
+        "Appli de Hentai - Kawaii Osananajimi o Monster Musume ni Shiyou",
+        "mari- kaityou to uwagaki kusu",
+        "Become a Dog",
+        "\"Reclaiming Tenoch from Dubai ︎\""
+      ]
+    },
+    {
+      "fixtureId": "seed/HentaiFox/source",
+      "id": "61#1",
+      "expression": "//div[@class=\"info\"]/h1|//h1[@class=\"tag_info\"]/span",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/HentaiFox/source",
+      "id": "62#1",
+      "expression": "//div[@class=\"cover\"]/img/@src|(//div[@class=\"lc_galleries\"]/div[@class=\"thumb\"])[1]//img/@data-src",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": "https://i3.hentaifox.com/005/4325611/thumb.jpg"
+    },
+    {
+      "fixtureId": "seed/HentaiFox/source",
+      "id": "63#1",
+      "expression": "//ul[@class=\"artists\"]/li/a/text()",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/HentaiFox/source",
+      "id": "64#1",
+      "expression": "//div[@class=\"info\"]/ul[not(@class=\"artists\")]/li/a/text()",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/HentaiFox/source",
+      "id": "70#1",
+      "expression": "//ul[@class=\"pagination\"]/li[last()-1]/a",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": "8156"
+    },
+    {
+      "fixtureId": "seed/HentaiFox/source",
+      "id": "72#1",
+      "expression": "//h2[@class=\"g_title\"]/a",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "list",
+      "result": [
+        "Yamada gets tangled up with a dangerous old man in the neighborhood",
+        "I'm Sorry for the Onaho, Even Though You Raised Me Carefully as a Human",
+        "Welcome to the Pleasure Sokubaikai",
+        "Pregnant Office Lady in 100 Days! 2",
+        "The Netorare Partner Was My Wife's Ex-Boyfriend",
+        "Paradiso Guardian Comics 2",
+        "Nanja Kono Holo!?",
+        "Dosukebe Ajin Ch 3 Isekai Teni de Ajin to Tanetsuke Koubi",
+        "Slut-Only Car ~BITCH ONLY~",
+        "The story of how the perverts seduced the older female ninja - sakura, ino, tenten Hen",
+        "Futanari Kanojo no Haramibukuro Kareshi",
+        "Haetate Futanari 2 Natsu, Mankitsu-chuu",
+        "My Two Wives 2",
+        "Mesugaki Testament Form-chan o Wakarasetai",
+        "Netori Otoko o Mesu ni suru",
+        "SlapStickStrike] Watashi no Mamono Musume o Shoukai Shimasu! EX Monpara Soushuuhen | Introducing My Monster Girl! EX Paradox Compilation",
+        "Appli de Hentai - Kawaii Osananajimi o Monster Musume ni Shiyou",
+        "mari- kaityou to uwagaki kusu",
+        "Become a Dog",
+        "\"Reclaiming Tenoch from Dubai ︎\""
+      ]
+    },
+    {
+      "fixtureId": "seed/HentaiFox/source",
+      "id": "94#1",
+      "expression": "(//span[@class=\"i_text pages\"])[1]/substring-after(., \": \")",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/HentaiFox/source",
+      "id": "105#1",
+      "expression": "//img[@id=\"gimg\"]/@data-src",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    }
+  ]
+}

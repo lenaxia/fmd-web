@@ -1,0 +1,16 @@
+{
+  "moduleId": "cf53fabf3cd1141f7a239298280a3efc",
+  "module": "MangaThemesia",
+  "capturedAt": "2026-11-13",
+  "template": "MangaThemesia",
+  "syntheticId": true,
+  "entries": [
+    {
+      "fixtureId": "seed/MangaThemesia/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://mangakita.net/manga/?page=1",
+      "description": "MangaThemesia template directory"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "moduleId": "b8a5b7a71025420fa3718fd498977e3e",
+  "module": "18Comic",
+  "capturedAt": "2026-11-13",
+  "entries": [
+    {
+      "fixtureId": "seed/18Comic/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "http://web.archive.org/web/20220218093959id_/https://18comic.vip/albums?o=mr&page=1",
+      "description": "imagepuzzle module — album directory grid (live site hard-blocked; captured from the web.archive.org raw snapshot, 2022-02-18)"
+    }
+  ]
+}

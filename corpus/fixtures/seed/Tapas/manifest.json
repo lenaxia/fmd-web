@@ -1,0 +1,14 @@
+{
+  "moduleId": "9f2d722f3e90432ba913d5bdddc048b4",
+  "module": "Tapas",
+  "capturedAt": "2026-11-13",
+  "entries": [
+    {
+      "fixtureId": "seed/Tapas/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://tapas.io/comics",
+      "description": "TotalDirectory — comics landing page (GetDirectoryPageNumber expressions run here)"
+    }
+  ]
+}

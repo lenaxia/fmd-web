@@ -1,0 +1,61 @@
+{
+  "fixtureId": "seed/AsmHentai/source",
+  "moduleId": "845f86020f8b4744824f5eaffc1f278f",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "17#1",
+      "expression": "//*[@class=\"pagination\"]/a[last()-1]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "27#1",
+      "expression": "//*[@class=\"preview_item\"]/*[@class=\"caption\"]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "38#1",
+      "expression": "//div[@class=\"info\"]/h1",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "39#1",
+      "expression": "//div[@class=\"cover\"]//img/@src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "40#1",
+      "expression": "//div[@class=\"tags\" and contains(h3, \"Artist\")]/div/a/span/text()",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "41#1",
+      "expression": "//div[@class=\"tags\" and (contains(h3, \"Tags\") or contains(h3, \"Category\"))]/div/a/span/text()",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "54#1",
+      "expression": "//*[@id=\"dir\"]/@value",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "55#1",
+      "expression": "//*[@id=\"id\"]/@value",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "56#1",
+      "expression": "//*[@id=\"t_pages\"]/@value",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

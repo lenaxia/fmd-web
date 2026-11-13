@@ -1,0 +1,73 @@
+{
+  "fixtureId": "seed/LxHentai/source",
+  "moduleId": "a25c1b1030ee41e49018e1811bdf7085",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "35#1",
+      "expression": "//ul[@class=\"flex gap-2\"]/a[last()]/@href",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "46#1",
+      "expression": "//div[@class=\"p-2 w-full truncate\"]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "59#1",
+      "expression": "(//span[contains(@class, \"text-lg ml-1\")])[1]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "60#1",
+      "expression": "//div[@class=\"cover-frame\"]/div/@style",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "61#1",
+      "expression": "(//div[@class=\"grow\"])[1]/div[contains(., \"Tác giả\")]//a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "62#1",
+      "expression": "(//div[@class=\"grow\"])[1]/div[contains(., \"Thể loại\")]//a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "63#1",
+      "expression": "(//div[@class=\"grow\"])[1]/div[contains(., \"Tình trạng\")]//a",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "64#1",
+      "expression": "string-join(//div[contains(., \"Tóm tắt\")]/p[position()>1], \"\r\n\")",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "66#1",
+      "expression": "//ul[@class=\"overflow-y-auto overflow-x-hidden\"]/a",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "68#1",
+      "expression": "li/div[1]/span",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "84#1",
+      "expression": "//div[@id=\"image-container\"]/@data-src",
+      "engine": "xpath",
+      "output": "list"
+    }
+  ]
+}

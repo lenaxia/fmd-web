@@ -1,0 +1,14 @@
+{
+  "moduleId": "d07c9c2425764da8ba056505f57cf40c",
+  "module": "MangaDex",
+  "capturedAt": "2026-11-13",
+  "entries": [
+    {
+      "fixtureId": "seed/MangaDex/source",
+      "file": "source.json",
+      "kind": "json",
+      "url": "https://api.mangadex.org/manga?limit=8&hasAvailableChapters=true",
+      "description": "JSON API (io cache module) — manga list response"
+    }
+  ]
+}

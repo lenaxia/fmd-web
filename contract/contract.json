@@ -3,7 +3,7 @@
   "meta": {
     "designVersion": "v5",
     "source": "DESIGN.md §5 — FMD2 Compatibility Contract (derived from FMD2 baseunits/lua/*.pas)",
-    "groundTruth": "§5.2 table transcribed directly from the 15 Do* dispatchers in LuaWebsiteModules.pas (verified twice: REVIEW-001/002; 15/15 in REVIEW-003)",
+    "groundTruth": "§5.2 event rows + facade method tables are machine-verified by contract/tools/drift-check.ts against a fresh parse of the Pascal dispatchers and registration tables (LuaWebsiteModules.pas, LuaWebsiteModuleHandler.pas, LuaXQuery.pas, LuaImagePuzzle.pas, LuaDuktape.pas, LuaStringsStorage.pas, LuaCrypto.pas)",
     "schema": "./schema/contract.schema.json"
   },
   "statusConstants": {
@@ -14,96 +14,108 @@
     {
       "event": "GetDirectoryPageNumber",
       "returns": "code",
-      "globals": ["HTTP", "UPDATELIST", "PAGENUMBER", "WORKPTR"],
-      "readBack": ["PAGENUMBER"]
+      "globals": ["MODULE", "HTTP", "UPDATELIST", "PAGENUMBER", "WORKPTR"],
+      "readBack": ["PAGENUMBER"],
+      "constants": "net-status"
     },
     {
       "event": "GetNameAndLink",
       "returns": "code",
-      "globals": ["HTTP", "NAMES", "LINKS", "UPDATELIST", "URL"],
-      "readBack": []
+      "globals": ["MODULE", "HTTP", "NAMES", "LINKS", "UPDATELIST", "URL"],
+      "readBack": [],
+      "constants": "net-status"
     },
     {
       "event": "GetInfo",
       "returns": "code",
-      "globals": ["MANGAINFO", "HTTP", "URL"],
-      "readBack": []
+      "globals": ["MODULE", "MANGAINFO", "HTTP", "URL"],
+      "readBack": [],
+      "constants": "net-status"
     },
     {
       "event": "BeforeUpdateList",
       "returns": "boolean",
-      "globals": ["UPDATELIST"],
-      "readBack": []
+      "globals": ["MODULE", "UPDATELIST"],
+      "readBack": [],
+      "constants": "none"
     },
     {
       "event": "AfterUpdateList",
       "returns": "boolean",
-      "globals": ["UPDATELIST"],
-      "readBack": []
+      "globals": ["MODULE", "UPDATELIST"],
+      "readBack": [],
+      "constants": "none"
     },
     {
       "event": "TaskStart",
       "returns": "boolean",
-      "globals": ["TASK"],
-      "readBack": []
+      "globals": ["MODULE", "TASK"],
+      "readBack": [],
+      "constants": "none"
     },
     {
       "event": "GetPageNumber",
       "returns": "boolean",
-      "globals": ["TASK", "HTTP", "URL"],
-      "readBack": []
+      "globals": ["MODULE", "TASK", "HTTP", "URL"],
+      "readBack": [],
+      "constants": "none"
     },
     {
       "event": "GetImageURL",
       "returns": "boolean",
-      "globals": ["TASK", "HTTP", "WORKID", "URL"],
-      "readBack": []
+      "globals": ["MODULE", "TASK", "HTTP", "WORKID", "URL"],
+      "readBack": [],
+      "constants": "none"
     },
     {
       "event": "BeforeDownloadImage",
       "returns": "boolean",
-      "globals": ["TASK", "HTTP", "WORKID", "URL"],
+      "globals": ["MODULE", "TASK", "HTTP", "WORKID", "URL"],
       "readBack": [],
-      "pushOnly": true
+      "pushOnly": true,
+      "constants": "none"
     },
     {
       "event": "DownloadImage",
       "returns": "boolean",
-      "globals": ["TASK", "HTTP", "WORKID", "URL"],
-      "readBack": []
+      "globals": ["MODULE", "TASK", "HTTP", "WORKID", "URL"],
+      "readBack": [],
+      "constants": "none"
     },
     {
       "event": "SaveImage",
       "returns": "string",
-      "globals": ["HTTP", "PATH", "FILENAME"],
-      "readBack": []
+      "globals": ["MODULE", "HTTP", "PATH", "FILENAME"],
+      "readBack": [],
+      "constants": "none"
     },
     {
       "event": "AfterImageSaved",
       "returns": "boolean",
-      "globals": ["FILENAME"],
-      "readBack": []
+      "globals": ["MODULE", "FILENAME"],
+      "readBack": [],
+      "constants": "none"
     },
     {
       "event": "Login",
       "returns": "boolean",
-      "globals": ["HTTP"],
+      "globals": ["MODULE", "HTTP"],
       "readBack": [],
-      "accountConstants": true
+      "constants": "account-status"
     },
     {
       "event": "AccountState",
       "returns": "boolean",
-      "globals": [],
+      "globals": ["MODULE"],
       "readBack": [],
-      "accountConstants": true
+      "constants": "account-status"
     },
     {
       "event": "CheckSite",
       "returns": "boolean",
-      "globals": [],
+      "globals": ["MODULE"],
       "readBack": [],
-      "accountConstants": true
+      "constants": "account-status"
     }
   ],
   "moduleSurface": [
@@ -137,6 +149,345 @@
     "Title", "AltTitles", "Authors", "Artists", "Genres", "Status",
     "Summary", "CoverLink", "ChapterLinks", "ChapterNames", "URL", "Link"
   ],
+  "facades": [
+    {
+      "name": "TXQuery",
+      "fmd2Unit": "LuaXQuery",
+      "source": "LuaXQuery.pas:192-201 (methods), 22-43 (constructor)",
+      "access": "global-constructor",
+      "constructors": [
+        { "name": "CreateTXQuery", "notes": "(HTTP.Document | HTML string | none) => TXQuery instance (global function, LuaXQuery.pas:209-212)" }
+      ],
+      "methods": [
+        { "name": "ParseHTML", "notes": "instance method taking EXACTLY ONE argument: HTML string or stream (LuaXQuery.pas:45-56, 193)" },
+        { "name": "XPath", "notes": "(expr[, node]) => IXQValue object" },
+        { "name": "XPathString", "notes": "(expr[, node]) => string" },
+        { "name": "XPathStringAll", "notes": "overloads by argument type (LuaXQuery.pas:91-148): (expr) => ', '-joined trimmed string; (expr, TStrings-list) => fill list, returns nothing; (expr, separator, node) => joined string; (expr, TStrings-list, node) => fill list" },
+        { "name": "XPathHREFAll", "notes": "(expr, names:TStrings, links:TStrings[, node]) => fills both lists, returns nothing" },
+        { "name": "XPathHREFTitleAll", "notes": "(expr, titles:TStrings, links:TStrings[, node]) => fills both lists, returns nothing" },
+        { "name": "XPathCount", "notes": "(expr[, node]) => integer" }
+      ],
+      "properties": [],
+      "notes": "Fill-list overloads mutate the TStrings facade — the primary way modules populate TASK.PageLinks (§5.6). Query evaluation swallows all errors => empty (XQueryEngineHTML.pas:358-399); log WARN rate-limited per (module, expression template). JSON dialect modeled as node tree: json(*) steps + fn:data(); css(\"sel\") registered."
+    },
+    {
+      "name": "IXQValue",
+      "fmd2Unit": "LuaIXQValue",
+      "source": "LuaIXQValue.pas:135-149",
+      "access": "derived-object",
+      "methods": [
+        { "name": "Get", "notes": "() => Lua iterator; (i) => i-th item (0-based)" },
+        { "name": "GetAttribute", "notes": "(name) => string" },
+        { "name": "GetProperty", "notes": "(name) => IXQValue" },
+        { "name": "InnerHTML" },
+        { "name": "OuterHTML" },
+        { "name": "InnerText" },
+        { "name": "ToString", "notes": "element => inner text (NOT outerHTML)" }
+      ],
+      "properties": [
+        { "name": "Count", "access": "read-only" }
+      ],
+      "notes": "Result object of TXQuery.XPath; also nested via GetProperty."
+    },
+    {
+      "name": "TStrings",
+      "fmd2Unit": "LuaStrings",
+      "source": "LuaStrings.pas:216-263",
+      "access": "require-lib",
+      "constructors": [
+        { "name": "New" },
+        { "name": "Create" }
+      ],
+      "methods": [
+        { "name": "LoadFromFile", "notes": "jailed to the job temp dir (§5.5)" },
+        { "name": "LoadFromStream" },
+        { "name": "SaveToFile", "notes": "jailed to the job temp dir (§5.5)" },
+        { "name": "SaveToStream" },
+        { "name": "SetText" },
+        { "name": "GetText" },
+        { "name": "Add" },
+        { "name": "AddText" },
+        { "name": "Get", "notes": "(i) 0-based" },
+        { "name": "Set", "notes": "(i, value) 0-based" },
+        { "name": "GetCount" },
+        { "name": "Sort" },
+        { "name": "Clear" },
+        { "name": "Delete" },
+        { "name": "IndexOf" },
+        { "name": "IndexOfName" },
+        { "name": "Reverse" }
+      ],
+      "properties": [
+        { "name": "Count", "access": "read-only" },
+        { "name": "Text", "access": "read-write" },
+        { "name": "CommaText", "access": "read-write" },
+        { "name": "DelimitedText", "access": "read-write" },
+        { "name": "Delimiter", "access": "read-write" },
+        { "name": "NameValueSeparator", "access": "read-write" }
+      ],
+      "arrayProperties": [
+        { "name": "Strings", "access": "read-write" },
+        { "name": "Values", "access": "read-write", "notes": "Values['name'] name/value pairs" }
+      ],
+      "defaultArrayProperty": { "access": "read-write", "notes": "s[i] bracket indexing (0-based)" },
+      "notes": "Also reachable as event globals (NAMES/LINKS) and as MANGAINFO.ChapterLinks/ChapterNames, TASK lists, HTTP.Headers/HTTP.Cookies."
+    },
+    {
+      "name": "MangaInfo",
+      "fmd2Unit": "LuaMangaInfo",
+      "source": "LuaMangaInfo.pas:23-34",
+      "access": "event-global",
+      "methods": [],
+      "properties": [
+        { "name": "URL", "access": "read-write" },
+        { "name": "Title", "access": "read-write" },
+        { "name": "AltTitles", "access": "read-write" },
+        { "name": "Link", "access": "read-write" },
+        { "name": "CoverLink", "access": "read-write" },
+        { "name": "Authors", "access": "read-write" },
+        { "name": "Artists", "access": "read-write" },
+        { "name": "Genres", "access": "read-write" },
+        { "name": "Status", "access": "read-write" },
+        { "name": "Summary", "access": "read-write" },
+        { "name": "ChapterNames", "access": "read-write", "notes": "TStrings facade" },
+        { "name": "ChapterLinks", "access": "read-write", "notes": "TStrings facade" }
+      ],
+      "notes": "Bound as MANGAINFO for GetInfo; unknown-property typo keys (e.g. Artist) silently no-op — case-sensitive LuaClass semantics (§5.1)."
+    },
+    {
+      "name": "Storage",
+      "fmd2Unit": "LuaStringsStorage",
+      "source": "LuaStringsStorage.pas:143-159",
+      "access": "module-property",
+      "methods": [
+        { "name": "Remove", "notes": "(key)" },
+        { "name": "Free" },
+        { "name": "Destroy" }
+      ],
+      "properties": [
+        { "name": "Text", "access": "read-write" },
+        { "name": "Tag", "access": "read-write", "notes": "integer" },
+        { "name": "Enable", "access": "read-write", "notes": "boolean" },
+        { "name": "Status", "access": "read-write", "notes": "string" }
+      ],
+      "defaultArrayProperty": { "access": "read-write", "notes": "Storage['key'] string KV map" },
+      "notes": "MODULE.Storage — shared per-module KV store (§5.3); Storage['reload']='true' triggers the §5.9 bypass re-issue."
+    },
+    {
+      "name": "HTTP",
+      "fmd2Unit": "LuaHTTPSend",
+      "source": "LuaHTTPSend.pas:153-197 (registration); semantics httpsendthread.pas (§5.4)",
+      "access": "event-global",
+      "methods": [
+        { "name": "Request", "notes": "(method, url)" },
+        { "name": "GET" },
+        { "name": "POST", "notes": "moves Content-Type from Headers into MimeType and rewrites text/html => application/x-www-form-urlencoded; charset=UTF-8 (httpsendthread.pas:730-747)" },
+        { "name": "HEAD" },
+        { "name": "XHR", "notes": "GET + X-Requested-With header (httpsendthread.pas:749-755)" },
+        { "name": "Reset", "notes": "installs the full default header set (below)" },
+        { "name": "ResetBasic", "notes": "minimal set + Compress-on Accept-Encoding" },
+        { "name": "ClearCookies" },
+        { "name": "ClearCookiesStorage" },
+        { "name": "GetCookies" },
+        { "name": "AddServerCookies" },
+        { "name": "ParseServerCookies" },
+        { "name": "SetProxy", "notes": "('HTTP'|'SOCKS4'|'SOCKS5', host, port, user, pass)" },
+        { "name": "MergeCookies" },
+        { "name": "RemoveCookie" }
+      ],
+      "properties": [
+        { "name": "Terminated", "access": "read-only", "notes": "cooperative cancellation flag" },
+        { "name": "LastURL", "access": "read-only" },
+        { "name": "ResultCode", "access": "read-only" },
+        { "name": "ResultString", "access": "read-only" },
+        { "name": "Timeout", "access": "read-write" },
+        { "name": "MimeType", "access": "read-write" },
+        { "name": "UserAgent", "access": "read-write" },
+        { "name": "RetryCount", "access": "read-write", "notes": "retry on >500, no delay" },
+        { "name": "EnabledCookies", "access": "read-write" },
+        { "name": "FollowRedirection", "access": "read-write" },
+        { "name": "MaxRedirect", "access": "read-write" },
+        { "name": "AllowServerErrorResponse", "access": "read-write" },
+        { "name": "Compress", "access": "read-write" },
+        { "name": "Headers", "access": "read-write", "notes": "TStrings, case-insensitive Values['name']" },
+        { "name": "Cookies", "access": "read-write", "notes": "TStrings cookie jar, Values['name']" },
+        { "name": "Document", "access": "read-write", "notes": "stream facade: ToString(=ReadString), WriteString, LoadFromFile, SaveToFile, Clear, Size (writable); POST bodies are written into it" }
+      ],
+      "defaults": {
+        "RetryCount": 0,
+        "MaxRedirect": 5
+      },
+      "headerSets": [
+        {
+          "name": "Reset",
+          "headers": ["DNT=1", "Upgrade-Insecure-Requests=1", "Accept", "Accept-Language", "Accept-Charset"],
+          "notes": "httpsendthread.pas:924-932"
+        },
+        {
+          "name": "ResetBasic",
+          "headers": ["Accept-Encoding: gzip, deflate, br"],
+          "notes": "Compress on => Accept-Encoding; zstd appended ONLY if the decoder is enabled (D13) — default omits zstd (documented divergence)"
+        },
+        {
+          "name": "AcceptImage",
+          "headers": ["Accept: image/webp,*/*"],
+          "notes": "swapped in during the image download phase (httpsendthread.pas:919-922, uDownloadsManager.pas:369-370)"
+        }
+      ],
+      "notes": "Redirects 301/302/303/307 followed AS GET, max 5 (default), Referer of the pre-redirect URL added (httpsendthread.pas:642-674); retry on >500 bounded by RetryCount, no delay (:623-629); URL massaging strips leading ':/', prepends scheme, MaybeEncodeURL (:612-616, 394-400); decompression gzip/deflate/brotli (+zstd per D13); a request succeeded iff Document.Size > 0 (:717)."
+    },
+    {
+      "name": "Crypto",
+      "fmd2Unit": "LuaCrypto",
+      "source": "LuaCrypto.pas:429-494 (cryptomethods + synacodemethods)",
+      "access": "require-lib",
+      "methods": [
+        { "name": "EncryptString" },
+        { "name": "DecryptString" },
+        { "name": "HTMLDecode" },
+        { "name": "HTMLEncode" },
+        { "name": "HexToStr" },
+        { "name": "StrToHexStr" },
+        { "name": "MD5Hex" },
+        { "name": "HMAC_MD5Hex" },
+        { "name": "SHA1Hex" },
+        { "name": "HMAC_SHA1Hex" },
+        { "name": "SHA256" },
+        { "name": "SHA256Hex" },
+        { "name": "SHA512" },
+        { "name": "SHA512Hex" },
+        { "name": "HMAC_SHA256" },
+        { "name": "HMAC_SHA256Hex" },
+        { "name": "HMAC_SHA512" },
+        { "name": "HMAC_SHA512Hex" },
+        { "name": "AESEncryptCFB" },
+        { "name": "AESDecryptCFB" },
+        { "name": "AESEncryptCBC" },
+        { "name": "AESDecryptCBC" },
+        { "name": "AESEncryptCBCSHA256Base64Pkcs7" },
+        { "name": "AESDecryptCBCSHA256Base64Pkcs7" },
+        { "name": "AESDecryptCBCMD5Base64ZerosPadding" },
+        { "name": "AESDecryptCBCHexBase64ZerosPadding" },
+        { "name": "AESEncryptECBPkcs7" },
+        { "name": "AESDecryptECBPkcs7" },
+        { "name": "AESCTR" },
+        { "name": "AESOFB" },
+        { "name": "RC4", "notes": "pure-JS implementation" },
+        { "name": "PBKDF2SHA256" },
+        { "name": "EncodeBase64URL" },
+        { "name": "DecodeBase64URL" },
+        { "name": "AESEncryptGCM", "notes": "+AAD" },
+        { "name": "AESDecryptGCM", "notes": "+AAD" },
+        { "name": "X25519_PublicKey" },
+        { "name": "X25519_SharedSecret" },
+        { "name": "P256_PublicKey" },
+        { "name": "P256_SharedSecret" },
+        { "name": "P256_GenerateKeyPair" },
+        { "name": "SecretStream_InitPull", "notes": "pull-side only" },
+        { "name": "SecretStream_Pull", "notes": "pull-side only" },
+        { "name": "DecodeURL" },
+        { "name": "EncodeURL" },
+        { "name": "DecodeUU" },
+        { "name": "EncodeUU" },
+        { "name": "EncodeURLElement" },
+        { "name": "DecodeBase64" },
+        { "name": "EncodeBase64" },
+        { "name": "CRC16" },
+        { "name": "CRC32" },
+        { "name": "MD4" },
+        { "name": "MD5" },
+        { "name": "HMAC_MD5" },
+        { "name": "MD5LongHash" },
+        { "name": "SHA1" },
+        { "name": "HMAC_SHA1" },
+        { "name": "SHA1LongHash" }
+      ],
+      "properties": [],
+      "notes": "require 'fmd.crypto'; single lib table = cryptomethods + synacodemethods (LuaCrypto.pas:496-500)."
+    },
+    {
+      "name": "ImagePuzzle",
+      "fmd2Unit": "LuaImagePuzzle",
+      "source": "LuaImagePuzzle.pas:73-91, 99",
+      "access": "require-lib",
+      "constructors": [
+        { "name": "New", "notes": "(w, h)" },
+        { "name": "Create", "notes": "(w, h) — same implementation as New" }
+      ],
+      "methods": [
+        { "name": "DeScramble", "notes": "(srcStream, dstStream); in-place same-Document calls supported (MangaGo.lua:264, 18Comic.lua:99, TonarinoYoungJump.lua:96)" }
+      ],
+      "properties": [
+        { "name": "HorBlock", "access": "read-only" },
+        { "name": "VerBlock", "access": "read-only" },
+        { "name": "Multiply", "access": "read-write", "notes": "integer (LuaImagePuzzle.pas:99)" }
+      ],
+      "arrayProperties": [
+        { "name": "Matrix", "access": "read-write", "notes": "integer array" },
+        { "name": "Flips", "access": "read-write", "notes": "integer array" }
+      ],
+      "notes": "require 'fmd.imagepuzzle'; sharp port (7 modules)."
+    },
+    {
+      "name": "Duktape",
+      "fmd2Unit": "LuaDuktape",
+      "source": "LuaDuktape.pas:27-30",
+      "access": "require-lib",
+      "methods": [
+        { "name": "ExecJS", "notes": "(js) => string; JS error => nil, never a Lua exception (LuaDuktape.pas:14-24)" }
+      ],
+      "properties": [],
+      "notes": "require 'fmd.duktape'; node:vm (timeout 5s) with Duktape.enc/dec polyfill. JS-side CommonJS require loader (duk_module_duktape_init + Duktape.modSearch, Duktape.pas:88-89): module/exports with per-context caching, jailed to the synced lua/ tree (bare names + '.js'); 77 modules depend on it from inside JS (templates/Madara.lua:178-179, MangaGo.lua:206). JS-context print routes to the host log (Duktape.pas:90)."
+    }
+  ],
+  "getInfoPipeline": {
+    "source": "uData.pas:85-207 (DESIGN.md §5.8)",
+    "dedup": "last-occurrence-wins",
+    "steps": [
+      {
+        "order": 1,
+        "name": "info-cleanup",
+        "description": "Title/author/genre/summary cleanup as uData.pas.",
+        "source": "uData.pas"
+      },
+      {
+        "order": 2,
+        "name": "link-fallback",
+        "description": "Link falls back from MANGAINFO.URL when empty.",
+        "source": "uData.pas:112-113"
+      },
+      {
+        "order": 3,
+        "name": "chapter-list-alignment",
+        "description": "Pad ChapterNames with '' / prune so it matches ChapterLinks count.",
+        "source": "uData.pas:143-152"
+      },
+      {
+        "order": 4,
+        "name": "trim-and-dedup",
+        "description": "Trim each link+name; case-insensitive duplicate chapter removal (SameText): the host DELETES the earlier index j, so the LAST occurrence's link+name survive.",
+        "source": "uData.pas:154-173"
+      },
+      {
+        "order": 5,
+        "name": "chapter-name-cleanup",
+        "description": "Trim(CleanString(RemoveStringBreaks(CommonStringFilter(name)))); optional manga-name prefix strip (OptionRemoveMangaNameFromChapter) — names feed output filenames (§7.1).",
+        "source": "uData.pas:181-202"
+      },
+      {
+        "order": 6,
+        "name": "remove-host-from-links",
+        "description": "RemoveHostFromURLsPair strips hosts from the chapter links pair; the same normalization applies to update-list scraped links.",
+        "source": "uData.pas:175-179; uUpdateThread.pas:236-239"
+      },
+      {
+        "order": 7,
+        "name": "count",
+        "description": "NumChapter := ChapterLinks.Count.",
+        "source": "uData.pas:205"
+      }
+    ]
+  },
   "requireShims": [
     { "require": "fmd.env", "fmd2Unit": "LuaFMD", "implementation": "Directory, ExeName ('fmd-web'), Version, Revision, LuaDirectory, SelectedLanguage ('en', D10)", "status": "planned" },
     { "require": "fmd.crypto", "fmd2Unit": "LuaCrypto", "implementation": "full surface (LuaCrypto.pas:429-494) incl. RC4 (pure-JS), AES*GCM(+AAD), X25519_*, P256_*, SecretStream pull-side, PBKDF2SHA256, Base64/Base64URL, CRC16/32, MD4, LongHash, UU, URL enc/dec, synacode block — backends node:crypto + sodium-native + pure-JS RC4/MD4; byte-exact base64 Lua bridge; deviations + vectors documented in docs/COMPAT.md crypto notes and server/test/engine/shims/crypto-*.test.ts", "status": "partial" },
@@ -158,13 +509,14 @@
     { "id": "webdriver.bypass", "description": "Python/webdriver bypass sites; needs browser sidecar profile", "defaultEnabled": false }
   ],
   "invariants": [
-    "MODULE is bound for every event (LuaWebsiteModuleHandler.pas:47-49, 59-64)",
-    "There is no ACCOUNT global; the account is reached only as MODULE.Account",
-    "PAGENUMBER is the only read-back global (LuaWebsiteModules.pas:210-212)",
-    "URL is never read back after any call",
+    "MODULE is bound for every event (LuaWebsiteModuleHandler.pas:47-49, 59-64); there is no ACCOUNT global — the account is reached only as MODULE.Account",
+    "PAGENUMBER is the only read-back global (LuaWebsiteModules.pas:210-212); URL is never read back after any call",
     "First three table rows return codes; all others return booleans; SaveImage returns a string",
+    "Status constants are bound per return type: net-status for the code rows, account-status for Login/AccountState/CheckSite",
     "BeforeDownloadImage globals are push-only; modules cannot mutate the download URL",
     "Module property access is case-sensitive; unknown keys silently no-op on get and set (LuaClass.pas:94-169)",
-    "NewWebsiteModule() is available only during Init(); registrations missing ID or Name are dropped"
+    "NewWebsiteModule() is available only during Init(); registrations missing ID or Name are dropped",
+    "GetInfo results are post-processed by the §5.8 pipeline (last-occurrence-wins dedup) before caching, diffing, or keying",
+    "Facade method/property names are machine-verified against the Pascal registration tables by contract/tools/drift-check.ts (extractable: TXQuery, Storage, ImagePuzzle, Duktape, Crypto)"
   ]
 }

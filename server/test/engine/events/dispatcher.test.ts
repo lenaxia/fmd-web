@@ -450,6 +450,109 @@ end
   });
 });
 
+describe('return-kind coercion (§5.2) — wrong-return-type follows the lua_to* C semantics', () => {
+  // FMD2 reads `code` rows with lua_tointeger, `boolean` rows with
+  // lua_toboolean and SaveImage with luaToString (lua_tolstring). A module
+  // returning the WRONG type is coerced by the C function, never a TS
+  // type error: booleans are non-convertible to integers (→ 0), numbers
+  // are never false/nil for lua_toboolean (→ true, incl. 0), strings
+  // convertible to numbers coerce through lua_tointeger, and
+  // lua_tolstring renders numbers but not booleans/tables.
+
+  it('code row returning a boolean reads 0 (lua_tointeger: not convertible)', async () => {
+    const { dispatch } = await makeModule(moduleWithHandlers({ GetInfo: 'Impl' }) + `
+function Impl() return true end
+`);
+    expect(dispatch('GetInfo')).toEqual({ kind: 'code', value: 0, readBack: {} });
+  });
+
+  it('code row returning false reads 0', async () => {
+    const { dispatch } = await makeModule(moduleWithHandlers({ GetInfo: 'Impl' }) + `
+function Impl() return false end
+`);
+    expect(dispatch('GetInfo')).toEqual({ kind: 'code', value: 0, readBack: {} });
+  });
+
+  it('code row returning a numeric string coerces (lua_tointeger string conversion)', async () => {
+    const { dispatch } = await makeModule(moduleWithHandlers({ GetInfo: 'Impl' }) + `
+function Impl() return '2' end
+`);
+    expect(dispatch('GetInfo')).toEqual({ kind: 'code', value: 2, readBack: {} });
+  });
+
+  it('code row returning a non-numeric string reads 0', async () => {
+    const { dispatch } = await makeModule(moduleWithHandlers({ GetInfo: 'Impl' }) + `
+function Impl() return 'abc' end
+`);
+    expect(dispatch('GetInfo')).toEqual({ kind: 'code', value: 0, readBack: {} });
+  });
+
+  it('code row returning nothing reads 0', async () => {
+    const { dispatch } = await makeModule(moduleWithHandlers({ GetNameAndLink: 'Impl' }) + `
+function Impl() end
+`);
+    expect(dispatch('GetNameAndLink')).toEqual({ kind: 'code', value: 0, readBack: {} });
+  });
+
+  it('boolean row returning a string reads true (lua_toboolean: any non-nil/false)', async () => {
+    const { dispatch } = await makeModule(moduleWithHandlers({ TaskStart: 'Impl' }) + `
+function Impl() return 'yes' end
+`);
+    expect(dispatch('TaskStart')).toEqual({ kind: 'boolean', value: true });
+  });
+
+  it('boolean row returning 0 reads true (0 is truthy in Lua)', async () => {
+    const { dispatch } = await makeModule(moduleWithHandlers({ TaskStart: 'Impl' }) + `
+function Impl() return 0 end
+`);
+    expect(dispatch('TaskStart')).toEqual({ kind: 'boolean', value: true });
+  });
+
+  it('boolean row returning an empty string reads true', async () => {
+    const { dispatch } = await makeModule(moduleWithHandlers({ TaskStart: 'Impl' }) + `
+function Impl() return '' end
+`);
+    expect(dispatch('TaskStart')).toEqual({ kind: 'boolean', value: true });
+  });
+
+  it('boolean row returning a table reads true', async () => {
+    const { dispatch } = await makeModule(moduleWithHandlers({ TaskStart: 'Impl' }) + `
+function Impl() return {} end
+`);
+    expect(dispatch('TaskStart')).toEqual({ kind: 'boolean', value: true });
+  });
+
+  it('string row returning a number renders it (lua_tolstring number conversion)', async () => {
+    const { dispatch } = await makeModule(moduleWithHandlers({ SaveImage: 'Impl' }) + `
+function Impl() return 123 end
+`);
+    expect(dispatch('SaveImage', { path: '/tmp', fileName: 'x.jpg' })).toEqual({
+      kind: 'string',
+      value: '123',
+    });
+  });
+
+  it('string row returning a boolean reads empty (lua_tolstring: not convertible)', async () => {
+    const { dispatch } = await makeModule(moduleWithHandlers({ SaveImage: 'Impl' }) + `
+function Impl() return true end
+`);
+    expect(dispatch('SaveImage', { path: '/tmp', fileName: 'x.jpg' })).toEqual({
+      kind: 'string',
+      value: '',
+    });
+  });
+
+  it('string row returning nothing reads empty', async () => {
+    const { dispatch } = await makeModule(moduleWithHandlers({ SaveImage: 'Impl' }) + `
+function Impl() end
+`);
+    expect(dispatch('SaveImage', { path: '/tmp', fileName: 'x.jpg' })).toEqual({
+      kind: 'string',
+      value: '',
+    });
+  });
+});
+
 describe('sleep + print base globals (§5.1)', () => {
   it('sleep truly blocks the worker thread', async () => {
     const logger = createMemoryLogger();

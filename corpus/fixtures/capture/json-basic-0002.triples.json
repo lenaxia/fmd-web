@@ -1,0 +1,136 @@
+{
+  "generator" : "fmd_capture",
+  "mode" : "expression",
+  "fixture" : "corpus/fixtures/capture/json-basic-0002.json",
+  "document" : "json",
+  "moduleId" : "2b3c4d5e6f77889900aabbccddeeff01",
+  "internettoolsCommit" : "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit" : "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion" : "3.2.2",
+  "triples" : [
+    {
+      "fixtureId" : "capture/json-basic-0002",
+      "id" : "title",
+      "expression" : "json(*).data.manga.title",
+      "engine" : "xpath",
+      "output" : "scalar",
+      "resultKind" : "scalar",
+      "result" : "JSON Fixture Manga"
+    },
+    {
+      "fixtureId" : "capture/json-basic-0002",
+      "id" : "alttitles",
+      "expression" : "json(*).data.manga.altTitles()",
+      "engine" : "xpath",
+      "output" : "list",
+      "resultKind" : "list",
+      "result" : [
+        "JSON-Fixture",
+        "フィクスチャ"
+      ]
+    },
+    {
+      "fixtureId" : "capture/json-basic-0002",
+      "id" : "slugs",
+      "expression" : "json(*).data.manga.chapters().slug",
+      "engine" : "xpath",
+      "output" : "list",
+      "resultKind" : "list",
+      "result" : [
+        "ch-3",
+        "ch-2",
+        "ch-1"
+      ]
+    },
+    {
+      "fixtureId" : "capture/json-basic-0002",
+      "id" : "chapter-count",
+      "expression" : "json(*).data.manga.chapters()",
+      "engine" : "xpath",
+      "output" : "count",
+      "resultKind" : "count",
+      "result" : 3
+    },
+    {
+      "fixtureId" : "capture/json-basic-0002",
+      "id" : "total",
+      "expression" : "json(*).data.total",
+      "engine" : "xpath",
+      "output" : "scalar",
+      "resultKind" : "scalar",
+      "result" : "3"
+    },
+    {
+      "fixtureId" : "capture/json-basic-0002",
+      "id" : "names-joined",
+      "expression" : "json(*).data.manga.chapters().name",
+      "engine" : "xpath",
+      "output" : "all",
+      "resultKind" : "scalar",
+      "result" : "Chapter 3, Chapter 2, Chapter 1"
+    },
+    {
+      "fixtureId" : "capture/json-basic-0002",
+      "id" : "genres-joined",
+      "expression" : "json(*).data.manga.genres()",
+      "engine" : "xpath",
+      "output" : "all",
+      "resultKind" : "scalar",
+      "result" : "Action, Drama"
+    },
+    {
+      "fixtureId" : "capture/json-basic-0002",
+      "id" : "first-chapter-slug",
+      "expression" : "json(*).data.manga.chapters()[1].slug",
+      "engine" : "xpath",
+      "output" : "scalar",
+      "resultKind" : "scalar",
+      "result" : "ch-3"
+    },
+    {
+      "fixtureId" : "capture/json-basic-0002",
+      "id" : "alttitles-count",
+      "expression" : "json(*).data.manga.altTitles()",
+      "engine" : "xpath",
+      "output" : "count",
+      "resultKind" : "count",
+      "result" : 2
+    },
+    {
+      "fixtureId" : "capture/json-basic-0002",
+      "id" : "missing-key",
+      "expression" : "json(*).data.manga.nope",
+      "engine" : "xpath",
+      "output" : "scalar",
+      "resultKind" : "empty",
+      "result" : ""
+    },
+    {
+      "fixtureId" : "capture/json-basic-0002",
+      "id" : "missing-deeper",
+      "expression" : "json(*).no.such.path",
+      "engine" : "xpath",
+      "output" : "scalar",
+      "resultKind" : "empty",
+      "result" : ""
+    },
+    {
+      "fixtureId" : "capture/json-basic-0002",
+      "id" : "broken-syntax",
+      "expression" : "json(*).data..[(",
+      "engine" : "xpath",
+      "output" : "scalar",
+      "resultKind" : "empty",
+      "result" : ""
+    },
+    {
+      "fixtureId" : "capture/json-basic-0002",
+      "id" : "css-on-json",
+      "expression" : "manga",
+      "engine" : "css",
+      "output" : "scalar",
+      "resultKind" : "empty",
+      "result" : ""
+    }
+  ]
+}

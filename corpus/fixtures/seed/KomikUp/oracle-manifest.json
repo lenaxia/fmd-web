@@ -1,0 +1,19 @@
+{
+  "fixtureId": "seed/KomikUp/source",
+  "moduleId": "60fc962a67a2420f8381ce0f33b3898d",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "43#1",
+      "expression": "//li[contains(@class, \"wp-manga-chapter\")]//a[not(@href=\"#\")]",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "45#1",
+      "expression": "p",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

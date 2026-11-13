@@ -1,0 +1,55 @@
+{
+  "fixtureId": "seed/8Muses/source",
+  "moduleId": "d5d532724aba452ea6d4b50663b76326",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "16#1",
+      "expression": "//*[@class=\"gallery\"]/a/div/img/@data-src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "17#1",
+      "expression": "//*[@class=\"top-menu-breadcrumb\"]//li[last()]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "21#1",
+      "expression": "//*[@class=\"top-menu-breadcrumb\"]//li[last()-1]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "25#1",
+      "expression": "//*[@class=\"gallery\"]/a[@href!=\"\" and ./div[@class=\"image-title\"]]",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "34#1",
+      "expression": "//*[@class=\"gallery\"]/a[@href!=\"\" and not(./div[@class=\"image-title\"])]",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "52#1",
+      "expression": "//*[@class=\"gallery\"]/a[@href!=\"\" and not(./div[@class=\"image-title\"])]/div/img/@data-src",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "56#1",
+      "expression": "//*[@class=\"gallery\"]/a[@href!=\"\"]/@href",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "69#1",
+      "expression": "string-join((//*[@id=\"imageDir\"]/@value,//*[@id=\"imageName\"]/@value),\"\")",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

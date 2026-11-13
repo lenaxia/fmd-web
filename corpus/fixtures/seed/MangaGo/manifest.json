@@ -1,0 +1,14 @@
+{
+  "moduleId": "77c3c3cd38444bd7bb4e5f63f2c5c93c",
+  "module": "MangaGo",
+  "capturedAt": "2026-11-13",
+  "entries": [
+    {
+      "fixtureId": "seed/MangaGo/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://www.mangago.me/genre/all/1/?sortby=create_date",
+      "description": "Duktape-based module — genre directory page"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "moduleId": "58a2dec76ebf43a5a9e7dc9b453e52e9",
+  "module": "HentaiFox",
+  "capturedAt": "2026-11-13",
+  "entries": [
+    {
+      "fixtureId": "seed/HentaiFox/source",
+      "file": "source.html",
+      "kind": "html",
+      "url": "https://hentaifox.com/",
+      "description": "Gallery source"
+    }
+  ]
+}

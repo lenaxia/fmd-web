@@ -1,0 +1,19 @@
+{
+  "fixtureId": "seed/MangaSusu/source",
+  "moduleId": "c69cbc947a6a42e194b2e097bba15047",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "45#1",
+      "expression": "//div[@class=\"bsx\"]/a",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "46#1",
+      "expression": "//div[@class=\"pagination\"]/a[last()-1]",
+      "engine": "xpath",
+      "output": "scalar"
+    }
+  ]
+}

@@ -1,0 +1,120 @@
+{
+  "generator": "fmd_capture",
+  "mode": "expression",
+  "fixture": "/workspace/fmd-web/corpus/fixtures/seed/HentaiNexus/source.html",
+  "document": "html",
+  "moduleId": "5eda5ccf87f1488f9dfa7a9a18f2bcf1",
+  "internettoolsCommit": "2724779c4287547137141ec9ec2a6df0af0f82af",
+  "flreCommit": "643bac1dbfb90ed658859db747c99ad558efb613",
+  "fpcVersion": "3.2.2",
+  "triples": [
+    {
+      "fixtureId": "seed/HentaiNexus/source",
+      "id": "115#1",
+      "expression": "(//ul[@class=\"pagination-list\"])[1]/li[last()]/a/text()",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": "612"
+    },
+    {
+      "fixtureId": "seed/HentaiNexus/source",
+      "id": "171#1",
+      "expression": "json(*)().image_fallback",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/HentaiNexus/source",
+      "id": "127#1",
+      "expression": "//div[@class=\"container\"]/div/div/a[contains(@href, \"/view/\")]",
+      "engine": "xpath",
+      "output": "all",
+      "resultKind": "scalar",
+      "result": "I Became Fuck Buddies With My Friend's Mom 2, Don’t Shoot! I’m Just a Succubus!, Part-Time Temptation, Their Anniversary, A Nerd With the Skills to Pay the Bills, My Horny Harem House, You're Not Getting Away!, Honomi Break! Ep. 115, Mine and Senpai's 7 Days War, Countryside Harem Bliss 8, Backroom Dealings at the Restaurant, XXX Kouhai, Charging Comes Before the Deadline!, BEAST Cover Artist Page 2026-09, Not Like I Asked You to Cross the Universe, Secret Guanxi, Sex Between Gloomy Types Is the Hottest, Ain't It?, Scarlet Desire EX 11, Scarlet Desire EX 10 - At the Inn, My Friend's Dad's a Hunk 17, My Best Friend Is a Gender Bender 6 Part 1, Hard to Believe Shizune-chan is..., A Hopeless Maid Who's Crazy About You, My Co-worker Is an Incubus!?, My Wife Gets Spoiled by Two With a Super Slick Massage, When You Strip a Cat, Lemme Sleep Over!, The Ojou-sama Queen, You Poor Girl, Thanks for the Post-Con Hookup 3"
+    },
+    {
+      "fixtureId": "seed/HentaiNexus/source",
+      "id": "129#1",
+      "expression": "div/header/@title",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/HentaiNexus/source",
+      "id": "142#1",
+      "expression": "//h1[@class=\"title\"]/text()",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/HentaiNexus/source",
+      "id": "143#1",
+      "expression": "(//figure[@class=\"image\"]/img/@src)[1]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "scalar",
+      "result": "https://images.hentainexus.com/v2/78da1d8e416e42310c44ef923542b6e3c43167f91bc78ea9aa8290685788bb37623b4f33f35ee5592e85fb98a3fbd420edc356d48e6379cf16c84dc23174459bdd949d3c672e048ae151ad5a32b01b78f6480163e291d47830a0761b9308aa0466b3740aa9bbdab469e706210409544e25b6c6eb287994cb5168cafe42b1b92cb6c7a8cea41661dd8ce64ac7a5623c01415255225dba77af23060a1ce57494fb670a00cf8ffbf5fcfbf5779be7efc7f5c36e9ba168654502d8c16307693fcff52eef7f6ee44d1f/001.png.thumb.jpg"
+    },
+    {
+      "fixtureId": "seed/HentaiNexus/source",
+      "id": "144#1",
+      "expression": "//table[@class=\"view-page-details\"]//a[contains(@href, \"=publisher:\")]/text()",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/HentaiNexus/source",
+      "id": "145#1",
+      "expression": "//table[@class=\"view-page-details\"]//a[contains(@href, \"=artist:\")]/text()",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/HentaiNexus/source",
+      "id": "146#1",
+      "expression": "//table[@class=\"view-page-details\"]//a[contains(@href, \"=tag:\")]/substring-before(., \"(\")",
+      "engine": "xpath",
+      "output": "list",
+      "resultKind": "empty",
+      "result": []
+    },
+    {
+      "fixtureId": "seed/HentaiNexus/source",
+      "id": "147#1",
+      "expression": "//table[@class=\"view-page-details\"]//td[contains(., \"Description\")]/following-sibling::td/text()",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/HentaiNexus/source",
+      "id": "149#1",
+      "expression": "//table[@class=\"view-page-details\"]//a[contains(@href, \"=magazine:\")]/text()",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    },
+    {
+      "fixtureId": "seed/HentaiNexus/source",
+      "id": "170#1",
+      "expression": "//script[contains(., \"initReader\")]",
+      "engine": "xpath",
+      "output": "scalar",
+      "resultKind": "empty",
+      "result": ""
+    }
+  ]
+}

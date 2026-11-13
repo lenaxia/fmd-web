@@ -1,0 +1,14 @@
+{
+  "moduleId": "1972cec9c85b43f6b10b11920a7aafef",
+  "module": "HitomiLa",
+  "capturedAt": "2026-11-13",
+  "entries": [
+    {
+      "fixtureId": "seed/HitomiLa/source",
+      "file": "source.json",
+      "kind": "json",
+      "url": "https://hitomi.la/",
+      "description": "Gallery (JS-backed, JSON ltnb)"
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "fixtureId": "seed/TuMangaOnline/source",
+  "moduleId": "9185eb6c49324a849c7d7925a41ef3a3",
+  "document": "html",
+  "expressions": [
+    {
+      "id": "36#1",
+      "expression": "//a[@rel=\"next\"]/@href",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "41#1",
+      "expression": "//a[@rel=\"next\"]/@href",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "55#1",
+      "expression": "//div[@id=\"library-grid\"]/div/a",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "57#1",
+      "expression": ".//h4",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "70#1",
+      "expression": "//h1[contains(@class, \"element-title\")]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "71#1",
+      "expression": "//p[@class=\"element-alternative-title\"]/span",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "72#1",
+      "expression": "//img[contains(@class,\"book-thumbnail\")]/@src",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "73#1",
+      "expression": "//div[@class=\"staff-card\"]//a[contains(@href, \"author\")]",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "74#1",
+      "expression": "//div[@class=\"staff-card\"]//a[contains(@href, \"artist\")]",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "75#1",
+      "expression": "(//a[contains(@class, \"badge\")], //div[contains(@class, \"demography\")], upper-case(substring(//h1[contains(@class, \"book-type\")], 1, 1)) || lower-case(substring(//h1[contains(@class, \"book-type\")], 2)))",
+      "engine": "xpath",
+      "output": "list"
+    },
+    {
+      "id": "76#1",
+      "expression": "//span[contains(@class, \"book-status\")]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "77#1",
+      "expression": "//p[@id=\"manga-synopsis\"]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "79#1",
+      "expression": "//ul[@class=\"list-group list-chapters\"]/li",
+      "engine": "xpath",
+      "output": "all"
+    },
+    {
+      "id": "80#1",
+      "expression": ".//a[contains(@class, \"btn-primary\")]/@href",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "81#1",
+      "expression": ".//span[contains(@class, \"chapter-number\")]",
+      "engine": "xpath",
+      "output": "scalar"
+    },
+    {
+      "id": "97#1",
+      "expression": "//div[@class=\"reader-img-wrap\"]/img/@src",
+      "engine": "xpath",
+      "output": "list"
+    }
+  ]
+}
