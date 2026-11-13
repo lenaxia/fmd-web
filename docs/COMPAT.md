@@ -62,3 +62,96 @@ CFB8, ECDH P-256), `sodium-native` (X25519 `crypto_scalarmult(_base)`,
 SecretStream pull), pure JS (RC4 — see the OpenSSL note below, MD4 — OpenSSL 3
 dropped it, the synacode encoders/CRCs, DCP's exact CBC/CFB variants, the
 base64 Lua↔JS bridge). Full details and vectors: `docs/evidence-dual-sapling-picnics.md`.
+
+**RC4 (OpenSSL legacy provider note).** FMD2's `RC4` is DCPCrypt's pure-Pascal
+`TDCP_rc4` (BaseCrypto.pas:470–489, textbook KSA + PRGA, no drop-N) — it never
+touches OpenSSL. The JS implementation is likewise pure JS (the same textbook
+KSA + PRGA over the same guard rules: `''` when data/key empty or key > 256
+bytes), so **the JS impl does not differ** — and deliberately does not
+delegate to `node:crypto`, where RC4 sits behind OpenSSL 3's legacy provider
+(unavailable by default in the docker target). Verified against classic RC4
+test vectors and the roundtrip properties in `crypto-vectors.test.ts`.
+(For completeness: the Pascal functions that DO load OpenSSL are the X25519/
+P256 ECDH set via `libcrypto.so.3` direct linkage — those need no legacy
+provider; the JS side maps them to sodium-native/node ECDH below.)
+
+**MD4 note.** OpenSSL 3 dropped MD4 from the default provider (and FMD2 gets
+it from synacode's own Pascal port anyway), so `MD4`/`MD5LongHash`'s core is
+a pure-JS RFC 1320 implementation — all 7 published RFC 1320 test vectors
+pass (`crypto-vectors.test.ts`).
+
+**sodium-native (docker target).** `sodium-native` ships prebuilt libsodium
+binaries for linux-x64 (no OS packages needed); `docker/Dockerfile` runs a
+build-time smoke check — `require('sodium-native')` + a `crypto_scalarmult`
+probe — so an image whose native backend cannot load **fails the build**.
+Tests guard on `sodiumAvailable()` and skip with an explicit reason string
+when the native build is unavailable in a dev runtime; in that case X25519/
+SecretStream degrade to exactly the Pascal OpenSSL-failure paths
+(`''` / nil / zero returns — `loadSodium()` returning null mirrors the Pascal
+`EVP_*` returning nil). P256 uses node ECDH (`crypto.createECDH('prime256v1')`
++ the Pascal's exact SEC1/SPKI DER wrappers) and therefore does NOT depend on
+sodium: libsodium has no P-256.
+
+**Byte-exact Lua bridge.** wasmoon marshals Lua strings as UTF-8 (replacement
+chars on read, NUL truncation, UTF-8 encode on push) which would corrupt the
+crypto API's byte-string arguments. The shim installs a pure-Lua base64
+codec; every Lua argument is base64-encoded Lua-side, JS decodes → core →
+base64-encodes results, Lua decodes back. Byte-exact for NUL and 0x80–0xFF,
+one uniform protocol; the result protocol mirrors the Pascal `lua_push*`
+returns exactly (string / integer for CRC16/CRC32/tags / nil via sentinel
+for InitPull failure / **zero returns** for P256_GenerateKeyPair and
+SecretStream_Pull failure — Pascal `Result := 0` / multi-returns).
+
+**SecretStream state token (documented deviation).** The Pascal carries the
+76-byte raw `TSecretStreamState` through Lua as a binary string; the JS shim
+carries the libsodium state as an **opaque base64 token** (raw binary state
+cannot round-trip wasmoon losslessly). Both are opaque to the caller — same
+Init/Pull wire contract, same header/tag semantics, rekey handled
+internally. Cross-checked against libsodium push streams (multi-chunk,
+empty messages, TAG_FINAL, tamper → zero returns) in
+`crypto-bridge.test.ts`.
+
+**DCP cipher semantics carried over** (the reason several AES variants are
+implemented directly rather than delegated):
+- Key classes: DCPrijndael zero-pads keys < 16/24/32 bytes into the next
+  class; > 32 bytes raises in Pascal → `''`.
+- Nil-IV default: DCP initializes the chaining value with **E_K(zero block)**
+  when `Init` gets no IV — this is what `EncryptString` uses.
+- CBC: DCP processes a partial tail block with an E(CV) keystream rule and
+  the composed variants pad explicitly; ECB+PKCS7 uses manual pad (always
+  appends 1..16) and a **blind pad chop** on decrypt (`Pkcs7RemovePad` never
+  validates — mirrored).
+- CTR: full 16-byte big-endian counter wrap (Pascal byte-wise carry loop).
+- GCM: ciphertext ‖ 16-byte tag, arbitrary IV lengths via the GHASH J0 path
+  (12-byte IVs take the J0=IV‖0⁷‖1 fast path) — cross-checked byte-for-byte
+  against OpenSSL GCM incl. AAD and tag/AAD tamper → `''`.
+- `EncryptString`/`DecryptString` (uBaseUnit.pas:1556–1589): AES-256 key =
+  `SHA512('B74945FB50E84FD58BF9FEAB8E4BEA6B')[0..32]` (DCP InitStr with
+  TDCP_sha512 → min(512, 256) bits), IV = E_K(0¹⁶), DCP blockcipher
+  EncryptString = **CFB8** + standard base64 (canonical DCPcrypt2 2.0.4) —
+  verified by independent openssl `aes-256-cfb8` composition
+  (`crypto-composed.test.ts`).
+
+**Lenient edges (Pascal parity, all vector-tested).** `HexToStr` → `''` on
+odd length or any non-hex char; DCP Base64 decode is garbage-in/garbage-out
+(invalid chars skipped, no error — DecryptString of non-base64 does NOT
+yield `''`); `AESDecryptCBCMD5Base64ZerosPadding` uses the **32-char MD5 hex
+TEXT** as the AES-256 key (BaseCrypto.pas:362 — not hex-decoded);
+`MD5LongHash('' , 0)` divides by zero in the Pascal → surfaces as a Lua
+error (asserted via `pcall` returning false); URL encode/decode replicate
+synacode's exact char sets and DecodeTriplet quirks; HTMLDecode replicates
+uBaseUnit's entity set, `else Exit` truncation and Chr>255 truncation.
+
+**Coverage map.** `crypto-vectors.test.ts` — known-answer vectors (RFC 1320
+MD4 ×7, RFC 1321, RFC 2202, RFC 4231, RFC 7914, CRC32/16, LongHash, RC4,
+encodings incl. Pascal-quirk vectors). `crypto-ciphers.test.ts` —
+encrypt/decrypt roundtrip properties for every cipher pair (ECB/CBC/CFB/
+CTR/OFB/GCM ± AAD over key classes × length grid, SP800-38A blocks,
+OpenSSL/aes-js cross-checks), RFC 7748 X25519, P256 ECDH interop,
+libsodium push → pull SecretStream flow (criterion 2). `crypto-composed.test.ts`
+— composed FMD2 variants against hand-derived vectors with per-vector
+derivation notes citing the Pascal lines (criterion 3). `crypto-bridge.test.ts`
+— wasmoon integration: full surface require-able, byte-exact binary
+roundtrips, result/arity protocol, module-shaped flows. Surface completeness
+(59 methods, order-identical to LuaCrypto.pas:429–494) is contract-checked;
+`contract/contract.json` `requireShims` entry carries the implementation note.
