@@ -11,5 +11,8 @@
       "types": "./dist/src/main.d.ts",
       "default": "./dist/src/main.js"
     }
+  },
+  "dependencies": {
+    "wasmoon": "^1.16.0"
   }
 }

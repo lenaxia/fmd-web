@@ -1,0 +1,414 @@
+[
+  {
+    "file": "11Toon.lua",
+    "modules": [
+      {
+        "id": "c7b742a4dc8a451fa95baec1aa183b39",
+        "name": "11Toon",
+        "rootURL": "https://www.11toon.com",
+        "category": "Raw",
+        "accountSupport": false,
+        "options": [],
+        "eventHandlers": {
+          "GetDirectoryPageNumber": "GetDirectoryPageNumber",
+          "GetNameAndLink": "GetNameAndLink",
+          "GetInfo": "GetInfo",
+          "GetPageNumber": "GetPageNumber"
+        },
+        "sourceFile": "11Toon.lua"
+      }
+    ]
+  },
+  {
+    "file": "18Kami.lua",
+    "modules": [
+      {
+        "id": "73bedd818a034fcfb50144ff26298368",
+        "name": "18Kami",
+        "rootURL": "https://18kami.com",
+        "category": "H-Sites",
+        "accountSupport": false,
+        "options": [],
+        "eventHandlers": {
+          "GetDirectoryPageNumber": "GetDirectoryPageNumber",
+          "GetNameAndLink": "GetNameAndLink",
+          "GetInfo": "GetInfo",
+          "GetPageNumber": "GetPageNumber"
+        },
+        "sourceFile": "18Kami.lua"
+      }
+    ]
+  },
+  {
+    "file": "8Muses.lua",
+    "modules": [
+      {
+        "id": "d5d532724aba452ea6d4b50663b76326",
+        "name": "8Muses",
+        "rootURL": "https://comics.8muses.com",
+        "category": "",
+        "accountSupport": false,
+        "options": [],
+        "eventHandlers": {
+          "GetInfo": "GetInfo",
+          "GetPageNumber": "GetPageNumber",
+          "GetImageURL": "GetImageURL"
+        },
+        "sourceFile": "8Muses.lua"
+      }
+    ]
+  },
+  {
+    "file": "AsuraScans.lua",
+    "modules": [
+      {
+        "id": "7103ae6839ea46ec80cdfc2c4b37c803",
+        "name": "Asura Scans",
+        "rootURL": "https://asurascans.com",
+        "category": "English-Scanlation",
+        "accountSupport": false,
+        "options": [],
+        "eventHandlers": {
+          "GetDirectoryPageNumber": "GetDirectoryPageNumber",
+          "GetNameAndLink": "GetNameAndLink",
+          "GetInfo": "GetInfo",
+          "GetPageNumber": "GetPageNumber"
+        },
+        "sourceFile": "AsuraScans.lua"
+      }
+    ]
+  },
+  {
+    "file": "Comicaso.lua",
+    "modules": [
+      {
+        "id": "ab4a91f79df84a8583f6b806eccd1d87",
+        "name": "Comicaso",
+        "rootURL": "https://v3.comicaso.pro",
+        "category": "Indonesian",
+        "accountSupport": false,
+        "options": [
+          {
+            "name": "session",
+            "kind": "edit",
+            "defaultValue": ""
+          }
+        ],
+        "eventHandlers": {
+          "GetDirectoryPageNumber": "GetDirectoryPageNumber",
+          "GetNameAndLink": "GetNameAndLink",
+          "GetInfo": "GetInfo",
+          "GetPageNumber": "GetPageNumber",
+          "BeforeDownloadImage": "BeforeDownloadImage"
+        },
+        "sourceFile": "Comicaso.lua"
+      }
+    ]
+  },
+  {
+    "file": "Desu.lua",
+    "modules": [
+      {
+        "id": "41e78386ff3447e7a283b6ce55950f0f",
+        "name": "Desu",
+        "rootURL": "https://desu.uno",
+        "category": "Russian",
+        "accountSupport": false,
+        "options": [],
+        "eventHandlers": {
+          "GetDirectoryPageNumber": "GetDirectoryPageNumber",
+          "GetNameAndLink": "GetNameAndLink",
+          "GetInfo": "GetInfo",
+          "GetPageNumber": "GetPageNumber",
+          "BeforeDownloadImage": "BeforeDownloadImage"
+        },
+        "sourceFile": "Desu.lua"
+      }
+    ]
+  },
+  {
+    "file": "DynastyScans.lua",
+    "modules": [
+      {
+        "id": "f5bc5d44e9f24a7a9afb40788acf20e3",
+        "name": "DynastyScans",
+        "rootURL": "https://dynasty-scans.com",
+        "category": "English-Scanlation",
+        "accountSupport": false,
+        "options": [],
+        "eventHandlers": {
+          "GetNameAndLink": "GetNameAndLink",
+          "GetInfo": "GetInfo",
+          "GetPageNumber": "GetPageNumber"
+        },
+        "sourceFile": "DynastyScans.lua"
+      }
+    ]
+  },
+  {
+    "file": "FlameComics.lua",
+    "modules": [
+      {
+        "id": "fb34a56c83f54b19b57a9a92070fe899",
+        "name": "Flame Comics",
+        "rootURL": "https://flamecomics.xyz",
+        "category": "English-Scanlation",
+        "accountSupport": false,
+        "options": [],
+        "eventHandlers": {
+          "GetNameAndLink": "GetNameAndLink",
+          "GetInfo": "GetInfo",
+          "GetPageNumber": "GetPageNumber"
+        },
+        "sourceFile": "FlameComics.lua"
+      }
+    ]
+  },
+  {
+    "file": "Hentai2Read.lua",
+    "modules": [
+      {
+        "id": "053da85062184626a0a1ff6d57c3c955",
+        "name": "Hentai2Read",
+        "rootURL": "https://hentai2read.com",
+        "category": "H-Sites",
+        "accountSupport": false,
+        "options": [],
+        "eventHandlers": {
+          "GetDirectoryPageNumber": "GetDirectoryPageNumber",
+          "GetNameAndLink": "GetNameAndLink",
+          "GetInfo": "GetInfo",
+          "GetPageNumber": "GetPageNumber"
+        },
+        "sourceFile": "Hentai2Read.lua"
+      }
+    ]
+  },
+  {
+    "file": "HentaiFox.lua",
+    "modules": [
+      {
+        "id": "58a2dec76ebf43a5a9e7dc9b453e52e9",
+        "name": "HentaiFox",
+        "rootURL": "https://hentaifox.com",
+        "category": "H-Sites",
+        "accountSupport": false,
+        "options": [],
+        "eventHandlers": {
+          "GetInfo": "GetInfo",
+          "GetDirectoryPageNumber": "GetDirectoryPageNumber",
+          "GetNameAndLink": "GetNameAndLink",
+          "GetPageNumber": "GetPageNumber",
+          "GetImageURL": "GetImageURL"
+        },
+        "sourceFile": "HentaiFox.lua"
+      }
+    ]
+  },
+  {
+    "file": "InManga.lua",
+    "modules": [
+      {
+        "id": "03ae42ac9141443fa0711bd401c0203d",
+        "name": "InManga",
+        "rootURL": "https://inmanga.com",
+        "category": "Spanish",
+        "accountSupport": false,
+        "options": [],
+        "eventHandlers": {
+          "GetInfo": "getinfo",
+          "GetPageNumber": "getpagenumber",
+          "GetNameAndLink": "getnameandlink"
+        },
+        "sourceFile": "InManga.lua"
+      }
+    ]
+  },
+  {
+    "file": "Luscious.lua",
+    "modules": [
+      {
+        "id": "e0408ff713684f35923671af560054a5",
+        "name": "Luscious",
+        "rootURL": "https://www.luscious.net",
+        "category": "H-Sites",
+        "accountSupport": false,
+        "options": [],
+        "eventHandlers": {
+          "GetDirectoryPageNumber": "GetDirectoryPageNumber",
+          "GetNameAndLink": "GetNameAndLink",
+          "GetInfo": "GetInfo",
+          "GetPageNumber": "GetPageNumber"
+        },
+        "sourceFile": "Luscious.lua"
+      }
+    ]
+  },
+  {
+    "file": "Manta.lua",
+    "modules": [
+      {
+        "id": "596b042dc96d4f3886a544f91a648438",
+        "name": "Manta",
+        "rootURL": "https://manta.net",
+        "category": "English",
+        "accountSupport": false,
+        "options": [
+          {
+            "name": "auth",
+            "kind": "edit",
+            "defaultValue": ""
+          }
+        ],
+        "eventHandlers": {
+          "GetNameAndLink": "GetNameAndLink",
+          "GetInfo": "GetInfo",
+          "GetPageNumber": "GetPageNumber"
+        },
+        "sourceFile": "Manta.lua"
+      }
+    ]
+  },
+  {
+    "file": "TCBScans.lua",
+    "modules": [
+      {
+        "id": "80cb4513684e4b4ebc68730d0813781c",
+        "name": "TCB Scans",
+        "rootURL": "https://tcbonepiecechapters.com",
+        "category": "English-Scanlation",
+        "accountSupport": false,
+        "options": [],
+        "eventHandlers": {
+          "GetNameAndLink": "GetNameAndLink",
+          "GetInfo": "GetInfo",
+          "GetPageNumber": "GetPageNumber"
+        },
+        "sourceFile": "TCBScans.lua"
+      }
+    ]
+  },
+  {
+    "file": "TuMangaOnline.lua",
+    "modules": [
+      {
+        "id": "9185eb6c49324a849c7d7925a41ef3a3",
+        "name": "TuMangaOnline",
+        "rootURL": "https://zonatmo.org",
+        "category": "Spanish",
+        "accountSupport": false,
+        "options": [],
+        "eventHandlers": {
+          "GetDirectoryPageNumber": "GetDirectoryPageNumber",
+          "GetNameAndLink": "GetNameAndLink",
+          "GetInfo": "GetInfo",
+          "GetPageNumber": "GetPageNumber",
+          "BeforeDownloadImage": "BeforeDownloadImage"
+        },
+        "sourceFile": "TuMangaOnline.lua"
+      }
+    ]
+  },
+  {
+    "file": "YoungAceUp.lua",
+    "modules": [
+      {
+        "id": "9398095f450f4a1f9f0cc5c3ea145f0b",
+        "name": "YoungAceUp",
+        "rootURL": "https://web-ace.jp/youngaceup",
+        "category": "Raw",
+        "accountSupport": false,
+        "options": [],
+        "eventHandlers": {
+          "GetNameAndLink": "GetNameAndLink",
+          "GetInfo": "GetInfo",
+          "GetPageNumber": "GetPageNumber"
+        },
+        "sourceFile": "YoungAceUp.lua"
+      }
+    ]
+  },
+  {
+    "file": "options-showcase.lua",
+    "modules": [
+      {
+        "id": "aaaa1111bbbb2222cccc3333dddd4444",
+        "name": "OptionsShowcase",
+        "rootURL": "https://showcase.example",
+        "category": "English",
+        "accountSupport": true,
+        "options": [
+          {
+            "name": "dark_mode",
+            "kind": "checkbox",
+            "defaultValue": true
+          },
+          {
+            "name": "session",
+            "kind": "edit",
+            "defaultValue": "abc123"
+          },
+          {
+            "name": "concurrency",
+            "kind": "spinedit",
+            "defaultValue": 3
+          },
+          {
+            "name": "quality",
+            "kind": "combobox",
+            "defaultValue": 2,
+            "items": [
+              "Low",
+              "Medium",
+              "High"
+            ]
+          }
+        ],
+        "eventHandlers": {},
+        "sourceFile": "options-showcase.lua"
+      }
+    ]
+  },
+  {
+    "file": "multi-module.lua",
+    "modules": [
+      {
+        "id": "11112222333344445555666677778888",
+        "name": "MultiFirst",
+        "rootURL": "https://first.example",
+        "category": "",
+        "accountSupport": false,
+        "options": [],
+        "eventHandlers": {},
+        "sourceFile": "multi-module.lua"
+      },
+      {
+        "id": "88887777666655554444333322221111",
+        "name": "MultiSecond",
+        "rootURL": "https://second.example",
+        "category": "Raw",
+        "accountSupport": false,
+        "options": [],
+        "eventHandlers": {
+          "GetInfo": "GetInfo"
+        },
+        "sourceFile": "multi-module.lua"
+      }
+    ]
+  },
+  {
+    "file": "dropped-modules.lua",
+    "modules": [
+      {
+        "id": "ddddeeeeffff00001111222233334444",
+        "name": "DropSurvivor",
+        "rootURL": "https://valid.example",
+        "category": "",
+        "accountSupport": false,
+        "options": [],
+        "eventHandlers": {},
+        "sourceFile": "dropped-modules.lua"
+      }
+    ]
+  }
+]
