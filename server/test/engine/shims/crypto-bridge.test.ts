@@ -14,7 +14,7 @@ import * as core from '../../../src/engine/shims/crypto-core.js';
  * fmd.crypto Lua bridge integration (wasmoon): the base64 byte-exact
  * bridge carries NUL bytes and 0x80–0xFF values through Lua↔JS, mirrors
  * the Pascal lua_push* return protocol (values / nil / zero returns /
- * multi-returns), and the full 60-method surface is require-able.
+ * multi-returns), and the full 59-method surface is require-able.
  */
 
 const fromLatin1 = (s: string): Buffer => Buffer.from(s, 'latin1');
@@ -33,7 +33,7 @@ describe('fmd.crypto Lua bridge', () => {
     engine.global.close();
   });
 
-  it('exposes the full 60-method surface under require lib fmd.crypto', () => {
+  it('exposes the full 59-method surface under require lib fmd.crypto', () => {
     const names = (engine.doStringSync(`
       local c = require 'fmd.crypto'
       local keys = {}

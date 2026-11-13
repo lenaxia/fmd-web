@@ -550,6 +550,14 @@ export interface NormalizationEngine {
   /** Engine identity, recorded verbatim in replay reports. */
   readonly name: string;
   /** Normalize one raw module output. Never throws on data shape —
-   * normalization is total (FMD2 tolerates empty/partial fields). */
-  normalize(input: Readonly<Record<string, unknown>>): Record<string, unknown>;
+   * normalization is total (FMD2 tolerates empty/partial fields).
+   * `flags` carries the uData steering globals the oracle capture ran
+   * with (capture flag names, e.g. `optionRemoveMangaNameFromChapter`,
+   * `removeHostFromChapterLinks`); engines honoring uData defaults must
+   * map them onto their flag names — absent keys keep the engine's
+   * defaults (uData.pas:85-207 gate flags). */
+  normalize(
+    input: Readonly<Record<string, unknown>>,
+    flags?: Readonly<Record<string, boolean>>,
+  ): Record<string, unknown>;
 }

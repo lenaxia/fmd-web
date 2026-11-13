@@ -66,45 +66,50 @@ function main(): void {
   const cases = buildFullCorpus(seedDir, captureDir);
   const normalization: NormalizationEngine = {
     name: 'udata-normalize',
-    normalize: (input) => normalizeMangaInfo(input) as unknown as Record<string, unknown>,
+    normalize: (input, flags) =>
+      normalizeMangaInfo(input, {
+        isRemoveHostFromChapterLinks: flags?.['removeHostFromChapterLinks'] ?? true,
+        OptionRemoveMangaNameFromChapter:
+          flags?.['optionRemoveMangaNameFromChapter'] ?? false,
+      }) as unknown as Record<string, unknown>,
   };
   const report = runCorpus(cases, new FontoXPathQueryEngine(null), { normalization });
 
   const bindingStatus: Readonly<Record<string, { status: string; note: string }>> = {
     HTTP: {
-      status: 'partial',
-      note: 'v0: undici-envelope RecordedResponseResolver (no live net), Document stream facade (ToString/WriteString/Clear/Size, success\u21d4Size>0), ResultCode/ResultString/LastURL, case-insensitive Headers/Cookies Values + cookie jar from Set-Cookie, GET/POST/XHR (+POST MimeType move + text/html\u2192urlencoded rewrite), Terminated, Reset/ResetBasic. Pending: redirect-follow semantics, proxy support, per-host limits/delays.',
+      status: 'implemented',
+      note: 'full \u00a75.4 surface (tsk-native-trinket-stencils, mock-server verified): undici-envelope resolver + Document stream facade (ToString/WriteString/Clear/Size, success\u21d4Size>0), ResultCode/ResultString/LastURL, case-insensitive Headers/Cookies Values + cookie jar from Set-Cookie, GET/POST/XHR (+POST MimeType move + text/html\u2192urlencoded rewrite), Terminated, Reset/ResetBasic/AcceptImage default sets (D13 zstd omit), URL massaging + SplitURL + redirect Location merge, redirect-follow (301/302/303/307 AS GET, Referer, MaxRedirect 5) + retry >500 bounded RetryCount + abort fail-fast, SetProxy HTTP|SOCKS4|SOCKS5, per-host connection gate (limits/delays), egress policy (RFC1918/link-local denied by default, allow-list override). Transport backends: recorded (offline) + loopback (integration/live smoke); the production non-loopback transport lands with the Phase-2 server runtime.',
     },
     TXQuery: {
-      status: 'done',
+      status: 'implemented',
       note: '\u00a75.6 full surface (oracle-verified: 100% of the seed expression corpus) \u2014 FontoXPath 3.1 + linkedom behind the InternetTools dialect transform: json()/parse-json() NODE TREES (objects \u2192 key elements, arrays \u2192 item elements, typed scalar leaves), .step shorthand, chained name()() member steps, ?map lookups, css(), fmd:not (JSONiq EBV), fmd:string/fmd:string-join (XQGlobalTrimNodes), repairing-parser preprocessing (CRLF\u2192LF, adjacent-text merge, comment/PI drop, post-</body> text skip, bare-payload scaffold, literal CR normalization), list-fill overloads (XPathStringAll(expr[,node,]list), XPathHREFAll/XPathHREFTitleAll \u2192 TStrings mutation, order preserved), ParseHTML 1-arg reparse, swallow-to-empty + per-(module,expression) WARN dedupe.',
     },
     IXQValue: {
-      status: 'done',
+      status: 'implemented',
       note: 'Get() iterator / Get(i) / GetProperty / GetAttribute / ToString inner-text / Count (facade tables stay Lua-side; JS-registered ids resolve via glue).',
     },
-    TStrings: { status: 'done', note: 'Full \u00a75.5 surface (facades story).' },
-    MangaInfo: { status: 'done', note: '\u00a75.2 field surface + unknown-key tolerance (facades story).' },
-    Storage: { status: 'done', note: '\u00a75.3 shared KV via the state service (facades story).' },
-    Crypto: { status: 'partial', note: 'crypto story in flight: full LuaCrypto surface with vectors.' },
+    TStrings: { status: 'implemented', note: 'Full \u00a75.5 surface (facades story).' },
+    MangaInfo: { status: 'implemented', note: '\u00a75.2 field surface + unknown-key tolerance (facades story).' },
+    Storage: { status: 'implemented', note: '\u00a75.3 shared KV via the state service (facades story).' },
+    Crypto: { status: 'implemented', note: 'full LuaCrypto surface (LuaCrypto.pas:429\u2013494): node:crypto + sodium-native + pure-JS RC4/MD4, vectors in server/test/engine/shims/crypto-*.test.ts.' },
     Duktape: {
-      status: 'done',
+      status: 'implemented',
       note: 'v0: node:vm (5 s timeout), one heap per ExecJS (duk_peval semantics: completion value, JSON text for object/array results), Duktape.enc/dec polyfill, CommonJS require (module/exports, cached, jailed to the synced lua tree), error\u21d2nil, print\u2192host log.',
     },
     pb: {
-      status: 'done',
+      status: 'implemented',
       note: 'v0: protobufjs-backed package.preload["pb"] \u2014 load (raw .proto text + serialized FileDescriptorSet, (ret, pos) binding), decode (proto3 defaults, proto name casing), encode.',
     },
-    'fmd.env': { status: 'done', note: 'v0: ExeName/Version/Revision/LuaDirectory/SelectedLanguage/Directory.' },
-    'fmd.fileutil': { status: 'partial', note: 'v0: ExtractFileName/ExtractFileNameOnly; SerializeAndMaintainNames pending.' },
-    'fmd.imagepuzzle': { status: 'planned', note: 'sharp port (7 modules).' },
-    'fmd.pcre2': { status: 'planned', note: 'PCRE2 wasm/RE2.' },
-    'fmd.gzip': { status: 'planned', note: 'single Inflate method.' },
-    'fmd.logger': { status: 'partial', note: 'structured host logger (print routing) done; LuaLogger API pending.' },
-    'fmd.mangafoxwatermark': { status: 'planned', note: 'sharp port + PNG assets.' },
-    subprocess: { status: 'stub', note: 'denied stub unless the browser profile (\u00a75.11).' },
+    'fmd.env': { status: 'implemented', note: 'v0: ExeName/Version/Revision/LuaDirectory/SelectedLanguage/Directory.' },
+    'fmd.fileutil': { status: 'partial (gap: SerializeAndMaintainNames)', note: 'implemented: ExtractFileName/ExtractFileNameOnly; GAP: SerializeAndMaintainNames (1/418 tree modules, 0 seed modules call it).' },
+    'fmd.imagepuzzle': { status: 'deferred', note: 'sharp port (cost: 7/418 tree modules require it, 2/67 seed modules \u2014 18Comic, MangaGo).' },
+    'fmd.pcre2': { status: 'deferred', note: 'PCRE2 wasm/RE2 (cost: 0/418 tree modules require it \u2014 no seed or tree consumer).' },
+    'fmd.gzip': { status: 'deferred', note: 'single Inflate method (cost: 1/418 tree modules requires it, 0 seed modules).' },
+    'fmd.logger': { status: 'partial (gap: LuaLogger API)', note: 'implemented: structured host logger (print routing); GAP: LuaLogger API (1/418 tree modules use fmd.logger).' },
+    'fmd.mangafoxwatermark': { status: 'deferred', note: 'sharp port + PNG assets (cost: 1/418 tree module requires it, 0 seed modules).' },
+    subprocess: { status: 'deferred', note: 'denied stub unless the browser profile (\u00a75.11; cost: 0/418 tree modules require it).' },
     'utils.* / templates.*': {
-      status: 'done',
+      status: 'implemented',
       note: 'file-package loader from the synced lua tree (dots\u2192slashes, package.loaded caching); utils.nodejs \u00a75.11 sidecar pending.',
     },
   };
@@ -117,9 +122,10 @@ function main(): void {
   const lines: string[] = [];
   lines.push('# COMPAT.md \u2014 per-binding-unit compatibility tracker (DESIGN.md \u00a75)');
   lines.push('');
-  lines.push('Status vocabulary: `planned` \u00b7 `in-progress` \u00b7 `done` \u00b7 `degraded`');
-  lines.push('(with module counts recorded for every deferral \u2014 D11: nothing dropped');
-  lines.push('silently).');
+  lines.push('Status vocabulary (Phase-1 gate): `implemented` · `partial (gap: …)` ·');
+  lines.push('`deferred` — every deferral records its module-count cost (D11: nothing');
+  lines.push('dropped silently). Cost counts scan the FMD2 lua tree (418 module files)');
+  lines.push('and the ≥50-module seed corpus (67 captured modules).');
   lines.push('');
   lines.push('> Binding statuses and the corpus-replay sections are');
   lines.push('> GENERATED by `corpus/scripts/generate-compat.ts`; curated notes');
@@ -129,24 +135,24 @@ function main(): void {
   lines.push('|---|---|---|---|');
   // tracker rows keyed by FMD2 unit, boundary text preserved from the scaffold
   const unitStatus: Readonly<Record<string, { status: string; note: string }>> = {
-    'LuaBase.pas': { status: 'done', note: '\u00a75.1 Init globals (print, sleep, Trim, MaybeFillHost, MangaInfoStatusIfPos, GetBetween, SeparateLeft/Right)' },
-    'LuaWebsiteModules.pas': { status: 'done', note: '\u00a75.1\u20135.2 module surface + generated \u00a75.2 dispatchers (contract.json as data)' },
-    'LuaWebsiteModuleHandler.pas': { status: 'done', note: '\u00a75.3/\u00a75.12 chunk re-exec on module switch' },
-    'LuaHTTPSend.pas / httpsendthread.pas': { status: 'in-progress', note: bindingStatus['HTTP']?.note ?? '\u00a75.4' },
-    'LuaStrings.pas': { status: 'done', note: '\u00a75.5 full facade surface' },
-    'LuaXQuery.pas / LuaIXQValue.pas': { status: 'done', note: bindingStatus['TXQuery']?.note ?? '\u00a75.6' },
-    'LuaCrypto.pas': { status: 'done', note: '\u00a75.7 full surface (LuaCrypto.pas:429\u2013494): node:crypto + sodium-native + pure-JS RC4/MD4; vectors in server/test/engine/shims/crypto-*.test.ts \u2014 details below' },
-    'LuaDuktape.pas': { status: 'done', note: bindingStatus['Duktape']?.note ?? '\u00a75.7' },
-    'LuaGZip.pas': { status: 'planned', note: '\u00a75.7' },
-    'LuaFileUtil.pas': { status: 'in-progress', note: bindingStatus['fmd.fileutil']?.note ?? '\u00a75.7' },
-    'LuaImagePuzzle.pas': { status: 'planned', note: '\u00a75.7 (sharp port)' },
-    'LuaPCRE2.pas': { status: 'planned', note: '\u00a75.7' },
-    'LuaStringsStorage.pas': { status: 'done', note: '\u00a75.1/\u00a75.3 MODULE.Storage via the shared state service' },
-    'lua-protobuf (`pb.dll`)': { status: 'done', note: bindingStatus['pb']?.note ?? 'D17' },
-    'LuaSubprocess.pas': { status: 'planned (stub default)', note: '\u00a75.10\u20135.11' },
-    'uData.pas': { status: 'in-progress', note: '\u00a75.8 pipeline (dedupe/pad/trim done; prefix-strip + unicode cleanup converging in the facades story)' },
-    'uFavoritesManager.pas': { status: 'planned', note: '\u00a77.2 (DoCheck parity)' },
-    'uDownloadsManager.pas': { status: 'planned', note: '\u00a77.1/\u00a77.3 (streaming packers, D16)' },
+    'LuaBase.pas': { status: 'implemented', note: '\u00a75.1 Init globals (print, sleep, Trim, MaybeFillHost, MangaInfoStatusIfPos, GetBetween, SeparateLeft/Right)' },
+    'LuaWebsiteModules.pas': { status: 'implemented', note: '\u00a75.1\u20135.2 module surface + generated \u00a75.2 dispatchers (contract.json as data)' },
+    'LuaWebsiteModuleHandler.pas': { status: 'implemented', note: '\u00a75.3/\u00a75.12 chunk re-exec on module switch' },
+    'LuaHTTPSend.pas / httpsendthread.pas': { status: 'implemented', note: bindingStatus['HTTP']?.note ?? '\u00a75.4' },
+    'LuaStrings.pas': { status: 'implemented', note: '\u00a75.5 full facade surface' },
+    'LuaXQuery.pas / LuaIXQValue.pas': { status: 'implemented', note: bindingStatus['TXQuery']?.note ?? '\u00a75.6' },
+    'LuaCrypto.pas': { status: 'implemented', note: '\u00a75.7 full surface (LuaCrypto.pas:429\u2013494): node:crypto + sodium-native + pure-JS RC4/MD4; vectors in server/test/engine/shims/crypto-*.test.ts \u2014 details below' },
+    'LuaDuktape.pas': { status: 'implemented', note: bindingStatus['Duktape']?.note ?? '\u00a75.7' },
+    'LuaGZip.pas': { status: 'deferred', note: 'single Inflate method — cost: 1/418 tree modules requires it, 0/67 seed modules.' },
+    'LuaFileUtil.pas': { status: 'partial (gap: SerializeAndMaintainNames)', note: bindingStatus['fmd.fileutil']?.note ?? '\u00a75.7' },
+    'LuaImagePuzzle.pas': { status: 'deferred', note: 'sharp port \u2014 cost: 7/418 tree modules require it, 2/67 seed modules (18Comic, MangaGo).' },
+    'LuaPCRE2.pas': { status: 'deferred', note: 'PCRE2 wasm/RE2 \u2014 cost: 0/418 tree modules require it (no seed consumer).' },
+    'LuaStringsStorage.pas': { status: 'implemented', note: '\u00a75.1/\u00a75.3 MODULE.Storage via the shared state service' },
+    'lua-protobuf (`pb.dll`)': { status: 'implemented', note: bindingStatus['pb']?.note ?? 'D17' },
+    'LuaSubprocess.pas': { status: 'deferred', note: 'denied stub unless the browser profile (\u00a75.10\u20135.11) \u2014 cost: 0/418 tree modules require it.' },
+    'uData.pas': { status: 'implemented', note: '\u00a75.8 pipeline oracle-verified: 100% of the seed normalization corpus (flag-faithful \u2014 per-capture removeHostFromChapterLinks / OptionRemoveMangaNameFromChapter honored).' },
+    'uFavoritesManager.pas': { status: 'deferred', note: '\u00a77.2 (DoCheck parity) \u2014 cost: Phase-4 epic scope (favorites engine; no shim binding).' },
+    'uDownloadsManager.pas': { status: 'deferred', note: '\u00a77.1/\u00a77.3 (streaming packers, D16) \u2014 cost: Phase-3 epic scope (download engine; no shim binding).' },
   };
   const boundaries: Readonly<Record<string, string>> = {
     'LuaBase.pas': 'Init globals (`print`, `sleep`, `Trim`, \u2026)',
@@ -234,6 +240,37 @@ function main(): void {
   mkdirSync(dirname(compatPath), { recursive: true });
   writeFileSync(compatPath, `${lines.join('\n')}${curated}`);
   console.log(`COMPAT.md written: ${report.summary.passed}/${report.summary.cases} = ${(report.summary.passRate * 100).toFixed(2)}%`);
+
+  // --gate (scripts/ci.sh corpus step): the Phase-1 gate — pass rate must
+  // be ≥99% AND every non-passing case must carry a curated root cause.
+  if (process.argv.includes('--gate')) {
+    const failures: string[] = [];
+    for (const mod of report.modules) {
+      for (const c of mod.cases) {
+        if (c.status !== 'pass' && gapFor(c.expression.expression).cause.startsWith('UNDOCUMENTED')) {
+          failures.push(`${mod.module}: ${c.expression.id}`);
+        }
+      }
+    }
+    for (const n of report.normalizations) {
+      if (n.status !== 'pass' && gapFor(n.fixtureId).cause.startsWith('UNDOCUMENTED')) {
+        failures.push(`uData: ${n.fixtureId}`);
+      }
+    }
+    if (report.summary.passRate < 0.99) {
+      console.error(
+        `corpus gate FAILED: pass rate ${(report.summary.passRate * 100).toFixed(2)}% < 99%`,
+      );
+      process.exit(1);
+    }
+    if (failures.length > 0) {
+      console.error(
+        `corpus gate FAILED: ${failures.length} undocumented mismatch(es):\n  ${failures.join('\n  ')}`,
+      );
+      process.exit(1);
+    }
+    console.log('corpus gate passed: >=99% with zero undocumented mismatches');
+  }
 }
 
 main();

@@ -237,11 +237,13 @@ export function runCorpus(
       const input = isRecord(c.input)
         ? (c.input as Record<string, unknown>)
         : {};
-      const actual = normalizer.normalize(
+      const actual =
         'rawModuleOutput' in input && isRecord(input['rawModuleOutput'])
-          ? (input['rawModuleOutput'] as Record<string, unknown>)
-          : input,
-      );
+          ? normalizer.normalize(
+              input['rawModuleOutput'] as Record<string, unknown>,
+              c.flags,
+            )
+          : normalizer.normalize(input, c.flags);
       const ok = canonical(actual) === canonical(c.expected);
       if (ok) passed++;
       else failed++;

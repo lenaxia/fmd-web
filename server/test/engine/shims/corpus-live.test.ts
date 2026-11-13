@@ -24,10 +24,17 @@ const GOLDEN_PATH = join(ROOT, 'server', 'test', 'engine', 'golden', 'seed-corpu
 
 describe('live corpus replay (§13.1 FontoXPath engine vs FPC oracle)', () => {
   const cases = buildFullCorpus(SEED_DIR, CAPTURE_DIR);
-  // §5.8 normalization engine adapter (uData.pas:85-207 pipeline)
+  // §5.8 normalization engine adapter (uData.pas:85-207 pipeline): the
+  // oracle's capture flag names map onto NormalizeFlags; absent keys
+  // keep the uData defaults.
   const normalization: NormalizationEngine = {
     name: 'udata-normalize',
-    normalize: (input) => normalizeMangaInfo(input) as unknown as Record<string, unknown>,
+    normalize: (input, flags) =>
+      normalizeMangaInfo(input, {
+        isRemoveHostFromChapterLinks: flags?.['removeHostFromChapterLinks'] ?? true,
+        OptionRemoveMangaNameFromChapter:
+          flags?.['optionRemoveMangaNameFromChapter'] ?? false,
+      }) as unknown as Record<string, unknown>,
   };
   const report = runCorpus(cases, new FontoXPathQueryEngine(null), { normalization });
 

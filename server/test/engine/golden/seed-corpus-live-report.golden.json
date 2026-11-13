@@ -4,9 +4,9 @@
   "normalization": "udata-normalize",
   "summary": {
     "cases": 912,
-    "passed": 908,
-    "failed": 4,
-    "passRate": 0.9956
+    "passed": 912,
+    "failed": 0,
+    "passRate": 1
   },
   "modules": [
     {
@@ -14937,7 +14937,7 @@
     {
       "fixtureId": "capture/getinfo-normalization-0004-prefixstrip",
       "moduleId": "4d5e6f77889900aabbccddeeff0304",
-      "status": "fail",
+      "status": "pass",
       "expected": {
         "title": "ExampleMan",
         "altTitles": "",
@@ -14975,54 +14975,10 @@
           "/manga/exampleman/ch-6"
         ],
         "chapterNames": [
-          "ExampleMan Ch. 5",
-          "ExampleMan- Ch. 6"
+          "Ch. 5",
+          "Ch. 6"
         ],
         "numChapter": 2
-      },
-      "mismatch": {
-        "expected": {
-          "title": "ExampleMan",
-          "altTitles": "",
-          "authors": "Author One",
-          "artists": "",
-          "genres": "Action",
-          "status": "Completed",
-          "summary": "",
-          "coverLink": "",
-          "url": "https://site.example/manga/exampleman",
-          "link": "/manga/exampleman",
-          "chapterLinks": [
-            "/manga/exampleman/ch-5",
-            "/manga/exampleman/ch-6"
-          ],
-          "chapterNames": [
-            "Ch. 5",
-            "Ch. 6"
-          ],
-          "numChapter": 2
-        },
-        "actual": {
-          "title": "ExampleMan",
-          "altTitles": "",
-          "authors": "Author One",
-          "artists": "",
-          "genres": "Action",
-          "status": "Completed",
-          "summary": "",
-          "coverLink": "",
-          "url": "https://site.example/manga/exampleman",
-          "link": "/manga/exampleman",
-          "chapterLinks": [
-            "/manga/exampleman/ch-5",
-            "/manga/exampleman/ch-6"
-          ],
-          "chapterNames": [
-            "ExampleMan Ch. 5",
-            "ExampleMan- Ch. 6"
-          ],
-          "numChapter": 2
-        }
       }
     },
     {
@@ -15259,7 +15215,7 @@
     {
       "fixtureId": "capture/getinfo-normalization-0011",
       "moduleId": "3c4d5e6f77889900aabbccddeeff0011",
-      "status": "fail",
+      "status": "pass",
       "expected": {
         "title": "My Manga",
         "altTitles": "",
@@ -15300,59 +15256,11 @@
           "/m/3"
         ],
         "chapterNames": [
-          "My Manga Ch.1",
-          "My Manga- Ch.2",
+          "Ch.1",
+          "Ch.2",
           "My Manga"
         ],
         "numChapter": 3
-      },
-      "mismatch": {
-        "expected": {
-          "title": "My Manga",
-          "altTitles": "",
-          "authors": "",
-          "artists": "",
-          "genres": "",
-          "status": "",
-          "summary": "",
-          "coverLink": "",
-          "url": "https://s.example/m",
-          "link": "/m",
-          "chapterLinks": [
-            "/m/1",
-            "/m/2",
-            "/m/3"
-          ],
-          "chapterNames": [
-            "Ch.1",
-            "Ch.2",
-            "My Manga"
-          ],
-          "numChapter": 3
-        },
-        "actual": {
-          "title": "My Manga",
-          "altTitles": "",
-          "authors": "",
-          "artists": "",
-          "genres": "",
-          "status": "",
-          "summary": "",
-          "coverLink": "",
-          "url": "https://s.example/m",
-          "link": "/m",
-          "chapterLinks": [
-            "/m/1",
-            "/m/2",
-            "/m/3"
-          ],
-          "chapterNames": [
-            "My Manga Ch.1",
-            "My Manga- Ch.2",
-            "My Manga"
-          ],
-          "numChapter": 3
-        }
       }
     },
     {
@@ -15765,7 +15673,7 @@
     {
       "fixtureId": "capture/getinfo-normalization-0021",
       "moduleId": "3c4d5e6f77889900aabbccddeeff0021",
-      "status": "fail",
+      "status": "pass",
       "expected": {
         "title": "K",
         "altTitles": "",
@@ -15799,58 +15707,14 @@
         "url": "https://s.example/m",
         "link": "/m",
         "chapterLinks": [
-          "/1",
-          "/2"
+          "https://A.example/1",
+          "https://b.example/2"
         ],
         "chapterNames": [
           "y",
           "z"
         ],
         "numChapter": 2
-      },
-      "mismatch": {
-        "expected": {
-          "title": "K",
-          "altTitles": "",
-          "authors": "",
-          "artists": "",
-          "genres": "",
-          "status": "",
-          "summary": "",
-          "coverLink": "",
-          "url": "https://s.example/m",
-          "link": "/m",
-          "chapterLinks": [
-            "https://A.example/1",
-            "https://b.example/2"
-          ],
-          "chapterNames": [
-            "y",
-            "z"
-          ],
-          "numChapter": 2
-        },
-        "actual": {
-          "title": "K",
-          "altTitles": "",
-          "authors": "",
-          "artists": "",
-          "genres": "",
-          "status": "",
-          "summary": "",
-          "coverLink": "",
-          "url": "https://s.example/m",
-          "link": "/m",
-          "chapterLinks": [
-            "/1",
-            "/2"
-          ],
-          "chapterNames": [
-            "y",
-            "z"
-          ],
-          "numChapter": 2
-        }
       }
     },
     {
@@ -15973,7 +15837,7 @@
     {
       "fixtureId": "capture/getinfo-normalization-0025",
       "moduleId": "3c4d5e6f77889900aabbccddeeff0025",
-      "status": "fail",
+      "status": "pass",
       "expected": {
         "title": "Ünïcode Manga",
         "altTitles": "",
@@ -16014,59 +15878,11 @@
           "/3"
         ],
         "chapterNames": [
-          "Ünïcode Manga - Ch1",
+          "Ch1",
           "ÜNÏCODE MANGA Ch2",
           "Ünïcode"
         ],
         "numChapter": 3
-      },
-      "mismatch": {
-        "expected": {
-          "title": "Ünïcode Manga",
-          "altTitles": "",
-          "authors": "",
-          "artists": "",
-          "genres": "",
-          "status": "",
-          "summary": "",
-          "coverLink": "",
-          "url": "https://s.example/m",
-          "link": "/m",
-          "chapterLinks": [
-            "/1",
-            "/2",
-            "/3"
-          ],
-          "chapterNames": [
-            "Ch1",
-            "ÜNÏCODE MANGA Ch2",
-            "Ünïcode"
-          ],
-          "numChapter": 3
-        },
-        "actual": {
-          "title": "Ünïcode Manga",
-          "altTitles": "",
-          "authors": "",
-          "artists": "",
-          "genres": "",
-          "status": "",
-          "summary": "",
-          "coverLink": "",
-          "url": "https://s.example/m",
-          "link": "/m",
-          "chapterLinks": [
-            "/1",
-            "/2",
-            "/3"
-          ],
-          "chapterNames": [
-            "Ünïcode Manga - Ch1",
-            "ÜNÏCODE MANGA Ch2",
-            "Ünïcode"
-          ],
-          "numChapter": 3
-        }
       }
     },
     {

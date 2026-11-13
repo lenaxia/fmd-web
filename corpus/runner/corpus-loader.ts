@@ -62,6 +62,8 @@ export interface CaptureTriples {
   readonly mode: string;
   readonly moduleId?: ModuleId;
   readonly internettoolsCommit?: string;
+  /** The uData steering globals this capture ran with (mode=normalize). */
+  readonly flags?: Readonly<Record<string, boolean>>;
   readonly triples: readonly Record<string, unknown>[];
 }
 
@@ -162,6 +164,13 @@ export function loadCaptureTriplesFile(path: string): CaptureTriples {
     throw new Error(`malformed capture triples: ${path}`);
   }
   const triples = raw['triples'] as Record<string, unknown>[];
+  // normalize-mode captures record the uData steering globals the FPC
+  // oracle ran with; boolean-valued keys only (never guess).
+  const rawFlags = raw['flags'];
+  const flags: Record<string, boolean> | undefined =
+    isRecord(rawFlags) && Object.entries(rawFlags).every(([, v]) => typeof v === 'boolean')
+      ? Object.fromEntries(Object.entries(rawFlags).map(([k, v]) => [k, Boolean(v)]))
+      : undefined;
   const out: CaptureTriples = {
     generator: raw['generator'],
     mode: raw['mode'],
@@ -172,6 +181,7 @@ export function loadCaptureTriplesFile(path: string): CaptureTriples {
     ...(typeof raw['internettoolsCommit'] === 'string'
       ? { internettoolsCommit: raw['internettoolsCommit'] }
       : {}),
+    ...(flags !== undefined ? { flags } : {}),
   };
   return out;
 }
@@ -198,6 +208,8 @@ export type CorpusCase =
       readonly moduleId: ModuleId;
       readonly module: string;
       readonly input: unknown;
+      /** The uData steering globals the oracle ran with (when recorded). */
+      readonly flags?: Readonly<Record<string, boolean>>;
       readonly expected: unknown;
     };
 
@@ -298,6 +310,7 @@ export function buildFullCorpus(
         moduleId: String(triple['moduleId'] ?? doc.moduleId ?? ''),
         module: 'uData',
         input: triple['input'],
+        ...(doc.flags !== undefined ? { flags: doc.flags } : {}),
         expected: triple['normalized'],
       });
     }
