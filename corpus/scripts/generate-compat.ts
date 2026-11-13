@@ -60,6 +60,65 @@ function gapFor(label: string): { cause: string; tracking: string } {
   return { cause: 'UNDOCUMENTED \u2014 root cause required', tracking: 'this story' };
 }
 
+/**
+ * contract.json binding → COMPAT.md tracker row key. The `--gate` mode
+ * asserts EVERY requireShims/facades entry maps to an emitted row — a
+ * contract binding without a tracker row is an undocumented omission
+ * (D11) and fails the gate.
+ */
+const BINDING_ROWS: Readonly<Record<string, string>> = {
+  'require:fmd.env': 'LuaFMD.pas',
+  'require:fmd.crypto': 'LuaCrypto.pas',
+  'require:fmd.duktape': 'LuaDuktape.pas',
+  'require:fmd.gzip': 'LuaGZip.pas',
+  'require:fmd.fileutil': 'LuaFileUtil.pas',
+  'require:fmd.imagepuzzle': 'LuaImagePuzzle.pas',
+  'require:fmd.logger': 'LuaLogger.pas',
+  'require:fmd.mangafoxwatermark': 'LuaMangaFox.pas',
+  'require:fmd.pcre2': 'LuaPCRE2.pas',
+  'require:fmd.strings': 'LuaStrings.pas',
+  'require:pb': 'lua-protobuf (`pb.dll`)',
+  'require:subprocess': 'LuaSubprocess.pas',
+  'require:utils.* / templates.*': 'lua/utils/ + lua/templates/',
+  'facade:TXQuery': 'LuaXQuery.pas / LuaIXQValue.pas',
+  'facade:IXQValue': 'LuaXQuery.pas / LuaIXQValue.pas',
+  'facade:TStrings': 'LuaStrings.pas',
+  'facade:MangaInfo': 'LuaMangaInfo.pas',
+  'facade:Storage': 'LuaStringsStorage.pas',
+  'facade:HTTP': 'LuaHTTPSend.pas / httpsendthread.pas',
+  'facade:Crypto': 'LuaCrypto.pas',
+  'facade:ImagePuzzle': 'LuaImagePuzzle.pas',
+  'facade:Duktape': 'LuaDuktape.pas',
+};
+
+interface ContractDoc {
+  readonly requireShims?: readonly { readonly require: string }[];
+  readonly facades?: readonly { readonly name: string }[];
+}
+
+/**
+ * Gate check: every contract.json binding must map to an emitted
+ * tracker row. Returns the missing bindings ('kind:id → row|none').
+ */
+export function missingBindingRows(
+  contract: ContractDoc,
+  emittedUnits: ReadonlySet<string>,
+): string[] {
+  const missing: string[] = [];
+  const check = (kind: string, id: string, row: string | undefined): void => {
+    if (row === undefined || !emittedUnits.has(row)) {
+      missing.push(`${kind}:${id} → ${row ?? '(no mapping)'}`);
+    }
+  };
+  for (const r of contract.requireShims ?? []) {
+    check('require', r.require, BINDING_ROWS[`require:${r.require}`]);
+  }
+  for (const f of contract.facades ?? []) {
+    check('facade', f.name, BINDING_ROWS[`facade:${f.name}`]);
+  }
+  return missing;
+}
+
 function main(): void {
   const seedDir = join(ROOT, 'corpus', 'fixtures', 'seed');
   const captureDir = join(ROOT, 'corpus', 'fixtures', 'capture');
@@ -149,6 +208,11 @@ function main(): void {
     'LuaPCRE2.pas': { status: 'deferred', note: 'PCRE2 wasm/RE2 \u2014 cost: 0/418 tree modules require it (no seed consumer).' },
     'LuaStringsStorage.pas': { status: 'implemented', note: '\u00a75.1/\u00a75.3 MODULE.Storage via the shared state service' },
     'lua-protobuf (`pb.dll`)': { status: 'implemented', note: bindingStatus['pb']?.note ?? 'D17' },
+    'LuaFMD.pas': { status: 'implemented', note: bindingStatus['fmd.env']?.note ?? '\u00a75.1' },
+    'LuaLogger.pas': { status: 'partial (gap: LuaLogger API)', note: bindingStatus['fmd.logger']?.note ?? 'structured logging' },
+    'LuaMangaFox.pas': { status: 'deferred', note: bindingStatus['fmd.mangafoxwatermark']?.note ?? 'sharp port + PNG assets' },
+    'LuaMangaInfo.pas': { status: 'implemented', note: bindingStatus['MangaInfo']?.note ?? '\u00a75.2 field surface' },
+    'lua/utils/ + lua/templates/': { status: 'implemented', note: bindingStatus['utils.* / templates.*']?.note ?? 'file-package loader' },
     'LuaSubprocess.pas': { status: 'deferred', note: 'denied stub unless the browser profile (\u00a75.10\u20135.11) \u2014 cost: 0/418 tree modules require it.' },
     'uData.pas': { status: 'implemented', note: '\u00a75.8 pipeline oracle-verified: 100% of the seed normalization corpus (flag-faithful \u2014 per-capture removeHostFromChapterLinks / OptionRemoveMangaNameFromChapter honored).' },
     'uFavoritesManager.pas': { status: 'deferred', note: '\u00a77.2 (DoCheck parity) \u2014 cost: Phase-4 epic scope (favorites engine; no shim binding).' },
@@ -169,6 +233,11 @@ function main(): void {
     'LuaPCRE2.pas': 'fmd.pcre2',
     'LuaStringsStorage.pas': 'MODULE.Storage',
     'lua-protobuf (`pb.dll`)': '`pb` preload shim',
+    'LuaFMD.pas': '`fmd.env` host lib',
+    'LuaLogger.pas': '`fmd.logger` structured logging',
+    'LuaMangaFox.pas': '`fmd.mangafoxwatermark`',
+    'LuaMangaInfo.pas': '`MANGAINFO` facade',
+    'lua/utils/ + lua/templates/': '`utils.*` / `templates.*` file packages',
     'LuaSubprocess.pas': 'subprocess',
     'uData.pas': 'GetInfo post-processing',
     'uFavoritesManager.pas': 'favorites engine',
@@ -184,6 +253,27 @@ function main(): void {
   lines.push(`- Normalization: **${report.normalization}** (\u00a75.8 uData pipeline)`);
   lines.push(`- Cases: ${report.summary.cases} \u00b7 passed: ${report.summary.passed} \u00b7 failed: ${report.summary.failed}`);
   lines.push(`- **Pass rate: ${(report.summary.passRate * 100).toFixed(2)}%** (gate: \u226599%)`);
+  lines.push('');
+  lines.push('### Per-module pass rates');
+  lines.push('');
+  lines.push('Expression cases per seed module (report.modules rollup), plus the');
+  lines.push('uData \u00a75.8 normalization rollup \u2014 the aggregate above is the sum.');
+  lines.push('');
+  lines.push('| Module | Cases | Passed | Failed | Rate |');
+  lines.push('|---|---|---|---|---|');
+  for (const mod of report.modules) {
+    const total = mod.passed + mod.failed;
+    const rate = total === 0 ? 0 : mod.passed / total;
+    lines.push(
+      `| ${mod.module} | ${total} | ${mod.passed} | ${mod.failed} | ${(rate * 100).toFixed(2)}% |`,
+    );
+  }
+  const normTotal = report.normalizations.length;
+  const normPassed = report.normalizations.filter((n) => n.status === 'pass').length;
+  const normRate = normTotal === 0 ? 0 : normPassed / normTotal;
+  lines.push(
+    `| uData (\u00a75.8 normalization) | ${normTotal} | ${normPassed} | ${normTotal - normPassed} | ${(normRate * 100).toFixed(2)}% |`,
+  );
   lines.push('');
   lines.push('### Per-expression results');
   lines.push('');
@@ -266,6 +356,19 @@ function main(): void {
     if (failures.length > 0) {
       console.error(
         `corpus gate FAILED: ${failures.length} undocumented mismatch(es):\n  ${failures.join('\n  ')}`,
+      );
+      process.exit(1);
+    }
+    // Contract-coverage gate: every contract.json binding must have an
+    // emitted tracker row (17/22-style omissions fail here).
+    const contract: ContractDoc = JSON.parse(
+      readFileSync(join(ROOT, 'contract', 'contract.json'), 'utf8'),
+    ) as ContractDoc;
+    const emitted = new Set(Object.keys(unitStatus));
+    const missingRows = missingBindingRows(contract, emitted);
+    if (missingRows.length > 0) {
+      console.error(
+        `corpus gate FAILED: ${missingRows.length} contract binding(s) without a COMPAT.md tracker row:\n  ${missingRows.join('\n  ')}`,
       );
       process.exit(1);
     }

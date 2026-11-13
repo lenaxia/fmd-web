@@ -47,6 +47,25 @@ harness skeleton is in place behind an explicit `--live` network gate.
   FMD2 lua tree and the 67-module seed corpus; e.g. `fmd.imagepuzzle`
   deferred — 7/418 tree modules, 2/67 seed; `fmd.pcre2` deferred — 0
   consumers; `fmd.gzip` deferred — 1/418).
+- **Review fix (blocker, binding coverage 22/22):** the tracker table
+  initially omitted 5 contract.json bindings whose statuses existed in
+  the generator's `bindingStatus` map but had no emitted rows —
+  `fmd.env`/LuaFMD, `fmd.logger`/LuaLogger (partial: LuaLogger API,
+  1/418), `fmd.mangafoxwatermark`/LuaMangaFox (deferred, 1/418),
+  `utils.* / templates.*`, and the MangaInfo facade/LuaMangaInfo. The
+  five rows were added to `unitStatus`+`boundaries` and the generator
+  now carries a `BINDING_ROWS` map (contract.json binding → tracker
+  row) whose `--gate` coverage check FAILS when any requireShims/facades
+  binding lacks an emitted row — the 17/22-style omission is now a
+  gate error (negative-tested: a partial row set reports every missing
+  binding).
+- **Review fix (major, per-module pass rates):** the corpus-replay
+  section now publishes a `### Per-module pass rates` table — 65 seed
+  module rows (module, cases, passed, failed, rate) from the
+  `report.modules` rollup plus the uData §5.8 normalization rollup row
+  (885 expression + 27 normalization = 912) — so the per-module pass
+  rates live in COMPAT.md itself, not only in the golden report
+  artifact. Generation is byte-stable (two consecutive runs diff-identical).
 - Stale statuses corrected: crypto (story done → implemented), uData
   §5.8 (now oracle-verified at 100% with flag fidelity → implemented),
   HTTP (full §5.4 surface landed by tsk-native-trinket-stencils →
@@ -54,8 +73,9 @@ harness skeleton is in place behind an explicit `--live` network gate.
   the generator below the crypto marker).
 - The failure table is empty (no mismatches; the v0 documented-divergence
   notes are retained).
-- `--gate` mode: exit 1 when pass rate < 99% or any mismatch lacks a
-  curated root cause (`scripts/ci.sh` corpus step).
+- `--gate` mode: exit 1 when pass rate < 99%, any mismatch lacks a
+  curated root cause, or any contract binding lacks a tracker row
+  (`scripts/ci.sh` corpus step).
 
 **3. scripts/ci.sh — the five-step local CI gate**
 

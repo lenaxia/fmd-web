@@ -25,6 +25,11 @@ and the ≥50-module seed corpus (67 captured modules).
 | LuaPCRE2.pas | fmd.pcre2 | deferred | PCRE2 wasm/RE2 — cost: 0/418 tree modules require it (no seed consumer). |
 | LuaStringsStorage.pas | MODULE.Storage | implemented | §5.1/§5.3 MODULE.Storage via the shared state service |
 | lua-protobuf (`pb.dll`) | `pb` preload shim | implemented | v0: protobufjs-backed package.preload["pb"] — load (raw .proto text + serialized FileDescriptorSet, (ret, pos) binding), decode (proto3 defaults, proto name casing), encode. |
+| LuaFMD.pas | `fmd.env` host lib | implemented | v0: ExeName/Version/Revision/LuaDirectory/SelectedLanguage/Directory. |
+| LuaLogger.pas | `fmd.logger` structured logging | partial (gap: LuaLogger API) | implemented: structured host logger (print routing); GAP: LuaLogger API (1/418 tree modules use fmd.logger). |
+| LuaMangaFox.pas | `fmd.mangafoxwatermark` | deferred | sharp port + PNG assets (cost: 1/418 tree module requires it, 0 seed modules). |
+| LuaMangaInfo.pas | `MANGAINFO` facade | implemented | §5.2 field surface + unknown-key tolerance (facades story). |
+| lua/utils/ + lua/templates/ | `utils.*` / `templates.*` file packages | implemented | file-package loader from the synced lua tree (dots→slashes, package.loaded caching); utils.nodejs §5.11 sidecar pending. |
 | LuaSubprocess.pas | subprocess | deferred | denied stub unless the browser profile (§5.10–5.11) — cost: 0/418 tree modules require it. |
 | uData.pas | GetInfo post-processing | implemented | §5.8 pipeline oracle-verified: 100% of the seed normalization corpus (flag-faithful — per-capture removeHostFromChapterLinks / OptionRemoveMangaNameFromChapter honored). |
 | uFavoritesManager.pas | favorites engine | deferred | §7.2 (DoCheck parity) — cost: Phase-4 epic scope (favorites engine; no shim binding). |
@@ -36,6 +41,80 @@ and the ≥50-module seed corpus (67 captured modules).
 - Normalization: **udata-normalize** (§5.8 uData pipeline)
 - Cases: 912 · passed: 912 · failed: 0
 - **Pass rate: 100.00%** (gate: ≥99%)
+
+### Per-module pass rates
+
+Expression cases per seed module (report.modules rollup), plus the
+uData §5.8 normalization rollup — the aggregate above is the sum.
+
+| Module | Cases | Passed | Failed | Rate |
+|---|---|---|---|---|
+| 18Comic | 13 | 13 | 0 | 100.00% |
+| 3asq | 26 | 26 | 0 | 100.00% |
+| 8Muses | 8 | 8 | 0 | 100.00% |
+| ARESManga | 2 | 2 | 0 | 100.00% |
+| AdonisFansub | 15 | 15 | 0 | 100.00% |
+| ApollComics | 26 | 26 | 0 | 100.00% |
+| AsmHentai | 9 | 9 | 0 | 100.00% |
+| AsuraScans | 14 | 14 | 0 | 100.00% |
+| BacaKomik | 8 | 8 | 0 | 100.00% |
+| BrainRotComics | 26 | 26 | 0 | 100.00% |
+| CartoonPorn | 4 | 4 | 0 | 100.00% |
+| ComicK | 15 | 15 | 0 | 100.00% |
+| DoujinHentai | 2 | 2 | 0 | 100.00% |
+| Doujinku | 15 | 15 | 0 | 100.00% |
+| EHentai | 12 | 12 | 0 | 100.00% |
+| EgoToons | 1 | 1 | 0 | 100.00% |
+| EmperorScan | 26 | 26 | 0 | 100.00% |
+| GenzToons | 13 | 13 | 0 | 100.00% |
+| GourmetScans | 26 | 26 | 0 | 100.00% |
+| HadesScans | 26 | 26 | 0 | 100.00% |
+| Hentai20 | 15 | 15 | 0 | 100.00% |
+| Hentai2Read | 14 | 14 | 0 | 100.00% |
+| HentaiEra | 21 | 21 | 0 | 100.00% |
+| HentaiFox | 10 | 10 | 0 | 100.00% |
+| HentaiHere | 12 | 12 | 0 | 100.00% |
+| HentaiLib | 17 | 17 | 0 | 100.00% |
+| HentaiNexus | 12 | 12 | 0 | 100.00% |
+| HitomiLa | 12 | 12 | 0 | 100.00% |
+| IMHentai | 12 | 12 | 0 | 100.00% |
+| InManga | 11 | 11 | 0 | 100.00% |
+| KissMangaIN | 26 | 26 | 0 | 100.00% |
+| KlikManga | 26 | 26 | 0 | 100.00% |
+| KomikStation | 15 | 15 | 0 | 100.00% |
+| KomikUp | 2 | 2 | 0 | 100.00% |
+| Komiktap | 15 | 15 | 0 | 100.00% |
+| LHTranslation | 26 | 26 | 0 | 100.00% |
+| LectorHentai | 8 | 8 | 0 | 100.00% |
+| LilyManga | 26 | 26 | 0 | 100.00% |
+| LunaToons | 13 | 13 | 0 | 100.00% |
+| LxHentai | 11 | 11 | 0 | 100.00% |
+| Madara | 26 | 26 | 0 | 100.00% |
+| MadaraScans | 7 | 7 | 0 | 100.00% |
+| MangaDex | 30 | 30 | 0 | 100.00% |
+| MangaFreak | 10 | 10 | 0 | 100.00% |
+| MangaGo | 12 | 12 | 0 | 100.00% |
+| MangaKatana | 12 | 12 | 0 | 100.00% |
+| MangaNato | 12 | 12 | 0 | 100.00% |
+| MangaSusu | 2 | 2 | 0 | 100.00% |
+| MangaThemesia | 15 | 15 | 0 | 100.00% |
+| Mangacan | 1 | 1 | 0 | 100.00% |
+| ManhwaIndo | 15 | 15 | 0 | 100.00% |
+| NicoManga | 3 | 3 | 0 | 100.00% |
+| NineManga | 2 | 2 | 0 | 100.00% |
+| Raw1001 | 13 | 13 | 0 | 100.00% |
+| RawDEX | 13 | 13 | 0 | 100.00% |
+| RawSenManga | 2 | 2 | 0 | 100.00% |
+| Rawkuma | 6 | 6 | 0 | 100.00% |
+| Tapas | 12 | 12 | 0 | 100.00% |
+| TuMangaNet | 15 | 15 | 0 | 100.00% |
+| TuMangaOnline | 16 | 16 | 0 | 100.00% |
+| VerMangasPorno | 6 | 6 | 0 | 100.00% |
+| WebToons | 14 | 14 | 0 | 100.00% |
+| WebtoonXYZ | 26 | 26 | 0 | 100.00% |
+| WestManga | 12 | 12 | 0 | 100.00% |
+| Zenko | 12 | 12 | 0 | 100.00% |
+| uData (§5.8 normalization) | 27 | 27 | 0 | 100.00% |
 
 ### Per-expression results
 
