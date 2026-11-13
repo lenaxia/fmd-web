@@ -53,6 +53,7 @@ export default defineConfig({
       'server/test/**/*.test.ts',
       'corpus/test/**/*.test.ts',
       'web/test/**/*.test.ts',
+      'web/test/**/*.test.tsx',
     ],
     testTimeout: 60_000,
     coverage: {

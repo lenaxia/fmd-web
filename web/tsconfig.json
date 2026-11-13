@@ -6,8 +6,18 @@
     "declarationMap": true,
     "rootDir": ".",
     "outDir": "dist",
-    "types": []
+
+    // Browser bundle context (Vite): the STRICTNESS flags all come from
+    // ../tsconfig.base.json untouched; only the module/JSX settings are
+    // overridden for the browser+Vite toolchain (bundler resolution,
+    // automatic JSX runtime, DOM lib, vite/client env types).
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "types": ["vite/client"],
+    "useDefineForClassFields": true
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "test/**/*.tsx", "e2e/**/*.ts"],
   "exclude": ["dist"]
 }

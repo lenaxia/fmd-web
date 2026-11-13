@@ -10,3 +10,7 @@ corpus/harness/bin/
 
 # Platform session monitor artifacts
 .monitor/
+
+# Playwright e2e artifacts
+web/test-results/
+web/playwright-report/

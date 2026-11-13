@@ -27,13 +27,23 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['**/*.ts', '**/*.mts', '**/*.cts'],
+    files: ['**/*.ts', '**/*.mts', '**/*.cts', '**/*.tsx'],
     rules: {
       ...boundaryRules,
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
+    },
+  },
+  {
+    // GENERATED api client types (openapi-typescript output) — exempt
+    // from hand-maintained boundary rules; staleness is guarded by the
+    // drift test (web/test/api-drift.test.ts) instead.
+    files: ['web/src/api/openapi.d.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
     },
   },
   {

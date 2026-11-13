@@ -35,7 +35,8 @@ fmd-web/
 │   ├── harness/       FPC capture harness (D1) — Pascal skeleton + README
 │   ├── fixtures/      recorded/synthetic triples (seed set)
 │   └── runner/        offline replay loader/validator
-├── web/               @fmd/web — React + Vite SPA (Phase-0 placeholder)
+├── web/               @fmd/web — React + Vite SPA: Browse · Manga · Downloads · Settings
+│                      (typed API client GENERATED from the OpenAPI snapshot; see web/README.md)
 ├── docs/              DESIGN.md · COMPAT.md · REVIEW-00*.md · runbook
 ├── scripts/ci.sh      local CI gate (typecheck → lint → test)
 ├── Makefile           thin wrapper over the npm scripts
