@@ -1,0 +1,15 @@
+{
+  "name": "@fmd/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "fmd-web API server, module engine (wasmoon worker pool + §5 shims), job queue lanes, sync and db. Phase-0 scaffold: placeholders + healthcheck stub.",
+  "main": "./dist/src/main.js",
+  "types": "./dist/src/main.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/main.d.ts",
+      "default": "./dist/src/main.js"
+    }
+  }
+}

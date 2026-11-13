@@ -1,0 +1,15 @@
+{
+  "name": "@fmd/corpus",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Ground-truth corpus (DESIGN.md §13.1): FPC capture harness, recorded fixtures (triples), and the offline replay runner.",
+  "main": "./dist/runner/fixture-loader.js",
+  "types": "./dist/runner/fixture-loader.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/runner/fixture-loader.d.ts",
+      "default": "./dist/runner/fixture-loader.js"
+    }
+  }
+}

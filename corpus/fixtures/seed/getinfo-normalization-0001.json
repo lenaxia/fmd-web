@@ -1,0 +1,49 @@
+{
+  "id": "seed/getinfo-normalization-0001",
+  "moduleId": "1a2b3c4d5e6f77889900aabbccddeeff",
+  "kind": "getinfo-normalization",
+  "input": {
+    "rawModuleOutput": {
+      "title": "  Example Manga  ",
+      "altTitles": ["  ExampleMan  ", ""],
+      "authors": [" Author One ", "author one "],
+      "genres": ["Action", " Drama "],
+      "summary": "A  test summary.\n\nSecond line.",
+      "status": "Ongoing",
+      "chapterLinks": [
+        "https://site.example/manga/x/ch-1",
+        "https://site.example/manga/x/ch-2",
+        "https://SITE.example/manga/x/ch-2"
+      ],
+      "chapterNames": [
+        "Chapter 1",
+        "Chapter  2 ",
+        "chapter 2"
+      ]
+    }
+  },
+  "expected": {
+    "postProcessed": {
+      "title": "Example Manga",
+      "altTitles": ["ExampleMan"],
+      "authors": ["Author One", "author one"],
+      "genres": ["Action", "Drama"],
+      "summary": "A  test summary.\n\nSecond line.",
+      "chapterLinks": ["/manga/x/ch-1", "/manga/x/ch-2"],
+      "chapterNames": ["Chapter 1", "chapter 2"],
+      "numChapter": 2
+    },
+    "pipelineNotes": {
+      "dedupe": "case-insensitive duplicate chapter removal deletes the EARLIER index (uData.pas:154-173) so the LAST occurrence's link+name survives (§5.8 step 4)",
+      "padPrune": "ChapterNames padded with '' / pruned to match ChapterLinks (uData.pas:143-152)",
+      "hostStrip": "RemoveHostFromURLsPair strips hosts from the chapter-links pair (uData.pas:175-179)",
+      "numChapter": "NumChapter := ChapterLinks.Count (uData.pas:205)"
+    }
+  },
+  "meta": {
+    "captured": false,
+    "synthetic": true,
+    "source": "DESIGN.md §5.8 walkthrough (uData.pas:85-207); replace with an FPC-captured triple before Phase-1 exit",
+    "internettoolsCommit": null
+  }
+}

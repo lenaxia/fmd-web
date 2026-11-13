@@ -1,0 +1,170 @@
+{
+  "$schema": "./schema/contract.schema.json",
+  "meta": {
+    "designVersion": "v5",
+    "source": "DESIGN.md §5 — FMD2 Compatibility Contract (derived from FMD2 baseunits/lua/*.pas)",
+    "groundTruth": "§5.2 table transcribed directly from the 15 Do* dispatchers in LuaWebsiteModules.pas (verified twice: REVIEW-001/002; 15/15 in REVIEW-003)",
+    "schema": "./schema/contract.schema.json"
+  },
+  "statusConstants": {
+    "netStatus": { "no_error": 0, "net_problem": 1, "information_not_found": 2 },
+    "accountStatus": ["asUnknown", "asChecking", "asValid", "asInvalid"]
+  },
+  "events": [
+    {
+      "event": "GetDirectoryPageNumber",
+      "returns": "code",
+      "globals": ["HTTP", "UPDATELIST", "PAGENUMBER", "WORKPTR"],
+      "readBack": ["PAGENUMBER"]
+    },
+    {
+      "event": "GetNameAndLink",
+      "returns": "code",
+      "globals": ["HTTP", "NAMES", "LINKS", "UPDATELIST", "URL"],
+      "readBack": []
+    },
+    {
+      "event": "GetInfo",
+      "returns": "code",
+      "globals": ["MANGAINFO", "HTTP", "URL"],
+      "readBack": []
+    },
+    {
+      "event": "BeforeUpdateList",
+      "returns": "boolean",
+      "globals": ["UPDATELIST"],
+      "readBack": []
+    },
+    {
+      "event": "AfterUpdateList",
+      "returns": "boolean",
+      "globals": ["UPDATELIST"],
+      "readBack": []
+    },
+    {
+      "event": "TaskStart",
+      "returns": "boolean",
+      "globals": ["TASK"],
+      "readBack": []
+    },
+    {
+      "event": "GetPageNumber",
+      "returns": "boolean",
+      "globals": ["TASK", "HTTP", "URL"],
+      "readBack": []
+    },
+    {
+      "event": "GetImageURL",
+      "returns": "boolean",
+      "globals": ["TASK", "HTTP", "WORKID", "URL"],
+      "readBack": []
+    },
+    {
+      "event": "BeforeDownloadImage",
+      "returns": "boolean",
+      "globals": ["TASK", "HTTP", "WORKID", "URL"],
+      "readBack": [],
+      "pushOnly": true
+    },
+    {
+      "event": "DownloadImage",
+      "returns": "boolean",
+      "globals": ["TASK", "HTTP", "WORKID", "URL"],
+      "readBack": []
+    },
+    {
+      "event": "SaveImage",
+      "returns": "string",
+      "globals": ["HTTP", "PATH", "FILENAME"],
+      "readBack": []
+    },
+    {
+      "event": "AfterImageSaved",
+      "returns": "boolean",
+      "globals": ["FILENAME"],
+      "readBack": []
+    },
+    {
+      "event": "Login",
+      "returns": "boolean",
+      "globals": ["HTTP"],
+      "readBack": [],
+      "accountConstants": true
+    },
+    {
+      "event": "AccountState",
+      "returns": "boolean",
+      "globals": [],
+      "readBack": [],
+      "accountConstants": true
+    },
+    {
+      "event": "CheckSite",
+      "returns": "boolean",
+      "globals": [],
+      "readBack": [],
+      "accountConstants": true
+    }
+  ],
+  "moduleSurface": [
+    "ID", "Name", "RootURL", "Category", "TotalDirectory",
+    "MaxTaskLimit", "MaxThreadPerTaskLimit", "MaxConnectionLimit",
+    "ActiveTaskCount", "ActiveConnectionCount", "SortedList",
+    "InformationAvailable", "FavoriteAvailable", "DynamicPageLink",
+    "CurrentDirectoryIndex", "LastUpdated", "Tag", "Guardian",
+    "Storage", "AccountSupport",
+    "OnBeforeUpdateList", "OnAfterUpdateList", "OnGetDirectoryPageNumber",
+    "OnGetNameAndLink", "OnGetInfo", "OnTaskStart", "OnGetPageNumber",
+    "OnGetImageURL", "OnBeforeDownloadImage", "OnDownloadImage",
+    "OnSaveImage", "OnAfterImageSaved", "OnLogin", "OnAccountState",
+    "OnCheckSite",
+    "AddOptionCheckBox", "AddOptionEdit", "AddOptionSpinEdit",
+    "AddOptionComboBox", "AddServerCookies", "GetServerCookies",
+    "RemoveCookies", "ClearCookies", "GetOption"
+  ],
+  "taskFields": [
+    { "name": "PageLinks", "access": "read-write", "kind": "list" },
+    { "name": "PageContainerLinks", "access": "read-write", "kind": "list" },
+    { "name": "PageNumber", "access": "read-write", "kind": "int" },
+    { "name": "FileNames", "access": "read-write", "kind": "list" },
+    { "name": "ChapterLinks", "access": "read-only", "kind": "list" },
+    { "name": "ChapterNames", "access": "read-only", "kind": "list" },
+    { "name": "CurrentDownloadChapterPtr", "access": "read-only", "kind": "int" },
+    { "name": "CurrentMaxFileNameLength", "access": "read-only", "kind": "int" },
+    { "name": "Link", "access": "read-only", "kind": "string" }
+  ],
+  "mangaInfoFields": [
+    "Title", "AltTitles", "Authors", "Artists", "Genres", "Status",
+    "Summary", "CoverLink", "ChapterLinks", "ChapterNames", "URL", "Link"
+  ],
+  "requireShims": [
+    { "require": "fmd.env", "fmd2Unit": "LuaFMD", "implementation": "Directory, ExeName ('fmd-web'), Version, Revision, LuaDirectory, SelectedLanguage ('en', D10)", "status": "planned" },
+    { "require": "fmd.crypto", "fmd2Unit": "LuaCrypto", "implementation": "full surface (LuaCrypto.pas:429-494) incl. RC4, AES*GCM(+AAD), X25519_*, P256_*, SecretStream pull-side, PBKDF2SHA256, Base64/Base64URL, CRC16/32, MD4, LongHash, UU, URL enc/dec, synacode block", "status": "planned" },
+    { "require": "fmd.duktape", "fmd2Unit": "LuaDuktape", "implementation": "ExecJS(js) via node:vm (timeout 5s) + Duktape.enc/dec polyfill; JS-side CommonJS require jailed to synced lua/ tree (77 modules); JS error => nil", "status": "planned" },
+    { "require": "fmd.gzip", "fmd2Unit": "LuaGZip", "implementation": "single method Inflate (LuaGZip.pas:47-50)", "status": "planned" },
+    { "require": "fmd.fileutil", "fmd2Unit": "LuaFileUtil", "implementation": "3 pure helpers: ExtractFileName, ExtractFileNameOnly, SerializeAndMaintainNames", "status": "planned" },
+    { "require": "fmd.imagepuzzle", "fmd2Unit": "LuaImagePuzzle", "implementation": "sharp port; New/Create(w,h), HorBlock/VerBlock, Matrix[]/Flips[]/Multiply, DeScramble(src,dst) incl. in-place", "status": "planned" },
+    { "require": "fmd.logger", "fmd2Unit": "LuaLogger", "implementation": "structured logging", "status": "planned" },
+    { "require": "fmd.mangafoxwatermark", "fmd2Unit": "LuaMangaFox", "implementation": "sharp port; Windows backslash paths normalized to synced lua/; PNG assets shipped", "status": "planned" },
+    { "require": "fmd.pcre2", "fmd2Unit": "LuaPCRE2", "implementation": "PCRE2 wasm/RE2, API-faithful", "status": "planned" },
+    { "require": "fmd.strings", "fmd2Unit": "LuaStrings", "implementation": "TStrings facade factory (§5.5)", "status": "planned" },
+    { "require": "pb", "fmd2Unit": "lua-protobuf (native, pb.dll)", "implementation": "package.preload['pb'] backed by protobufjs: decode, encode, load (returns (ret,pos)) — D17", "status": "planned" },
+    { "require": "subprocess", "fmd2Unit": "LuaSubprocess", "implementation": "denied stub (RunCommand* => nil) unless browser profile (§5.11)", "status": "stub" },
+    { "require": "utils.* / templates.*", "fmd2Unit": "lua/utils/, lua/templates/", "implementation": "plain Lua chunks via the file-package loader from the synced tree; utils.nodejs special (§5.11)", "status": "planned" }
+  ],
+  "capabilities": [
+    { "id": "fmd.subprocess", "description": "Module requires fmd.subprocess (TheBlank, RaijinScans, Comix); needs browser sidecar profile", "defaultEnabled": false },
+    { "id": "madara.run_html_load", "description": "templates/Madara.lua:169 run_html_load no-JS fallback (up to 76 Madara-family sites); Duktape image-decryption path is default-flow and unaffected", "defaultEnabled": false },
+    { "id": "webdriver.bypass", "description": "Python/webdriver bypass sites; needs browser sidecar profile", "defaultEnabled": false }
+  ],
+  "invariants": [
+    "MODULE is bound for every event (LuaWebsiteModuleHandler.pas:47-49, 59-64)",
+    "There is no ACCOUNT global; the account is reached only as MODULE.Account",
+    "PAGENUMBER is the only read-back global (LuaWebsiteModules.pas:210-212)",
+    "URL is never read back after any call",
+    "First three table rows return codes; all others return booleans; SaveImage returns a string",
+    "BeforeDownloadImage globals are push-only; modules cannot mutate the download URL",
+    "Module property access is case-sensitive; unknown keys silently no-op on get and set (LuaClass.pas:94-169)",
+    "NewWebsiteModule() is available only during Init(); registrations missing ID or Name are dropped"
+  ]
+}

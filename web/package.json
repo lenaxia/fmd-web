@@ -1,0 +1,9 @@
+{
+  "name": "@fmd/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "React + Vite SPA (Browse · Manga · Favorites · Downloads · Settings) — Phase-0 placeholder; Vite/React wiring lands in Phase 2 (DESIGN.md §11).",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts"
+}

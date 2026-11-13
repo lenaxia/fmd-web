@@ -1,0 +1,17 @@
+{
+  "name": "@fmd/contract",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Machine-readable FMD2 compatibility contract (DESIGN.md §5): source of generated code and CI drift checks.",
+  "main": "./dist/types.js",
+  "types": "./dist/types.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types.d.ts",
+      "default": "./dist/types.js"
+    },
+    "./contract.json": "./contract.json",
+    "./schema/contract.schema.json": "./schema/contract.schema.json"
+  }
+}

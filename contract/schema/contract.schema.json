@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fmd-web compatibility contract (DESIGN.md §5)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "meta",
+    "statusConstants",
+    "events",
+    "moduleSurface",
+    "taskFields",
+    "mangaInfoFields",
+    "requireShims",
+    "capabilities",
+    "invariants"
+  ],
+  "properties": {
+    "$schema": { "type": "string" },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["designVersion", "source", "groundTruth", "schema"],
+      "properties": {
+        "designVersion": { "type": "string" },
+        "source": { "type": "string" },
+        "groundTruth": { "type": "string" },
+        "schema": { "type": "string" }
+      }
+    },
+    "statusConstants": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["netStatus", "accountStatus"],
+      "properties": {
+        "netStatus": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["no_error", "net_problem", "information_not_found"],
+          "properties": {
+            "no_error": { "const": 0 },
+            "net_problem": { "const": 1 },
+            "information_not_found": { "const": 2 }
+          }
+        },
+        "accountStatus": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["asUnknown", "asChecking", "asValid", "asInvalid"] },
+          "minItems": 4,
+          "maxItems": 4
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "minItems": 15,
+      "maxItems": 15,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["event", "returns", "globals", "readBack"],
+        "properties": {
+          "event": {
+            "type": "string",
+            "enum": [
+              "GetDirectoryPageNumber", "GetNameAndLink", "GetInfo",
+              "BeforeUpdateList", "AfterUpdateList", "TaskStart",
+              "GetPageNumber", "GetImageURL", "BeforeDownloadImage",
+              "DownloadImage", "SaveImage", "AfterImageSaved",
+              "Login", "AccountState", "CheckSite"
+            ]
+          },
+          "returns": { "type": "string", "enum": ["code", "boolean", "string"] },
+          "globals": { "type": "array", "items": { "type": "string", "pattern": "^[A-Z][A-Za-z]*$" }, "uniqueItems": true },
+          "readBack": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+          "pushOnly": { "type": "boolean" },
+          "accountConstants": { "type": "boolean" }
+        }
+      }
+    },
+    "moduleSurface": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+    "taskFields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "access", "kind"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "access": { "type": "string", "enum": ["read-write", "read-only"] },
+          "kind": { "type": "string", "enum": ["list", "int", "string"] }
+        }
+      }
+    },
+    "mangaInfoFields": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true,
+      "minItems": 12
+    },
+    "requireShims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["require", "fmd2Unit", "implementation", "status"],
+        "properties": {
+          "require": { "type": "string", "minLength": 1 },
+          "fmd2Unit": { "type": "string", "minLength": 1 },
+          "implementation": { "type": "string", "minLength": 1 },
+          "status": { "type": "string", "enum": ["planned", "partial", "stub"] }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "description", "defaultEnabled"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1 },
+          "defaultEnabled": { "type": "boolean" }
+        }
+      }
+    },
+    "invariants": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    }
+  }
+}

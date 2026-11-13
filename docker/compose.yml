@@ -1,0 +1,34 @@
+name: fmd-web
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: fmd-web:local
+    init: true
+    ports:
+      - "3000:3000"
+    environment:
+      PORT: "3000"
+      NODE_ENV: production
+      FMD_WEB_DATA_DIR: /app/data
+      # FMD_WEB_SECRET: set in production (account encryption, §8)
+      # FMD_WEB_PASSWORD: optional single-password auth (§10)
+    volumes:
+      - app-data:/app/data
+    restart: unless-stopped
+
+  # ── Optional `browser` profile (DESIGN.md §5.11, D2) ────────────────
+  # Opt in with:  docker compose --profile browser up
+  # Provides FlareSolverr + headless Chromium so subprocess-dependent
+  # and webdriver-bypass modules run (§5.10 capability flags flip).
+  # The server reaches it via http://flaresolverr:8191 when enabled.
+  # flaresolverr:
+  #   image: ghcr.io/flaresolverr/flaresolverr:v3.3.21
+  #   profiles: ["browser"]
+  #   ports:
+  #     - "8191:8191"
+
+volumes:
+  app-data:

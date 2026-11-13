@@ -1,0 +1,66 @@
+# fmd-web image (DESIGN.md §11 docker/).
+#
+# Multi-stage: build (full workspace + tsc -b) → runtime (prod deps +
+# dist trees, non-root `node` user, healthcheck stub).
+#
+# Base image is pinned to an exact Node LTS minor (DESIGN.md §3
+# reproducibility). CI replaces this tag with its resolved
+# @sha256:... digest and double-builds + SBOM-diffs to catch drift;
+# keep the exact-minor form here so local builds stay deterministic.
+FROM node:22.14.0-bookworm-slim AS build
+
+WORKDIR /app
+
+# Workspace manifests first for layer-cached installs.
+COPY package.json package-lock.json ./
+COPY contract/package.json contract/
+COPY server/package.json server/
+COPY corpus/package.json corpus/
+COPY web/package.json web/
+RUN npm ci --no-audit --no-fund
+
+# Sources + build (project references build contract → server/corpus/web).
+COPY tsconfig.base.json tsconfig.json ./
+COPY contract ./contract
+COPY server ./server
+COPY corpus ./corpus
+COPY web ./web
+RUN npm run build \
+    && npm prune --omit=dev --no-audit --no-fund
+
+FROM node:22.14.0-bookworm-slim AS runtime
+
+ENV NODE_ENV=production \
+    PORT=3000 \
+    FMD_WEB_DATA_DIR=/app/data
+
+WORKDIR /app
+
+# The placeholder server needs no OS packages beyond the base image;
+# when sharp/7zz/sodium-native land (DESIGN.md §3), add them HERE with
+# apt-get + exact versions, never in the build stage.
+RUN mkdir -p /app/data \
+    && chown node:node /app/data
+
+COPY --from=build --chown=root:root /app/package.json ./package.json
+COPY --from=build --chown=root:root /app/node_modules ./node_modules
+COPY --from=build --chown=root:root /app/contract/package.json ./contract/package.json
+COPY --from=build --chown=root:root /app/contract/dist ./contract/dist
+COPY --from=build --chown=root:root /app/server/package.json ./server/package.json
+COPY --from=build --chown=root:root /app/server/dist ./server/dist
+COPY --from=build --chown=root:root /app/corpus/package.json ./corpus/package.json
+COPY --from=build --chown=root:root /app/web/package.json ./web/package.json
+
+# Non-root (official image ships the `node` user, uid 1000).
+USER node
+
+EXPOSE 3000
+VOLUME /app/data
+
+# Healthcheck stub against the placeholder /healthz endpoint.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||'3000')+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+# SIGTERM → bounded drain (server/src/main.ts, DESIGN.md §4).
+# dist/src/ layout: the composite project emits src + test trees.
+CMD ["node", "server/dist/src/main.js"]

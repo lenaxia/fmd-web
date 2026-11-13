@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "rootDir": ".",
+    "outDir": "dist",
+    "types": ["node"]
+  },
+  "include": ["types.ts", "tools/**/*.ts", "test/**/*.ts"],
+  "exclude": ["dist", "tools/fixture-tests"]
+}
