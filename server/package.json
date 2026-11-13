@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "fmd-web API server, module engine (wasmoon worker pool + \u00a75 shims), job queue lanes, sync and db. Phase-0 scaffold: placeholders + healthcheck stub.",
+  "description": "fmd-web API server, module engine (wasmoon worker pool + §5 shims), job queue lanes, sync and db. Phase-0 scaffold: placeholders + healthcheck stub.",
   "main": "./dist/src/main.js",
   "types": "./dist/src/main.d.ts",
   "scripts": {
@@ -16,12 +16,13 @@
     }
   },
   "dependencies": {
+    "aes-js": "1.0.0",
     "fontoxpath": "3.33.2",
     "linkedom": "^0.18.15",
     "protobufjs": "^8.8.1",
+    "socks-proxy-agent": "^10.1.0",
+    "sodium-native": "5.2.1",
     "undici": "^8.12.4",
-    "wasmoon": "^1.16.0",
-    "aes-js": "1.0.0",
-    "sodium-native": "5.2.1"
+    "wasmoon": "^1.16.0"
   }
 }

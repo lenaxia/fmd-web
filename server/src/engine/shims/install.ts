@@ -5,7 +5,15 @@ import { readFileSync } from 'node:fs';
 import type { LuaEngine as WasmoonEngine } from 'wasmoon';
 import { parseQueryDocument, type DuckDocument } from './txquery-shim.js';
 import { TxQueryShim } from './txquery-facade.js';
-import { makeHttpShim, type HttpDocument, type RecordedResponseResolver } from './http-shim.js';
+import {
+  makeHttpShim,
+  type CookieJarPort,
+  type EgressPolicy,
+  type HttpDocument,
+  type HostGatePort,
+  type HttpTransportPort,
+  type RecordedResponseResolver,
+} from './http-shim.js';
 import { installRequireShim } from './lua-require.js';
 
 /**
@@ -30,6 +38,16 @@ export interface InstallShimsOptions {
     readonly revision?: string;
     readonly selectedLanguage?: string;
   };
+  /** §5.3 shared cookie jar port (cookie persistence across objects). */
+  readonly sharedCookies?: CookieJarPort;
+  /** Per-host connection gate (limits + host-level delays). */
+  readonly gate?: HostGatePort;
+  /** Egress policy (default: deny RFC1918/link-local). */
+  readonly egress?: EgressPolicy;
+  /** Transport override (default: recorded fixtures; loopback for integration tests). */
+  readonly transport?: HttpTransportPort;
+  /** Filesystem jail root for Document LoadFromFile/SaveToFile (§5.4). */
+  readonly fsJail?: string;
 }
 
 export interface InstalledShims {
@@ -91,6 +109,11 @@ export function installShims(
       resolver: options.resolver,
       abort: options.abort,
       documents,
+      ...(options.sharedCookies !== undefined ? { sharedCookies: options.sharedCookies } : {}),
+      ...(options.gate !== undefined ? { gate: options.gate } : {}),
+      ...(options.egress !== undefined ? { egress: options.egress } : {}),
+      ...(options.transport !== undefined ? { transport: options.transport } : {}),
+      ...(options.fsJail !== undefined ? { fsJail: options.fsJail } : {}),
     }).spec;
 
   // CreateTXQuery: HTTP.Document facade | HTML string | none

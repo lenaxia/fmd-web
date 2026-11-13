@@ -30,16 +30,24 @@
       "body": "",
       "mimeType": "",
       "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        "Accept-Encoding": "gzip, deflate, br",
+        "DNT": "1",
+        "Upgrade-Insecure-Requests": "1",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Charset": "utf-8",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
       }
     },
     {
       "method": "GET",
       "url": "https://comick.live/api/comics/solo-leveling/chapter-list?chapOrder=asc&page=1&lang=en",
-      "body": "",
-      "mimeType": "",
+      "body": "<!DOCTYPE html>\n<html><head>\n<script id=\"comic-data\">{\"title\":\"Solo Leveling\",\"slug\":\"solo-leveling\",\"status\":1,\"demographic_name\":\"shounen\",\"origination\":\"Korean\",\"desc\":\"Level up.\",\"default_thumbnail\":\"https://comick.cc/thumbs/solo-leveling.jpg\",\"md_titles\":[{\"title\":\"나 혼자만 레벨업\"},{\"title\":\"Solamente yo subo de nivel\"}],\"authors\":[{\"name\":\"Chugong\"}],\"artists\":[],\"md_comic_md_genres\":[{\"md_genres\":{\"name\":\"Action\"}},{\"md_genres\":{\"name\":\"Fantasy\"}}]}</script>\n</head><body></body></html>\n",
+      "mimeType": "text/html; charset=utf-8",
       "headers": {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        "content-type": "text/html; charset=utf-8",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+        "Content-Type": "text/html; charset=utf-8"
       }
     }
   ]
