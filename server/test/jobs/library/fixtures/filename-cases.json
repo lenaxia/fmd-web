@@ -1,12 +1,14 @@
 {
-  "$comment": "Golden fixtures for library chapter filename resolution (DESIGN §7.1): order = module FileNames[] → SaveImage return → filename template → chapter name; RemoveSymbols sanitization (uBaseUnit.pas:55-57, 1382-1394 — \\ / : \" * ? < > | plus #0..#31 and #127 DELETED); tail truncation when over CurrentMaxFileNameLength, 0 = unlimited (D5, uDownloadsManager.pas:543-550).",
+  "$comment": "Golden fixtures for library chapter filename resolution (DESIGN §7.1): order = module FileNames[] → SaveImage return → filename template → chapter name. Sanitization = exact RemoveSymbols parity: EXACTLY the FMD2 Symbols set — \\ / : * ? \" < > | plus tab (#9) and ';' (uBaseUnit.pas:59-60) — is deleted unit by unit (:1382-1394); control units OUTSIDE the set and DEL #127 are NOT removed (RemoveSymbols has no general control sweep). The trim is FPC Trim parity (leading/trailing units ≤ #32) per FixStringLocal's CommonStringFilter (:1807 → :2123), applied by fmd-web to every candidate as the documented §7.1 whole-component divergence (FMD2 trims only CustomRename results, :1804-1813/:1856). Tail truncation when over CurrentMaxFileNameLength, 0 = unlimited (D5, uDownloadsManager.pas:545-549, applied after :542 substitution).",
   "sanitize": [
     { "input": "a/b:c", "expected": "abc" },
     { "input": "a*b?c<d>e|f\"g\\h", "expected": "abcdefgh" },
     { "input": "back\\slash", "expected": "backslash" },
-    { "input": "ctrl\u0001x\u001f\u007f", "expected": "ctrlx" },
-    { "input": "tab\tnewline\nremoved", "expected": "tabnewlineremoved" },
-    { "input": "  trimmed  ", "expected": "trimmed" },
+    { "input": "semi;colon", "expected": "semicolon" },
+    { "input": "tab\tstop", "expected": "tabstop" },
+    { "input": "keep\u0001ctrl\u001fand\u007fdel", "expected": "keep\u0001ctrl\u001fand\u007fdel" },
+    { "input": "line\nbreak-kept", "expected": "line\nbreak-kept" },
+    { "input": "  trimmed\t", "expected": "trimmed" },
     { "input": "第一章 (v2) [end]", "expected": "第一章 (v2) [end]" },
     { "input": "50% off", "expected": "50% off" },
     { "input": "plus+minus=-", "expected": "plus+minus=-" },

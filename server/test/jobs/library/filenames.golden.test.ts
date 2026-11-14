@@ -13,8 +13,10 @@ import {
  * Filename golden tests (DESIGN §7.1): resolution order (module
  * FileNames[] → SaveImage return → filename template → chapter name),
  * tail-keeping truncation over CurrentMaxFileNameLength (0 = unlimited,
- * D5) and the path-unsafe sanitization table (uBaseUnit.pas:55-57,
- * 1382-1394) — all table-driven from committed fixtures.
+ * D5) and the path-unsafe sanitization table (uBaseUnit.pas:59-60 set,
+ * :1382-1394 — exactly the Symbols set, incl. tab #9 and ';', is
+ * deleted; no general control sweep; FPC Trim per :2123) — all
+ * table-driven from committed fixtures.
  */
 interface StringTableCase {
   readonly input: string;
@@ -50,7 +52,7 @@ const doc = JSON.parse(
   ),
 ) as FilenameCasesFile;
 
-describe('sanitizeFileName — RemoveSymbols table (uBaseUnit.pas:55-57, 1382-1394)', () => {
+describe('sanitizeFileName — RemoveSymbols table (set :59-60, loop :1382-1394)', () => {
   for (const testCase of doc.sanitize) {
     it(JSON.stringify(testCase.input), () => {
       expect(sanitizeFileName(testCase.input)).toBe(testCase.expected);

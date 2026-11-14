@@ -6,17 +6,20 @@
  *   1. module `FileNames[]` entry for the chapter
  *      (TASK.FileNames, LuaDownloadTask.pas:21-32 — honored when the
  *      chapter pointer indexes the list, mirroring GetFileName's
- *      count-alignment guard, uDownloadsManager.pas:531-539);
+ *      count-alignment guard, uDownloadsManager.pas:537-539);
  *   2. the `SaveImage` return value (DoSaveImage, LuaWebsiteModules.pas:
- *      372-391 — SaveImage returns the filename the module saved);
+ *      372-391 — SaveImage returns the filename the module saved,
+ *      luaToString at :386);
  *   3. the filename template — chapter-scope CustomRename placeholders
- *      (CR_* constants, uBaseUnit.pas:251-257; every substituted value is
- *      sanitized per FixStringLocal, :1804-1813). `%FILENAME%` has no
- *      page-name source at chapter scope — FMD2's chapter-scope
- *      CustomRename calls pass AFileName='' — so it substitutes the
- *      SaveImage return (normally absent, since a present SaveImage
- *      return already won at step 2), leaving the template's literal
- *      text (FMD2 behavior: unresolvable placeholders yield '').
+ *      (CR_* constants, uBaseUnit.pas:251-257). FMD2's chapter-naming
+ *      CustomRename calls leave `AFileName` at its '' default
+ *      (signature :564-567; calls uFavoritesManager.pas:483-492,
+ *      uSilentThread.pas:332-340), so `%FILENAME%` has no page-name
+ *      source at chapter scope there — it substitutes ''. fmd-web
+ *      substitutes the SaveImage return instead (normally absent,
+ *      since a present SaveImage return already won at step 2),
+ *      leaving the template's literal text (FMD2 behavior:
+ *      unresolvable placeholders yield '').
  *   4. the chapter name (FMD2's packer fallback — the packed chapter is
  *      `<SaveTo>/<ChapterNames[ptr]>.<ext>`, uDownloadsManager.pas:577).
  *
@@ -24,20 +27,43 @@
  * sanitized once more as a whole: the fmd-web library is a fixed-depth
  * layout (§7.1/§9), so a template's literal text cannot introduce path
  * separators — a deliberate, documented divergence from FMD2, where a
- * CustomRename template may create subdirectories under downloads/.
+ * CustomRename template may create subdirectories under downloads/ and
+ * the GetFileName page path is not sanitized at all (:542).
  *
- * Sanitization = `RemoveSymbols` parity (uBaseUnit.pas:55-57, 1382-1394)
- * plus Trim: the FMD2 symbol set `\ / : " * ? < > |`, all control
- * characters #0..#31 and #127 are DELETED (not replaced), then the name
- * is trimmed (CommonStringFilter Trims, :2123). Truncation = tail
- * survival: `Delete(s, 1, Length(s) - FCurrentMaxFileNameLength)` when
- * over `CurrentMaxFileNameLength`, applied AFTER template expansion
- * (:543-550, :542→:543 order); 0 = no limit (D5 Windows-desktop parity,
- * UTF-16 code units — Pascal's UnicodeString Length).
+ * Sanitization = exact `RemoveSymbols` parity (set uBaseUnit.pas:59-60,
+ * loop :1382-1394): EXACTLY the FMD2 `Symbols` set — `\ / : * ? " < > |`
+ * plus tab (#9) and `;` — is deleted, unit by unit, and NOTHING else.
+ * `RemoveSymbols` has no general control-character sweep: control units
+ * outside the set (#0..#8, #10..#31, ...) and DEL (#127) survive —
+ * parity, verified. The trailing trim is FPC `Trim` parity (strips only
+ * leading/trailing units ≤ #32, not Unicode whitespace) and follows
+ * FixStringLocal's CommonStringFilter (uBaseUnit.pas:1807 → :2119-2124,
+ * the Trim at :2123); fmd-web applies it to every candidate as part of
+ * the whole-component sanitization above, whereas FMD2 trims only
+ * CustomRename results (per-value FixStringLocal :1804-1813, final
+ * `TrimChar(AllowDirectorySeparators)` at :1856).
+ *
+ * Template-substitution values pass through the same
+ * {@link sanitizeFileName}; FMD2's FixStringLocal (:1804-1813)
+ * additionally entity-decodes via CommonStringFilter and optionally
+ * strips unicode (:1810-1812) — HTML-text hygiene plus a user option
+ * fmd-web does not reproduce here (documented divergence).
+ *
+ * Truncation = tail survival: `Delete(s, 1, Length(s) -
+ * FCurrentMaxFileNameLength)` when over `CurrentMaxFileNameLength`,
+ * applied AFTER the template expansion (uDownloadsManager.pas:545-549,
+ * the :542 substitution → :545 check order); 0 = no limit (D5
+ * Windows-desktop parity, UTF-16 code units — Pascal's UnicodeString
+ * Length).
  */
 
-/** uBaseUnit.pas:55-57 — the path-unsafe symbol set. */
-export const SYMBOLS: readonly string[] = ['\\', '/', ':', '"', '*', '?', '<', '>', '|'];
+/**
+ * uBaseUnit.pas:59-60 — the FMD2 `Symbols` set, in declaration order:
+ * path-unsafe punctuation plus tab (#9) and `;`. Exactly these units
+ * are deleted by {@link sanitizeFileName} (`RemoveSymbols` parity) —
+ * no other character is removed.
+ */
+export const SYMBOLS: readonly string[] = ['\\', '/', ':', '*', '?', '"', '<', '>', '|', '\t', ';'];
 
 /** CustomRename placeholders (uBaseUnit.pas:251-257). */
 export const CR = {
@@ -50,24 +76,34 @@ export const CR = {
   fileName: '%FILENAME%',
 } as const;
 
-function isSymbolUnit(code: number): boolean {
-  return code <= 31 || code === 127;
+/**
+ * FPC `Trim` parity (:2123): strips leading/trailing units ≤ #32 only —
+ * deliberately NOT JS `.trim()`, which additionally strips Unicode
+ * whitespace (U+00A0, U+2028, ...) Pascal leaves alone.
+ */
+function trimAscii(s: string): string {
+  let start = 0;
+  let end = s.length;
+  while (start < end && s.charCodeAt(start) <= 0x20) start += 1;
+  while (end > start && s.charCodeAt(end - 1) <= 0x20) end -= 1;
+  return s.slice(start, end);
 }
 
 /**
- * `RemoveSymbols` + Trim parity: deletes every `\ / : " * ? < > |`,
- * control (#0..#31) and DEL (#127) unit, then trims. Idempotent.
+ * `RemoveSymbols` + Trim parity: deletes exactly the {@link SYMBOLS}
+ * set (uBaseUnit.pas:59-60, loop :1382-1394) and nothing else — no
+ * general control-character sweep — then strips leading/trailing units
+ * ≤ #32 (:2123). Idempotent.
  */
 export function sanitizeFileName(name: string): string {
   let out = '';
   for (const ch of name) {
-    const code = ch.charCodeAt(0);
-    if (SYMBOLS.includes(ch) || isSymbolUnit(code)) {
+    if (SYMBOLS.includes(ch)) {
       continue;
     }
     out += ch;
   }
-  return out.trim();
+  return trimAscii(out);
 }
 
 /**
@@ -105,7 +141,7 @@ export interface ChapterFileNameParts {
   readonly template?: string;
   /** Chapter name (the FMD2 packer fallback, :577). */
   readonly chapterName?: string;
-  /** Template substitution values (each sanitized, FixStringLocal). */
+  /** Template substitution values (each passed through sanitizeFileName). */
   readonly website?: string;
   readonly manga?: string;
   readonly author?: string;
@@ -143,8 +179,11 @@ export function resolveChapterFileName(parts: ChapterFileNameParts): string {
     if (candidate !== '') return truncateKeepTail(candidate, parts.maxLength ?? 0);
   }
 
-  // 3. filename template (CR_* substitution; values sanitized per
-  //    FixStringLocal, uBaseUnit.pas:1843-1852)
+  // 3. filename template (CR_* substitution). Substitution values go
+  //    through the same sanitizeFileName; FMD2's FixStringLocal
+  //    (uBaseUnit.pas:1804-1813) additionally entity-decodes via
+  //    CommonStringFilter and optionally strips unicode (:1810-1812) —
+  //    documented divergences, see the module doc.
   if (parts.template !== undefined && parts.template !== '') {
     const values: Record<string, string> = {
       [CR.numbering]: safe(parts.numbering ?? ''),
