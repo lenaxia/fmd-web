@@ -1,0 +1,92 @@
+{
+  "$comment": "Golden parity fixtures for MergeCaseInsensitive (uBaseUnit.pas:1438-1455) — TStringList(CaseSensitive=False, Duplicates=dupIgnore, Sorted=True), AddText per input (DoSetTextStr line split), Text out (LF-joined + trailing LF). Every 'expected' string was derived by hand-simulating the FPC 3.2.2 algorithm: sorted case-insensitive, dupIgnore drops the NEW line on a case-insensitive match (the FIRST-ADDED case variant survives), interior empty lines are items, a trailing break adds no item, LineEnding = LF (Linux runtime convention, engine/lua/tstrings.ts).",
+  "cases": [
+    {
+      "name": "no inputs yields empty string",
+      "inputs": [],
+      "expected": ""
+    },
+    {
+      "name": "empty-string inputs yield empty string (AddText adds no lines)",
+      "inputs": ["", ""],
+      "expected": ""
+    },
+    {
+      "name": "single list passes through sorted and trailing-LF",
+      "inputs": ["Zebra\nmango\nApple\n"],
+      "expected": "Apple\nmango\nZebra\n"
+    },
+    {
+      "name": "exact duplicate across inputs drops the repeat",
+      "inputs": ["Ch1\nCh2\n", "Ch2\n"],
+      "expected": "Ch1\nCh2\n"
+    },
+    {
+      "name": "case variants across inputs: first-added variant survives both keys",
+      "inputs": ["Banana\napple\n", "Apple\nbanana\n"],
+      "expected": "apple\nBanana\n"
+    },
+    {
+      "name": "case-variant duplicate: the first-added case wins, order is sort order",
+      "inputs": ["Chapter 1\nchapter 2\n", "CHAPTER 1\nChapter 2\n"],
+      "expected": "Chapter 1\nchapter 2\n"
+    },
+    {
+      "name": "reorder: output is sorted regardless of input order",
+      "inputs": ["https://s/3\nhttps://s/1\n", "https://s/2\n"],
+      "expected": "https://s/1\nhttps://s/2\nhttps://s/3\n"
+    },
+    {
+      "name": "interior empty line is an item, kept once",
+      "inputs": ["a\n\nb\n", "\n"],
+      "expected": "\na\nb\n"
+    },
+    {
+      "name": "trailing break adds no item",
+      "inputs": ["a\nb\n", ""],
+      "expected": "a\nb\n"
+    },
+    {
+      "name": "CRLF input parses to LF-joined output",
+      "inputs": ["x\r\ny\r\n"],
+      "expected": "x\ny\n"
+    },
+    {
+      "name": "whitespace-only line sorts before letters (CompareText byte order)",
+      "inputs": ["a\n \nb\n"],
+      "expected": " \na\nb\n"
+    },
+    {
+      "name": "underscore sorts before folded letters (ASCII fold, byte order)",
+      "inputs": ["b\nA\n_underscore\n"],
+      "expected": "_underscore\nA\nb\n"
+    },
+    {
+      "name": "digits sort before letters",
+      "inputs": ["ch10\nch2\n1st\n"],
+      "expected": "1st\nch10\nch2\n"
+    },
+    {
+      "name": "mixed-case duplicates inside a single input collapse",
+      "inputs": ["dup\nDUP\ndup\n"],
+      "expected": "dup\n"
+    },
+    {
+      "name": "dual-write style merge: stored favorite list + new chapter links",
+      "inputs": [
+        "https://site/manga/ch-1\nhttps://site/manga/ch-2\n",
+        "https://site/manga/ch-2\nhttps://site/manga/ch-3\n"
+      ],
+      "expected": "https://site/manga/ch-1\nhttps://site/manga/ch-2\nhttps://site/manga/ch-3\n"
+    },
+    {
+      "name": "long lists merge with case-variant overlap kept once",
+      "inputs": [
+        "AAA\nbbb\nCCC\n",
+        "aaa\nBBB\nccc\n",
+        "ddd\n"
+      ],
+      "expected": "AAA\nbbb\nCCC\nddd\n"
+    }
+  ]
+}

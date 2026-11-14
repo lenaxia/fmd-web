@@ -1,0 +1,35 @@
+{
+  "$comment": "Golden fixtures for the downloaded_chapters row key = LowerCase(ModuleID+Link) (DownloadedChaptersDB.pas:55,78). Pascal LowerCase folds ONLY ASCII A-Z — asciiLowerCase parity; JS toLowerCase would additionally fold non-ASCII (e.g. 'İ') and must NOT be used.",
+  "cases": [
+    {
+      "name": "plain module id + url",
+      "moduleId": "a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8",
+      "link": "https://site.example/manga/x",
+      "expected": "a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8https://site.example/manga/x"
+    },
+    {
+      "name": "uppercase module id and link fold to lower",
+      "moduleId": "ABCDEF",
+      "link": "HTTPS://SITE.EXAMPLE/Page?Q=1",
+      "expected": "abcdefhttps://site.example/page?q=1"
+    },
+    {
+      "name": "case-variant (module, link) pairs collide on one key",
+      "moduleId": "ModuleID",
+      "link": "Link/One",
+      "expected": "moduleidlink/one"
+    },
+    {
+      "name": "the colliding twin of the previous case",
+      "moduleId": "moduleid",
+      "link": "link/one",
+      "expected": "moduleidlink/one"
+    },
+    {
+      "name": "non-ASCII units are untouched (Pascal LowerCase is ASCII-only)",
+      "moduleId": "İstanbul",
+      "link": "Änderungen",
+      "expected": "İstanbulÄnderungen"
+    }
+  ]
+}

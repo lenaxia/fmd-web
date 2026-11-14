@@ -1,0 +1,133 @@
+{
+  "$comment": "Golden fixtures for library chapter filename resolution (DESIGN §7.1): order = module FileNames[] → SaveImage return → filename template → chapter name; RemoveSymbols sanitization (uBaseUnit.pas:55-57, 1382-1394 — \\ / : \" * ? < > | plus #0..#31 and #127 DELETED); tail truncation when over CurrentMaxFileNameLength, 0 = unlimited (D5, uDownloadsManager.pas:543-550).",
+  "sanitize": [
+    { "input": "a/b:c", "expected": "abc" },
+    { "input": "a*b?c<d>e|f\"g\\h", "expected": "abcdefgh" },
+    { "input": "back\\slash", "expected": "backslash" },
+    { "input": "ctrl\u0001x\u001f\u007f", "expected": "ctrlx" },
+    { "input": "tab\tnewline\nremoved", "expected": "tabnewlineremoved" },
+    { "input": "  trimmed  ", "expected": "trimmed" },
+    { "input": "第一章 (v2) [end]", "expected": "第一章 (v2) [end]" },
+    { "input": "50% off", "expected": "50% off" },
+    { "input": "plus+minus=-", "expected": "plus+minus=-" },
+    { "input": "???*|", "expected": "" }
+  ],
+  "truncate": [
+    { "input": "abc", "maxLength": 2, "expected": "bc" },
+    { "input": "abc", "maxLength": 0, "expected": "abc" },
+    { "input": "abc", "maxLength": 3, "expected": "abc" },
+    { "input": "abcdef", "maxLength": 4, "expected": "cdef" },
+    { "input": "第一章话", "maxLength": 2, "expected": "章话" },
+    { "input": "short", "maxLength": 100, "expected": "short" },
+    { "input": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", "maxLength": 0, "expected": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" }
+  ],
+  "resolve": [
+    {
+      "name": "module FileNames[] wins (chapter-aligned entry)",
+      "parts": {
+        "fileNames": ["NameA", "NameB"],
+        "fileNamesIndex": 1,
+        "saveImageName": "SaveRet",
+        "template": "%CHAPTER%",
+        "chapterName": "Chapter Name"
+      },
+      "expected": "NameB"
+    },
+    {
+      "name": "empty FileNames entry falls through to SaveImage return",
+      "parts": {
+        "fileNames": ["", "AlsoIgnored"],
+        "fileNamesIndex": 0,
+        "saveImageName": "img_001.png",
+        "chapterName": "Chapter Name"
+      },
+      "expected": "img_001.png"
+    },
+    {
+      "name": "FileNames out of range falls through (alignment guard, :531-539)",
+      "parts": { "fileNames": ["Only"], "fileNamesIndex": 3, "chapterName": "Chapter Name" },
+      "expected": "Chapter Name"
+    },
+    {
+      "name": "no FileNames at all → SaveImage return",
+      "parts": { "saveImageName": "cover.jpg", "chapterName": "Chapter Name" },
+      "expected": "cover.jpg"
+    },
+    {
+      "name": "SaveImage-returned unsafe characters are sanitized",
+      "parts": { "saveImageName": "img?001.png", "chapterName": "Chapter Name" },
+      "expected": "img001.png"
+    },
+    {
+      "name": "SaveImage return wins before the template (resolution order)",
+      "parts": { "saveImageName": "cover", "template": "%FILENAME%_chapter", "chapterName": "CN" },
+      "expected": "cover"
+    },
+    {
+      "name": "template substitutes manga + chapter placeholders",
+      "parts": {
+        "template": "%MANGA% - %CHAPTER%",
+        "manga": "My Manga",
+        "chapterName": "Ch. 5"
+      },
+      "expected": "My Manga - Ch. 5"
+    },
+    {
+      "name": "template substitutes numbering and website",
+      "parts": {
+        "template": "%NUMBERING% [%WEBSITE%] %CHAPTER%",
+        "numbering": "0004",
+        "website": "SiteName",
+        "chapterName": "X"
+      },
+      "expected": "0004 [SiteName] X"
+    },
+    {
+      "name": "%FILENAME% has no page-name source at chapter scope (FMD2 passes AFileName=''), literal template text survives",
+      "parts": { "template": "%FILENAME%_chapter", "chapterName": "CN" },
+      "expected": "_chapter"
+    },
+    {
+      "name": "template values are sanitized (FixStringLocal)",
+      "parts": { "template": "%MANGA%", "manga": "A/B*C" },
+      "expected": "ABC"
+    },
+    {
+      "name": "template literals are sanitized as one library component",
+      "parts": { "template": "sub/dir/%CHAPTER%", "chapterName": "Ch1" },
+      "expected": "subdirCh1"
+    },
+    {
+      "name": "template collapsing to empty falls through to chapter name",
+      "parts": { "template": "%AUTHOR%", "author": "???|*", "chapterName": "Real Name" },
+      "expected": "Real Name"
+    },
+    {
+      "name": "chapter name is the last fallback (packer naming, :577)",
+      "parts": { "chapterName": "Chapter 12 (v2)" },
+      "expected": "Chapter 12 (v2)"
+    },
+    {
+      "name": "truncation applies AFTER resolution+substitution (tail survives)",
+      "parts": { "template": "%CHAPTER%-artifact", "chapterName": "C5", "maxLength": 10 },
+      "expected": "5-artifact"
+    },
+    {
+      "name": "truncation applies to the chapter-name fallback too",
+      "parts": { "chapterName": "an-extraordinarily-long-chapter-title", "maxLength": 12 },
+      "expected": "hapter-title"
+    },
+    {
+      "name": "empty candidates everywhere throw (finalize fails, never writes unnamed)",
+      "parts": { "chapterName": "???*|" },
+      "throws": true
+    }
+  ],
+  "extensions": [
+    { "input": "zip", "expected": "zip" },
+    { "input": ".cbz", "expected": "cbz" },
+    { "input": "PDF", "expected": "pdf" },
+    { "input": "EPUB", "expected": "epub" },
+    { "input": "rar", "throws": true }
+  ]
+}
