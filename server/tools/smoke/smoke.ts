@@ -312,7 +312,15 @@ async function runModuleGetInfoInner(
   try {
     const descriptors = await loadRealModuleFile(host, luaRoot, moduleFile, hook);
     if (descriptors.length === 0) {
-      throw new Error('Init pass produced no module descriptor');
+      // The Init error line sits in the host log — surface it so the
+      // report is self-explanatory (e.g. a module reading a missing
+      // sibling asset through the VM's io layer fails Init quietly).
+      const initError = [...logger.records].reverse().find((r) => r.level === 'error');
+      throw new Error(
+        initError !== undefined
+          ? `Init pass produced no module descriptor — last host error: ${initError.message}`
+          : 'Init pass produced no module descriptor',
+      );
     }
     const descriptor = descriptors[0];
     if (descriptor === undefined) {

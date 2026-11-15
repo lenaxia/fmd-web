@@ -340,6 +340,81 @@ Flag unset = byte-identical to the pre-switch goldens.
   pass-rate table; its rates feed `fmd_corpus_pass_rate` via the
   runtime's corpus provider. Run it from an operator schedule, not
   inside the container boot path.
+- Suite command (writes the committed artifact):
+
+  ```bash
+  npx tsx server/tools/smoke/run.ts --live --suite   # → docs/live-smoke-report.json
+  ```
+
+  Per-site budget: ≥1s between requests to the same host (enforced
+  in-process), fixed UA `fmd-web-live-smoke/1.0 (…)` on every request,
+  curl 30s cap, 8 MiB body cap. A full 12-site run lands in the
+  minutes range. The report's `requestLog.violations` MUST be empty;
+  non-empty means the pacing/UA invariant broke and the run's rates
+  are not comparable.
+- Network-unavailable fallback: when the operator environment cannot
+  reach the seed sites, the SAME code path is verified against a
+  loopback mock cluster (worker-thread servers, one per site + D18
+  probe routes):
+
+  ```bash
+  npx tsx server/tools/smoke/run.ts --suite --mock \
+      --blocker-note "worker env cannot reach the seed sites"
+  ```
+
+  The blocker note is mandatory and lands verbatim in the report so a
+  committed mock-cluster report can never be mistaken for live
+  evidence.
+- Report staleness (wired into the workspace board monitor): every
+  monitor run appends one staleness line for
+  `docs/live-smoke-report.json` to the monitor's status log — `STALE`
+  when the report is missing or its `generatedAt` is older than 7
+  days, `OK (age N d)` otherwise. Log line only; nothing gates on it
+  and no ALERT is written.
+- Failure classifications: `transport` = the site/CDN was unreachable
+  (DNS/TLS/timeout — retry later); `http` = the site answered but the
+  module flow failed (check the detail: net status, event deadline);
+  `setup` = the module failed to load at all (the detail carries the
+  last host error — e.g. MangaPlus's proto read through the VM io
+  layer); `dispatch`/`host-error` = engine-level failures;
+  `skip:account-gated` = account-gated site, no credentials configured
+  (expected-skip; excluded from pass rates).
+
+#### D18 flip procedure (zstd add-on trigger; DESIGN D13/D18)
+
+The §5.4 shim advertises `Accept-Encoding: gzip, deflate, br` (zstd
+omitted, D13) and the v1 decoder covers exactly those. The smoke
+suite inspects every response (advertised vs `Content-Encoding` vs
+body decodability) and emits structured findings in the report's
+`d18` block:
+
+- `undecodable-body` (**d18-hit**) — the module received undecoded
+  garbage under a claimed encoding, or the decode pass died (curl
+  error 61); counts toward the trigger.
+- `unadvertised-encoding` (info) — the server ignored the negotiation
+  but the body decoded (e.g. curl handled it); does NOT count.
+- `binary-body-without-encoding` (info) — integrity anomaly; does NOT
+  count.
+
+**Flip condition: ≥2 modules with d18-hit findings within one week.**
+When it fires:
+
+1. Enable the zstd decoder add-on in the HTTP response-decode path
+   (the §5.4 transport's decode chain).
+2. Add `zstd` to the advertised header — `ACCEPT_ENCODING_NO_ZSTD` in
+   `server/src/engine/shims/http-headers.ts` becomes
+   `gzip, deflate, br, zstd` — and update the D13 decision-log row
+   (DESIGN.md D18) to record the flip.
+3. Re-run the suite for one more week: d18-hits for the affected
+   modules must drop to zero (they reclassify as advertised+decoded).
+4. Record the flip in the evidence doc with the report excerpts as
+   provenance.
+
+Until it fires, detector findings are monitoring signals only — no
+decoder change, no header change. Note on wire truth: requests that
+carry no explicit `Accept-Encoding` inherit curl `--compressed`'s own
+list (incl. zstd for this build); the D18-relevant scenario rides the
+pipeline's explicit D13 header and stays fully detectable.
 
 ### Volumes & permissions (non-root container)
 

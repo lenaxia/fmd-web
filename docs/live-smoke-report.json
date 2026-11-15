@@ -1,6 +1,6 @@
 {
   "schema": "live-smoke-report/1",
-  "generatedAt": "2026-11-15T16:28:55.546Z",
+  "generatedAt": "2026-11-15T20:52:11.205Z",
   "environment": "live",
   "suite": "heterogeneous-v1",
   "siteCount": 12,
@@ -124,8 +124,8 @@
       "status": "pass",
       "classification": "pass",
       "resultCode": 0,
-      "latencyMs": 3254,
-      "durationMs": 3762,
+      "latencyMs": 4104,
+      "durationMs": 4438,
       "detail": "title=\"I Met the Male Lead in Prison\" chapters=0"
     },
     {
@@ -137,9 +137,9 @@
       "status": "fail",
       "classification": "setup",
       "resultCode": 0,
-      "latencyMs": 32,
-      "durationMs": 32,
-      "detail": "setup failed: Init pass produced no module descriptor"
+      "latencyMs": 35,
+      "durationMs": 35,
+      "detail": "setup failed: Init pass produced no module descriptor — last host error: LUA>DoInit(\"modules/MangaPlus.lua\")> modules/MangaPlus.lua:99: modules/MangaPlus.proto: No such file or directory"
     },
     {
       "site": "KlikManga",
@@ -150,8 +150,8 @@
       "status": "pass",
       "classification": "pass",
       "resultCode": 0,
-      "latencyMs": 668,
-      "durationMs": 685,
+      "latencyMs": 2041,
+      "durationMs": 2057,
       "detail": "title=\"Solo Leveling\" chapters=0"
     },
     {
@@ -163,8 +163,8 @@
       "status": "pass",
       "classification": "pass",
       "resultCode": 0,
-      "latencyMs": 1421,
-      "durationMs": 1438,
+      "latencyMs": 1596,
+      "durationMs": 1612,
       "detail": "title=\"Solo Leveling\" chapters=201"
     },
     {
@@ -176,8 +176,8 @@
       "status": "pass",
       "classification": "pass",
       "resultCode": 0,
-      "latencyMs": 357,
-      "durationMs": 375,
+      "latencyMs": 398,
+      "durationMs": 420,
       "detail": "title=\"\" chapters=0"
     },
     {
@@ -189,8 +189,8 @@
       "status": "pass",
       "classification": "pass",
       "resultCode": 0,
-      "latencyMs": 301,
-      "durationMs": 315,
+      "latencyMs": 306,
+      "durationMs": 320,
       "detail": "title=\"BunnyGirlGrey-Furry [AI Generated]\" chapters=1"
     },
     {
@@ -202,8 +202,8 @@
       "status": "pass",
       "classification": "pass",
       "resultCode": 0,
-      "latencyMs": 1427,
-      "durationMs": 1443,
+      "latencyMs": 1484,
+      "durationMs": 1499,
       "detail": "title=\"\" chapters=1"
     },
     {
@@ -215,8 +215,8 @@
       "status": "pass",
       "classification": "pass",
       "resultCode": 0,
-      "latencyMs": 111,
-      "durationMs": 130,
+      "latencyMs": 113,
+      "durationMs": 139,
       "detail": "title=\"\" chapters=1"
     },
     {
@@ -228,8 +228,8 @@
       "status": "pass",
       "classification": "pass",
       "resultCode": 0,
-      "latencyMs": 36066,
-      "durationMs": 36090,
+      "latencyMs": 60026,
+      "durationMs": 60045,
       "detail": "title=\"Solo Leveling\" chapters=1774"
     },
     {
@@ -241,8 +241,8 @@
       "status": "fail",
       "classification": "http",
       "resultCode": 1,
-      "latencyMs": 193,
-      "durationMs": 221,
+      "latencyMs": 261,
+      "durationMs": 277,
       "detail": "net status 1 (non-zero)"
     },
     {
@@ -254,8 +254,8 @@
       "status": "pass",
       "classification": "pass",
       "resultCode": 0,
-      "latencyMs": 106,
-      "durationMs": 131,
+      "latencyMs": 318,
+      "durationMs": 333,
       "detail": "title=\"\" chapters=0"
     },
     {
@@ -267,8 +267,8 @@
       "status": "pass",
       "classification": "pass",
       "resultCode": 0,
-      "latencyMs": 888,
-      "durationMs": 905,
+      "latencyMs": 1103,
+      "durationMs": 1121,
       "detail": "title=\"\" chapters=0"
     }
   ],
