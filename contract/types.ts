@@ -8,7 +8,12 @@
  * The §5.2 event-binding table lives as DATA in `contract.json`
  * (validated by `schema/contract.schema.json`); the types below describe
  * that document and the core domain boundaries (jobs, lanes, health).
+ *
+ * The zod wire schemas (`./schemas.js`) are the shared REST/WS source —
+ * §10 job payloads and the `/ws` protocol (D19/D21) — re-exported here
+ * so every workspace imports the whole boundary from `@fmd/contract`.
  */
+export * from './schemas.js';
 
 /** 32-hex module ID — the join key across modules, catalogs and DB rows. */
 export type ModuleId = string;
@@ -45,7 +50,7 @@ export type EventReturnKind = 'code' | 'boolean' | 'string';
 export type ConstantBinding = 'net-status' | 'account-status' | 'none';
 
 /** HTTP methods the API surface uses (§10); `WS` is the websocket hub. */
-export type ApiMethod = 'GET' | 'POST' | 'PUT' | 'WS';
+export type ApiMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'WS';
 
 /** One row of the §5.2 event-binding table. */
 export interface EventBinding {
@@ -84,7 +89,35 @@ export interface TaskField {
 }
 
 /** Status of a require-able shim implementation (§5.7 table). */
-export type ShimStatus = 'planned' | 'partial' | 'stub';
+export type ShimStatus = 'planned' | 'partial' | 'stub' | 'implemented';
+
+/**
+ * How the shim loader (server/src/engine/shims/lua-require.ts) serves a
+ * §5.7 require name:
+ * - `host-lib` — a registered host lib table (`libs` map, `AddLib` parity)
+ * - `package-preload` — installed through `package.preload`
+ * - `file-chunk` — resolved from the synced lua/ tree by the file searcher
+ * - `none` — not served at all (the require errors)
+ */
+export type RequireShimServedBy = 'host-lib' | 'package-preload' | 'file-chunk' | 'none';
+
+/**
+ * One row of the shim loader registry (§5.7) — the machine-readable
+ * projection of what `installRequireShim` actually registers. This is
+ * the single source of truth for `requireShims[].status` in
+ * contract.json: the CI drift check fails on any divergence, so the
+ * contract statuses are derived, never hand-edited.
+ */
+export interface RequireShimRegistryEntry {
+  /** Lua-side require name (the contract.json row key). */
+  readonly require: string;
+  /** Key the loader registers under (null = not registered). */
+  readonly loaderKey: string | null;
+  readonly servedBy: RequireShimServedBy;
+  readonly status: ShimStatus;
+  /** Required exactly when status is `partial`: the uncovered surface. */
+  readonly gap?: string;
+}
 
 /** One row of the §5.7 require table. */
 export interface RequireShim {
@@ -371,6 +404,24 @@ export interface EventContext {
   readonly path?: string;
   /** `FILENAME` global (SaveImage, AfterImageSaved). */
   readonly fileName?: string;
+  /**
+   * Host-provided TASK seed (§5.2 download events): FMD2's TASK object
+   * is the persistent download task — PageLinks carry the previous
+   * state into GetImageURL (the module reads the container URL at
+   * [WORKID-1] and writes the resolved image URL back). The host
+   * pre-seeds the facade from the pipeline state and reads the backing
+   * after the call (the dispatcher's readTask accessor).
+   */
+  readonly task?: EventTaskSeed;
+}
+
+/** Host-side TASK seed/readback snapshot (dispatcher-managed backing). */
+export interface EventTaskSeed {
+  readonly pageLinks?: readonly string[];
+  readonly pageContainerLinks?: readonly string[];
+  readonly fileNames?: readonly string[];
+  readonly pageNumber?: number;
+  readonly link?: string;
 }
 
 /** Outcome of one dispatched event (§5.2 return protocol). */
@@ -459,6 +510,104 @@ export interface LuaHost {
    * `sleep(ms)` blocks the caller's thread and is interruptible.
    */
   createDispatcher(engine: LuaEngine, abort: HttpAbortHandle, deadline?: EventDeadlineController): EventDispatcher;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// D5 filename policy (DESIGN.md §14 D5) — the single choke point both
+// filename resolvers share (server/src/jobs/library/filenames.ts,
+// server/src/jobs/download/filenames.ts).
+//
+// DEFAULT (flags unset): deliberate Windows-desktop parity — the D5
+// semantics FMD2 ships on the Windows desktop (tail-truncation over
+// `CurrentMaxFileNameLength`; 0 = no limit) are reproduced byte-for-byte.
+//
+// OPT-OUT (`FMD_NORMALIZE_PATHS=1` or the CLI alias `--normalize-paths`):
+// sanitized Linux-normalized paths — the same symbol sanitization
+// upstream, then control units (C0 + DEL) are deleted (a Linux filename
+// may hold any byte except `/` and NUL; the control sweep is the
+// Linux-native hygiene FMD2's Windows path never does) and the
+// Windows-desktop tail truncation is NOT applied.
+// ─────────────────────────────────────────────────────────────────
+
+/** Which D5 semantics a filename resolution applies. */
+export type FileNamePolicyMode = 'windows-parity' | 'linux-normalized';
+
+/** The env switch (exactly `1` enables; every other value keeps parity). */
+export const FMD_NORMALIZE_PATHS_ENV = 'FMD_NORMALIZE_PATHS';
+
+/** The CLI alias (presence anywhere on the command line enables). */
+export const FMD_NORMALIZE_PATHS_FLAG = '--normalize-paths';
+
+/**
+ * True when the D5 Linux-normalized opt-out was requested via env
+ * (`FMD_NORMALIZE_PATHS=1`) or the `--normalize-paths` CLI alias.
+ */
+export function normalizePathsRequested(
+  env: Record<string, string | undefined> = process.env,
+  argv: readonly string[] = process.argv,
+): boolean {
+  if (env[FMD_NORMALIZE_PATHS_ENV] === '1') {
+    return true;
+  }
+  return argv.some((entry) => entry === FMD_NORMALIZE_PATHS_FLAG);
+}
+
+/** The effective D5 mode for the current process (or explicit inputs). */
+export function fileNamePolicyMode(
+  env: Record<string, string | undefined> = process.env,
+  argv: readonly string[] = process.argv,
+): FileNamePolicyMode {
+  return normalizePathsRequested(env, argv) ? 'linux-normalized' : 'windows-parity';
+}
+
+export interface FileNamePolicyRequest {
+  /** Explicit mode override; omitted = resolve from env/argv. */
+  readonly mode?: FileNamePolicyMode | undefined;
+  /** `CurrentMaxFileNameLength` analog; 0/absent = no limit (parity only). */
+  readonly maxLength?: number | undefined;
+}
+
+/**
+ * Delete the C0 control units (#0–#31) and DEL (#127) — the
+ * Linux-normalized hygiene step. Everything else (including Unicode
+ * whitespace and astral characters) is kept: Linux filenames may hold
+ * any byte except `/` (already deleted by the shared sanitization
+ * upstream) and NUL (deleted here).
+ */
+export function linuxNormalizeFileName(name: string): string {
+  let out = '';
+  for (const ch of name) {
+    const code = ch.codePointAt(0) ?? 0;
+    if (code <= 0x1f || code === 0x7f) {
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+/**
+ * THE D5 CHOKE POINT. Both filename resolvers hand their (sanitized)
+ * candidate here as the final step; neither re-implements mode logic.
+ *
+ * - `windows-parity` (default, flags unset): exact
+ *   uDownloadsManager.pas:543-550 tail truncation — over a positive
+ *   `maxLength` the HEAD is deleted, the TAIL survives; 0 = no limit.
+ *   Byte-identical to the pre-switch behavior.
+ * - `linux-normalized` (opt-out): control units deleted, `maxLength`
+ *   IGNORED — tail truncation is the Windows-desktop quirk the opt-out
+ *   exists to turn off.
+ */
+export function applyFileNamePolicy(name: string, request: FileNamePolicyRequest = {}): string {
+  const mode = request.mode ?? fileNamePolicyMode();
+  if (mode === 'linux-normalized') {
+    return linuxNormalizeFileName(name);
+  }
+  const max = Math.trunc(request.maxLength ?? 0);
+  if (!(max > 0) || name.length <= max) {
+    return name;
+  }
+  return name.slice(name.length - max);
 }
 
 // ---------------------------------------------------------------------------
@@ -560,4 +709,225 @@ export interface NormalizationEngine {
     input: Readonly<Record<string, unknown>>,
     flags?: Readonly<Record<string, boolean>>,
   ): Record<string, unknown>;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Catalog pipeline (DESIGN.md §6, FMD2-DB parity).
+//
+// `CatalogSyncService` is the write side (fetch/extract/install, §6.1–
+// §6.3); `CatalogStore` is the read side (read-only attach + FTS
+// sidecar, §6.4–§6.6). Catalog files are NEVER written after install —
+// they are rollback-journal SQLite opened with SQLITE_OPEN_READONLY.
+// ─────────────────────────────────────────────────────────────────
+
+/** One FMD2-DB catalog row (`DBDataProcess.pas:137-153`, §6). */
+export interface CatalogEntry {
+  readonly link: string;
+  readonly title: string;
+  readonly alttitles: string;
+  readonly authors: string;
+  readonly artists: string;
+  readonly genres: string;
+  readonly status: string;
+  readonly summary: string;
+  readonly numChapter: number;
+  /** Julian day number of the last-update date (Pascal `DateToJDN`,
+   * uBaseUnit.pas:2740 — epoch-independent Gregorian JDN integer). */
+  readonly jdn: number;
+}
+
+/** Cursor/offset-paginated page of catalog rows (§6.6). */
+export interface CatalogPage {
+  readonly entries: readonly CatalogEntry[];
+  /**
+   * Opaque cursor for the next page; absent on the last page. FTS
+   * search is cursor-paginated (offset-carrying, query-bound);
+   * `latest`/`title` accept `page` numbers directly.
+   */
+  readonly nextCursor?: string;
+  /** Total matching rows (absent when unknown, e.g. rank-ordered FTS
+   * counts are skipped for cheap pages). */
+  readonly total?: number;
+}
+
+/** Browsing query for the ordered non-FTS endpoints (§6.6). */
+export interface CatalogBrowseQuery {
+  /** 1-based page number (default 1). */
+  readonly page?: number;
+  /** Page size (default 20, clamped to a bounded maximum). */
+  readonly limit?: number;
+}
+
+/** FTS5 search query (§10 `GET /api/catalog/:id/search`). */
+export interface CatalogSearchQuery {
+  /** FTS5 MATCH expression (raw user query, sanitized by the store). */
+  readonly query: string;
+  /** Opaque cursor from a previous page; takes priority over `page`. */
+  readonly cursor?: string;
+  /** 1-based page number used when no cursor is given (default 1). */
+  readonly page?: number;
+  /** Page size (default 20, clamped to a bounded maximum). */
+  readonly limit?: number;
+  /** Filter on the exact `status` column value (§10 search params). */
+  readonly status?: string;
+  /** Filter: `genres` must contain this token (FTS secondary match). */
+  readonly genre?: string;
+}
+
+/** Install state of one catalog (§9 `catalog_meta`). */
+export interface CatalogMeta {
+  readonly id: ModuleId;
+  /** Content hash of the installed db file (sha256 hex). */
+  readonly dbSha: string;
+  /** RFC 3339 timestamp of the successful install. */
+  readonly fetchedAt: string;
+  /** Installed db size in bytes. */
+  readonly bytes: number;
+}
+
+/** Result of the §6.1 update check (1 GitHub commits-API call). */
+export interface CatalogUpdateCheck {
+  /** Repo pin, e.g. `dazedcat19/FMD2-DB`. */
+  readonly repo: string;
+  /** Latest commit SHA from the commits API (empty when unreachable). */
+  readonly headSha: string;
+  /** True when `headSha` differs from the stored batch pin. */
+  readonly changed: boolean;
+  /** Catalog IDs the sync will fetch (pending carry-over + all known
+   * catalog ids when the pin moved; per-file ETag 304s still filter). */
+  readonly changedIds: readonly string[];
+}
+
+/** Outcome of one catalog fetch/install attempt (§6.2–§6.3). */
+export interface CatalogSyncResult {
+  readonly id: ModuleId;
+  /** `unchanged`: blob 304 (ETag match). `updated`: new db installed.
+   * `failed`: fetch/extract error (id stays pending for resume). */
+  readonly state: 'unchanged' | 'updated' | 'failed';
+  readonly dbSha?: string;
+  readonly bytes?: number;
+  readonly error?: string;
+}
+
+/** Read side of the catalog pipeline (§6.4–§6.6). All db access is
+ * READ-ONLY; implementations must never create sidecar files (-journal/
+ * -wal/-shm) next to catalog files and must never modify them. */
+export interface CatalogStore {
+  /** Install state of one catalog (undefined when not installed). */
+  getMeta(catalogId: ModuleId): CatalogMeta | undefined;
+  /** `GET /api/catalog/:id/latest` — ordered by `jdn` DESC (§6.6). */
+  latest(catalogId: ModuleId, query?: CatalogBrowseQuery): CatalogPage;
+  /** `GET /api/catalog/:id/title` — ordered by `title` (§6.6). */
+  byTitle(catalogId: ModuleId, query?: CatalogBrowseQuery): CatalogPage;
+  /** `GET /api/catalog/:id/search` — FTS5 sidecar, cursor pagination. */
+  search(catalogId: ModuleId, query: CatalogSearchQuery): CatalogPage;
+}
+
+/**
+ * Write side of the catalog pipeline (§6.1–§6.3): update check via the
+ * GitHub commits API (1 call), per-blob conditional GET (ETag /
+ * If-None-Match) under a token-bucket rate budget, 7zz extraction to a
+ * temp dir, ATOMIC rename into the catalogs dir (never in-place), and
+ * resumable batch state (a crash mid-batch resumes from pending).
+ */
+export interface CatalogSyncService {
+  /** §6.1 — 1 commits-API call → changed set (no blob traffic). */
+  checkForUpdates(): Promise<CatalogUpdateCheck>;
+  /** §6.2–§6.3 — fetch+extract+install one catalog atomically. */
+  syncCatalog(catalogId: ModuleId): Promise<CatalogSyncResult>;
+  /** Sync the whole changed set; resumable (pending survives crashes
+   * and repeat calls skip 304'd ids). */
+  syncChanged(ids?: readonly ModuleId[]): Promise<readonly CatalogSyncResult[]>;
+  /** Read side over the installed catalogs. */
+  readonly store: CatalogStore;
+  /** FTS sidecar invalidation hook: `dbSha` change (or undefined) →
+   * sidecar keyed by db_sha rebuilds on next use (§6.5). */
+  invalidate(catalogId: ModuleId): void;
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Live-scrape fallback (DESIGN.md §6.8): browse/search for enabled
+// modules WITHOUT an FMD2-DB catalog. Lookup order everywhere:
+// catalog first (§6.4–§6.6), live directory walk second (§6.8:
+// GetDirectoryPageNumber → GetNameAndLink), typed error otherwise —
+// a failed walk NEVER surfaces as a partial page.
+// ─────────────────────────────────────────────────────────────────
+
+/** §6.8 discriminator: where a browse/search response was served from. */
+export type CatalogSource = 'catalog' | 'live';
+
+/** Failure kinds of the live-scrape fallback (mapped onto the §10 envelope). */
+export type CatalogFallbackErrorKind =
+  | 'fallback_unavailable'
+  | 'walk_failed'
+  | 'lane_closed';
+
+/**
+ * Typed fallback error. `fallback_unavailable` → 404 (no catalog AND
+ * the module cannot serve a directory walk); `walk_failed` → 502 (the
+ * module's directory events failed or returned net_problem — callers
+ * must discard ALL partial results); `lane_closed` → 503 (the update
+ * lane is shutting down).
+ */
+export class CatalogFallbackError extends Error {
+  readonly kind: CatalogFallbackErrorKind;
+
+  constructor(kind: CatalogFallbackErrorKind, message: string) {
+    super(message);
+    this.name = 'CatalogFallbackError';
+    this.kind = kind;
+  }
+}
+
+/**
+ * §4 job-lane slot port for live scrapes: browse-triggered directory
+ * walks run on the UPDATE lane's slot budget (never the download
+ * lane's), so saturating scrapes cannot starve downloads. `acquire`
+ * resolves with the slot's release function, or null when the lane is
+ * closing (caller maps to `lane_closed`).
+ */
+export interface UpdateLaneGate {
+  acquire(): Promise<(() => void) | null>;
+  /** Concurrent in-flight scrape slots (watchdog/test input). */
+  readonly active: number;
+  /** Waiters queued behind the slot budget (watchdog/test input). */
+  readonly queued: number;
+  /** Stop granting new slots; queued waiters resolve null (§4 fail fast). */
+  close(): void;
+}
+
+/**
+ * Read side of the §6.8 live-scrape fallback: serves the SAME shapes
+ * as {@link CatalogStore} from the module API when
+ * `data/catalogs/<ID>.db` is absent. Results are §5.8-normalized
+ * directory-walk snapshots cached per module with a TTL (default 6 h);
+ * a catalog install invalidates the cache and the API's lookup order
+ * flips the module back to `catalog` on its next request.
+ *
+ * All methods are async (each may drive a module-engine walk) and may
+ * throw {@link CatalogFallbackError}; cursor pagination follows the
+ * catalog endpoints' opaque base64url offset scheme (query-bound).
+ */
+export interface CatalogFallbackStore {
+  /**
+   * True when `catalogId` can be served live — the module is
+   * registered AND declares BOTH directory events
+   * (OnGetDirectoryPageNumber + OnGetNameAndLink, §5.1). Catalog
+   * presence is NOT part of this check: callers consult
+   * `CatalogStore.getMeta` first and only fall back when absent.
+   */
+  supports(catalogId: ModuleId): boolean;
+  /** Latest-first browse over the cached walk (§6.8; the walk order IS
+   * the site's newest-first directory order). */
+  latest(catalogId: ModuleId, query?: CatalogBrowseQuery): Promise<CatalogPage>;
+  /** Title-ordered browse over the cached walk (§6.8; NOCASE + link
+   * tiebreak, same ordering as §6.6 `title`). */
+  byTitle(catalogId: ModuleId, query?: CatalogBrowseQuery): Promise<CatalogPage>;
+  /** In-memory LIKE search (title/alttitles/summary terms ANDed,
+   * exact `status`, substring `genre`) with the catalog endpoints'
+   * cursor scheme (§6.8). */
+  search(catalogId: ModuleId, query: CatalogSearchQuery): Promise<CatalogPage>;
+  /** Drop the cached walk for one id — called when a catalog arrives
+   * (§6.8: the live→catalog switch). */
+  invalidate(catalogId: ModuleId): void;
 }

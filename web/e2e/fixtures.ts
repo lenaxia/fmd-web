@@ -44,6 +44,7 @@ export const module: ModuleSummaryT = {
   accountSupport: true,
   file: 'modules/FixtureSite.lua',
   enabled: true,
+  proxy: null,
   options: [
     { name: 'Auto-skip pages', kind: 'checkbox', defaultValue: false },
     { name: 'Quality', kind: 'combobox', defaultValue: 1, items: ['low', 'medium', 'high'] },
@@ -52,8 +53,11 @@ export const module: ModuleSummaryT = {
     requires_subprocess: false,
     requires_browser: true,
     bypass_python_gated: false,
+    requires_imagepuzzle: false,
+    requires_mangafoxwatermark: false,
     events: [],
     known_broken_flags: ['cloudflare-loop'],
+    live_scrape_fallback: false,
   },
 };
 

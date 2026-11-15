@@ -1,0 +1,747 @@
+/**
+ * SQLite-backed job queue (DESIGN.md §4/§9) — the production
+ * `JobQueue` behind the four lanes (info/download/update/sync), each
+ * with independent concurrency.
+ *
+ * §4 SQLite discipline honored end-to-end:
+ * - one connection per thread (`openQueueDb`, §connection.ts); nothing
+ *   crosses a `worker_threads` boundary;
+ * - claiming is a single-writer transaction: `BEGIN IMMEDIATE` +
+ *   `UPDATE ... WHERE id = (SELECT ... state IN ('queued','retry') ...)
+ *   RETURNING` — a losing claimant waits on `busy_timeout=5000`, then
+ *   re-evaluates against the NEW row states, so a job can never be
+ *   claimed twice (the stress drill proves this under 16 threads);
+ * - WAL auto-checkpoint sized (default 1000 pages, tunable);
+ * - progress writes coalesced ≤1 flush/sec/job (`ProgressCoalescer`);
+ * - retention prunes terminal jobs after 30 days (§9), injectable
+ *   clock for deterministic tests.
+ *
+ * §7.1: the persisted state machine is enforced by
+ * {@link assertJobTransition} — invalid transitions THROW; jobs are
+ * resumable across restarts (progress survives in `job.progress`,
+ * orphaned `running` rows re-enter the pool as `retry` at recovery).
+ */
+import type { JobFailureKind, JobId, JobState, LaneId } from '@fmd/contract';
+import type Database from 'better-sqlite3';
+import { systemClock, type SyncClock } from '../../sync/db/rate-budget.js';
+import {
+  ensureJobSchema,
+  openQueueDb,
+  parseFailureKind,
+  type OpenQueueDbOptions,
+} from './connection.js';
+import { ProgressCoalescer, type JobProgress, type CoalescerStats } from './coalesce.js';
+import {
+  assertJobTransition,
+  InvalidJobTransitionError,
+  type JobTransitionDetail,
+} from './state-machine.js';
+import {
+  laneForPayload,
+  parseJobPayload,
+  payloadFingerprint,
+  type JobPayload,
+} from './payloads.js';
+
+/** §9 retention: terminal job history pruned after 30 days. */
+export const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+const JOB_STATES: readonly JobState[] = [
+  'queued',
+  'running',
+  'retry',
+  'done',
+  'failed',
+  'cancelled',
+];
+
+function isJobState(value: unknown): value is JobState {
+  return typeof value === 'string' && (JOB_STATES as readonly unknown[]).includes(value);
+}
+
+/** The queue's typed view of one job row (§9 `job`). */
+export interface QueueJob {
+  readonly id: JobId;
+  readonly lane: LaneId;
+  readonly payload: JobPayload;
+  readonly state: JobState;
+  readonly priority: number;
+  readonly progress: JobProgress | undefined;
+  readonly failureKind: JobFailureKind | undefined;
+  readonly error: string | undefined;
+  readonly attempts: number;
+  readonly createdAt: number;
+  readonly updatedAt: number;
+}
+
+export interface EnqueueOptions {
+  /** §10 idempotency: same key + same payload ⇒ original job replayed. */
+  readonly idempotencyKey?: string;
+  /** Higher claims first (ORDER BY priority DESC, id ASC). Default 0. */
+  readonly priority?: number;
+}
+
+export interface EnqueueResult {
+  readonly job: QueueJob;
+  readonly replayed: boolean;
+}
+
+export interface ClaimOptions {
+  /** Claim bookkeeping (§4 watchdog input: `claimed_by`). */
+  readonly workerId?: string;
+}
+
+export interface QueueListOptions {
+  readonly state?: JobState;
+  readonly lane?: LaneId;
+  readonly limit?: number;
+}
+
+/** The lane-agnostic port. `SqliteJobQueue` is the §4 implementation. */
+export interface JobQueue {
+  enqueue(payload: JobPayload, opts?: EnqueueOptions): EnqueueResult;
+  claim(lane: LaneId, opts?: ClaimOptions): QueueJob | undefined;
+  transition(jobId: JobId, to: JobState, detail?: JobTransitionDetail): QueueJob;
+  cancel(jobId: JobId): QueueJob;
+  /** The job row last enqueued under `key`, or undefined (§10 lookup). */
+  byIdempotencyKey(key: string): QueueJob | undefined;
+  /** Coalesced progress (≤1 durable flush/sec/job, §4). */
+  updateProgress(jobId: JobId, progress: JobProgress): void;
+  /** Current progress: live in-memory snapshot, else the persisted one. */
+  progressOf(jobId: JobId): JobProgress | undefined;
+  get(jobId: JobId): QueueJob | undefined;
+  list(opts?: QueueListOptions): QueueJob[];
+  counts(lane?: LaneId): Record<JobState, number>;
+  /** §9: prune terminal jobs older than 30 days. Returns rows removed. */
+  pruneRetention(now?: number): number;
+  /** Crash recovery (§7.1 "resumable across restarts"): orphaned
+   * `running` rows (no live claim in THIS instance) → `retry`,
+   * progress preserved. Returns rows recovered. */
+  recoverOrphans(now?: number): number;
+  /** §4 watchdog input: `running` rows whose claim went quiet. */
+  staleRunningJobs(olderThanMs: number, now?: number): QueueJob[];
+  /** Flush buffered progress, then close THIS thread's connection. */
+  close(): void;
+}
+
+export interface SqliteJobQueueOptions {
+  readonly file: string;
+  readonly clock?: SyncClock;
+  /** Progress flush cadence (default 1000 ms, §4 ≤1/sec/job). */
+  readonly flushIntervalMs?: number;
+  /** WAL auto-checkpoint pages (default 1000, §4 tunable). */
+  readonly walAutocheckpointPages?: number;
+  /** Run `recoverOrphans()` at construction (boot-time recovery). */
+  readonly recoverOnOpen?: boolean;
+  readonly openDbOptions?: OpenQueueDbOptions;
+}
+
+interface JobRow {
+  readonly id: number;
+  readonly type: JobPayload['type'];
+  readonly payload: string;
+  readonly state: JobState;
+  readonly priority: number;
+  readonly progress: string | null;
+  readonly failure: string | null;
+  readonly error: string | null;
+  readonly attempts: number;
+  readonly created_at: number;
+  readonly updated_at: number;
+}
+
+/** Replay lookup also carries the fingerprint (§10 conflict check). */
+type JobRowWithFp = JobRow & { readonly idempotency_fp: string | null };
+
+function parseProgress(raw: string | null): JobProgress | undefined {
+  if (raw === null) {
+    return undefined;
+  }
+  const parsed: unknown = JSON.parse(raw) as unknown;
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('corrupt job row: progress is not a JSON object');
+  }
+  return parsed as JobProgress;
+}
+
+function toQueueJob(row: JobRow): QueueJob {
+  if (!isJobState(row.state)) {
+    throw new Error(`corrupt job row: unknown state ${JSON.stringify(row.state)}`);
+  }
+  return {
+    id: String(row.id),
+    lane: row.type,
+    payload: parseJobPayload(row.payload),
+    state: row.state,
+    priority: row.priority,
+    progress: parseProgress(row.progress),
+    failureKind: parseFailureKind(row.failure),
+    error: row.error ?? undefined,
+    attempts: row.attempts,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/** Thrown when an idempotency key is reused with a DIFFERENT payload (§10). */
+export class IdempotencyConflictError extends Error {
+  public readonly key: string;
+
+  public constructor(key: string) {
+    super(
+      `idempotency key ${JSON.stringify(key)} was already used with a different payload`,
+    );
+    this.name = 'IdempotencyConflictError';
+    this.key = key;
+  }
+}
+
+function moduleIdOf(payload: JobPayload): string | null {
+  if (payload.type === 'download' || payload.type === 'info') {
+    return payload.moduleId;
+  }
+  if (payload.type === 'update' && payload.moduleId !== undefined) {
+    return payload.moduleId;
+  }
+  return null;
+}
+
+/** Structural cross-checks zod cannot express per-member. */
+function validatePayloadSemantics(payload: JobPayload): void {
+  if (payload.type === 'sync' && payload.target === 'catalog' && payload.catalogId === undefined) {
+    throw new Error("sync job with target 'catalog' requires catalogId");
+  }
+}
+
+const SELECT_COLUMNS =
+  'id, type, payload, state, priority, progress, failure, error, attempts, created_at, updated_at';
+
+export class SqliteJobQueue implements JobQueue {
+  private readonly db: Database.Database;
+  private readonly clock: SyncClock;
+  private readonly coalescer: ProgressCoalescer;
+  private closed = false;
+
+  private readonly stmtClaim: Database.Statement;
+  private readonly stmtInsert: Database.Statement;
+  private readonly stmtByIdempotencyKey: Database.Statement;
+  private readonly stmtTransition: Database.Statement;
+  private readonly stmtRecover: Database.Statement;
+  private readonly stmtPrune: Database.Statement;
+  private readonly stmtGet: Database.Statement;
+  private readonly stmtStale: Database.Statement;
+  private readonly stmtCountsAll: Database.Statement;
+  private readonly stmtCountsLane: Database.Statement;
+  private readonly stmtProgress: Database.Statement;
+
+  /** Single-writer claim: IMMEDIATE grabs the write lock up front, so
+   * the subquery+UPDATE evaluate atomically against committed state. */
+  private readonly claimTx: (lane: LaneId, workerId: string, now: number) => JobRow | undefined;
+  private readonly enqueueTx: (input: {
+    readonly payload: JobPayload;
+    readonly moduleId: string | null;
+    readonly fingerprint: string;
+    readonly priority: number;
+    readonly now: number;
+    readonly idempotencyKey: string | null;
+  }) => { readonly row: JobRow; readonly replayed: boolean };
+
+  public constructor(opts: SqliteJobQueueOptions) {
+    this.clock = opts.clock ?? systemClock;
+    this.db = openQueueDb(opts.file, opts.openDbOptions ?? {});
+    ensureJobSchema(this.db);
+    this.coalescer = new ProgressCoalescer({
+      write: (jobId, progress): void => {
+        this.db
+          .prepare('UPDATE job SET progress = @progress, updated_at = @now WHERE id = @id')
+          .run({ progress: JSON.stringify(progress), now: this.clock.now(), id: Number(jobId) });
+      },
+      clock: this.clock,
+      ...(opts.flushIntervalMs !== undefined
+        ? { flushIntervalMs: opts.flushIntervalMs }
+        : {}),
+    });
+
+    this.stmtClaim = this.db.prepare(
+      `UPDATE job SET
+         state = 'running',
+         claimed_by = @worker,
+         claimed_at = @now,
+         attempts = attempts + 1,
+         updated_at = @now
+       WHERE id = (
+         SELECT id FROM job
+         WHERE type = @lane AND state IN ('queued', 'retry')
+         ORDER BY priority DESC, id ASC
+         LIMIT 1
+       )
+       RETURNING ${SELECT_COLUMNS}`,
+    );
+    this.stmtInsert = this.db.prepare(
+      `INSERT INTO job
+         (type, module_id, payload, state, priority, idempotency_key, idempotency_fp, created_at, updated_at)
+       VALUES
+         (@type, @moduleId, @payload, 'queued', @priority, @key, @fp, @now, @now)
+       RETURNING ${SELECT_COLUMNS}`,
+    );
+    this.stmtByIdempotencyKey = this.db.prepare(
+      `SELECT ${SELECT_COLUMNS}, idempotency_fp FROM job WHERE idempotency_key = @key`,
+    );
+    this.stmtTransition = this.db.prepare(
+      `UPDATE job SET
+         state = @to,
+         failure = @failure,
+         error = @error,
+         progress = COALESCE(@progress, progress),
+         updated_at = @now
+       WHERE id = @id AND state = @from`,
+    );
+    this.stmtRecover = this.db.prepare(
+      `UPDATE job SET state = 'retry', claimed_by = NULL, claimed_at = NULL, updated_at = @now
+       WHERE state = 'running'`,
+    );
+    this.stmtPrune = this.db.prepare(
+      `DELETE FROM job
+       WHERE state IN ('done', 'failed', 'cancelled') AND updated_at < @cutoff`,
+    );
+    this.stmtGet = this.db.prepare(`SELECT ${SELECT_COLUMNS} FROM job WHERE id = @id`);
+    this.stmtStale = this.db.prepare(
+      `SELECT ${SELECT_COLUMNS} FROM job
+       WHERE state = 'running' AND claimed_at IS NOT NULL AND claimed_at < @cutoff`,
+    );
+    this.stmtCountsAll = this.db.prepare('SELECT state, COUNT(*) AS n FROM job GROUP BY state');
+    this.stmtCountsLane = this.db.prepare(
+      "SELECT state, COUNT(*) AS n FROM job WHERE type = @lane GROUP BY state",
+    );
+    this.stmtProgress = this.db.prepare('SELECT progress FROM job WHERE id = @id');
+
+    this.claimTx = this.db.transaction(
+      (lane: LaneId, workerId: string, now: number): JobRow | undefined => {
+        const row: JobRow | undefined = this.stmtClaim.get({
+          worker: workerId,
+          now,
+          lane,
+        }) as JobRow | undefined;
+        return row;
+      },
+    );
+
+    this.enqueueTx = this.db.transaction((input): { row: JobRow; replayed: boolean } => {
+      if (input.idempotencyKey !== null) {
+        const existing = this.stmtByIdempotencyKey.get({ key: input.idempotencyKey }) as
+          | JobRowWithFp
+          | undefined;
+        if (existing !== undefined) {
+          if (existing.idempotency_fp !== input.fingerprint) {
+            throw new IdempotencyConflictError(input.idempotencyKey);
+          }
+          return { row: existing, replayed: true };
+        }
+      }
+      const row: JobRow = this.stmtInsert.get({
+        type: input.payload.type,
+        moduleId: input.moduleId,
+        payload: JSON.stringify(input.payload),
+        priority: input.priority,
+        key: input.idempotencyKey,
+        fp: input.fingerprint,
+        now: input.now,
+      }) as JobRow;
+      return { row, replayed: false };
+    });
+
+    if (opts.recoverOnOpen === true) {
+      this.recoverOrphans();
+    }
+  }
+
+  public enqueue(payload: JobPayload, opts?: EnqueueOptions): EnqueueResult {
+    this.assertOpen();
+    validatePayloadSemantics(payload);
+    laneForPayload(payload); // discriminant ≡ lane; unreachable throw keeps routing honest
+    const priority: number = opts?.priority ?? 0;
+    if (!Number.isInteger(priority)) {
+      throw new Error(`priority must be an integer, got ${String(priority)}`);
+    }
+    const { row, replayed } = this.enqueueTx({
+      payload,
+      moduleId: moduleIdOf(payload),
+      fingerprint: payloadFingerprint(payload),
+      priority,
+      now: this.clock.now(),
+      idempotencyKey: opts?.idempotencyKey ?? null,
+    });
+    return { job: toQueueJob(row), replayed };
+  }
+
+  public claim(lane: LaneId, opts?: ClaimOptions): QueueJob | undefined {
+    this.assertOpen();
+    const row = this.claimTx(lane, opts?.workerId ?? 'worker', this.clock.now());
+    return row === undefined ? undefined : toQueueJob(row);
+  }
+
+  public transition(jobId: JobId, to: JobState, detail?: JobTransitionDetail): QueueJob {
+    this.assertOpen();
+    const current: QueueJob | undefined = this.get(jobId);
+    if (current === undefined) {
+      throw new Error(`transition target not found: job ${jobId}`);
+    }
+    assertJobTransition(current.state, to, detail);
+    // Terminal transitions carry the coalesced snapshot atomically
+    // (single UPDATE), then the buffer drops it.
+    const pendingProgress: JobProgress | undefined =
+      to === 'done' || to === 'failed' || to === 'cancelled'
+        ? this.coalescer.take(jobId)
+        : undefined;
+    const pendingProgressJson: string | null =
+      pendingProgress === undefined ? null : JSON.stringify(pendingProgress);
+    const result = this.stmtTransition.run({
+      to,
+      from: current.state,
+      id: Number(jobId),
+      failure: to === 'failed' ? (detail?.failureKind ?? null) : null,
+      error: detail?.error ?? null,
+      progress: pendingProgressJson,
+      now: this.clock.now(),
+    });
+    if (result.changes !== 1) {
+      // Raced: another thread moved the row between our read and write.
+      const actual: QueueJob | undefined = this.get(jobId);
+      throw new InvalidJobTransitionError(actual?.state ?? current.state, to);
+    }
+    const updated: QueueJob | undefined = this.get(jobId);
+    if (updated === undefined) {
+      throw new Error(`job ${jobId} vanished after transition (db corruption)`);
+    }
+    return updated;
+  }
+
+  public cancel(jobId: JobId): QueueJob {
+    return this.transition(jobId, 'cancelled');
+  }
+
+  public updateProgress(jobId: JobId, progress: JobProgress): void {
+    this.assertOpen();
+    this.coalescer.update(jobId, progress);
+  }
+
+  public progressOf(jobId: JobId): JobProgress | undefined {
+    this.assertOpen();
+    const live: JobProgress | undefined = this.coalescer.peek(jobId);
+    if (live !== undefined) {
+      return live;
+    }
+    const row = this.stmtProgress.get({ id: Number(jobId) }) as
+      | { progress: string | null }
+      | undefined;
+    if (row === undefined) {
+      return undefined;
+    }
+    return parseProgress(row.progress);
+  }
+
+  public get(jobId: JobId): QueueJob | undefined {
+    this.assertOpen();
+    const row = this.stmtGet.get({ id: Number(jobId) }) as JobRow | undefined;
+    return row === undefined ? undefined : toQueueJob(row);
+  }
+
+  /**
+   * The newest job row holding `key` (§10 idempotent re-enqueue support:
+   * a TERMINAL replay may be superseded by a fresh attempt whose key is
+   * chained off the original — the API adapter probes this to pick the
+   * chain slot). `undefined` when the key was never used.
+   */
+  public byIdempotencyKey(key: string): QueueJob | undefined {
+    this.assertOpen();
+    const row = this.stmtByIdempotencyKey.get({ key }) as JobRowWithFp | undefined;
+    return row === undefined ? undefined : toQueueJob(row);
+  }
+
+  public list(opts?: QueueListOptions): QueueJob[] {
+    this.assertOpen();
+    const fragments: string[] = [];
+    const params: Record<string, string | number> = {};
+    if (opts?.state !== undefined) {
+      fragments.push('state = @state');
+      params.state = opts.state;
+    }
+    if (opts?.lane !== undefined) {
+      fragments.push('type = @lane');
+      params.lane = opts.lane;
+    }
+    const where: string = fragments.length === 0 ? '' : ` WHERE ${fragments.join(' AND ')}`;
+    const limit: number = opts?.limit ?? 200;
+    const rows = this.db
+      .prepare(
+        `SELECT ${SELECT_COLUMNS} FROM job${where} ORDER BY updated_at DESC, id DESC LIMIT @limit`,
+      )
+      .all({ ...params, limit }) as JobRow[];
+    return rows.map(toQueueJob);
+  }
+
+  public counts(lane?: LaneId): Record<JobState, number> {
+    this.assertOpen();
+    const counts: Record<JobState, number> = {
+      queued: 0,
+      running: 0,
+      retry: 0,
+      done: 0,
+      failed: 0,
+      cancelled: 0,
+    };
+    const rows = (
+      lane === undefined
+        ? this.stmtCountsAll.all()
+        : this.stmtCountsLane.all({ lane })
+    ) as Array<{ state: string; n: number }>;
+    for (const row of rows) {
+      if (isJobState(row.state)) {
+        counts[row.state] = row.n;
+      }
+    }
+    return counts;
+  }
+
+  public pruneRetention(now: number = this.clock.now()): number {
+    this.assertOpen();
+    const result = this.stmtPrune.run({ cutoff: now - RETENTION_MS });
+    return result.changes;
+  }
+
+  public recoverOrphans(now: number = this.clock.now()): number {
+    this.assertOpen();
+    const result = this.stmtRecover.run({ now });
+    return result.changes;
+  }
+
+  public staleRunningJobs(olderThanMs: number, now: number = this.clock.now()): QueueJob[] {
+    this.assertOpen();
+    if (!Number.isFinite(olderThanMs) || olderThanMs < 0) {
+      throw new Error('olderThanMs must be ≥ 0');
+    }
+    const rows = this.stmtStale.all({ cutoff: now - olderThanMs }) as JobRow[];
+    return rows.map(toQueueJob);
+  }
+
+  /** Coalescer observability (write-count assertions in the drill). */
+  public coalescerStats(): CoalescerStats {
+    return this.coalescer.stats();
+  }
+
+  public close(): void {
+    if (this.closed) {
+      return;
+    }
+    this.closed = true;
+    // §4 shutdown order: flush coalesced progress, then close the
+    // connection this thread owns.
+    this.coalescer.flushAll();
+    void this.coalescer.dispose();
+    this.db.close();
+  }
+
+  private assertOpen(): void {
+    if (this.closed) {
+      throw new Error('job queue is closed');
+    }
+  }
+}
+
+// ── lane runner: independent per-lane concurrency (§4) ──────────────
+
+/** What a lane handler decided for its job (typed — no throw-based flow). */
+export type LaneHandlerOutcome =
+  | { readonly type: 'done' }
+  | {
+      /** Request another attempt (§7.1 running → retry). */
+      readonly type: 'retry';
+      readonly error?: string;
+      /** Failure kind if this was the last allowed attempt (default `net`). */
+      readonly exhaustedKind?: JobFailureKind;
+    }
+  | { readonly type: 'failed'; readonly kind: JobFailureKind; readonly error?: string };
+
+export type LaneHandler = (
+  job: QueueJob,
+  ctx: { setProgress(progress: JobProgress): void },
+) => Promise<LaneHandlerOutcome>;
+
+export interface LaneRunnerLaneOptions {
+  /** Concurrent in-flight jobs for THIS lane only (§4 independence). */
+  readonly concurrency: number;
+  readonly handler: LaneHandler;
+  /** Backoff between empty-poll claims (default 250 ms). */
+  readonly pollIntervalMs?: number;
+  /** Dwell after a `retry` outcome before the re-claim (default 1000 ms):
+   * keeps the transient `retry` row state observable on the API/WS
+   * surface (the e2e state-history assertions poll at 100 ms). */
+  readonly retryBackoffMs?: number;
+}
+
+export interface LaneRunnerOptions {
+  readonly clock?: SyncClock;
+  readonly lanes: Partial<Record<LaneId, LaneRunnerLaneOptions>>;
+  /** Total claims allowed per job before `retry` exhausts (default 3). */
+  readonly maxAttempts?: number;
+  readonly workerIdPrefix?: string;
+}
+
+function messageOf(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause);
+}
+
+/**
+ * Drives the four lanes with independent concurrency: each lane has
+ * its own claim loop × `concurrency` slots; a busy download lane never
+ * starves the info lane (they share only the queue's single-writer
+ * claim discipline, which serializes the claim microseconds, not the
+ * handler work). Default clock = wall clock; tests inject FakeClock.
+ */
+export class LaneRunner {
+  private readonly queue: JobQueue;
+  private readonly clock: SyncClock;
+  private readonly lanes: Partial<Record<LaneId, LaneRunnerLaneOptions>>;
+  private readonly maxAttempts: number;
+  private readonly workerIdPrefix: string;
+  private readonly active = new Map<LaneId, number>();
+  private readonly loopPromises: Promise<void>[] = [];
+  private stopping = false;
+  private stopSignal: Promise<void> | undefined;
+  private resolveStop: (() => void) | undefined;
+
+  public constructor(queue: JobQueue, opts: LaneRunnerOptions) {
+    this.queue = queue;
+    this.clock = opts.clock ?? systemClock;
+    this.lanes = opts.lanes;
+    this.maxAttempts = opts.maxAttempts ?? 3;
+    this.workerIdPrefix = opts.workerIdPrefix ?? 'lane';
+    for (const [lane, laneOpts] of Object.entries(this.lanes) as Array<[LaneId, LaneRunnerLaneOptions]>) {
+      if (!Number.isInteger(laneOpts.concurrency) || laneOpts.concurrency < 1) {
+        throw new Error(`lane ${lane}: concurrency must be an integer ≥ 1`);
+      }
+      this.active.set(lane, 0);
+    }
+  }
+
+  /** Spawn every lane's slots (idempotent-free: call once). */
+  public start(): void {
+    if (this.stopSignal !== undefined) {
+      throw new Error('LaneRunner already started');
+    }
+    let resolve: () => void = (): void => {
+      /* rebound synchronously by the executor below */
+    };
+    const signal: Promise<void> = new Promise<void>((res) => {
+      resolve = res;
+    });
+    this.stopSignal = signal;
+    this.resolveStop = resolve;
+    for (const [lane, laneOpts] of Object.entries(this.lanes) as Array<
+      [LaneId, LaneRunnerLaneOptions]
+    >) {
+      for (let slot = 0; slot < laneOpts.concurrency; slot += 1) {
+        this.loopPromises.push(this.runSlot(lane, laneOpts, slot, signal));
+      }
+    }
+  }
+
+  /** Concurrent in-flight handler count for one lane (watchdog/test input). */
+  public activeCount(lane: LaneId): number {
+    return this.active.get(lane) ?? 0;
+  }
+
+  /** Stop claiming; in-flight handlers run to completion, then loops exit. */
+  public async stop(): Promise<void> {
+    if (this.resolveStop === undefined) {
+      return;
+    }
+    this.stopping = true;
+    this.resolveStop();
+    await Promise.all(this.loopPromises);
+  }
+
+  private async runSlot(
+    lane: LaneId,
+    laneOpts: LaneRunnerLaneOptions,
+    slot: number,
+    stopPromise: Promise<void>,
+  ): Promise<void> {
+    const workerId: string = `${this.workerIdPrefix}-${lane}-${String(slot)}`;
+    const pollIntervalMs: number = laneOpts.pollIntervalMs ?? 250;
+    while (!this.stopping) {
+      const job: QueueJob | undefined = this.queue.claim(lane, { workerId });
+      if (job === undefined) {
+        await Promise.race([this.clock.delay(pollIntervalMs), stopPromise]);
+        continue;
+      }
+      this.active.set(lane, (this.active.get(lane) ?? 0) + 1);
+      try {
+        const outcome: LaneHandlerOutcome = await laneOpts.handler(job, {
+          setProgress: (progress: JobProgress): void => {
+            this.queue.updateProgress(job.id, progress);
+          },
+        });
+        this.applyOutcome(job, outcome);
+        if (outcome.type === 'retry' && job.attempts < this.maxAttempts) {
+          // §7.1 retry dwell: the slot holds for the backoff before the
+          // re-claim so the transient 'retry' row state is observable on
+          // the API/WS surface (state-history assertions poll at 100 ms).
+          // Cancellation/stop ends the wait immediately.
+          await Promise.race([this.clock.delay(laneOpts.retryBackoffMs ?? 1000), stopPromise]);
+        }
+      } catch (cause: unknown) {
+        // Handler escaped without an outcome: the worker misbehaved —
+        // §4 semantics classify that as worker_stalled.
+        this.applyOutcome(job, {
+          type: 'failed',
+          kind: 'worker_stalled',
+          error: `unhandled handler error: ${messageOf(cause)}`,
+        });
+      } finally {
+        this.active.set(lane, Math.max(0, (this.active.get(lane) ?? 0) - 1));
+      }
+    }
+  }
+
+  private applyOutcome(job: QueueJob, outcome: LaneHandlerOutcome): void {
+    try {
+      switch (outcome.type) {
+        case 'done':
+          this.queue.transition(job.id, 'done');
+          break;
+        case 'retry': {
+          if (job.attempts < this.maxAttempts) {
+            this.queue.transition(
+              job.id,
+              'retry',
+              outcome.error !== undefined ? { error: outcome.error } : undefined,
+            );
+          } else {
+            this.queue.transition(job.id, 'failed', {
+              failureKind: outcome.exhaustedKind ?? 'net',
+              error: outcome.error ?? `retry attempts exhausted (${String(this.maxAttempts)})`,
+            });
+          }
+          break;
+        }
+        case 'failed':
+          this.queue.transition(
+            job.id,
+            'failed',
+            outcome.error !== undefined
+              ? { failureKind: outcome.kind, error: outcome.error }
+              : { failureKind: outcome.kind },
+          );
+          break;
+      }
+    } catch (cause: unknown) {
+      if (!(cause instanceof InvalidJobTransitionError)) {
+        throw cause;
+      }
+      // Benign race: the job was cancelled/terminal while the handler
+      // ran — its outcome no longer applies (cooperative cancellation).
+    }
+  }
+}
+

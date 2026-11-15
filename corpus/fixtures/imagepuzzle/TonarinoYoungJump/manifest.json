@@ -1,0 +1,49 @@
+{
+  "site": "TonarinoYoungJump",
+  "moduleId": "88fb782a9c234fde82b0de32f710ce3f",
+  "horBlock": 4,
+  "verBlock": 4,
+  "multiply": 8,
+  "matrix": [
+    0,
+    4,
+    8,
+    12,
+    1,
+    5,
+    9,
+    13,
+    2,
+    6,
+    10,
+    14,
+    3,
+    7,
+    11,
+    15
+  ],
+  "flips": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "image": {
+    "width": 1536,
+    "height": 3072
+  },
+  "expectedSha_note": "expected.png = the clean page; the shim descramble must equal it pixel-for-pixel",
+  "provenance": "SYNTHESIZED (offline workspace). The Tonarino scramble is the fixed 4×4×8 transpose (TonarinoYoungJump.lua:93-99 — self-inverse, direction-independent). expected.png = the clean source (pixel-exact oracle). Exercises the ImagePuzzle.pas:241-245 Multiply block geometry."
+}

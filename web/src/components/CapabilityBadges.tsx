@@ -38,6 +38,15 @@ export function CapabilityBadges(props: { module: ModuleSummaryT }): ReactElemen
           <Badge kind="capability" label="bypass-gated" title="Module carries python-gated bypass code" />
         </li>
       ) : null}
+      {caps.live_scrape_fallback ? (
+        <li>
+          <Badge
+            kind="capability"
+            label="live-scrape browse"
+            title="§6.8: no FMD2-DB catalog — Browse serves this module live from its directory walk (§5.8-normalized, TTL-cached)"
+          />
+        </li>
+      ) : null}
       {props.module.accountSupport ? (
         <li>
           <Badge kind="account" label="account" title="Module supports account login" />

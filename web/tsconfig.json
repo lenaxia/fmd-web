@@ -19,5 +19,6 @@
     "useDefineForClassFields": true
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "test/**/*.tsx", "e2e/**/*.ts"],
-  "exclude": ["dist"]
+  "exclude": ["dist"],
+  "references": [{ "path": "../contract" }]
 }

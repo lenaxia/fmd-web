@@ -149,28 +149,34 @@ describe('EncryptString / DecryptString (uBaseUnit.pas:1556–1589)', () => {
    * blockcipher EncryptString override = CFB8bit + base64 (canonical
    * DCPcrypt2 2.0.4). Expected = openssl aes-256-cfb8 with that key/iv —
    * byte-wise CFB with a 16-byte shift register, exactly DCP's CFB8bit.
+   * The composition takes an EXPLICIT key — the constant itself lives only
+   * in tools/import/fmd2-crypto.ts (D4 key isolation); this test derives
+   * the same key independently (the same oracle as the import fixtures).
    */
   const encryptKey = createHash('sha512').update('B74945FB50E84FD58BF9FEAB8E4BEA6B', 'latin1').digest().subarray(0, 32);
   const ecb = createCipheriv('aes-256-ecb', encryptKey, null);
   ecb.setAutoPadding(false);
   const iv0 = ecb.update(Buffer.alloc(16));
+  // The composition takes the RAW key string (uBaseUnit passes EncryptKey
+  // itself; InitStr does the SHA-512 derivation).
+  const keyString = 'B74945FB50E84FD58BF9FEAB8E4BEA6B';
 
   it('vector: AES-256-CFB8 with IV = E_K(0^16) + base64', () => {
     const c = createCipheriv('aes-256-cfb8', encryptKey, iv0);
     const expected = Buffer.concat([c.update('Hello FMD settings'), c.final()]).toString('base64');
-    expect(encryptString('Hello FMD settings')).toBe(expected);
+    expect(encryptString('Hello FMD settings', keyString)).toBe(expected);
     const d2 = createDecipheriv('aes-256-cfb8', encryptKey, iv0);
-    expect(decryptString(expected))
+    expect(decryptString(expected, keyString))
       .toBe(Buffer.concat([d2.update(Buffer.from(expected, 'base64')), d2.final()]).toString('latin1'));
   });
   it('roundtrip + determinism + guards', () => {
-    expect(decryptString(encryptString('roundtrip me'))).toBe('roundtrip me');
-    expect(encryptString('same input')).toBe(encryptString('same input'));
-    expect(encryptString('')).toBe('');
-    expect(decryptString('')).toBe('');
+    expect(decryptString(encryptString('roundtrip me', keyString), keyString)).toBe('roundtrip me');
+    expect(encryptString('same input', keyString)).toBe(encryptString('same input', keyString));
+    expect(encryptString('', keyString)).toBe('');
+    expect(decryptString('', keyString)).toBe('');
     // DCP Base64Decode is garbage-in/garbage-out (skips invalid chars, no
     // error) — invalid input does NOT produce a clean ''
-    expect(decryptString('not base64 !!!')).not.toBe('');
+    expect(decryptString('not base64 !!!', keyString)).not.toBe('');
   });
 });
 

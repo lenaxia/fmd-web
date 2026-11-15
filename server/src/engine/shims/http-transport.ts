@@ -13,8 +13,27 @@ import { Worker } from 'node:worker_threads';
  *   node:http mock server, performed on a worker thread and awaited
  *   with `Atomics.wait` (the deadline-watchdog pattern). Loopback hosts
  *   only — the transport refuses and never opens non-loopback sockets,
- *   keeping DESIGN §13's zero-network guarantee.
+ *   keeping DESIGN §13's zero-network guarantee. The one sanctioned
+ *   extension is an EXPLICIT `allowedHosts` allow-list for local mock
+ *   containers on the compose e2e network (docker/compose.e2e.yml):
+ *   still http-only, still local-infrastructure-only, never a live
+ *   external network path (DESIGN §13).
  */
+
+/**
+ * Proxy hop descriptor riding the request (SetProxy parity, DESIGN §5.4
+ * httpsendthread.pas:838-874): the transport worker routes the hop
+ * through this proxy — HTTP → forward-proxy absolute-form request;
+ * SOCKS4(a)/SOCKS5 → handshake + CONNECT tunnel, then the origin-form
+ * request over the tunnel. Loopback-only hosts as always (DESIGN §13).
+ */
+export interface RawProxy {
+  readonly type: 'HTTP' | 'SOCKS4' | 'SOCKS5';
+  readonly host: string;
+  readonly port: string;
+  readonly user: string;
+  readonly pass: string;
+}
 
 export interface RawHttpRequest {
   method: string;
@@ -23,6 +42,8 @@ export interface RawHttpRequest {
   headers: Readonly<Record<string, string>>;
   body: string;
   timeoutMs: number;
+  /** Active proxy for THIS hop (absent = direct). */
+  readonly proxy?: RawProxy;
 }
 
 export interface RawHttpResult {
@@ -127,9 +148,13 @@ const LOOPBACK_WORKER_SCRIPT = `
   // workers get ESM/CJS syntax-detected on some node entry paths)
   const { workerData } = await import('node:worker_threads');
   const http = await import('node:http');
+  const net = await import('node:net');
   const control = new Int32Array(workerData.control);
   const reqBuf = new Uint8Array(workerData.reqBuf);
   const resBuf = new Uint8Array(workerData.resBuf);
+  const allowedHosts = new Set(
+    (workerData.allowedHosts || []).map((h) => String(h).toLowerCase()),
+  );
   let lastSeq = 0;
 
   function isLoopbackHost(h) {
@@ -138,6 +163,10 @@ const LOOPBACK_WORKER_SCRIPT = `
       s === 'localhost' || s.endsWith('.localhost') ||
       s.startsWith('127.') || s === '::1' || s === '[::1]'
     );
+  }
+
+  function isAllowedHost(h) {
+    return isLoopbackHost(h) || allowedHosts.has(String(h).toLowerCase());
   }
 
   function readReq() {
@@ -166,6 +195,133 @@ const LOOPBACK_WORKER_SCRIPT = `
     Atomics.notify(control, 1);
   }
 
+  // ── proxy tunnel (SetProxy parity, httpsendthread.pas:838-874) ────────
+  // HTTP  → forward-proxy absolute-form request line at the proxy.
+  // SOCKS5 → greeting (+ RFC1929 user/pass subnegotiation) + CONNECT.
+  // SOCKS4 → SOCKS4a CONNECT form (hostname + 0.0.0.1 placeholder IP).
+  // The tunnel socket then carries the origin-form request; every phase
+  // honors the request timeout.
+
+  // Ordered sequential reader for the SOCKS handshake: replies may
+  // arrive coalesced in one chunk, so leftover bytes must be retained
+  // between reads.
+  function makeReader(socket) {
+    let buf = Buffer.alloc(0);
+    const waiters = [];
+    socket.on('data', (chunk) => {
+      buf = Buffer.concat([buf, chunk]);
+      while (waiters.length > 0 && buf.length >= waiters[0].n) {
+        const w = waiters.shift();
+        const out = buf.subarray(0, w.n);
+        buf = buf.subarray(w.n);
+        w.cb(out);
+      }
+    });
+    return {
+      read(n, cb) {
+        if (buf.length >= n) {
+          const out = buf.subarray(0, n);
+          buf = buf.subarray(n);
+          cb(out);
+          return;
+        }
+        waiters.push({ n, cb });
+      },
+    };
+  }
+
+  function socksTunnel(proxy, host, port, timeoutMs) {
+    return new Promise((resolveTunnel, rejectTunnel) => {
+      let timer = null;
+      const socket = net.connect({ host: proxy.host, port: Number(proxy.port) || 1080 });
+      const fail = (what) => {
+        if (timer !== null) clearTimeout(timer);
+        socket.destroy();
+        rejectTunnel(new Error(what));
+      };
+      const arm = (what) => {
+        if (timer !== null) clearTimeout(timer);
+        timer = setTimeout(() => fail('proxy timeout: ' + what), timeoutMs > 0 ? timeoutMs : 60000);
+      };
+      arm('connect');
+      socket.on('error', (e) => fail('proxy connect failed: ' + String((e && e.message) || e)));
+      socket.once('connect', () => {
+        const reader = makeReader(socket);
+        if (proxy.type === 'SOCKS5') {
+          const wantAuth = proxy.user !== '';
+          const methods = wantAuth ? Buffer.from([0x05, 2, 0x00, 0x02]) : Buffer.from([0x05, 1, 0x00]);
+          arm('socks5 greeting');
+          socket.write(methods);
+          reader.read(2, (greet) => {
+            if (greet[0] !== 0x05) return fail('socks5: bad greeting version');
+            const method = greet[1];
+            if (method === 0xff) return fail('socks5: no acceptable auth method');
+            if (method === 0x00) { sendConnect5(); return; }
+            if (method !== 0x02) return fail('socks5: unsupported auth method ' + method);
+            if (!wantAuth) return fail('socks5: proxy demands auth but no credentials set');
+            const user = Buffer.from(String(proxy.user), 'utf8');
+            const pass = Buffer.from(String(proxy.pass), 'utf8');
+            const auth = Buffer.concat([
+              Buffer.from([0x01, user.length]), user, Buffer.from([pass.length]), pass,
+            ]);
+            arm('socks5 auth');
+            socket.write(auth);
+            reader.read(2, (authReply) => {
+              if (authReply[0] !== 0x01 || authReply[1] !== 0x00) return fail('socks5: auth rejected');
+              sendConnect5();
+            });
+          });
+          function sendConnect5() {
+            const hostBuf = Buffer.from(String(host), 'utf8');
+            const req = Buffer.concat([
+              Buffer.from([0x05, 0x01, 0x00, 0x03, hostBuf.length]),
+              hostBuf,
+              Buffer.from([(port >> 8) & 0xff, port & 0xff]),
+            ]);
+            arm('socks5 connect');
+            socket.write(req);
+            reader.read(4, (head) => {
+              if (head[0] !== 0x05) return fail('socks5: bad reply version');
+              if (head[1] !== 0x00) return fail('socks5 CONNECT refused (code ' + head[1] + ')');
+              const atyp = head[3];
+              const addrLen = atyp === 0x01 ? 4 : atyp === 0x04 ? 16 : null;
+              if (addrLen !== null) {
+                reader.read(addrLen + 2, () => {
+                  if (timer !== null) clearTimeout(timer);
+                  resolveTunnel(socket);
+                });
+                return;
+              }
+              // domain-bound reply: 1 length byte + name + 2 port bytes
+              reader.read(1, (l) => {
+                reader.read(l[0] + 2, () => {
+                  if (timer !== null) clearTimeout(timer);
+                  resolveTunnel(socket);
+                });
+              });
+            });
+          }
+        } else {
+          // SOCKS4 / SOCKS4a
+          const userBuf = Buffer.from(String(proxy.user || ''), 'utf8');
+          const hostBuf = Buffer.from(String(host), 'utf8');
+          const req = Buffer.concat([
+            Buffer.from([0x04, 0x01, (port >> 8) & 0xff, port & 0xff, 0, 0, 0, 1]),
+            userBuf, Buffer.from([0x00]),
+            hostBuf, Buffer.from([0x00]),
+          ]);
+          arm(proxy.type === 'SOCKS4' ? 'socks4 connect' : 'socks4a connect');
+          socket.write(req);
+          reader.read(8, (reply) => {
+            if (reply[1] !== 0x5a) return fail('socks4 CONNECT refused (code ' + reply[1] + ')');
+            if (timer !== null) clearTimeout(timer);
+            resolveTunnel(socket);
+          });
+        }
+      });
+    });
+  }
+
   function perform(seq, req) {
     let u;
     try {
@@ -178,8 +334,13 @@ const LOOPBACK_WORKER_SCRIPT = `
       writeResult(seq, { ok: false, error: 'loopback transport is http-only', status: 0, statusText: '', headers: [], setCookie: [], bodyB64: '' });
       return;
     }
-    if (!isLoopbackHost(u.hostname)) {
+    if (!isAllowedHost(u.hostname)) {
       writeResult(seq, { ok: false, error: 'loopback transport refuses non-loopback host: ' + u.hostname, status: 0, statusText: '', headers: [], setCookie: [], bodyB64: '' });
+      return;
+    }
+    const proxy = req.proxy || null;
+    if (proxy !== null && !isAllowedHost(proxy.host)) {
+      writeResult(seq, { ok: false, error: 'loopback transport refuses non-loopback proxy host: ' + proxy.host, status: 0, statusText: '', headers: [], setCookie: [], bodyB64: '' });
       return;
     }
     const body = Buffer.from(req.bodyB64, 'base64');
@@ -191,65 +352,103 @@ const LOOPBACK_WORKER_SCRIPT = `
       'connection', 'keep-alive', 'transfer-encoding', 'te', 'upgrade',
       'proxy-connection', 'host', 'content-length', 'expect',
     ]);
-    const headers: Record<string, string> = {};
+    const headers = {};
     for (const [k, v] of Object.entries(req.headers)) {
       if (!HOP_BY_HOP.has(k.toLowerCase())) {
         headers[k] = v;
       }
     }
-    if (body.length > 0) headers['Content-Length'] = body.length;
     let done = false;
     const finish = (result) => {
       if (done) return;
       done = true;
       writeResult(seq, result);
     };
-    const upstream = http.request(
-      {
-        host: u.hostname,
-        port: u.port === '' ? 80 : Number(u.port),
-        path: u.pathname + u.search,
-        method: req.method,
-        headers,
-      },
-      (res) => {
-        const chunks = [];
-        res.on('data', (c) => chunks.push(Buffer.from(c)));
-        res.on('end', () => {
-          const pairs = [];
-          const raw = res.rawHeaders;
-          for (let i = 0; i + 1 < raw.length; i += 2) {
-            pairs.push([raw[i], raw[i + 1]]);
-          }
-          const setCookie = res.headers['set-cookie'];
-          finish({
-            ok: true,
-            error: '',
-            status: res.statusCode,
-            statusText: res.statusMessage,
-            headers: pairs,
-            setCookie: Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [],
-            bodyB64: Buffer.concat(chunks).toString('base64'),
+    const issueRequest = (targetHost, targetPort, requestPath, requestHeaders, tunnel) => {
+      const upstream = http.request(
+        {
+          host: targetHost,
+          port: targetPort,
+          path: requestPath,
+          method: req.method,
+          headers: requestHeaders,
+          ...(tunnel ? { createConnection: () => tunnel } : {}),
+        },
+        (res) => {
+          const chunks = [];
+          res.on('data', (c) => chunks.push(Buffer.from(c)));
+          res.on('end', () => {
+            const pairs = [];
+            const raw = res.rawHeaders;
+            for (let i = 0; i + 1 < raw.length; i += 2) {
+              pairs.push([raw[i], raw[i + 1]]);
+            }
+            const setCookie = res.headers['set-cookie'];
+            finish({
+              ok: true,
+              error: '',
+              status: res.statusCode,
+              statusText: res.statusMessage,
+              headers: pairs,
+              setCookie: Array.isArray(setCookie) ? setCookie : setCookie ? [setCookie] : [],
+              bodyB64: Buffer.concat(chunks).toString('base64'),
+            });
           });
-        });
-      },
-    );
-    upstream.setTimeout(req.timeoutMs > 0 ? req.timeoutMs : 0, () => {
-      upstream.destroy(new Error('timeout'));
-    });
-    upstream.on('error', (e) => {
-      finish({
-        ok: false,
-        error: String((e && e.message) || e),
-        status: 0,
-        statusText: '',
-        headers: [],
-        setCookie: [],
-        bodyB64: '',
+        },
+      );
+      upstream.setTimeout(req.timeoutMs > 0 ? req.timeoutMs : 0, () => {
+        upstream.destroy(new Error('timeout'));
       });
-    });
-    if (body.length > 0) upstream.write(body);
-    upstream.end();
+      upstream.on('error', (e) => {
+        finish({
+          ok: false,
+          error: String((e && e.message) || e),
+          status: 0,
+          statusText: '',
+          headers: [],
+          setCookie: [],
+          bodyB64: '',
+        });
+      });
+      if (body.length > 0) upstream.write(body);
+      upstream.end();
+    };
+
+    if (proxy === null) {
+      if (body.length > 0) headers['Content-Length'] = body.length;
+      issueRequest(u.hostname, u.port === '' ? 80 : Number(u.port), u.pathname + u.search, headers, null);
+      return;
+    }
+    const proxyPort = Number(proxy.port) || (proxy.type === 'HTTP' ? 8080 : 1080);
+    if (proxy.type === 'HTTP') {
+      // forward proxy: absolute-form request line + Host of the TARGET;
+      // Proxy-Authorization when credentials are configured (:853-857)
+      const pheaders = { ...headers, Host: u.host };
+      if (body.length > 0) pheaders['Content-Length'] = body.length;
+      if (proxy.user !== '') {
+        pheaders['Proxy-Authorization'] = 'Basic ' +
+          Buffer.from(proxy.user + ':' + proxy.pass, 'utf8').toString('base64');
+      }
+      issueRequest(proxy.host, proxyPort, req.url, pheaders, null);
+      return;
+    }
+    socksTunnel(proxy, u.hostname, u.port === '' ? 80 : Number(u.port), req.timeoutMs)
+      .then((tunnel) => {
+        if (done) { tunnel.destroy(); return; }
+        if (body.length > 0) headers['Content-Length'] = body.length;
+        issueRequest(u.hostname, u.port === '' ? 80 : Number(u.port), u.pathname + u.search, headers, tunnel);
+      })
+      .catch((e) => {
+        finish({
+          ok: false,
+          error: String((e && e.message) || e),
+          status: 0,
+          statusText: '',
+          headers: [],
+          setCookie: [],
+          bodyB64: '',
+        });
+      });
   }
 
   // Poll instead of blocking in Atomics.wait: a blocking wait would
@@ -281,23 +480,34 @@ function isLoopbackHost(host: string): boolean {
 export interface LoopbackTransportOptions {
   /** Hard cap for one send() on the caller side (ms, default 120000). */
   readonly maxWaitMs?: number;
+  /**
+   * Explicit allow-list of EXTRA (non-loopback) hostnames the transport
+   * may open — local mock containers on the compose e2e network only.
+   * Empty/undefined (default): loopback hosts only. Host-side AND
+   * worker-side checks both enforce the same set.
+   */
+  readonly allowedHosts?: readonly string[];
 }
 
 /**
  * Real requests against a LOCAL node:http server, one worker thread
  * per transport (created lazily, `dispose()` terminates). Loopback
- * hosts only; the worker re-asserts that before opening any socket.
+ * hosts only (plus an explicit `allowedHosts` allow-list for compose
+ * e2e mock containers); the worker re-asserts that before opening any
+ * socket.
  */
 export class LoopbackHttpTransport implements HttpTransportPort {
   private readonly control: Int32Array;
   private readonly reqBuf: SharedArrayBuffer;
   private readonly resBuf: SharedArrayBuffer;
+  private readonly allowedHosts: readonly string[];
   private seq = 0;
   private worker: Worker | null = null;
   private readonly maxWaitMs: number;
 
   constructor(options: LoopbackTransportOptions = {}) {
     this.maxWaitMs = Math.max(1000, Math.trunc(options.maxWaitMs ?? 120000));
+    this.allowedHosts = (options.allowedHosts ?? []).map((h) => h.toLowerCase());
     const controlBuf = new SharedArrayBuffer(2 * Int32Array.BYTES_PER_ELEMENT);
     this.control = new Int32Array(controlBuf);
     this.reqBuf = new SharedArrayBuffer(REQ_BUF_BYTES);
@@ -319,6 +529,7 @@ export class LoopbackHttpTransport implements HttpTransportPort {
           control: this.control.buffer,
           reqBuf: this.reqBuf,
           resBuf: this.resBuf,
+          allowedHosts: [...this.allowedHosts],
         },
       });
       // NOT unref'd: an unref'd worker's event loop may be starved while
@@ -329,7 +540,7 @@ export class LoopbackHttpTransport implements HttpTransportPort {
 
   send(request: RawHttpRequest): RawHttpResult {
     const urlHost = hostOfUrl(request.url);
-    if (!isLoopbackHost(urlHost)) {
+    if (!isLoopbackHost(urlHost) && !this.allowedHosts.includes(urlHost.toLowerCase())) {
       return TRANSPORT_ERROR(
         `loopback transport refuses non-loopback host: ${urlHost}`,
       );
@@ -343,6 +554,7 @@ export class LoopbackHttpTransport implements HttpTransportPort {
         headers: request.headers,
         bodyB64: Buffer.from(request.body, 'utf8').toString('base64'),
         timeoutMs: request.timeoutMs,
+        ...(request.proxy !== undefined ? { proxy: request.proxy } : {}),
       }),
       'utf8',
     );

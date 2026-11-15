@@ -1,0 +1,28 @@
+{
+  "added": [
+    {
+      "kind": "added",
+      "id": "aaaacccc111122223333444455556666",
+      "name": "CraftedFixture",
+      "sourceFile": "modules/CraftedFixture.lua"
+    }
+  ],
+  "removed": [
+    {
+      "kind": "removed",
+      "id": "053da85062184626a0a1ff6d57c3c955",
+      "name": "Hentai2Read",
+      "sourceFile": "modules/Hentai2Read.lua"
+    }
+  ],
+  "changed": [
+    {
+      "kind": "changed",
+      "id": "c7b742a4dc8a451fa95baec1aa183b39",
+      "previousName": "11Toon",
+      "currentName": "11Toon Classic",
+      "previousSourceFile": "modules/11Toon.lua",
+      "currentSourceFile": "modules/11Toon.lua"
+    }
+  ]
+}

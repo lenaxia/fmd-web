@@ -5,6 +5,8 @@ Ground-truth corpus replayed **fully offline** in CI (DESIGN.md §13.1).
 ```
 fixtures/
 ├── lua/             hand-written fixture .lua modules (harvester unit tests)
+├── antibot/         §12 Phase-0 bypass fixtures (antibot pipeline test):
+│                    manifest + challenge pages + signature matrix + configs
 ├── capture/         FPC-oracle capture batches (fmd_capture expression|normalize)
 │   ├── *.html|*.json          recorded documents
 │   ├── *.manifest.json        expression manifests fed to the oracle
@@ -86,3 +88,14 @@ node corpus/scripts/validate-triples.mjs corpus/fixtures/capture/*.triples.json
 The TypeScript port (`server/src/engine/normalize/`, §5.8) is golden-tested
 against every batch: `server/test/engine/normalize/pipeline.golden.test.ts`
 asserts `JSON.stringify(normalized)` byte-equality per fixture.
+
+### Antibot / websitebypass fixtures (§12 Phase-0, §5.9)
+
+`antibot/` — deterministic mock-server signatures, IUAM/FlareSolverr
+challenge fixtures and websitebypass config branches for the antibot
+interceptor **pipeline** test
+(`server/test/engine/state/antibot.pipeline.integration.test.ts`): real
+FMD2 bypass scripts executed fully offline against a local mock server.
+Provenance, constants and consumption: `antibot/README.md` +
+`antibot/manifest.json`; registered in `corpus/meta.json`
+(`antibotFixtures`). Run evidence: `docs/evidence-antibot-integration.md`.

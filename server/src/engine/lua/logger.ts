@@ -28,3 +28,23 @@ export class MemoryLogger implements HostLogger {
 export function createMemoryLogger(): MemoryLogger {
   return new MemoryLogger();
 }
+
+/**
+ * MemoryLogger that ALSO forwards every record to a sink (§4
+ * observability tee): engine internals keep their full in-memory
+ * record set, while the run's structured log receives the same lines
+ * (module-id correlation + swallow WARN dedup happen downstream).
+ */
+export class TeeMemoryLogger extends MemoryLogger {
+  private readonly tee: (record: HostLogRecord) => void;
+
+  constructor(tee: (record: HostLogRecord) => void) {
+    super();
+    this.tee = tee;
+  }
+
+  override write(record: HostLogRecord): void {
+    super.write(record);
+    this.tee(record);
+  }
+}

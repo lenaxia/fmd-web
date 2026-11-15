@@ -11,11 +11,86 @@ import {
   useSyncModules,
   useUpdateModule,
   type ModuleSummaryT,
+  type ProxySettingsT,
 } from '../api/hooks';
 import { CapabilityBadges } from '../components/CapabilityBadges';
+import { ProxySettingsSection } from '../components/ProxySettings';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorBanner } from '../components/ErrorBanner';
 import { OptionsEditor } from '../components/OptionsEditor';
+
+const EMPTY_PROXY: ProxySettingsT = { type: '', host: '', port: '', user: '', pass: '' };
+
+function ModuleProxyEditor(props: { module: ModuleSummaryT }): ReactElement {
+  const update = useUpdateModule();
+  const [override, setOverride] = useState(props.module.proxy !== null);
+  const [draft, setDraft] = useState<ProxySettingsT>(props.module.proxy ?? EMPTY_PROXY);
+
+  const save = (): void => {
+    // unchecked = inherit the global config (explicit null clears the override)
+    update.mutate({ id: props.module.id, proxy: override ? draft : null });
+  };
+
+  return (
+    <form
+      className="proxy-override-form"
+      aria-label={`Proxy override for ${props.module.name}`}
+      onSubmit={(event: FormEvent<HTMLFormElement>): void => {
+        event.preventDefault();
+        save();
+      }}
+    >
+      <label htmlFor={`proxy-override-${props.module.id}`}>
+        <input
+          id={`proxy-override-${props.module.id}`}
+          type="checkbox"
+          checked={override}
+          onChange={(e): void => {
+            setOverride(e.target.checked);
+          }}
+        />{' '}
+        Module proxy override {override ? '' : '(inherits the global proxy)'}
+      </label>
+      {override ? (
+        <>
+          <label htmlFor={`proxy-type-${props.module.id}`}>Type</label>
+          <select
+            id={`proxy-type-${props.module.id}`}
+            value={draft.type}
+            onChange={(e): void => {
+              const type = e.target.value as ProxySettingsT['type'];
+              setDraft(type === '' ? EMPTY_PROXY : { ...draft, type });
+            }}
+          >
+            <option value="">none</option>
+            <option value="HTTP">HTTP</option>
+            <option value="SOCKS4">SOCKS4</option>
+            <option value="SOCKS5">SOCKS5</option>
+          </select>
+          <label htmlFor={`proxy-host-${props.module.id}`}>Host</label>
+          <input
+            id={`proxy-host-${props.module.id}`}
+            value={draft.host}
+            onChange={(e): void => {
+              setDraft({ ...draft, host: e.target.value });
+            }}
+          />
+          <label htmlFor={`proxy-port-${props.module.id}`}>Port</label>
+          <input
+            id={`proxy-port-${props.module.id}`}
+            value={draft.port}
+            onChange={(e): void => {
+              setDraft({ ...draft, port: e.target.value });
+            }}
+          />
+        </>
+      ) : null}
+      <button type="submit" disabled={update.isPending}>
+        Save module proxy
+      </button>
+    </form>
+  );
+}
 
 function ModuleEditor(props: { module: ModuleSummaryT; onDone: () => void }): ReactElement {
   const update = useUpdateModule();
@@ -52,6 +127,7 @@ function ModuleEditor(props: { module: ModuleSummaryT; onDone: () => void }): Re
           Save cookies
         </button>
       </form>
+      <ModuleProxyEditor module={props.module} />
       {update.isError ? <ErrorBanner error={update.error} /> : null}
       {update.isSuccess ? (
         <p role="status" aria-live="polite">
@@ -205,6 +281,8 @@ export function SettingsPage(): ReactElement {
           {syncCatalogs.data.results.map((r): string => `${r.id.slice(0, 8)}:${r.state}`).join(', ')}.
         </p>
       ) : null}
+
+      <ProxySettingsSection />
 
       <h2>Modules ({list.length})</h2>
       <ul className="module-list">

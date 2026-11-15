@@ -1,0 +1,445 @@
+==> contract:check (Pascal extractors vs contract.json vs generated bindings)
+
+> fmd-web@0.1.0 contract:check
+> npm run contract:check -w @fmd/contract
+
+
+> @fmd/contract@0.1.0 contract:check
+> npm run build && npx tsx ../scripts/contract-drift-check.ts
+
+
+> @fmd/contract@0.1.0 build
+> tsc -b
+
+contract drift-check: OK — 0 mismatches (events + TXQuery/Storage/ImagePuzzle/Duktape/Crypto facades + requireShims statuses vs FMD2/baseunits/lua + shim loader registry)
+==> lint
+
+> fmd-web@0.1.0 lint
+> eslint .
+
+==> typecheck
+
+> fmd-web@0.1.0 typecheck
+> tsc -b tsconfig.json
+
+==> test (unit + integration — the one offline suite, DESIGN.md §13)
+
+> fmd-web@0.1.0 test
+> vitest run
+
+
+ RUN  v3.2.7 /workspace/fmd-web
+
+ ✓ server/test/jobs/packers/packers-memory.test.ts (3 tests) 13581ms
+   ✓ 1000-page synthetic chapter packs under the D16 budget > ZIP pack: entries ordered, CRC-valid, heap far below the book size  3735ms
+   ✓ 1000-page synthetic chapter packs under the D16 budget > EPUB pack: spine equals chapter order across 1000 pages, under budget  3435ms
+   ✓ 1000-page synthetic chapter packs under the D16 budget > PDF pack: incremental writer streams 1000 pages, page count matches, under budget  3405ms
+ ✓ server/test/jobs/stress.test.ts (1 test) 8594ms
+   ✓ stress: 16 claimants × 500 jobs × 10 reps > zero double-claims, zero lost jobs — deterministic across all 10 repetitions  8496ms
+ ✓ server/test/engine/state/antibot.pipeline.integration.test.ts (5 tests) 8653ms
+   ✓ antibot interceptor pipeline (real FMD2 bypass scripts, offline mock server) > detects every checkantibot.lua:5-12 signature over real loopback responses (real Lua heuristic)  418ms
+   ✓ antibot interceptor pipeline (real FMD2 bypass scripts, offline mock server) > IUAM pipeline: detect → serialize → single-flight → challenge JS via duktape shim → cookies/UA persisted; reload=false keeps the single execution  4036ms
+   ✓ antibot interceptor pipeline (real FMD2 bypass scripts, offline mock server) > ≥8 parallel image downloads on ONE module during a bypass window: exactly one bypass, losers not delayed  4097ms
+ ✓ server/test/jobs/download/cancel-resume-determinism.test.ts (1 test) 6869ms
+   ✓ cancel→resume determinism (wire-straggler regression, Blocker 2) > over 30 cancel→resume cycles: resume fetches exactly the remaining images, each exactly once  6868ms
+ ✓ server/test/engine/shims/duktape-shim.test.ts (7 tests) 5029ms
+   ✓ Duktape shim v0 > ExecJS returns nil (undefined) on JS errors — never throws (LuaDuktape.pas:18-24)  5006ms
+ ✓ corpus/test/seed-corpus.test.ts (7 tests) 2714ms
+   ✓ seed corpus — offline replay (MockQueryEngine) > replays the FULL corpus with 100% pass and deterministic reports  1391ms
+   ✓ seed corpus — offline replay (MockQueryEngine) > a corrupted truth flips exactly its own case to fail with detail  875ms
+   ✓ seed corpus — offline replay (MockQueryEngine) > every seed module with queryable fixtures contributes report cases  438ms
+{
+  "live": false,
+  "note": "plan only — rerun with --live to fetch and dispatch (never in CI)",
+  "rotationIndex": 20772,
+  "sampleSize": 5,
+  "planned": [
+    "Mangacan",
+    "MangaDex",
+    "MangaFreak",
+    "MangaGo",
+    "MangaKatana"
+  ]
+}
+ ✓ server/test/tools/live-suite.test.ts (25 tests) 2648ms
+   ✓ mock cluster integration — SAME code path on loopback (R-LS7) > runs the suite end-to-end: gate/skip, 403/fail, fixture parse — paced + UA-stamped  480ms
+   ✓ mock cluster integration — SAME code path on loopback (R-LS7) > the D18 probe routes fire the detector END-TO-END through the real resolver  2094ms
+ ✓ server/test/jobs/download/download-runner.integration.test.ts (7 tests) 2483ms
+   ✓ download pipeline vs the local fixture manga site (§7.1) > happy path: a recorded 20-image chapter downloads in FileNames/PageLinks order with every module hook invoked  408ms
+   ✓ download pipeline vs the local fixture manga site (§7.1) > cancel mid-download: workers stop within the deadline, queued work fails fast, D markers persist  913ms
+   ✓ download pipeline vs the local fixture manga site (§7.1) > resume after cancel: only the remaining images are fetched (server request count)  503ms
+   ✓ download pipeline vs the local fixture manga site (§7.1) > site limiter: per-host concurrency never exceeds the configured limit under parallel chapters  361ms
+ ✓ server/test/engine/registry/sweep.test.ts (11 tests) 2345ms
+ ✓ server/test/engine/shims/mangafoxwatermark-shim.test.ts (10 tests) 2175ms
+   ✓ mangafoxwatermark assets + golden > SaveAsPNG on a JPEG sample keeps the Pascal writer override (chromium-gated)  1527ms
+ ✓ server/test/engine/shims/http-mock-server.integration.test.ts (17 tests) 1952ms
+ ✓ server/test/engine/shims/imagepuzzle-shim.test.ts (17 tests) 1870ms
+   ✓ imagepuzzle goldens — real-site descramble fixtures (pixel-identical) > TonarinoYoungJump: descrambled output is pixel-identical to the captured clean page  548ms
+   ✓ imagepuzzle Lua surface — real wasmoon state through installShims > TonarinoYoungJump.lua:93-99 pattern: Multiply = 8 + transpose matrix  564ms
+ ✓ server/test/engine/sidecar/bypass-adapter.test.ts (13 tests) 1658ms
+   ✓ FlareSolverrBypassExecutor contract (§5.11) > bounded concurrency 2: five concurrent solves never exceed two in-flight /v1 calls  439ms
+   ✓ FlareSolverrBypassExecutor contract (§5.11) > timeout: a stalled /v1 trips BypassTimeoutError within the configured budget  363ms
+ ✓ server/test/engine/events/dispatcher.test.ts (32 tests) 1633ms
+   ✓ EventDispatcher (§5.2) — return protocol driven by contract.json > all 11 boolean events return booleans (nil result reads false)  332ms
+{
+  "error": "secret_box",
+  "message": "FMD_WEB_SECRET is required for the accounts import (refusing to store plaintext)"
+}
+ ✓ server/test/tools/import/fmd2-import.test.ts (11 tests) 1359ms
+   ✓ fmd2-import CLI (tsx spawn) > all three commands run green through the real CLI  1097ms
+ ✓ server/test/runtime/drain.test.ts (1 test) 1313ms
+   ✓ SIGTERM graceful drain (§4, process-mode twin of the compose assertion) > boots with auto-bootstrap, serves the SPA, and exits ≤30s with flush logs on SIGTERM  1197ms
+ ✓ server/test/engine/shims/http-proxy-routing.integration.test.ts (7 tests) 1252ms
+   ✓ SetProxy end-to-end routing through local mock proxies > a stalling HTTP proxy trips the request timeout (Timeout property)  609ms
+ ✓ contract/test/toolchain.test.ts (11 tests) 1015ms
+   ✓ tsconfig strict flags reject violating fixtures > fails the build on the violating fixture  307ms
+   ✓ eslint boundary rules reject lint fixtures > flags any and missing explicit return types on exports  460ms
+ ✓ server/test/runtime/runtime.test.ts (8 tests) 1127ms
+   ✓ D20 auto-bootstrap (offline, real pipelines, real mock script) > empty data dir → module sync → registry sweep → catalog install → ready  509ms
+ ✓ server/test/api/ws/ws.integration.test.ts (10 tests) 748ms
+   ✓ /ws — D21 slow-consumer policy under a stalled reader (acceptance) > drop-oldest + gap marker: received ∪ gap ranges covers every published id exactly once  567ms
+ ✓ server/test/api/auth.test.ts (11 tests) 741ms
+   ✓ login rate limit — 10/min per remote address > the 11th attempt within the window is 429 with retry info; per-IP isolation holds  561ms
+ ✓ server/test/sync/db/sync-integration.test.ts (6 tests) 672ms
+ ✓ server/test/jobs/checkpoint.test.ts (6 tests) 874ms
+   ✓ §4 WAL discipline — auto-checkpoint sizing (default 1000 pages, tunable) > the threshold is tunable and effective: past N pages, nothing is left to checkpoint  773ms
+ ✓ server/test/jobs/queue.test.ts (28 tests) 773ms
+ ✓ server/test/jobs/library/dual-write.test.ts (15 tests) 669ms
+ ✓ server/test/sync/db/catalog-store.test.ts (16 tests) 522ms
+ ✓ server/test/sync/modules/module-sync.integration.test.ts (13 tests) 408ms
+ ✓ server/test/jobs/favorites/engine.test.ts (12 tests) 549ms
+ ✓ server/test/engine/registry/persistence.test.ts (4 tests) 478ms
+   ✓ startup registry — SHA-gated persistence > first boot sweeps and persists id/name/root_url/category/options/file/capabilities rows  317ms
+ ✓ server/test/engine/registry/isolation.test.ts (3 tests) 429ms
+   ✓ corrupted-file isolation > every good file registers despite the corrupted siblings  328ms
+ ✓ server/test/engine/shims/gzip-shim.test.ts (10 tests) 417ms
+ ✓ server/test/sync/db/batch-state.test.ts (4 tests) 434ms
+ ✓ server/test/engine/e2e/hentai2read-getpagenumber.e2e.test.ts (1 test) 377ms
+   ✓ seed flow: Hentai2Read GetPageNumber > fills TASK.PageLinks via the list-fill json() overload, offline  376ms
+ ✓ server/test/catalog/directory-walk.test.ts (4 tests) 366ms
+   ✓ EngineDirectoryWalker (§6.8) — real module, recorded fixtures > walks GetDirectoryPageNumber → per-page GetNameAndLink and returns §5.8-normalized entries  320ms
+ ✓ server/test/engine/e2e/comick-getinfo.e2e.test.ts (1 test) 337ms
+   ✓ seed flow: ComicK GetInfo > runs the JSON-API GetInfo against recorded fixtures, offline  336ms
+ ✓ server/test/accounts/account-login-engine.test.ts (5 tests) 350ms
+ ✓ server/test/engine/shims/pb-protoc.integration.test.ts (7 tests) 440ms
+ ✓ server/test/engine/e2e/madara-template-getpagenumber.e2e.test.ts (1 test) 394ms
+   ✓ seed flow: Madara template GetPageNumber (BrainRotComics) > decrypts chapter_data via Duktape JS require and fills TASK.PageLinks  392ms
+ ✓ server/test/jobs/favorites/service.test.ts (7 tests) 348ms
+ ✓ server/test/sync/db/atomic-install.test.ts (3 tests) 369ms
+ ✓ server/test/engine/e2e/asurascans-getinfo.e2e.test.ts (1 test) 323ms
+   ✓ seed flow: AsuraScans GetInfo > runs the JSON-API GetInfo against recorded fixtures, offline  322ms
+ ✓ server/test/sync/db/fts-replace-under-read.test.ts (4 tests) 316ms
+ ✓ server/test/engine/e2e/ehentai-getinfo-login.e2e.test.ts (1 test) 320ms
+   ✓ seed flow: EHentai GetInfo + ExHentai Login > runs GetInfo, account Login and PAGENUMBER read-back, offline  319ms
+ ✓ server/test/engine/shims/require-registry.test.ts (7 tests) 303ms
+ ✓ server/test/engine/shims/http-lua.test.ts (3 tests) 303ms
+ ✓ server/test/engine/shims/pcre2-shim.test.ts (46 tests) 306ms
+ ✓ server/test/engine/shims/crypto-bridge.test.ts (8 tests) 288ms
+ ✓ server/test/engine/e2e/tapas-totaldirectory.e2e.test.ts (1 test) 292ms
+ ✓ server/test/engine/shims/logger-shim.test.ts (8 tests) 291ms
+ ✓ server/test/jobs/packers/packers-watchdog.test.ts (6 tests) 267ms
+ ✓ server/test/engine/shims/ixqvalue.test.ts (13 tests) 113ms
+ ✓ web/test/api-drift.test.ts (3 tests) 196ms
+ ✓ server/test/accounts/account-service.test.ts (11 tests) 276ms
+ ✓ server/test/runtime/download-lane.test.ts (8 tests) 224ms
+ ✓ server/test/engine/state/antibot.test.ts (17 tests) 222ms
+ ✓ server/test/api/modules.test.ts (11 tests) 129ms
+ ✓ server/test/api/health.test.ts (4 tests) 122ms
+ ✓ server/test/jobs/coalescing.test.ts (7 tests) 139ms
+ ✓ server/test/engine/lua/init-pass.test.ts (5 tests) 224ms
+ ✓ server/test/api/catalog.test.ts (15 tests) 145ms
+ ✓ server/test/api/info.test.ts (6 tests) 145ms
+ ✓ server/test/api/jobs.test.ts (10 tests) 130ms
+ ✓ server/test/jobs/packers/packers.test.ts (9 tests) 144ms
+ ✓ server/test/api/favorites.test.ts (12 tests) 135ms
+ ✓ contract/test/contract.test.ts (13 tests) 132ms
+ ✓ server/test/observability/health-readyz.test.ts (4 tests) 137ms
+ ✓ server/test/api/accounts.test.ts (10 tests) 120ms
+ ✓ server/test/engine/shims/crypto-ciphers.test.ts (34 tests) 128ms
+ ✓ server/test/api/settings.test.ts (10 tests) 129ms
+ ✓ server/test/observability/metrics.integration.test.ts (1 test) 117ms
+ ✓ server/test/engine/shims/txquery-fill.test.ts (10 tests) 179ms
+ ✓ server/test/api/jobs-cancel-library.test.ts (8 tests) 116ms
+ ✓ server/test/jobs/retention.test.ts (4 tests) 101ms
+ ✓ server/test/engine/lua/facades.test.ts (9 tests) 104ms
+ ✓ server/test/api/catalog-fallback.test.ts (7 tests) 109ms
+ ✓ server/test/smoke.test.ts (15 tests) 99ms
+ ✓ server/test/api/openapi.test.ts (6 tests) 87ms
+ ✓ server/test/engine/shims/http-pipeline.test.ts (38 tests) 90ms
+ ✓ server/test/api/pagination.test.ts (3 tests) 90ms
+ ✓ server/test/jobs/crash-recovery.test.ts (5 tests) 108ms
+ ✓ corpus/test/harvester.test.ts (13 tests) 114ms
+ ✓ server/test/engine/lua/storage.test.ts (8 tests) 71ms
+ ✓ server/test/observability/backup-restore.test.ts (1 test) 105ms
+ ✓ corpus/test/runner.test.ts (10 tests) 78ms
+ ✓ server/test/jobs/library/finalize.test.ts (12 tests) 87ms
+ ✓ server/test/engine/shims/pb-shim.test.ts (9 tests) 82ms
+ ✓ server/test/engine/lua/chunk-cache.test.ts (6 tests) 68ms
+ ✓ server/test/engine/shims/txquery-json.test.ts (10 tests) 70ms
+ ✓ contract/test/drift-check.test.ts (27 tests) 65ms
+ ✓ server/test/accounts/secret-box.test.ts (8 tests) 65ms
+ ✓ server/test/catalog/lane-isolation.test.ts (2 tests) 61ms
+ ✓ server/test/engine/lua/mangainfo.test.ts (4 tests) 69ms
+ ✓ server/test/engine/shims/txquery-swallow.test.ts (5 tests) 47ms
+ ✓ server/test/api/ws/hub.test.ts (19 tests) 37ms
+ ✓ server/test/engine/shims/crypto-vectors.test.ts (34 tests) 36ms
+ ✓ server/test/engine/shims/corpus-live.test.ts (4 tests) 28ms
+ ✓ server/test/jobs/download/image-worker-pool.test.ts (7 tests) 34ms
+ ✓ server/test/jobs/favorites/golden-diff.test.ts (6 tests) 23ms
+ ✓ server/test/engine/state/module-state.test.ts (22 tests) 29ms
+ ✓ server/test/engine/state/persistence.test.ts (4 tests) 30ms
+ ✓ server/test/engine/lua/tstrings.test.ts (23 tests) 36ms
+ ✓ contract/test/extractor.test.ts (33 tests) 25ms
+ ✓ server/test/tools/import/fmd2-key-isolation.test.ts (5 tests) 25ms
+ ✓ server/test/engine/shims/http-facade.test.ts (23 tests) 20ms
+ ✓ server/test/sync/db/jdn.test.ts (5 tests) 16ms
+ ✓ server/test/engine/normalize/pipeline.golden.test.ts (28 tests) 12ms
+ ✓ server/test/jobs/state-machine.test.ts (46 tests) 10ms
+{
+  "live": false,
+  "note": "plan only — rerun with --live to fetch and dispatch (never in CI)",
+  "rotationIndex": 20772,
+  "sampleSize": 5,
+  "planned": [
+    "Mangacan",
+    "MangaDex",
+    "MangaFreak",
+    "MangaGo",
+    "MangaKatana"
+  ]
+}
+ ✓ server/test/tools/smoke.test.ts (16 tests) 11ms
+ ✓ server/test/catalog/live-scrape-store.test.ts (12 tests) 12ms
+ ✓ server/test/api/ws/wire-drift.test.ts (3 tests) 13ms
+ ✓ server/test/sync/db/rate-budget.test.ts (11 tests) 11ms
+ ✓ server/test/jobs/filename-policy.test.ts (59 tests) 11ms
+ ✓ corpus/test/no-network.test.ts (5 tests) 10ms
+ ✓ web/test/ws-contract-drift.test.ts (5 tests) 9ms
+ ✓ server/test/engine/pipeline/chapter-pipeline.test.ts (24 tests) 8ms
+ ✓ server/test/engine/shims/crypto-composed.test.ts (13 tests) 8ms
+ ✓ web/test/ws-backfill.test.ts (9 tests) 8ms
+ ✓ server/test/jobs/favorites/scheduler.test.ts (7 tests) 8ms
+ ✓ server/test/jobs/library/filenames.golden.test.ts (41 tests) 7ms
+ ✓ server/test/engine/shims/http-proxy.test.ts (13 tests) 7ms
+ ✓ server/test/engine/registry/capabilities.test.ts (10 tests) 7ms
+ ✓ server/test/engine/events/supervisor.test.ts (10 tests) 7ms
+ ✓ corpus/test/loader.test.ts (6 tests) 8ms
+ ✓ server/test/engine/shims/http-url.test.ts (22 tests) 7ms
+ ✓ server/test/engine/events/bindings-golden.test.ts (11 tests) 7ms
+ ✓ server/test/engine/lua/pascal-strings.test.ts (21 tests) 6ms
+ ✓ server/test/engine/shims/http-egress.test.ts (25 tests) 7ms
+ ✓ server/test/api/ws/ring-buffer.test.ts (12 tests) 6ms
+ ✓ server/test/jobs/library/merge.golden.test.ts (28 tests) 5ms
+ ✓ server/test/jobs/download/marker-store.test.ts (5 tests) 17ms
+ ✓ server/test/sync/modules/module-sync-config.test.ts (6 tests) 6ms
+ ✓ server/test/observability/log-dedup.test.ts (4 tests) 5ms
+ ✓ server/test/engine/shims/http-headers.test.ts (13 tests) 5ms
+ ✓ server/test/sync/modules/zipball.test.ts (5 tests) 5ms
+ ✓ server/test/jobs/download/site-limiter.test.ts (9 tests) 5ms
+ ✓ server/test/jobs/download/filenames.test.ts (12 tests) 4ms
+ ✓ server/test/sync/modules/module-diff.golden.test.ts (3 tests) 4ms
+ ✓ server/test/docker/compose-browser-profile.test.ts (4 tests) 3ms
+ ✓ corpus/test/smoke.test.ts (2 tests) 3ms
+ ✓ server/test/jobs/download/image-files.test.ts (3 tests) 3ms
+ ✓ web/test/bootstrap-banner.test.tsx (2 tests) 1085ms
+   ✓ App bootstrap banner (D20 progress) > surfaces the bootstrap stage while /readyz answers 503, then hides on ready  1069ms
+ ✓ web/test/proxy-settings.test.tsx (5 tests) 438ms
+ ✓ web/test/pagination.test.tsx (6 tests) 279ms
+ ✓ web/test/options-editor.test.tsx (8 tests) 245ms
+ ✓ web/test/favorites-page.test.tsx (6 tests) 181ms
+ ✓ web/test/downloads-feed.test.tsx (4 tests) 184ms
+ ✓ web/test/manga-dryrun.test.tsx (4 tests) 148ms
+ ✓ web/test/capability-badges.test.tsx (3 tests) 149ms
+ ✓ web/test/settings-bootstrap.test.tsx (2 tests) 130ms
+
+ Test Files  149 passed (149)
+      Tests  1597 passed (1597)
+   Start at  17:36:13
+   Duration  142.86s (transform 2.25s, setup 751ms, collect 23.33s, tests 90.59s, environment 2.63s, prepare 7.37s)
+
+==> corpus (full seed replay vs FPC oracle; >=99% + zero undocumented mismatches)
+
+> fmd-web@0.1.0 corpus
+> tsx corpus/scripts/generate-compat.ts --gate
+
+COMPAT.md written: 912/912 = 100.00% (docs/corpus-report.json: 912 cases, 65 modules)
+corpus gate passed: >=99% with zero undocumented mismatches
+==> e2e phase-2 (bootstrap-watch + main: compose stack, or the process twin without docker)
+
+[e2e] docker unavailable — running the process-mode twin (same fixtures/mock/entry/specs)
+[compose-check] using vendored docker CLI: Docker version 27.5.1, build 9f9e405 + Docker Compose version v2.32.4
+[compose-check] rendering the merged config (docker compose config — real merge, no daemon)
+[compose-check] merged config asserts OK (app env/depends_on/drain budget/ports/volume, mock pin/profile/mounts)
+[compose-check] Dockerfile contract OK (non-root USER, HEALTHCHECK, CMD -> built runtime entry, COPY sources present)
+[compose-check] digest pin FRESH: node:22.14.0-bookworm-slim = sha256:1c18d9ab3af4585870b92e4dbc5cac5a0dc77dd13df1a5905cea89fc720eb05b
+[compose-check] rendering the §5.11 browser profile (docker compose config — real merge, no daemon)
+[compose-check] §5.11 browser profile OK (digest-pinned flaresolverr + healthcheck + sidecar env pass-through)
+[compose-check] PASS — compose leg validated with the real docker compose implementation
+
+[e2e] building workspaces (tsc -b) + SPA (vite)
+vite v6.4.6 building for production...
+transforming...
+../node_modules/@tanstack/react-query/build/modern/QueryClientProvider.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/QueryClientProvider.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/HydrationBoundary.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/HydrationBoundary.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/IsRestoringProvider.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/IsRestoringProvider.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/QueryErrorResetBoundary.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/QueryErrorResetBoundary.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/useQuery.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/useQuery.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/useQueries.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/useQueries.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/useIsFetching.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/useIsFetching.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/useMutationState.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/useMutationState.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/useMutation.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/useMutation.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/useInfiniteQuery.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/useInfiniteQuery.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/useSuspenseQuery.js (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+../node_modules/@tanstack/react-query/build/modern/useSuspenseQuery.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/useSuspenseQuery.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/useSuspenseInfiniteQuery.js (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+../node_modules/@tanstack/react-query/build/modern/useSuspenseInfiniteQuery.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/useSuspenseInfiniteQuery.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/useSuspenseQueries.js (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+../node_modules/@tanstack/react-query/build/modern/useSuspenseQueries.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/useSuspenseQueries.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/errorBoundaryUtils.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/errorBoundaryUtils.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/useBaseQuery.js (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+../node_modules/@tanstack/react-query/build/modern/useBaseQuery.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/useBaseQuery.js" was ignored.
+✓ 94 modules transformed.
+rendering chunks...
+computing gzip size...
+dist-web/index.html                   0.45 kB │ gzip:  0.31 kB
+dist-web/assets/index-D4snSzV8.css    3.03 kB │ gzip:  1.11 kB
+dist-web/assets/index-CXWyWcPO.js   231.37 kB │ gzip: 71.71 kB │ map: 770.69 kB
+✓ built in 1.13s
+
+[e2e] preparing fixture upstream tree (crafted catalog .7z + fixture zipball; mock base http://127.0.0.1:8091)
+prep: upstream tree at /workspace/fmd-web/e2e/.tmp/fixtures/upstream (zipball 3488B, catalog e2ee000000000000000000000000ca7a)
+
+[e2e] starting the mock upstream (process mode)
+
+[e2e] starting the app runtime (process mode, empty data dir → D20 bootstrap)
+
+[e2e] Playwright: bootstrap-watch (empty-state → bootstrap progress → ready)
+
+Running 1 test using 1 worker
+
+  ✓  1 [bootstrap-watch] › e2e/bootstrap-watch.spec.ts:25:1 › empty-state → bootstrap progress → ready (7.9s)
+
+  1 passed (8.6s)
+
+[e2e] waiting on /readyz (healthcheck-gated test startup)
+
+[e2e] /readyz is 200 ready
+
+[e2e] Playwright: main scenario (browse → search → live info → dry-run → Downloads)
+
+Running 1 test using 1 worker
+
+  ✓  1 [main] › e2e/compose-scenario.spec.ts:23:1 › browse latest → search → live info → dry-run enqueue → Downloads queued (1.1s)
+
+  1 passed (1.7s)
+
+[e2e] asserting the mock upstream request log (offline proof: only fixtures hit)
+[e2e] mock served: zipball, commits, catalog .7z, site page — the ONLY upstream traffic
+
+[e2e] asserting the server process runs NON-ROOT (process-mode id equivalent)
+
+[e2e] server uid= 1000 (non-root)
+
+[e2e] SIGTERM drain: stopping the app (bound 30s), asserting flush logs
+
+[e2e] drain OK: exited in 39ms with flush logs
+
+[e2e] PASS — compose e2e green (mode: process, drain 39ms)
+
+[e2e] artifacts: /workspace/fmd-web/e2e/.tmp/artifacts (request log, drain timing, non-root id, digest/SBOM evidence)
+==> e2e phase-3 (download gate: enqueue → WS progress → pack → library → cancel/resume → retry)
+
+[e2e] docker unavailable — running the process-mode twin (same fixtures/mock/entry/specs)
+[compose-check] using vendored docker CLI: Docker version 27.5.1, build 9f9e405 + Docker Compose version v2.32.4
+[compose-check] rendering the merged config (docker compose config — real merge, no daemon)
+[compose-check] merged config asserts OK (app env/depends_on/drain budget/ports/volume, mock pin/profile/mounts)
+[compose-check] Dockerfile contract OK (non-root USER, HEALTHCHECK, CMD -> built runtime entry, COPY sources present)
+[compose-check] digest pin FRESH: node:22.14.0-bookworm-slim = sha256:1c18d9ab3af4585870b92e4dbc5cac5a0dc77dd13df1a5905cea89fc720eb05b
+[compose-check] rendering the §5.11 browser profile (docker compose config — real merge, no daemon)
+[compose-check] §5.11 browser profile OK (digest-pinned flaresolverr + healthcheck + sidecar env pass-through)
+[compose-check] PASS — compose leg validated with the real docker compose implementation
+
+[e2e] building workspaces (tsc -b) + SPA (vite)
+vite v6.4.6 building for production...
+transforming...
+../node_modules/@tanstack/react-query/build/modern/QueryClientProvider.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/QueryClientProvider.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/IsRestoringProvider.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/IsRestoringProvider.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/HydrationBoundary.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/HydrationBoundary.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/QueryErrorResetBoundary.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/QueryErrorResetBoundary.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/useQueries.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/useQueries.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/useQuery.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/useQuery.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/useIsFetching.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/useIsFetching.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/useMutationState.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/useMutationState.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/useMutation.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/useMutation.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/useInfiniteQuery.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/useInfiniteQuery.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/useSuspenseQuery.js (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+../node_modules/@tanstack/react-query/build/modern/useSuspenseQuery.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/useSuspenseQuery.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/useSuspenseInfiniteQuery.js (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+../node_modules/@tanstack/react-query/build/modern/useSuspenseInfiniteQuery.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/useSuspenseInfiniteQuery.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/useSuspenseQueries.js (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+../node_modules/@tanstack/react-query/build/modern/useSuspenseQueries.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/useSuspenseQueries.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/errorBoundaryUtils.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/errorBoundaryUtils.js" was ignored.
+../node_modules/@tanstack/react-query/build/modern/useBaseQuery.js (1:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+../node_modules/@tanstack/react-query/build/modern/useBaseQuery.js (1:0): Module level directives cause errors when bundled, "use client" in "../node_modules/@tanstack/react-query/build/modern/useBaseQuery.js" was ignored.
+✓ 94 modules transformed.
+rendering chunks...
+computing gzip size...
+dist-web/index.html                   0.45 kB │ gzip:  0.31 kB
+dist-web/assets/index-D4snSzV8.css    3.03 kB │ gzip:  1.11 kB
+dist-web/assets/index-CXWyWcPO.js   231.37 kB │ gzip: 71.71 kB │ map: 770.69 kB
+✓ built in 1.11s
+
+[e2e] preparing fixture upstream tree (crafted catalog .7z + fixture zipball; mock base http://127.0.0.1:8091)
+prep: upstream tree at /workspace/fmd-web/e2e/.tmp/fixtures/upstream (zipball 3488B, catalog e2ee000000000000000000000000ca7a)
+
+[e2e] starting the mock upstream (process mode)
+
+[e2e] starting the app runtime (process mode, empty data dir → D20 bootstrap)
+
+[e2e] Playwright: bootstrap-watch (empty-state → bootstrap progress → ready)
+
+Running 1 test using 1 worker
+
+  ✓  1 [bootstrap-watch] › e2e/bootstrap-watch.spec.ts:25:1 › empty-state → bootstrap progress → ready (8.6s)
+
+  1 passed (9.2s)
+
+[e2e] waiting on /readyz (healthcheck-gated test startup)
+
+[e2e] /readyz is 200 ready
+
+[e2e] Playwright: main scenario (browse → search → live info → dry-run → Downloads)
+
+Running 1 test using 1 worker
+
+  ✓  1 [main] › e2e/compose-scenario.spec.ts:23:1 › browse latest → search → live info → dry-run enqueue → Downloads queued (959ms)
+
+  1 passed (1.5s)
+
+[e2e] Playwright: phase3 gate (download → pack → library → cancel/resume → retry)
+
+Running 3 tests using 1 worker
+
+  ✓  1 [phase3] › e2e/download-flow.spec.ts:194:3 › phase3 — download → pack → library → cancel/resume → retry › scenario 1: enqueue → WS progress → library listing → artifact validates (891ms)
+  ✓  2 [phase3] › e2e/download-flow.spec.ts:233:3 › phase3 — download → pack → library → cancel/resume → retry › scenario 2: slow images → cancel mid-download → cancelled → re-enqueue resumes via markers (3.7s)
+  ✓  3 [phase3] › e2e/download-flow.spec.ts:292:3 › phase3 — download → pack → library → cancel/resume → retry › scenario 3: injected 500s → retry visible → recovers (2.8s)
+
+  3 passed (8.1s)
+
+[e2e] phase3 gate green
+
+[e2e] asserting the mock upstream request log (offline proof: only fixtures hit)
+[e2e] mock served: zipball, commits, catalog .7z, site page — the ONLY upstream traffic
+
+[e2e] asserting the server process runs NON-ROOT (process-mode id equivalent)
+
+[e2e] server uid= 1000 (non-root)
+
+[e2e] SIGTERM drain: stopping the app (bound 30s), asserting flush logs
+
+[e2e] drain OK: exited in 71ms with flush logs
+
+[e2e] PASS — compose e2e green (mode: process, drain 71ms)
+
+[e2e] artifacts: /workspace/fmd-web/e2e/.tmp/artifacts (request log, drain timing, non-root id, digest/SBOM evidence)
+==> CI gate passed

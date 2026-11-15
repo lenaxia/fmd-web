@@ -562,20 +562,42 @@ export function joinSeparatorString(parts: readonly string[], separator = ', '):
 }
 
 // ---------------------------------------------------------------------------
-// Rate-limited error swallowing (§5.6: max 1 WARN per (module, expression))
+// Rate-limited error swallowing (§5.6: max 1 WARN per (module, expression)
+// per RUN). Without a shared deduper the bound is per-instance; the
+// observability assembly injects one ({@link SwallowSharedDeduper}) so the
+// bound holds across engines/worker recycling and the counters feed the
+// metrics endpoint. Structural contract — engine code stays independent
+// of the observability module.
 // ---------------------------------------------------------------------------
+
+/** Shared run-level dedup contract (observability ExpressionFailureDeduper). */
+export interface SwallowSharedDeduper {
+  /** true → this (module, template) pair's WARN is due; false → suppressed. */
+  report(moduleId: ModuleId, template: string): boolean;
+}
 
 export class SwallowLogger {
   private readonly seen = new Set<string>();
-  constructor(private readonly logger: HostLogger | null) {}
+  constructor(
+    private readonly logger: HostLogger | null,
+    private readonly shared?: SwallowSharedDeduper,
+  ) {}
 
   /** Report one swallowed evaluation error (deduplicated per key). */
   warnOnce(moduleId: ModuleId, key: string, message: string): void {
-    const dedupe = `${moduleId}|${key}`;
-    if (this.seen.has(dedupe)) {
+    const due = this.shared !== undefined
+      ? this.shared.report(moduleId, key)
+      : ((): boolean => {
+          const dedupe = `${moduleId}|${key}`;
+          if (this.seen.has(dedupe)) {
+            return false;
+          }
+          this.seen.add(dedupe);
+          return true;
+        })();
+    if (!due) {
       return;
     }
-    this.seen.add(dedupe);
     this.logger?.write({
       level: 'warn',
       moduleId,

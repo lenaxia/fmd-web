@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import sodium from 'sodium-native';
 import { installRequireShim } from '../../../src/engine/shims/lua-require.js';
 import { CRYPTO_METHOD_NAMES } from '../../../src/engine/shims/crypto-shim.js';
+import { FMD2_ENCRYPT_KEY } from '../../../src/tools/import/fmd2-crypto.js';
 import * as core from '../../../src/engine/shims/crypto-core.js';
 
 /**
@@ -26,7 +27,9 @@ describe('fmd.crypto Lua bridge', () => {
 
   beforeAll(async () => {
     engine = await factory.createEngine();
-    installRequireShim(engine, { luaRoot });
+    // The FMD2 EncryptString key is injected (imported from the migration
+    // module — tests are a sanctioned consumer; see fmd2-crypto.ts).
+    installRequireShim(engine, { luaRoot, fmd2CryptoKey: FMD2_ENCRYPT_KEY });
   });
 
   afterAll(() => {

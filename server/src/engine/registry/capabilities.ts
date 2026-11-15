@@ -39,10 +39,27 @@ export interface ModuleCapabilities {
   readonly requires_subprocess: boolean;
   readonly requires_browser: boolean;
   readonly bypass_python_gated: boolean;
+  /**
+   * The module's own source pulls `fmd.imagepuzzle` (the descramble
+   * pipeline: MangaGo, 18Comic, TonarinoYoungJump family, WolfManga,
+   * NexusScanlation, Comix, PhiliaScans). Implemented shim ⇒ supported
+   * (audit bucket B): the flag is informational — these sites carry NO
+   * known-broken flag since fmd.imagepuzzle landed.
+   */
+  readonly requires_imagepuzzle: boolean;
+  /** Own source pulls `fmd.mangafoxwatermark` (FanFox/MangaHere watermark removal). */
+  readonly requires_mangafoxwatermark: boolean;
   /** §5.2 events the module declared via Init `On*` props, sorted. */
   readonly events: readonly string[];
   /** Contract CapabilityFlag ids this module carries (the D3 published set). */
   readonly known_broken_flags: readonly KnownBrokenFlagId[];
+  /**
+   * §6.8: the module can serve the live-scrape browse fallback — it
+   * declares BOTH directory events (OnGetDirectoryPageNumber +
+   * OnGetNameAndLink), so a site without an FMD2-DB catalog is still
+   * browsable through its directory walk.
+   */
+  readonly live_scrape_fallback: boolean;
 }
 
 export interface CapabilityDetection {
@@ -173,6 +190,12 @@ export function detectCapabilities(
   const usesRunHtmlLoad = templatesClosureUsesRunHtmlLoad(moduleSource, options);
   const bypassPythonGated = BYPASS_PYTHON_SIGNALS.some((signal) => signal.test(moduleSource));
 
+  // Audit bucket B: the descramble/watermark consumers are detected
+  // statically from their own source (none reach these libs through
+  // utils/templates closures — verified over the FMD2 tree).
+  const requiresImagepuzzle = ownRequires.includes('fmd.imagepuzzle');
+  const requiresMangafoxwatermark = ownRequires.includes('fmd.mangafoxwatermark');
+
   const flags: KnownBrokenFlagId[] = [];
   if (pullsSubprocess) {
     flags.push('fmd.subprocess');
@@ -184,15 +207,24 @@ export function detectCapabilities(
     flags.push('webdriver.bypass');
   }
 
+  // §6.8: the directory-walk pair — eventHandlers keys are the binding
+  // table's On-less event names (§5.2 rows).
+  const liveScrapeFallback =
+    descriptor.eventHandlers['GetDirectoryPageNumber'] !== undefined &&
+    descriptor.eventHandlers['GetNameAndLink'] !== undefined;
+
   return {
     capabilities: {
       requires_subprocess: pullsSubprocess,
       requires_browser: usesRunHtmlLoad,
       bypass_python_gated: bypassPythonGated,
+      requires_imagepuzzle: requiresImagepuzzle,
+      requires_mangafoxwatermark: requiresMangafoxwatermark,
       // the descriptor's binding table strips the On prefix (§5.2 rows);
       // the Init-DECLARED prop names are On* — restore them
       events: Object.keys(descriptor.eventHandlers).map((k) => `On${k}`).sort(),
       known_broken_flags: flags,
+      live_scrape_fallback: liveScrapeFallback,
     },
     ownRequires,
   };

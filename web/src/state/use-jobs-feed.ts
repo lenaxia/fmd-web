@@ -1,8 +1,9 @@
 /**
- * Downloads-page live feed (D19): bind the WS backfill controller to
- * the React Query jobs caches. Events patch every `['jobs', …]` cache
- * in place; a `resync` hint invalidates the jobs queries (full
- * refetch) and the connection status is exposed for the UI badge.
+ * Downloads-page live feed (D19/D21): bind the WS backfill controller
+ * to the React Query jobs caches. Events patch every `['jobs', …]`
+ * cache in place; a `resync` hint or a `gap` marker (D21) invalidates
+ * the jobs queries (full refetch) and the connection status is exposed
+ * for the UI badge.
  */
 import { useEffect, useRef, useState } from 'react';
 import type { QueryClient, InfiniteData } from '@tanstack/react-query';
@@ -14,6 +15,7 @@ import {
   type WsStatus,
   type WebSocketFactory,
 } from './ws-backfill';
+import { eventJobToWire } from './ws-protocol';
 
 /** Apply one job snapshot to a cached jobs page (replace or prepend). */
 export function patchJobsPage(page: JobsPageT, job: JobT): JobsPageT {
@@ -58,7 +60,7 @@ export function useJobsFeed(options: {
         queryClient.setQueriesData<InfiniteData<JobsPageT>>({ queryKey: ['jobs'] }, (data) =>
           data === undefined
             ? data
-            : { ...data, pages: data.pages.map((page): JobsPageT => patchJobsPage(page, event.job)) },
+            : { ...data, pages: data.pages.map((page): JobsPageT => patchJobsPage(page, eventJobToWire(event))) },
         );
         setFeed((prev) => ({
           ...prev,

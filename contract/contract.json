@@ -3,7 +3,7 @@
   "meta": {
     "designVersion": "v5",
     "source": "DESIGN.md §5 — FMD2 Compatibility Contract (derived from FMD2 baseunits/lua/*.pas)",
-    "groundTruth": "§5.2 event rows + facade method tables are machine-verified by contract/tools/drift-check.ts against a fresh parse of the Pascal dispatchers and registration tables (LuaWebsiteModules.pas, LuaWebsiteModuleHandler.pas, LuaXQuery.pas, LuaImagePuzzle.pas, LuaDuktape.pas, LuaStringsStorage.pas, LuaCrypto.pas)",
+    "groundTruth": "§5.2 event rows + facade method tables are machine-verified by contract/tools/drift-check.ts against a fresh parse of the Pascal dispatchers and registration tables (LuaWebsiteModules.pas, LuaWebsiteModuleHandler.pas, LuaXQuery.pas, LuaImagePuzzle.pas, LuaDuktape.pas, LuaStringsStorage.pas, LuaCrypto.pas); §5.7 requireShims[].status is verified against the shim loader registry (server/src/engine/shims/require-registry.ts) — statuses are DERIVED, never hand-edited",
     "schema": "./schema/contract.schema.json"
   },
   "statusConstants": {
@@ -426,7 +426,7 @@
         { "name": "Matrix", "access": "read-write", "notes": "integer array" },
         { "name": "Flips", "access": "read-write", "notes": "integer array" }
       ],
-      "notes": "require 'fmd.imagepuzzle'; sharp port (7 modules)."
+      "notes": "require 'fmd.imagepuzzle'; raw-pixel port (7 modules; docs/evidence-shims-image.md)."
     },
     {
       "name": "Duktape",
@@ -489,19 +489,19 @@
     ]
   },
   "requireShims": [
-    { "require": "fmd.env", "fmd2Unit": "LuaFMD", "implementation": "Directory, ExeName ('fmd-web'), Version, Revision, LuaDirectory, SelectedLanguage ('en', D10)", "status": "planned" },
-    { "require": "fmd.crypto", "fmd2Unit": "LuaCrypto", "implementation": "full surface (LuaCrypto.pas:429-494) incl. RC4 (pure-JS), AES*GCM(+AAD), X25519_*, P256_*, SecretStream pull-side, PBKDF2SHA256, Base64/Base64URL, CRC16/32, MD4, LongHash, UU, URL enc/dec, synacode block — backends node:crypto + sodium-native + pure-JS RC4/MD4; byte-exact base64 Lua bridge; deviations + vectors documented in docs/COMPAT.md crypto notes and server/test/engine/shims/crypto-*.test.ts", "status": "partial" },
-    { "require": "fmd.duktape", "fmd2Unit": "LuaDuktape", "implementation": "ExecJS(js) via node:vm (timeout 5s) + Duktape.enc/dec polyfill; JS-side CommonJS require jailed to synced lua/ tree (77 modules); JS error => nil", "status": "planned" },
-    { "require": "fmd.gzip", "fmd2Unit": "LuaGZip", "implementation": "single method Inflate (LuaGZip.pas:47-50)", "status": "planned" },
-    { "require": "fmd.fileutil", "fmd2Unit": "LuaFileUtil", "implementation": "3 pure helpers: ExtractFileName, ExtractFileNameOnly, SerializeAndMaintainNames", "status": "planned" },
-    { "require": "fmd.imagepuzzle", "fmd2Unit": "LuaImagePuzzle", "implementation": "sharp port; New/Create(w,h), HorBlock/VerBlock, Matrix[]/Flips[]/Multiply, DeScramble(src,dst) incl. in-place", "status": "planned" },
-    { "require": "fmd.logger", "fmd2Unit": "LuaLogger", "implementation": "structured logging", "status": "planned" },
-    { "require": "fmd.mangafoxwatermark", "fmd2Unit": "LuaMangaFox", "implementation": "sharp port; Windows backslash paths normalized to synced lua/; PNG assets shipped", "status": "planned" },
-    { "require": "fmd.pcre2", "fmd2Unit": "LuaPCRE2", "implementation": "PCRE2 wasm/RE2, API-faithful", "status": "planned" },
-    { "require": "fmd.strings", "fmd2Unit": "LuaStrings", "implementation": "TStrings facade factory (§5.5)", "status": "planned" },
-    { "require": "pb", "fmd2Unit": "lua-protobuf (native, pb.dll)", "implementation": "package.preload['pb'] backed by protobufjs: decode, encode, load (returns (ret,pos)) — D17", "status": "planned" },
+    { "require": "fmd.env", "fmd2Unit": "LuaFMD", "implementation": "Directory, ExeName ('fmd-web'), Version, Revision, LuaDirectory, SelectedLanguage ('en', D10)", "status": "implemented" },
+    { "require": "fmd.crypto", "fmd2Unit": "LuaCrypto", "implementation": "full surface (LuaCrypto.pas:429-494) incl. RC4 (pure-JS), AES*GCM(+AAD), X25519_*, P256_*, SecretStream pull-side, PBKDF2SHA256, Base64/Base64URL, CRC16/32, MD4, LongHash, UU, URL enc/dec, synacode block — backends node:crypto + sodium-native + pure-JS RC4/MD4; byte-exact base64 Lua bridge; deviations + vectors documented in docs/COMPAT.md crypto notes and server/test/engine/shims/crypto-*.test.ts", "status": "implemented" },
+    { "require": "fmd.duktape", "fmd2Unit": "LuaDuktape", "implementation": "ExecJS(js) via node:vm (timeout 5s) + Duktape.enc/dec polyfill; JS-side CommonJS require jailed to synced lua/ tree (77 modules); JS error => nil", "status": "implemented" },
+    { "require": "fmd.gzip", "fmd2Unit": "LuaGZip", "implementation": "one method Inflate (LuaGZip.pas:47-50 + GZIPUtils.pas unzipStream): gzip/zlib/raw-deflate auto-detect, checksum-verified, failure => nil with the Pascal log line, never raises", "status": "implemented" },
+    { "require": "fmd.fileutil", "fmd2Unit": "LuaFileUtil", "implementation": "2/3 pure helpers: ExtractFileName, ExtractFileNameOnly — GAP: SerializeAndMaintainNames", "status": "partial" },
+    { "require": "fmd.imagepuzzle", "fmd2Unit": "LuaImagePuzzle", "implementation": "raw-pixel port of ImagePuzzle.pas:136-305 over Buffers (PNG codec on node:zlib; sharp is uninstallable offline — docs/evidence-shims-image.md): New/Create(w,h) (LuaImagePuzzle.pas:73-77), read-only HorBlock/VerBlock (:78-82), read-write Matrix[]/Flips[] (:83-87)/Multiply (:99), DeScramble(src,dst) incl. in-place same-Document (MangaGo.lua:264) and non-square grids (18Comic.lua:99); goldens pixel-identical (corpus/fixtures/imagepuzzle); JPEG/WebP decode via the optional headless-Chromium bridge", "status": "implemented" },
+    { "require": "fmd.logger", "fmd2Unit": "LuaLogger", "implementation": "complete LuaLogger surface (LuaLogger.pas:33-45): Send/SendWarning/SendError routed to the module-correlated structured host logger with luaToString argument parity", "status": "implemented" },
+    { "require": "fmd.mangafoxwatermark", "fmd2Unit": "LuaMangaFox", "implementation": "raw-pixel port of MangaFoxWatermark.pas (LoadTemplate :297-330, RemoveWatermark :391-487: Otsu Single-precision matcher, white-border check, PSNR >= 9, crop H-Th + rewrite; LuaMangaFox.pas surface); Windows backslash path translation (FanFox.lua:36) at the path layer; the REAL PNG template assets ship from lua/extras/mangafoxtemplate into the synced-tree layout; FanFox.lua OnAfterImageSaved flow verified offline (corpus/fixtures/imagepuzzle/FanFox)", "status": "implemented" },
+    { "require": "fmd.pcre2", "fmd2Unit": "LuaPCRE2", "implementation": "API-faithful TLuaPCRE2Engine facade: exec/find/match/gmatch/gsub (LuaPCRE2.pas:237-245), PCRE2_UTF always on, V8 RegExp backend", "status": "implemented" },
+    { "require": "fmd.strings", "fmd2Unit": "LuaStrings", "implementation": "TStrings facade factory exists (§5.5), but require 'fmd.strings' is not served by the loader (planned)", "status": "planned" },
+    { "require": "pb", "fmd2Unit": "lua-protobuf (native, pb.dll)", "implementation": "package.preload['pb'] backed by protobufjs: decode, encode, load (returns (ret,pos)) — D17", "status": "implemented" },
     { "require": "subprocess", "fmd2Unit": "LuaSubprocess", "implementation": "denied stub (RunCommand* => nil) unless browser profile (§5.11)", "status": "stub" },
-    { "require": "utils.* / templates.*", "fmd2Unit": "lua/utils/, lua/templates/", "implementation": "plain Lua chunks via the file-package loader from the synced tree; utils.nodejs special (§5.11)", "status": "planned" }
+    { "require": "utils.* / templates.*", "fmd2Unit": "lua/utils/, lua/templates/", "implementation": "plain Lua chunks via the file-package loader from the synced tree; utils.nodejs special (§5.11)", "status": "implemented" }
   ],
   "capabilities": [
     { "id": "fmd.subprocess", "description": "Module requires fmd.subprocess (TheBlank, RaijinScans, Comix); needs browser sidecar profile", "defaultEnabled": false },

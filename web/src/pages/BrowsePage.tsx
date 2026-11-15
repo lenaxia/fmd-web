@@ -81,6 +81,11 @@ export function BrowsePage(props: { route: Route }): ReactElement {
     <section aria-label="Browse catalog">
       <p className="toolbar">
         Catalog <code>{catalogId}</code>
+        {pages.data?.pages.at(-1)?.source === 'live' ? (
+          <span className="badge badge-capability" title="§6.8 live-scrape fallback: no FMD2-DB catalog — served live from the module's directory walk">
+            live scrape
+          </span>
+        ) : null}
       </p>
       <CatalogIdForm />
 

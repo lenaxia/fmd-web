@@ -4,12 +4,14 @@
  * the React Query caches; a `resync` hint invalidates them.
  */
 import { useState, type ReactElement } from 'react';
-import { useJobsList, type JobStateT, type JobT } from '../api/hooks';
+import { useCancelJob, useJobsList, type JobStateT, type JobT } from '../api/hooks';
 import { useJobsFeed } from '../state/use-jobs-feed';
 import { EmptyState } from '../components/EmptyState';
 import { ErrorBanner } from '../components/ErrorBanner';
 
 const STATES: readonly (JobStateT | '')[] = ['', 'queued', 'running', 'retry', 'done', 'failed', 'cancelled'];
+
+const CANCELLABLE: readonly JobStateT[] = ['queued', 'running', 'retry'];
 
 function StatusBadge(props: { state: JobStateT }): ReactElement {
   return <span className={`badge job-${props.state}`}>{props.state}</span>;
@@ -38,8 +40,9 @@ function WsStatusLine(props: {
   );
 }
 
-function JobRow(props: { job: JobT }): ReactElement {
+function JobRow(props: { job: JobT; onCancel: (jobId: string) => void; cancelPending: boolean }): ReactElement {
   const job = props.job;
+  const cancellable = CANCELLABLE.includes(job.state);
   return (
     <li className="job-row" data-job-id={job.id}>
       <StatusBadge state={job.state} /> <code>{job.id.slice(0, 8)}</code>{' '}
@@ -51,6 +54,19 @@ function JobRow(props: { job: JobT }): ReactElement {
         <span className="job-progress"> {JSON.stringify(job.progress)}</span>
       ) : null}
       {job.error !== undefined ? <span className="job-error"> error: {job.error}</span> : null}
+      {cancellable ? (
+        <button
+          type="button"
+          className="job-cancel"
+          aria-label={`Cancel job ${job.id}`}
+          disabled={props.cancelPending}
+          onClick={(): void => {
+            props.onCancel(job.id);
+          }}
+        >
+          {props.cancelPending ? 'Cancelling…' : 'Cancel'}
+        </button>
+      ) : null}
     </li>
   );
 }
@@ -59,6 +75,7 @@ export function DownloadsPage(): ReactElement {
   const [state, setState] = useState<JobStateT | ''>('');
   const jobs = useJobsList(state);
   const feed = useJobsFeed({ enabled: true });
+  const cancelJob = useCancelJob();
 
   const rows = jobs.data?.pages.flatMap((page): JobT[] => [...page.jobs]) ?? [];
 
@@ -84,12 +101,22 @@ export function DownloadsPage(): ReactElement {
       </div>
 
       {jobs.isError ? <ErrorBanner error={jobs.error} /> : null}
+      {cancelJob.isError ? <ErrorBanner error={cancelJob.error} /> : null}
       {jobs.isPending ? <p role="status">Loading jobs…</p> : null}
 
       {rows.length > 0 ? (
         <>
           <ul className="job-list">
-            {rows.map((job): ReactElement => <JobRow key={job.id} job={job} />)}
+            {rows.map((job): ReactElement => (
+              <JobRow
+                key={job.id}
+                job={job}
+                cancelPending={cancelJob.isPending}
+                onCancel={(jobId): void => {
+                  void cancelJob.mutateAsync(jobId);
+                }}
+              />
+            ))}
           </ul>
           {jobs.hasNextPage ? (
             <button

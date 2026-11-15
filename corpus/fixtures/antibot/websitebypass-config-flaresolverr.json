@@ -1,0 +1,8 @@
+{
+  "$comment": "FMD2 lua/websitebypass/websitebypass_config.json shape with the FlareSolverr/webdriver branch enabled — cloudflare.lua solveWithWebDriver() path (result=2 → Storage['reload']='true'). flaresolverr_port is MATERIALIZED by the pipeline test with the loopback mock port before the bypass runs; flaresolverr_ip stays a loopback literal (zero-network guarantee).",
+  "use_webdriver": true,
+  "debug": false,
+  "flaresolverr_port": 0,
+  "testing": false,
+  "flaresolverr_ip": "127.0.0.1"
+}

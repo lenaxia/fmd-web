@@ -8,6 +8,6 @@
     "outDir": "dist",
     "types": ["node"]
   },
-  "include": ["types.ts", "tools/**/*.ts", "test/**/*.ts"],
+  "include": ["types.ts", "schemas.ts", "tools/**/*.ts", "test/**/*.ts"],
   "exclude": ["dist", "tools/fixture-tests"]
 }

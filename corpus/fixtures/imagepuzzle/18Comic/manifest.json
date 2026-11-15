@@ -1,0 +1,29 @@
+{
+  "site": "18Comic",
+  "moduleId": "b8a5b7a71025420fa3718fd498977e3e",
+  "horBlock": 1,
+  "verBlock": 6,
+  "multiply": 1,
+  "matrix": [
+    5,
+    4,
+    3,
+    2,
+    1,
+    0
+  ],
+  "flips": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "image": {
+    "width": 600,
+    "height": 900
+  },
+  "expectedSha_note": "expected.png = the clean page; the shim descramble must equal it pixel-for-pixel",
+  "provenance": "SYNTHESIZED (offline workspace). The 18Comic scramble is a vertical row-block reversal (18Comic.lua:99-105: Create(1,rows), Matrix[i]=rows-1-i — self-inverse, so the scramble direction is convention-independent). expected.png = the clean source (pixel-exact oracle)."
+}

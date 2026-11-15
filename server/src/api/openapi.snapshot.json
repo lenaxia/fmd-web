@@ -1,0 +1,3695 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "fmd-web API",
+    "version": "0.1.0",
+    "description": "fmd-web server API (DESIGN.md §10). Contract-based: every schema here is generated from the zod source of truth (server/src/api/schemas.ts); the committed snapshot (server/src/api/openapi.snapshot.json) fails CI on unintended drift. Errors use one typed envelope: { error: { code, message, details? } }."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "tags": [
+    {
+      "name": "modules",
+      "description": "Module registry + options (§5.1, §5.10)"
+    },
+    {
+      "name": "sync",
+      "description": "FMD2 lua/ tree + FMD2-DB catalog sync (§2, §6)"
+    },
+    {
+      "name": "catalog",
+      "description": "Catalog browse/search over read-only attached dbs (§6.4–§6.6) + the §6.8 live-scrape fallback"
+    },
+    {
+      "name": "info",
+      "description": "Live module info, normalized (§5.8)"
+    },
+    {
+      "name": "jobs",
+      "description": "Download job queue (§7.1) with idempotent create"
+    },
+    {
+      "name": "auth",
+      "description": "Optional password session (FMD_WEB_PASSWORD)"
+    },
+    {
+      "name": "health",
+      "description": "Liveness/readiness probes"
+    }
+  ],
+  "paths": {
+    "/api/modules": {
+      "get": {
+        "operationId": "listModules",
+        "summary": "Module registry with capability + known-broken flags",
+        "description": "One row per registered module (§9 module_state registry columns): identity, §5.1 options (combobox options carry `items`; the STORED value is the item INDEX), and §5.10 capability detection incl. the D3 known-broken flag ids. `live_scrape_fallback` (§6.8) marks modules declaring both directory events — browsable without an FMD2-DB catalog via the live walk.",
+        "tags": [
+          "modules"
+        ],
+        "responses": {
+          "200": {
+            "description": "Module list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "modules": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ModuleSummary"
+                      }
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "modules",
+                    "count"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/modules/{id}": {
+      "put": {
+        "operationId": "updateModule",
+        "summary": "Enable/disable a module, set options, cookies and the proxy override",
+        "description": "Option values are validated against the module descriptors: checkbox → boolean, edit → string, spinedit → integer, combobox → integer item INDEX within `items` range (§5.1). Unknown option names are rejected with 400. `proxy` sets the per-module proxy override (null clears it back to \"inherit the global proxy\"; §9/§10 settings, SetProxy field semantics).",
+        "tags": [
+          "modules"
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated module",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Module not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "description": "Module/catalog id (32-hex, §5)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "options": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": [
+                        "boolean",
+                        "string",
+                        "number"
+                      ]
+                    }
+                  },
+                  "cookies": {
+                    "type": "string"
+                  },
+                  "proxy": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/ProxySettings"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/accounts": {
+      "get": {
+        "operationId": "listAccounts",
+        "summary": "Module accounts (§8.6/D4)",
+        "description": "One row per module account: username, enabled flag and the module AccountState (§5.2 account-status constants). The password is write-only — it is sealed at rest (FMD_WEB_SECRET, AES-256-GCM) and never returned.",
+        "tags": [
+          "accounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Account list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accounts": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AccountView"
+                      }
+                    },
+                    "count": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "accounts",
+                    "count"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/accounts/{moduleId}": {
+      "put": {
+        "operationId": "upsertAccount",
+        "summary": "Create/replace the account for one module",
+        "description": "Module-scoped account upsert (FMD2 keeps exactly one account per module). Omitted `password`/`cookies` KEEP the stored values — the credential never round-trips through the API. All three fields are sealed with FMD_WEB_SECRET before the write.",
+        "tags": [
+          "accounts"
+        ],
+        "responses": {
+          "201": {
+            "description": "Stored account projection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "account": {
+                      "$ref": "#/components/schemas/AccountView"
+                    }
+                  },
+                  "required": [
+                    "account"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "moduleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "description": "Module id (32-hex, §5)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "password": {
+                    "type": "string"
+                  },
+                  "cookies": {
+                    "type": "string"
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "username"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteAccount",
+        "summary": "Remove the account for one module",
+        "description": "Deletes the sealed account row (§9 `account`). The module_state cookies are NOT touched.",
+        "tags": [
+          "accounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Account not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "moduleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "description": "Module id (32-hex, §5)"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/accounts/{moduleId}/login": {
+      "post": {
+        "operationId": "loginAccount",
+        "summary": "Run the module OnLogin flow (event runtime)",
+        "description": "Dispatches the §5.2 `Login` event with the account-status constants bound and MODULE.Account seeded from the sealed row; the handler-set `MODULE.Account.Status` and `MODULE.Account.Cookies` are read back and persisted (account row + §5.3 module_state cookies). Engine/dispatch failures are 502 upstream_error.",
+        "tags": [
+          "accounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Login outcome",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "account": {
+                      "$ref": "#/components/schemas/AccountView"
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "account",
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Account not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Account disabled or the module binds no OnLogin handler",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The module OnLogin run failed (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "moduleId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "description": "Module id (32-hex, §5)"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "operationId": "getSettings",
+        "summary": "Global proxy config + browser sidecar profile state",
+        "description": "The §9/§10 settings projection: the global proxy (SetProxy five-string semantics, httpsendthread.pas:838-874 — type HTTP|SOCKS4|SOCKS5, the empty type is \"no proxy\") and the §5.11 browser profile state (enabled ⇒ the D2 sidecar is wired and the satisfied §5.10 known-broken flags are dropped from /api/modules).",
+        "tags": [
+          "settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "Settings snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/proxy": {
+      "put": {
+        "operationId": "updateProxy",
+        "summary": "Replace the global proxy config",
+        "description": "Full replacement with SetProxy semantics: a config with a non-empty type requires a host; the all-empty config is the SetNoProxy path. Per-module overrides (PUT /api/modules/{id} proxy) take precedence for their module.",
+        "tags": [
+          "settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "Settings snapshot after the update",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProxySettings"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/sync/modules": {
+      "post": {
+        "operationId": "syncModules",
+        "summary": "Sync the pinned FMD2 lua/ tree (SHA pin + D9 diff report)",
+        "description": "Runs the §2/§6 module syncer: fetch at the pinned commit, validate via the Init pass, atomically swap the tree, record sync_state, and return the deterministic sweep summary.",
+        "tags": [
+          "sync"
+        ],
+        "responses": {
+          "200": {
+            "description": "Sync outcome + sweep summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "treeSha": {
+                          "type": "string"
+                        },
+                        "totalFiles": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "registeredFiles": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "failedFiles": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "totalModules": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "failures": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "file": {
+                                "type": "string"
+                              },
+                              "error": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "file",
+                              "error"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "knownBroken": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "eventCoverage": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": "number"
+                          }
+                        }
+                      },
+                      "required": [
+                        "treeSha",
+                        "totalFiles",
+                        "registeredFiles",
+                        "failedFiles",
+                        "totalModules",
+                        "failures",
+                        "knownBroken",
+                        "eventCoverage"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "summary"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Sync failed (fetch/validate)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/sync/catalog/{id}": {
+      "post": {
+        "operationId": "syncCatalog",
+        "summary": "Sync one FMD2-DB catalog (§6.1–§6.3)",
+        "description": "Conditional fetch with the ETag budget, 7z extract, atomic install; 404 for unknown ids.",
+        "tags": [
+          "sync"
+        ],
+        "responses": {
+          "200": {
+            "description": "Catalog sync outcome",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "unchanged",
+                            "updated",
+                            "failed"
+                          ]
+                        },
+                        "dbSha": {
+                          "type": "string"
+                        },
+                        "bytes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "error": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "state"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "result"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Catalog not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Sync failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "description": "Module/catalog id (32-hex, §5)"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/sync/catalog/all": {
+      "post": {
+        "operationId": "syncAllCatalogs",
+        "summary": "Sync all known FMD2-DB catalogs (§6.1–§6.3)",
+        "description": "Resumable batch: per-catalog outcomes (unchanged/updated/failed); failures stay pending.",
+        "tags": [
+          "sync"
+        ],
+        "responses": {
+          "200": {
+            "description": "Per-catalog outcomes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "unchanged",
+                              "updated",
+                              "failed"
+                            ]
+                          },
+                          "dbSha": {
+                            "type": "string"
+                          },
+                          "bytes": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "error": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "state"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "results"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Sync failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/catalog/{id}/latest": {
+      "get": {
+        "operationId": "catalogLatest",
+        "summary": "Catalog rows ordered by jdn DESC (§6.6)",
+        "description": "Page-number browse over the read-only attached catalog. No popularity ordering exists (D14). §6.8 fallback: with no catalog installed, modules declaring both directory events are served LIVE from their §5.8-normalized directory walk (TTL-cached, update-lane isolated) — every response carries `source: \"catalog\" | \"live\"` so the UI can badge it.",
+        "tags": [
+          "catalog"
+        ],
+        "responses": {
+          "200": {
+            "description": "Page of catalog entries (source discriminator per §6.8)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CatalogEntry"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": "string"
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "catalog",
+                        "live"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "entries",
+                    "source"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Catalog not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Live directory walk failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Live scrape update lane is shutting down",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "description": "Module/catalog id (32-hex, §5)"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "description": "string-coerced on the wire"
+            }
+          }
+        ]
+      }
+    },
+    "/api/catalog/{id}/title": {
+      "get": {
+        "operationId": "catalogByTitle",
+        "summary": "Catalog rows ordered by title (§6.6)",
+        "description": "Page-number browse over the read-only attached catalog. §6.8 fallback: catalog-less modules serve their §5.8-normalized directory walk live (title-ordered NOCASE); `source` discriminates.",
+        "tags": [
+          "catalog"
+        ],
+        "responses": {
+          "200": {
+            "description": "Page of catalog entries (source discriminator per §6.8)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CatalogEntry"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": "string"
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "catalog",
+                        "live"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "entries",
+                    "source"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Catalog not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Live directory walk failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Live scrape update lane is shutting down",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "description": "Module/catalog id (32-hex, §5)"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "description": "string-coerced on the wire"
+            }
+          }
+        ]
+      }
+    },
+    "/api/catalog/{id}/search": {
+      "get": {
+        "operationId": "catalogSearch",
+        "summary": "FTS5 search with cursor pagination (§6.5, §10)",
+        "description": "Sanitized FTS MATCH over the sidecar, ranked; `cursor` continues a previous page (opaque, query-bound). Catalogs are read-only after install, so cursors stay stable. §6.8 fallback: catalog-less modules search their §5.8-normalized directory-walk snapshot in memory (title/alttitles/summary terms, exact status, substring genre) with the SAME cursor scheme; `source` discriminates the channel.",
+        "tags": [
+          "catalog"
+        ],
+        "responses": {
+          "200": {
+            "description": "Ranked page of catalog entries (source discriminator per §6.8)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CatalogEntry"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": "string"
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": [
+                        "catalog",
+                        "live"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "entries",
+                    "source"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Catalog not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Live directory walk failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Live scrape update lane is shutting down",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "description": "Module/catalog id (32-hex, §5)"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "genre",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "description": "string-coerced on the wire"
+            }
+          }
+        ]
+      }
+    },
+    "/api/info": {
+      "post": {
+        "operationId": "liveInfo",
+        "summary": "Normalized live manga info (§5.8 pipeline, cached)",
+        "description": "Runs the module GetInfo event and applies the §5.8 post-processing pipeline (last-occurrence-wins dedup); responses are cached per (moduleId, url) for the configured TTL.",
+        "tags": [
+          "info"
+        ],
+        "responses": {
+          "200": {
+            "description": "Normalized MANGAINFO state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InfoResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Module not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Module GetInfo failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InfoRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/jobs/download": {
+      "post": {
+        "operationId": "createDownloadJob",
+        "summary": "Create a download job (idempotent, §10)",
+        "description": "With `idempotencyKey`: an identical-key replay returns the ORIGINAL job with 200 while it is live (queued/running/retry); key reuse with a DIFFERENT payload returns 409. Re-enqueueing a TERMINAL original (done/failed/cancelled) starts a FRESH job chained under the same key (`<key>#<n>`, 201) — the re-download semantic; the fresh attempt resumes from the persisted chapter markers ('D' slots skip their images). Fresh creates return 201.",
+        "tags": [
+          "jobs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Idempotent replay of the original job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "$ref": "#/components/schemas/Job"
+                    }
+                  },
+                  "required": [
+                    "job"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "$ref": "#/components/schemas/Job"
+                    }
+                  },
+                  "required": [
+                    "job"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Idempotency key reused with a different payload",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "moduleId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{32}$"
+                  },
+                  "mangaUrl": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "mangaTitle": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "chapterLink": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "chapterName": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "moduleId",
+                  "mangaUrl",
+                  "chapterLink"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/jobs": {
+      "get": {
+        "operationId": "listJobs",
+        "summary": "Job list with state filter + keyset cursor",
+        "description": "Newest-first page (`limit` ≤ 100). `cursor` is the keyset boundary (the last job id of the previous page) — stable under concurrent inserts: newly created jobs never shift pages.",
+        "tags": [
+          "jobs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Page of jobs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobs": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Job"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "jobs"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "queued",
+                "running",
+                "retry",
+                "done",
+                "failed",
+                "cancelled"
+              ],
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "description": "string-coerced on the wire"
+            }
+          }
+        ]
+      }
+    },
+    "/api/jobs/{id}": {
+      "get": {
+        "operationId": "getJob",
+        "summary": "One job snapshot",
+        "description": "The current §7.1 row (state, progress, error) — the polling fallback beside the WS stream.",
+        "tags": [
+          "jobs"
+        ],
+        "responses": {
+          "200": {
+            "description": "The job snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "$ref": "#/components/schemas/Job"
+                    }
+                  },
+                  "required": [
+                    "job"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "description": "Module/catalog id (32-hex, §5)"
+          }
+        ]
+      }
+    },
+    "/api/jobs/{id}/cancel": {
+      "post": {
+        "operationId": "cancelJob",
+        "summary": "User-cancel a download job (§7.1)",
+        "description": "queued/running/retry → cancelled (200). A running chapter aborts its in-flight images and persists the 'W'/'D' markers, so the next enqueue of the same chapter resumes (only the remaining images are fetched). A terminal row is 409 — nothing to cancel.",
+        "tags": [
+          "jobs"
+        ],
+        "responses": {
+          "200": {
+            "description": "The cancelled job snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "$ref": "#/components/schemas/Job"
+                    }
+                  },
+                  "required": [
+                    "job"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Job is already terminal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "description": "Module/catalog id (32-hex, §5)"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/library": {
+      "get": {
+        "operationId": "listLibrary",
+        "summary": "Finalized chapter artifacts (§7.1 library listing)",
+        "description": "Newest-first page over the library rows (one per packed chapter file, `library/<module>/<manga>/<file>`). `cursor` is the keyset boundary like /api/jobs.",
+        "tags": [
+          "library"
+        ],
+        "responses": {
+          "200": {
+            "description": "Page of library files",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LibraryFile"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "files"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "description": "string-coerced on the wire"
+            }
+          }
+        ]
+      }
+    },
+    "/api/library/{id}/file": {
+      "get": {
+        "operationId": "downloadLibraryFile",
+        "summary": "Download one packed chapter artifact",
+        "description": "Streams the artifact bytes (application/octet-stream, attachment Content-Disposition). The ZIP/CBZ structure is client-validatable (central directory walk).",
+        "tags": [
+          "library"
+        ],
+        "responses": {
+          "200": {
+            "description": "The artifact bytes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Library file not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Artifact file missing on disk",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "description": "Module/catalog id (32-hex, §5)"
+          }
+        ]
+      }
+    },
+    "/api/favorites": {
+      "get": {
+        "operationId": "listFavorites",
+        "summary": "Favorites listing (§7.2 DoCheck engine)",
+        "description": "One row per favorite (`id` = LowerCase(ModuleID+Link)): `currentChapter`/`status` from the last successful check (immediate update parity), `newChapterCount` for the UI badge, and the auto-download flag gating pipeline enqueues.",
+        "tags": [
+          "favorites"
+        ],
+        "responses": {
+          "200": {
+            "description": "Favorites list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "favorites": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Favorite"
+                      }
+                    }
+                  },
+                  "required": [
+                    "favorites"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createFavorite",
+        "summary": "Create a favorite and run its initial check",
+        "description": "Inserts the favorite and immediately runs the §7.2 DoCheck cycle: live GetInfoFromURL (§5.8-normalized), immediate CurrentChapter/Status update, new-chapter diff against the stored downloaded list.",
+        "tags": [
+          "favorites"
+        ],
+        "responses": {
+          "201": {
+            "description": "Created favorite",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "favorite": {
+                      "$ref": "#/components/schemas/Favorite"
+                    }
+                  },
+                  "required": [
+                    "favorite"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Favorite already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Module GetInfo failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "moduleId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{32}$"
+                  },
+                  "url": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "autoDownload": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "moduleId",
+                  "url"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/favorites/import": {
+      "post": {
+        "operationId": "importFavorite",
+        "summary": "Tag-100 transfer-favorite bulk-ingest (D4)",
+        "description": "The favorites-import path: the created favorite immediately runs the transfer branch of DoCheck — every live chapter is marked downloaded in ITS stored list (global downloaded_chapters untouched), so nothing re-downloads.",
+        "tags": [
+          "favorites"
+        ],
+        "responses": {
+          "201": {
+            "description": "Imported favorite",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "favorite": {
+                      "$ref": "#/components/schemas/Favorite"
+                    }
+                  },
+                  "required": [
+                    "favorite"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Module GetInfo failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "moduleId": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{32}$"
+                  },
+                  "url": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "autoDownload": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "moduleId",
+                  "url"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/favorites/{id}": {
+      "get": {
+        "operationId": "getFavorite",
+        "summary": "One favorite",
+        "description": "The `id` is LowerCase(ModuleID+Link), URL-encoded in the path.",
+        "tags": [
+          "favorites"
+        ],
+        "responses": {
+          "200": {
+            "description": "The favorite",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "favorite": {
+                      "$ref": "#/components/schemas/Favorite"
+                    }
+                  },
+                  "required": [
+                    "favorite"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Favorite not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "description": "Module/catalog id (32-hex, §5)"
+          }
+        ]
+      },
+      "put": {
+        "operationId": "updateFavorite",
+        "summary": "Update title / the auto-download toggle",
+        "description": "The auto-download toggle gates whether new-chapter diff results enqueue through the Phase-3 download pipeline (FMD2 OptionAutoCheckFavDownload, default off).",
+        "tags": [
+          "favorites"
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated favorite",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "favorite": {
+                      "$ref": "#/components/schemas/Favorite"
+                    }
+                  },
+                  "required": [
+                    "favorite"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Favorite not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "description": "Module/catalog id (32-hex, §5)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "autoDownload": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "deleteFavorite",
+        "summary": "Delete a favorite",
+        "description": "Removes the favorite row; its downloaded_chapters ledger row is NOT touched.",
+        "tags": [
+          "favorites"
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Favorite not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "description": "Module/catalog id (32-hex, §5)"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/favorites/{id}/check": {
+      "post": {
+        "operationId": "checkFavoriteNow",
+        "summary": "Manual check-now (the immediate DoCheck cycle)",
+        "description": "Live info → immediate CurrentChapter/Status update → case-insensitive new-chapter diff → auto-download + the :1131-1133 dual-write when the toggle is on. Returns the updated favorite, the queued download count and the new-chapter set (live order).",
+        "tags": [
+          "favorites"
+        ],
+        "responses": {
+          "200": {
+            "description": "Check result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "favorite": {
+                      "$ref": "#/components/schemas/Favorite"
+                    },
+                    "queuedDownloads": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "newChapters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "position": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "link": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "position",
+                          "link",
+                          "name"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "favorite",
+                    "queuedDownloads",
+                    "newChapters"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Favorite not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Module GetInfo failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "description": "Module/catalog id (32-hex, §5)"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "operationId": "login",
+        "summary": "Password login → session cookie (rate-limited 10/min)",
+        "description": "Only mounted/meaningful with FMD_WEB_PASSWORD set (otherwise 400 auth_disabled). Sets an HttpOnly, SameSite=Strict session cookie; the 11th attempt within a minute is 429.",
+        "tags": [
+          "auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "Session established",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Auth disabled (no FMD_WEB_PASSWORD)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Login rate limit exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "password"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/healthz": {
+      "get": {
+        "operationId": "healthz",
+        "summary": "Liveness",
+        "description": "Process is up; version reported. Never gated.",
+        "tags": [
+          "health"
+        ],
+        "responses": {
+          "200": {
+            "description": "Liveness",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "const": "ok"
+                    },
+                    "version": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "status",
+                    "version"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "operationId": "readyz",
+        "summary": "Readiness",
+        "description": "Data dirs opened, registry restored, catalogs attached. 503 + the bootstrap stage while the D20 first-run bootstrap runs.",
+        "tags": [
+          "health"
+        ],
+        "responses": {
+          "200": {
+            "description": "Readiness",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ready"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Bootstrap running / failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ready"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/metrics": {
+      "get": {
+        "operationId": "getMetrics",
+        "summary": "Prometheus metrics exposition (§4/§15 observability)",
+        "description": "The §4/§15 series in Prometheus text format (version 0.0.4): queue depth per lane, job throughput/failure by state, per-module request latency + error counts, corpus pass rates, engine pool RSS + GC stats, sync progress, and the expression-failure WARN dedup counters. Mounted only when a metrics registry is bound (the production assembly always binds one).",
+        "tags": [
+          "health"
+        ],
+        "responses": {
+          "200": {
+            "description": "Metrics exposition (text/plain, Prometheus version 0.0.4)",
+            "content": {
+              "text/plain; version=0.0.4; charset=utf-8": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiErrorEnvelope": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "validation_error",
+                  "unauthorized",
+                  "not_found",
+                  "conflict",
+                  "rate_limited",
+                  "bad_request",
+                  "upstream_error",
+                  "internal_error"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "details": {}
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      },
+      "ModuleOptionDescriptor": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "checkbox",
+              "edit",
+              "spinedit",
+              "combobox"
+            ]
+          },
+          "defaultValue": {
+            "type": [
+              "boolean",
+              "string",
+              "number"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "defaultValue"
+        ]
+      },
+      "ModuleCapabilities": {
+        "type": "object",
+        "properties": {
+          "requires_subprocess": {
+            "type": "boolean"
+          },
+          "requires_browser": {
+            "type": "boolean"
+          },
+          "bypass_python_gated": {
+            "type": "boolean"
+          },
+          "requires_imagepuzzle": {
+            "type": "boolean"
+          },
+          "requires_mangafoxwatermark": {
+            "type": "boolean"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "known_broken_flags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "live_scrape_fallback": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "requires_subprocess",
+          "requires_browser",
+          "bypass_python_gated",
+          "requires_imagepuzzle",
+          "requires_mangafoxwatermark",
+          "events",
+          "known_broken_flags",
+          "live_scrape_fallback"
+        ]
+      },
+      "ModuleSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "rootURL": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "accountSupport": {
+            "type": "boolean"
+          },
+          "file": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModuleOptionDescriptor"
+            }
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/ModuleCapabilities"
+          },
+          "proxy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProxySettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "rootURL",
+          "category",
+          "accountSupport",
+          "file",
+          "enabled",
+          "options",
+          "capabilities",
+          "proxy"
+        ]
+      },
+      "ProxySettings": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "$ref": "#/components/schemas/__schema0"
+          },
+          "host": {
+            "$ref": "#/components/schemas/__schema1"
+          },
+          "port": {
+            "$ref": "#/components/schemas/__schema2"
+          },
+          "user": {
+            "$ref": "#/components/schemas/__schema3"
+          },
+          "pass": {
+            "$ref": "#/components/schemas/__schema4"
+          }
+        },
+        "required": [
+          "type",
+          "host",
+          "port",
+          "user",
+          "pass"
+        ]
+      },
+      "SettingsResponse": {
+        "type": "object",
+        "properties": {
+          "proxy": {
+            "$ref": "#/components/schemas/ProxySettings"
+          },
+          "browser": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "enabled",
+              "url"
+            ]
+          }
+        },
+        "required": [
+          "proxy",
+          "browser"
+        ]
+      },
+      "CatalogEntry": {
+        "type": "object",
+        "properties": {
+          "link": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "alttitles": {
+            "type": "string"
+          },
+          "authors": {
+            "type": "string"
+          },
+          "artists": {
+            "type": "string"
+          },
+          "genres": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "numChapter": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "jdn": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "link",
+          "title",
+          "alttitles",
+          "authors",
+          "artists",
+          "genres",
+          "status",
+          "summary",
+          "numChapter",
+          "jdn"
+        ]
+      },
+      "Favorite": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "moduleId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currentChapter": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "newChapterCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "autoDownload": {
+            "type": "boolean"
+          },
+          "lastCheck": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastUpdated": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "moduleId",
+          "url",
+          "title",
+          "status",
+          "currentChapter",
+          "newChapterCount",
+          "autoDownload",
+          "lastCheck",
+          "lastUpdated"
+        ]
+      },
+      "AccountView": {
+        "type": "object",
+        "properties": {
+          "moduleId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{32}$"
+          },
+          "username": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "asUnknown",
+              "asChecking",
+              "asValid",
+              "asInvalid"
+            ]
+          }
+        },
+        "required": [
+          "moduleId",
+          "username",
+          "enabled",
+          "status"
+        ]
+      },
+      "InfoRequest": {
+        "type": "object",
+        "properties": {
+          "moduleId": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{32}$"
+          },
+          "url": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "moduleId",
+          "url"
+        ]
+      },
+      "InfoResponse": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "altTitles": {
+            "type": "string"
+          },
+          "authors": {
+            "type": "string"
+          },
+          "artists": {
+            "type": "string"
+          },
+          "genres": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "coverLink": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "link": {
+            "type": "string"
+          },
+          "chapterLinks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "chapterNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "numChapter": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "title",
+          "altTitles",
+          "authors",
+          "artists",
+          "genres",
+          "status",
+          "summary",
+          "coverLink",
+          "url",
+          "link",
+          "chapterLinks",
+          "chapterNames",
+          "numChapter"
+        ]
+      },
+      "Job": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "const": "download"
+          },
+          "moduleId": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "retry",
+              "done",
+              "failed",
+              "cancelled"
+            ]
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "progress": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          },
+          "error": {
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "updatedAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "moduleId",
+          "payload",
+          "state",
+          "priority",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "LibraryFile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^\\d+$"
+          },
+          "moduleId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "manga": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "moduleId",
+          "manga",
+          "fileName",
+          "bytes",
+          "createdAt"
+        ]
+      },
+      "Timestamp": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+      },
+      "__schema0": {
+        "type": "string",
+        "enum": [
+          "",
+          "HTTP",
+          "SOCKS4",
+          "SOCKS5"
+        ]
+      },
+      "__schema1": {
+        "type": "string"
+      },
+      "__schema2": {
+        "type": "string"
+      },
+      "__schema3": {
+        "type": "string"
+      },
+      "__schema4": {
+        "type": "string"
+      }
+    },
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "fmd_session",
+        "description": "Session cookie minted by POST /api/auth/login (only when FMD_WEB_PASSWORD is set)."
+      }
+    }
+  }
+}

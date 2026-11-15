@@ -4,10 +4,10 @@
   "treeSha": "0de5eadb5fb3717c8e6790440e48b1107a46df2a75411ed93bf8d453513f16e5",
   "counts": {
     "totalFiles": 417,
-    "registeredFiles": 411,
-    "failedFiles": 6,
-    "totalModules": 452,
-    "registerRate": "98.6%"
+    "registeredFiles": 412,
+    "failedFiles": 5,
+    "totalModules": 454,
+    "registerRate": "98.8%"
   },
   "d3KnownBroken": {
     "madara.run_html_load": [
@@ -101,31 +101,28 @@
     ]
   },
   "eventCoverage": {
-    "OnGetDirectoryPageNumber": 217,
-    "OnGetInfo": 452,
-    "OnGetNameAndLink": 447,
-    "OnGetPageNumber": 452,
+    "OnGetDirectoryPageNumber": 218,
+    "OnGetInfo": 454,
+    "OnGetNameAndLink": 449,
+    "OnGetPageNumber": 454,
     "OnDownloadImage": 14,
     "OnGetImageURL": 31,
-    "OnBeforeDownloadImage": 96,
+    "OnBeforeDownloadImage": 98,
     "OnLogin": 28,
     "OnCheckSite": 1,
+    "OnAfterImageSaved": 1,
     "OnTaskStart": 2,
     "OnAccountState": 2,
     "OnBeforeUpdateList": 1
   },
   "failures": [
     {
-      "file": "FanFox.lua",
-      "error": "LuaCallFunction(\"Init\") FanFox.lua:36: module 'fmd.mangafoxwatermark' not found:\n\tno field package.preload['fmd.mangafoxwatermark']\n\tno file '/usr/local/share/lua/5.4/fmd/mangafoxwatermark.lua'\n\tno file '/usr/local/share/lua/5.4/fmd/mangafoxwatermark/init.lua'\n\tno file '/usr/local/lib/lua/5.4/fmd/mangafoxwatermark.lua'\n\tno file '/usr/local/lib/lua/5.4/fmd/mangafoxwatermark/init.lua'\n\tno file './fmd/mangafoxwatermark.lua'\n\tno file './fmd/mangafoxwatermark/init.lua'\n\tno file '/usr/local/lib/lua/5.4/fmd/mangafoxwatermark.so'\n\tno file '/usr/local/lib/lua/5.4/loadall.so'\n\tno file './fmd/mangafoxwatermark.so'\n\tno file '/usr/local/lib/lua/5.4/fmd.so'\n\tno file '/usr/local/lib/lua/5.4/loadall.so'\n\tno file './fmd.so'"
-    },
-    {
       "file": "JapScan.lua",
       "error": "luaL_loadbufferx(JapScan.lua) failed: 3"
     },
     {
       "file": "MangaPlus.lua",
-      "error": "utils/protoc.lua:1144: load descriptor msg failed"
+      "error": "MangaPlus.lua:99: MangaPlus.proto: No such file or directory"
     },
     {
       "file": "Shakai.lua",

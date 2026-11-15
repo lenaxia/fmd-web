@@ -15,6 +15,7 @@ import {
   SwallowLogger,
   type DuckDocument,
   type DuckNode,
+  type SwallowSharedDeduper,
 } from './txquery-shim.js';
 import { transformExpression } from './query-dialect.js';
 import type { HttpDocument } from './http-shim.js';
@@ -109,6 +110,13 @@ export interface TxQueryShimOptions {
   readonly moduleId: ModuleId;
   /** HTTP Document facade ids → backing stream (ParseHTML argument). */
   readonly documents?: ReadonlyMap<number, HttpDocument>;
+  /**
+   * §5.6 run-level expression-failure dedup (observability): when
+   * present, the max-1-WARN-per-(module, expression-template) bound is
+   * enforced across ALL engine instances for the process run, not just
+   * this shim instance.
+   */
+  readonly swallowDeduper?: SwallowSharedDeduper;
 }
 
 export class TxQueryShim {
@@ -122,7 +130,7 @@ export class TxQueryShim {
   constructor(private readonly options: TxQueryShimOptions) {
     ensureLinkedomLowercase();
     registerFmdFunctions();
-    this.swallower = new SwallowLogger(options.logger);
+    this.swallower = new SwallowLogger(options.logger, options.swallowDeduper);
   }
 
   private installGlue(): void {

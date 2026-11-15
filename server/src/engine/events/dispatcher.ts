@@ -5,6 +5,7 @@ import type {
   EventDispatchResult,
   EventDispatcher,
   EventGlobalValue,
+  EventTaskSeed,
   HostLogger,
   HttpAbortHandle,
   LuaModuleDescriptor,
@@ -34,8 +35,19 @@ import { createDeadlineController } from './deadline.js';
 export interface DispatcherShims {
   /** Fresh request-scoped HTTP facade per event call (FMD2 LoadObject). */
   readonly makeHTTP?: (bridge: FacadeBridge) => FacadeSpec;
-  /** Host-level account credentials reached as MODULE.Account (§5.2). */
-  readonly account?: { readonly enabled: boolean; readonly username: string; readonly password: string };
+  /**
+   * Host-level account credentials reached as MODULE.Account (§5.2).
+   * `cookies`/`status` seed the persisted prior-session state (FMD2's
+   * loaded TWebsiteModuleAccount — modules.json Account.Cookies/Status);
+   * the handler reads/writes the same fields (read-back after Login).
+   */
+  readonly account?: {
+    readonly enabled: boolean;
+    readonly username: string;
+    readonly password: string;
+    readonly cookies?: string;
+    readonly status?: number;
+  };
 }
 
 export class EventNotBoundError extends Error {
@@ -50,6 +62,14 @@ export class EventNotBoundError extends Error {
 const LUA_TBOOLEAN = 1;
 const LUA_TNUMBER = 3;
 const LUA_TSTRING = 4;
+
+/** The module-writable TASK backing of the last dispatched download event. */
+interface TaskHandle {
+  readonly pageLinks: { readonly list: { readonly count: number; get(i: number): string } };
+  readonly pageContainerLinks: { readonly list: { readonly count: number; get(i: number): string } };
+  readonly fileNames: { readonly list: { readonly count: number; get(i: number): string } };
+  readonly pageNumber: () => number;
+}
 
 /** §5.2 status constants (WebsiteModules.pas:19-21, :78). */
 const NET_STATUS: Readonly<Record<string, number>> = {
@@ -75,6 +95,10 @@ export class ContractEventDispatcher implements EventDispatcher {
 
   /** Optional v0 shim hooks (§5.4/§5.2) — installed by the shim installer. */
   private readonly shims: DispatcherShims;
+
+  /** The TASK backing of the LAST dispatched event (download events;
+   * the host's readTask accessor reads the module's writes back). */
+  private lastTask: TaskHandle | undefined;
 
   constructor(
     private readonly engine: WasmoonLuaEngine,
@@ -192,7 +216,7 @@ export class ContractEventDispatcher implements EventDispatcher {
           bridge.create('UPDATELIST', this.makeUpdateListSpec());
           break;
         case 'TASK':
-          bridge.create('TASK', this.makeTaskSpec(bridge));
+          bridge.create('TASK', this.makeTaskSpec(bridge, context.task));
           break;
         case 'MANGAINFO': {
           // §5.5: the exact LuaMangaInfo field set (engine/lua/mangainfo.ts).
@@ -274,6 +298,33 @@ export class ContractEventDispatcher implements EventDispatcher {
     this.engine.innerEngine.doStringSync(`MODULE = __fmd_facades[${facadeId}]`);
   }
 
+  /**
+   * Host-side TASK readback (§5.2 download events): the module-writable
+   * backing of the LAST dispatched event — the DownloadPageNumber/
+   * GetImageURL flow reads PageLinks + PageNumber out of it. Empty
+   * arrays when the last event bound no TASK.
+   */
+  readTask(): Required<EventTaskSeed> {
+    const task = this.lastTask;
+    if (task === undefined) {
+      return { pageLinks: [], pageContainerLinks: [], fileNames: [], pageNumber: 0, link: '' };
+    }
+    const readList = (list: { count: number; get(i: number): string }): string[] => {
+      const out: string[] = [];
+      for (let i = 0; i < list.count; i += 1) {
+        out.push(list.get(i));
+      }
+      return out;
+    };
+    return {
+      pageLinks: readList(task.pageLinks.list),
+      pageContainerLinks: readList(task.pageContainerLinks.list),
+      fileNames: readList(task.fileNames.list),
+      pageNumber: task.pageNumber(),
+      link: '',
+    };
+  }
+
   private makeUpdateListSpec() {
     // §5.2 UPDATELIST = CurrentDirectoryPageNumber + UpdateStatusText
     let currentDirectoryPageNumber = 0;
@@ -292,14 +343,33 @@ export class ContractEventDispatcher implements EventDispatcher {
     };
   }
 
-  private makeTaskSpec(bridge: FacadeBridge) {
+  private makeTaskSpec(bridge: FacadeBridge, seed?: EventTaskSeed) {
     const pageLinks = makeTStrings(bridge);
     const pageContainerLinks = makeTStrings(bridge);
     const fileNames = makeTStrings(bridge);
     const chapterLinks = makeTStrings(bridge);
     const chapterNames = makeTStrings(bridge);
-    let pageNumber = 0;
-    const link = { value: '' };
+    let pageNumber = seed?.pageNumber ?? 0;
+    const link = { value: seed?.link ?? '' };
+    // Pre-seed the module-writable lists from the host pipeline state
+    // (§5.2: TASK is the persistent download task — GetImageURL reads
+    // PageLinks[WORKID-1]). Host-side reads go through the same handles
+    // (`readTask`), so the backing survives exactly one dispatch call.
+    for (const value of seed?.pageLinks ?? []) {
+      pageLinks.list.add(value);
+    }
+    for (const value of seed?.pageContainerLinks ?? []) {
+      pageContainerLinks.list.add(value);
+    }
+    for (const value of seed?.fileNames ?? []) {
+      fileNames.list.add(value);
+    }
+    this.lastTask = {
+      pageLinks,
+      pageContainerLinks,
+      fileNames,
+      pageNumber: (): number => pageNumber,
+    };
     const lists: Record<string, number> = {
       PageLinks: bridge.create('', pageLinks.spec),
       PageContainerLinks: bridge.create('', pageContainerLinks.spec),

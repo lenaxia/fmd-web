@@ -39,6 +39,7 @@ export {
 } from './store.js';
 export type {
   LibraryStore,
+  LibraryFileRow,
   DownloadedChaptersAccess,
   FavoriteRow,
   ChapterCompletionRequest,

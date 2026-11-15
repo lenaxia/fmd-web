@@ -75,12 +75,25 @@ function numArg(v: unknown): number {
   return Number.isFinite(n) ? Math.trunc(n) : 0;
 }
 
+/**
+ * Bridge deps — the FMD2 EncryptString/DecryptString key (the hardcoded
+ * uBaseUnit constant) is INJECTED here, never embedded: the single holder
+ * is `server/src/tools/import/fmd2-crypto.ts` (see its module doc; the
+ * eslint boundary + the key-isolation test enforce it). Unwired, the two
+ * methods return '' (they are not reachable from any seed module — the
+ * contract surface only fixes method NAMES, `CRYPTO_METHOD_NAMES`).
+ */
+export interface CryptoBridgeDeps {
+  readonly encryptKey?: string;
+}
+
 /** The full method table over base64-encoded strings. */
-export function cryptoBridgeMethods(): Record<string, (...args: unknown[]) => unknown> {
+export function cryptoBridgeMethods(deps?: CryptoBridgeDeps): Record<string, (...args: unknown[]) => unknown> {
+  const encryptKey = deps?.encryptKey ?? '';
   return {
     // composed + plain FMD2 API — (s, key, iv[, aad]) byte strings
-    EncryptString: (s: unknown) => b64of(core.encryptString(argIn(s))),
-    DecryptString: (s: unknown) => b64of(core.decryptString(argIn(s))),
+    EncryptString: (s: unknown) => b64of(core.encryptString(argIn(s), encryptKey)),
+    DecryptString: (s: unknown) => b64of(core.decryptString(argIn(s), encryptKey)),
     HTMLDecode: (s: unknown) => b64of(core.htmlDecode(argIn(s))),
     HTMLEncode: (s: unknown) => b64of(core.htmlEncode(argIn(s))),
     HexToStr: (h: unknown) => b64of(core.hexToStr(argIn(h))),
@@ -163,8 +176,8 @@ export function cryptoBridgeMethods(): Record<string, (...args: unknown[]) => un
  * method names return the nil sentinel (Lua nil) — the surface is fixed by
  * `CRYPTO_METHOD_NAMES`.
  */
-export function callCryptoMethod(name: unknown, args: unknown[]): unknown {
-  const fn = cryptoBridgeMethods()[typeof name === 'string' ? name : ''];
+export function callCryptoMethod(name: unknown, args: unknown[], deps?: CryptoBridgeDeps): unknown {
+  const fn = cryptoBridgeMethods(deps)[typeof name === 'string' ? name : ''];
   if (fn === undefined) {
     return [NIL_SENTINEL];
   }
@@ -292,10 +305,12 @@ end
 `;
 
 /** Install the crypto bridge onto a wasmoon engine (call after the Lua
- * package table exists — the glue only touches `package.preload`). */
-export function installCryptoShim(engine: WasmoonEngine): void {
+ * package table exists — the glue only touches `package.preload`).
+ * `deps.encryptKey` injects the FMD2 EncryptString key (see
+ * {@link CryptoBridgeDeps}); the wiring lives in `install.ts`. */
+export function installCryptoShim(engine: WasmoonEngine, deps?: CryptoBridgeDeps): void {
   engine.global.set('__fmd_crypto_names', () => [...CRYPTO_METHOD_NAMES]);
   engine.global.set('__fmd_crypto_call', (name: unknown, ...args: unknown[]) =>
-    callCryptoMethod(name, args));
+    callCryptoMethod(name, args, deps));
   engine.doStringSync(CRYPTO_LUA_GLUE);
 }

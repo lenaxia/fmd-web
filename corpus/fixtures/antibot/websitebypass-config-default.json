@@ -1,0 +1,8 @@
+{
+  "$comment": "FMD2 lua/websitebypass/websitebypass_config.json shape, default branch — what cloudflare.lua load_config() writes when the config file is absent (the per-execution file lives in the wasm MEMFS of the wasmoon heap, never on the repo FS).",
+  "use_webdriver": false,
+  "debug": false,
+  "flaresolverr_port": 8191,
+  "testing": false,
+  "flaresolverr_ip": "localhost"
+}

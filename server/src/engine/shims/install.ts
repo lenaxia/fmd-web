@@ -3,7 +3,7 @@ import type { FacadeBridge, FacadeSpec } from '../lua/facade.js';
 import type { WasmoonLuaHost } from '../lua/host.js';
 import { readFileSync } from 'node:fs';
 import type { LuaEngine as WasmoonEngine } from 'wasmoon';
-import { parseQueryDocument, type DuckDocument } from './txquery-shim.js';
+import { parseQueryDocument, type DuckDocument, type SwallowSharedDeduper } from './txquery-shim.js';
 import { TxQueryShim } from './txquery-facade.js';
 import {
   makeHttpShim,
@@ -14,7 +14,15 @@ import {
   type HttpTransportPort,
   type RecordedResponseResolver,
 } from './http-shim.js';
+import type { ProxyConfig } from './http-proxy.js';
+import type { BypassExecutorPort } from '../sidecar/bypass-adapter.js';
 import { installRequireShim } from './lua-require.js';
+// The ONE sanctioned src-side import of the migration module (D4): it
+// supplies the FMD2 EncryptString key to the fmd.crypto Lua surface
+// (LuaCrypto.pas parity). The eslint `no-restricted-imports` boundary
+// whitelists exactly this file + the import CLI + tests; native storage
+// never touches the key (see fmd2-crypto.ts module doc).
+import { FMD2_ENCRYPT_KEY } from '../../tools/import/fmd2-crypto.js';
 
 /**
  * v0 shim installer (DESIGN.md §5.4/§5.6/§5.7): wires the real offline
@@ -48,6 +56,33 @@ export interface InstallShimsOptions {
   readonly transport?: HttpTransportPort;
   /** Filesystem jail root for Document LoadFromFile/SaveToFile (§5.4). */
   readonly fsJail?: string;
+  /**
+   * Settings-provided default proxy for THIS module (the per-module
+   * override, else the global config — §9/§10 settings): exact SetProxy
+   * field semantics; a module's own SetProxy call overrides at runtime.
+   */
+  readonly initialProxy?: ProxyConfig;
+  /**
+   * §5.11 browser sidecar adapter: when present the `fmd.subprocess`
+   * stub routes RunCommandHide to it (bounded concurrency 2, 60 s
+   * timeout, health-gated); without it the denied stub stands (§5.7).
+   */
+  readonly bypass?: BypassExecutorPort;
+  /**
+   * §5.6 run-level expression-failure dedup (observability): shared
+   * across every engine this process creates, so the max-1-WARN bound
+   * per (module, expression-template) holds for the whole run and the
+   * suppressed counters feed the metrics endpoint.
+   */
+  readonly swallowDeduper?: SwallowSharedDeduper;
+  /**
+   * FMD2 EncryptString key for the fmd.crypto Lua surface (LuaCrypto.pas
+   * calls uBaseUnit's hardcoded-key EncryptString). Defaults to
+   * `FMD2_ENCRYPT_KEY` — the migration module is the ONLY holder of the
+   * literal (D4 isolation; see fmd2-crypto.ts module doc). Override for
+   * tests that need the shim unwired.
+   */
+  readonly fmd2CryptoKey?: string;
 }
 
 export interface InstalledShims {
@@ -95,6 +130,7 @@ export function installShims(
     logger: options.logger,
     moduleId: options.moduleId,
     documents,
+    ...(options.swallowDeduper !== undefined ? { swallowDeduper: options.swallowDeduper } : {}),
   });
 
   installRequireShim(engine, {
@@ -102,6 +138,13 @@ export function installShims(
     ...(options.env !== undefined ? { env: options.env } : {}),
     moduleId: options.moduleId,
     logger: options.logger,
+    fmd2CryptoKey: options.fmd2CryptoKey ?? FMD2_ENCRYPT_KEY,
+    // fmd.imagepuzzle DeScramble resolves its TStream arguments (the
+    // HTTP.Document facades) through this map (facade __fmd_id marker).
+    documents,
+    // §5.11 browser sidecar adapter → the fmd.subprocess stub routes
+    // RunCommandHide to it (absent = denied stub, §5.10 known-broken)
+    ...(options.bypass !== undefined ? { bypass: options.bypass } : {}),
   });
 
   const makeHTTP = (): FacadeSpec =>

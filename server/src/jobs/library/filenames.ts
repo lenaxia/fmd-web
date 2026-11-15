@@ -55,7 +55,19 @@
  * the :542 substitution → :545 check order); 0 = no limit (D5
  * Windows-desktop parity, UTF-16 code units — Pascal's UnicodeString
  * Length).
+ *
+ * The mode-dependent final step (parity tail-truncation vs the
+ * `FMD_NORMALIZE_PATHS=1` / `--normalize-paths` Linux-normalized
+ * opt-out) lives in the SHARED D5 policy
+ * ({@link applyFileNamePolicy} from `@fmd/contract`, DESIGN.md §14 D5)
+ * — this module never re-implements the mode switch; it only owns the
+ * parity sanitization (RemoveSymbols/Trim above), which both modes
+ * apply before the policy runs. The §7.1 fixed-depth LAYOUT caps
+ * (finalize.ts/download-lane.ts component truncations) are not D5
+ * filename semantics and stay parity-only.
  */
+
+import { applyFileNamePolicy, type FileNamePolicyMode } from '@fmd/contract';
 
 /**
  * uBaseUnit.pas:59-60 — the FMD2 `Symbols` set, in declaration order:
@@ -147,8 +159,15 @@ export interface ChapterFileNameParts {
   readonly author?: string;
   readonly artist?: string;
   readonly numbering?: string;
-  /** CurrentMaxFileNameLength (0 = no limit, D5). */
+  /** CurrentMaxFileNameLength (0 = no limit, D5 — parity mode only). */
   readonly maxLength?: number;
+  /**
+   * D5 policy mode override (undefined = resolve from
+   * `FMD_NORMALIZE_PATHS` / `--normalize-paths` at the shared choke
+   * point). `linux-normalized` skips the tail truncation and strips
+   * control units; `windows-parity` is the default semantics.
+   */
+  readonly mode?: FileNamePolicyMode | undefined;
 }
 
 /**
@@ -162,21 +181,25 @@ export function resolveChapterFileName(parts: ChapterFileNameParts): string {
     const sanitized = sanitizeFileName(candidate);
     return sanitized === '' ? '' : sanitized;
   };
+  // The shared D5 final step (parity tail-truncation vs Linux-normalized
+  // opt-out) — never re-implemented here (DESIGN.md §14 D5).
+  const finalize = (sanitized: string): string =>
+    applyFileNamePolicy(sanitized, { mode: parts.mode, maxLength: parts.maxLength ?? 0 });
 
   // 1. module FileNames[] (:531-539 alignment guard)
   if (parts.fileNames !== undefined) {
     const index = Math.trunc(parts.fileNamesIndex ?? 0);
     const entry = index >= 0 && index < parts.fileNames.length ? parts.fileNames[index] : undefined;
     if (entry !== undefined && entry !== '') {
-      const candidate = safe(entry);
-      if (candidate !== '') return truncateKeepTail(candidate, parts.maxLength ?? 0);
+      const candidate = finalize(safe(entry));
+      if (candidate !== '') return candidate;
     }
   }
 
   // 2. SaveImage return (LuaWebsiteModules.pas:385 luaToString result)
   if (parts.saveImageName !== undefined && parts.saveImageName !== '') {
-    const candidate = safe(parts.saveImageName);
-    if (candidate !== '') return truncateKeepTail(candidate, parts.maxLength ?? 0);
+    const candidate = finalize(safe(parts.saveImageName));
+    if (candidate !== '') return candidate;
   }
 
   // 3. filename template (CR_* substitution). Substitution values go
@@ -194,14 +217,14 @@ export function resolveChapterFileName(parts: ChapterFileNameParts): string {
       [CR.artist]: safe(parts.artist ?? ''),
       [CR.fileName]: safe(parts.saveImageName ?? ''),
     };
-    const candidate = safe(substitute(parts.template, values));
-    if (candidate !== '') return truncateKeepTail(candidate, parts.maxLength ?? 0);
+    const candidate = finalize(safe(substitute(parts.template, values)));
+    if (candidate !== '') return candidate;
   }
 
   // 4. chapter name (the packer fallback, uDownloadsManager.pas:577)
   if (parts.chapterName !== undefined && parts.chapterName !== '') {
-    const candidate = safe(parts.chapterName);
-    if (candidate !== '') return truncateKeepTail(candidate, parts.maxLength ?? 0);
+    const candidate = finalize(safe(parts.chapterName));
+    if (candidate !== '') return candidate;
   }
 
   throw new Error('chapter filename resolution produced no candidate');

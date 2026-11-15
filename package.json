@@ -21,6 +21,8 @@
     "lint": "eslint .",
     "typecheck": "tsc -b tsconfig.json",
     "contract:check": "npm run contract:check -w @fmd/contract",
+    "corpus": "tsx corpus/scripts/generate-compat.ts --gate",
+    "api:snapshot": "API_OPENAPI_SNAPSHOT=write vitest run server/test/api/openapi.test.ts",
     "ci": "bash scripts/ci.sh"
   },
   "devDependencies": {
@@ -29,9 +31,11 @@
     "@vitest/coverage-v8": "^3.2.4",
     "ajv": "^8.17.1",
     "eslint": "^9.39.2",
+    "tsx": "4.23.15",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.50.1",
     "vitest": "^3.2.4",
+    "wait-on": "^9.5.1",
     "yaml": "^2.6.1"
   }
 }

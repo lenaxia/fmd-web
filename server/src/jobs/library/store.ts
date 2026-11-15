@@ -47,6 +47,12 @@ export interface FavoriteRow {
   readonly status?: string;
   readonly currentChapter?: number;
   readonly lastCheck?: number;
+  /** §7.2 `DateLastUpdated` parity — stamped when new chapters appear. */
+  readonly lastUpdated?: number;
+  /** Auto-download eligible new chapters through the Phase-3 pipeline. */
+  readonly autoDownload?: boolean;
+  /** New-chapter count at the last check (Favorites page badge). */
+  readonly newChapterCount?: number;
   /** Case-insensitive merged list (M2) — trailing-LF text or ''. */
   readonly downloadedChapterList?: string;
 }
@@ -72,19 +78,48 @@ export interface ChapterCompletionResult {
 
 /**
  * The library facade (§7.1/§9): dedupe ledger + dual-write completion +
- * atomic finalize. Implemented by {@link SqliteLibraryStore}.
+ * atomic finalize + the listing/download rows. Implemented by
+ * {@link SqliteLibraryStore}.
  */
 export interface LibraryStore extends DownloadedChaptersAccess {
   /** Favorite-side stored list ('' when the favorite is absent). */
   getFavoriteDownloadedList(mangaKey: string): string;
   /** Favorites engine hook (Phase 4) — insert-or-replace a favorite. */
   upsertFavorite(favorite: FavoriteRow): void;
+  /** One favorite by key (undefined when absent). */
+  getFavorite(mangaKey: string): FavoriteRow | undefined;
+  /** All favorites, insertion order (Favorites page listing). */
+  listFavorites(): FavoriteRow[];
   /** Delete a favorite (its downloaded_chapters row is NOT touched). */
   deleteFavorite(mangaKey: string): void;
   /** §7.2 dual-write chapter completion (see module doc). */
   completeChapter(request: ChapterCompletionRequest): ChapterCompletionResult;
   /** §7.1 step 5 — atomic move into library/<module>/<manga>/. */
   finalize(request: FinalizeRequest): FinalizeResult;
+  /** Record a finalized artifact (insert-or-update by absolute path). */
+  recordLibraryFile(entry: {
+    moduleId: string;
+    manga: string;
+    fileName: string;
+    path: string;
+    bytes: number;
+    createdAt?: number;
+  }): LibraryFileRow;
+  /** Listing rows newest-first, `beforeId` exclusive (keyset cursor). */
+  listLibraryFiles(opts?: { limit?: number; beforeId?: number }): LibraryFileRow[];
+  /** One listing row (with its absolute path for the download route). */
+  getLibraryFile(id: string): (LibraryFileRow & { readonly path: string }) | undefined;
+}
+
+/** One §7.1 finalized artifact as the listing API projects it. */
+export interface LibraryFileRow {
+  readonly id: string;
+  readonly moduleId: string;
+  readonly manga: string;
+  readonly fileName: string;
+  readonly bytes: number;
+  /** RFC 3339 UTC (ISO string of the stored epoch ms). */
+  readonly createdAt: string;
 }
 
 export interface SqliteLibraryStoreOptions {
@@ -111,7 +146,19 @@ export function ensureLibrarySchema(db: Database.Database): void {
       status                 TEXT,
       current_chapter        INTEGER,
       last_check             INTEGER,
+      last_updated           INTEGER,
+      auto_download          INTEGER NOT NULL DEFAULT 1,
+      new_chapter_count      INTEGER NOT NULL DEFAULT 0,
       downloaded_chapter_list TEXT
+    );
+    CREATE TABLE IF NOT EXISTS library_files (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      module_id  TEXT NOT NULL,
+      manga      TEXT NOT NULL,
+      file       TEXT NOT NULL,
+      path       TEXT NOT NULL UNIQUE,
+      bytes      INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
     );
   `);
 }
@@ -182,17 +229,20 @@ export class SqliteLibraryStore implements LibraryStore {
     this.options.db
       .prepare(
         `INSERT INTO favorite
-           (manga_key, module_id, url, title, status, current_chapter, last_check,
-            downloaded_chapter_list)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(manga_key) DO UPDATE SET
-           module_id = excluded.module_id,
-           url = excluded.url,
-           title = excluded.title,
-           status = excluded.status,
-           current_chapter = excluded.current_chapter,
-           last_check = excluded.last_check,
-           downloaded_chapter_list = excluded.downloaded_chapter_list`,
+            (manga_key, module_id, url, title, status, current_chapter, last_check,
+             last_updated, auto_download, new_chapter_count, downloaded_chapter_list)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(manga_key) DO UPDATE SET
+            module_id = excluded.module_id,
+            url = excluded.url,
+            title = excluded.title,
+            status = excluded.status,
+            current_chapter = excluded.current_chapter,
+            last_check = excluded.last_check,
+            last_updated = excluded.last_updated,
+            auto_download = excluded.auto_download,
+            new_chapter_count = excluded.new_chapter_count,
+            downloaded_chapter_list = excluded.downloaded_chapter_list`,
       )
       .run(
         favorite.mangaKey,
@@ -202,8 +252,33 @@ export class SqliteLibraryStore implements LibraryStore {
         favorite.status ?? null,
         favorite.currentChapter ?? null,
         favorite.lastCheck ?? null,
+        favorite.lastUpdated ?? null,
+        favorite.autoDownload === false ? 0 : 1,
+        favorite.newChapterCount ?? 0,
         favorite.downloadedChapterList ?? null,
       );
+  }
+
+  public getFavorite(mangaKey: string): FavoriteRow | undefined {
+    const row = this.options.db
+      .prepare(
+        `SELECT manga_key, module_id, url, title, status, current_chapter, last_check,
+                last_updated, auto_download, new_chapter_count, downloaded_chapter_list
+           FROM favorite WHERE manga_key = ?`,
+      )
+      .get(mangaKey) as FavoriteDbRow | undefined;
+    return row === undefined ? undefined : toFavoriteRow(row);
+  }
+
+  public listFavorites(): FavoriteRow[] {
+    const rows = this.options.db
+      .prepare(
+        `SELECT manga_key, module_id, url, title, status, current_chapter, last_check,
+                last_updated, auto_download, new_chapter_count, downloaded_chapter_list
+           FROM favorite ORDER BY rowid`,
+      )
+      .all() as FavoriteDbRow[];
+    return rows.map(toFavoriteRow);
   }
 
   public deleteFavorite(mangaKey: string): void {
@@ -259,4 +334,119 @@ export class SqliteLibraryStore implements LibraryStore {
     }
     return this.finalizer.finalize(request);
   }
+
+  public recordLibraryFile(entry: {
+    moduleId: string;
+    manga: string;
+    fileName: string;
+    path: string;
+    bytes: number;
+    createdAt?: number;
+  }): LibraryFileRow {
+    const now = entry.createdAt ?? Date.now();
+    this.options.db
+      .prepare(
+        `INSERT INTO library_files (module_id, manga, file, path, bytes, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(path) DO UPDATE SET
+           module_id = excluded.module_id,
+           manga = excluded.manga,
+           file = excluded.file,
+           bytes = excluded.bytes,
+           created_at = excluded.created_at`,
+      )
+      .run(entry.moduleId, entry.manga, entry.fileName, entry.path, entry.bytes, now);
+    const row = this.options.db
+      .prepare('SELECT id, module_id, manga, file, bytes, created_at FROM library_files WHERE path = ?')
+      .get(entry.path) as {
+      id: number;
+      module_id: string;
+      manga: string;
+      file: string;
+      bytes: number;
+      created_at: number;
+    };
+    return toLibraryFileRow(row);
+  }
+
+  public listLibraryFiles(opts?: { limit?: number; beforeId?: number }): LibraryFileRow[] {
+    const limit = Math.max(1, Math.trunc(opts?.limit ?? 50));
+    const beforeId = opts?.beforeId;
+    const rows = (
+      beforeId === undefined
+        ? this.options.db
+            .prepare('SELECT id, module_id, manga, file, bytes, created_at FROM library_files ORDER BY id DESC LIMIT ?')
+            .all(limit) as LibraryFileDbRow[]
+        : this.options.db
+            .prepare(
+              'SELECT id, module_id, manga, file, bytes, created_at FROM library_files WHERE id < ? ORDER BY id DESC LIMIT ?',
+            )
+            .all(beforeId, limit) as LibraryFileDbRow[]
+    );
+    return rows.map(toLibraryFileRow);
+  }
+
+  public getLibraryFile(id: string): (LibraryFileRow & { readonly path: string }) | undefined {
+    const row = this.options.db
+      .prepare('SELECT id, module_id, manga, file, path, bytes, created_at FROM library_files WHERE id = ?')
+      .get(Number(id)) as
+      | (LibraryFileDbRow & { readonly path: string })
+      | undefined;
+    if (row === undefined) {
+      return undefined;
+    }
+    return { ...toLibraryFileRow(row), path: row.path };
+  }
+}
+
+interface LibraryFileDbRow {
+  readonly id: number;
+  readonly module_id: string;
+  readonly manga: string;
+  readonly file: string;
+  readonly bytes: number;
+  readonly created_at: number;
+}
+
+interface FavoriteDbRow {
+  readonly manga_key: string;
+  readonly module_id: string;
+  readonly url: string;
+  readonly title: string | null;
+  readonly status: string | null;
+  readonly current_chapter: number | null;
+  readonly last_check: number | null;
+  readonly last_updated: number | null;
+  readonly auto_download: number | null;
+  readonly new_chapter_count: number | null;
+  readonly downloaded_chapter_list: string | null;
+}
+
+function toFavoriteRow(row: FavoriteDbRow): FavoriteRow {
+  return {
+    mangaKey: row.manga_key,
+    moduleId: row.module_id,
+    url: row.url,
+    ...(row.title !== null ? { title: row.title } : {}),
+    ...(row.status !== null ? { status: row.status } : {}),
+    ...(row.current_chapter !== null ? { currentChapter: row.current_chapter } : {}),
+    ...(row.last_check !== null ? { lastCheck: row.last_check } : {}),
+    ...(row.last_updated !== null ? { lastUpdated: row.last_updated } : {}),
+    autoDownload: row.auto_download !== 0,
+    newChapterCount: row.new_chapter_count ?? 0,
+    ...(row.downloaded_chapter_list !== null
+      ? { downloadedChapterList: row.downloaded_chapter_list }
+      : {}),
+  };
+}
+
+function toLibraryFileRow(row: LibraryFileDbRow): LibraryFileRow {
+  return {
+    id: String(row.id),
+    moduleId: row.module_id,
+    manga: row.manga,
+    fileName: row.file,
+    bytes: row.bytes,
+    createdAt: new Date(row.created_at).toISOString(),
+  };
 }

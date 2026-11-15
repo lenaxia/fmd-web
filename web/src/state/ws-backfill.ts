@@ -1,22 +1,26 @@
 /**
- * D19 WS backfill client state machine (DESIGN.md §10, D19).
+ * D19 WS backfill client state machine (DESIGN.md §10, D19/D21).
  *
  * Transport-agnostic controller: the app passes a WebSocket factory
  * (default: the global constructor) so tests drive a mock socket.
  *
- * Protocol (documented §10 client contract — mirrors the WS hub):
+ * Protocol (documented §10 client contract — mirrored by the shared
+ * zod schemas in @fmd/contract, which the server hub validates with):
  *   client → `{type:'hello', lastEventId?}` on every open; the id is the
  *            last seen event, so the server backfills what was missed.
  *   server → `{type:'event', id, job}` snapshots (live or backfill)
  *   server → `{type:'resync'}` when the requested window is outside the
  *            ring buffer (last 1000 events/job, 15 min max age): the
  *            client must refetch full state and reset its cursor.
+ *   server → `{type:'gap', fromId, toId}` when the connection's
+ *            outbound queue dropped events (D21 slow-consumer policy):
+ *            same obligation — refetch full state and reset the cursor.
  *
  * Status machine:
  *   idle → connecting → open | backfilling → reconnecting → connecting …
  *   (reconnect attempts back off exponentially, capped; a successful
- *   open resets the attempt counter; `resync` clears lastEventId and
- *   invokes onResync exactly once per hint.)
+ *   open resets the attempt counter; `resync` or `gap` clears
+ *   lastEventId and invokes onResync exactly once per hint.)
  */
 import type { components } from '../api/openapi';
 import type { JobEventMessage, WsServerMessage, HelloMessage } from './ws-protocol';
@@ -187,10 +191,12 @@ export class WsBackfillController {
         this.opts.onEvent(message);
         break;
       }
-      case 'resync': {
+      case 'resync':
+      case 'gap': {
+        // D19 resync / D21 gap: the replay window (or the dropped id
+        // range) is gone — refetch full state and let the next hello
+        // start from a fresh cursor.
         if (this.statusValue === 'backfilling') this.setStatus('open');
-        // D19: the replay window is gone — refetch full state and let
-        // the next hello start from a fresh cursor.
         if (!this.resyncPending) {
           this.resyncPending = true;
           this.lastEventIdValue = undefined;
@@ -216,7 +222,10 @@ function defaultWebSocketFactory(url: string): WsLike {
   return new ctor(url) as unknown as WsLike;
 }
 
-/** Narrow a raw WS payload onto the documented server message union. */
+/** Narrow a raw WS payload onto the shared server-message union
+ * (`@fmd/contract` WsServerMessageT; drift-pinned by test). Hand-rolled
+ * (no zod in the browser bundle): every contract-valid frame parses,
+ * and anything else returns null and is ignored. */
 export function parseServerMessage(data: unknown): WsServerMessage | null {
   if (typeof data !== 'string') return null;
   let parsed: unknown;
@@ -230,8 +239,20 @@ export function parseServerMessage(data: unknown): WsServerMessage | null {
   if (record['type'] === 'resync') {
     return { type: 'resync' };
   }
+  if (
+    record['type'] === 'gap' &&
+    isEventId(record['fromId']) &&
+    isEventId(record['toId'])
+  ) {
+    return { type: 'gap', fromId: record['fromId'], toId: record['toId'] };
+  }
   if (record['type'] === 'event' && typeof record['id'] === 'string' && typeof record['job'] === 'object' && record['job'] !== null) {
     return { type: 'event', id: record['id'], job: record['job'] as components['schemas']['Job'] };
   }
   return null;
+}
+
+/** Contract event ids are decimal digit strings (`WsEventIdSchema`). */
+function isEventId(value: unknown): value is string {
+  return typeof value === 'string' && /^\d+$/.test(value);
 }

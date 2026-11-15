@@ -4,14 +4,17 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { runDriftCheck } from '../tools/drift-check.js';
-import type { ContractDocument, EventBinding, FacadeTable } from '../types.js';
+import { diffRequireShims, runDriftCheck } from '../tools/drift-check.js';
+import type { ContractDocument, EventBinding, FacadeTable, RequireShimRegistryEntry } from '../types.js';
 
 /**
  * Drift-check acceptance proofs (DESIGN.md §5 CI rule):
  * - exit 0 on the shipped contract.json vs the real FMD2 sources;
  * - exit ≠ 0 when a contract.json row is mutated in a temp copy;
- * - exit 2 when extraction itself fails (unrecognized Pascal pattern).
+ * - exit 2 when extraction itself fails (unrecognized Pascal pattern);
+ * - `requireShims[].status` is DERIVED: any status diverging from the
+ *   shim loader registry (server/src/engine/shims/require-registry.ts,
+ *   the single source of truth) fails the gate — proven by mutation.
  */
 
 const realLuaDir = resolve(
@@ -259,5 +262,188 @@ describe('runDriftCheck — mutation detection on a temp contract copy', (): voi
     const result = runDriftCheck({ contractPath: mutated, luaDir: realLuaDir });
     expect(result.exitCode).toBe(1);
     expect(result.messages.join('\n')).toContain('read-back global URL is not a bound global');
+  });
+});
+
+/**
+ * Loader-registry fixture mirroring
+ * server/src/engine/shims/require-registry.ts (the single source of
+ * truth the contract tests cannot import — the reference direction is
+ * contract ← server). If contract.json's requireShims statuses change,
+ * the real registry changes first and this fixture follows; the gate
+ * (scripts/contract-drift-check.ts) always cross-checks against the
+ * REAL registry.
+ */
+const registryFixture: readonly RequireShimRegistryEntry[] = [
+  { require: 'fmd.env', loaderKey: 'fmd.env', servedBy: 'host-lib', status: 'implemented' },
+  { require: 'fmd.crypto', loaderKey: 'fmd.crypto', servedBy: 'package-preload', status: 'implemented' },
+  { require: 'fmd.duktape', loaderKey: 'fmd.duktape', servedBy: 'host-lib', status: 'implemented' },
+  { require: 'fmd.gzip', loaderKey: 'fmd.gzip', servedBy: 'package-preload', status: 'implemented' },
+  { require: 'fmd.fileutil', loaderKey: 'fmd.fileutil', servedBy: 'host-lib', status: 'partial', gap: 'SerializeAndMaintainNames' },
+  { require: 'fmd.imagepuzzle', loaderKey: 'fmd.imagepuzzle', servedBy: 'package-preload', status: 'implemented' },
+  { require: 'fmd.logger', loaderKey: 'fmd.logger', servedBy: 'host-lib', status: 'implemented' },
+  { require: 'fmd.mangafoxwatermark', loaderKey: 'fmd.mangafoxwatermark', servedBy: 'host-lib', status: 'implemented' },
+  { require: 'fmd.pcre2', loaderKey: 'fmd.pcre2', servedBy: 'host-lib', status: 'implemented' },
+  { require: 'fmd.strings', loaderKey: null, servedBy: 'none', status: 'planned' },
+  { require: 'pb', loaderKey: 'pb', servedBy: 'package-preload', status: 'implemented' },
+  { require: 'subprocess', loaderKey: 'fmd.subprocess', servedBy: 'host-lib', status: 'stub' },
+  { require: 'utils.* / templates.*', loaderKey: null, servedBy: 'file-chunk', status: 'implemented' },
+];
+
+function mutateRequireShimStatus(
+  doc: ContractDocument,
+  requireName: string,
+  status: ContractDocument['requireShims'][number]['status'],
+): ContractDocument {
+  return {
+    ...doc,
+    requireShims: doc.requireShims.map((r) =>
+      r.require === requireName ? { ...r, status } : r,
+    ),
+  };
+}
+
+describe('runDriftCheck — requireShims[].status vs the shim loader registry', (): void => {
+  it('exits 0 on the shipped contract.json when statuses match the registry', (): void => {
+    const result = runDriftCheck({
+      contractPath: fileURLToPath(realContractPath),
+      luaDir: realLuaDir,
+      requireRegistry: registryFixture,
+    });
+    expect(result.messages).toEqual([]);
+    expect(result.exitCode).toBe(0);
+  });
+
+  it('fails when a status claims LESS than the loader implements (implemented → planned lie)', (): void => {
+    const mutated = writeTempContract((doc): ContractDocument =>
+      mutateRequireShimStatus(doc, 'fmd.env', 'planned'),
+    );
+    const result = runDriftCheck({
+      contractPath: mutated,
+      luaDir: realLuaDir,
+      requireRegistry: registryFixture,
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.messages.join('\n')).toContain(
+      'requireShims["fmd.env"].status: contract=planned registry=implemented',
+    );
+  });
+
+  it('fails when a status claims MORE than the loader registers (planned → implemented lie)', (): void => {
+    // fmd.strings is the shipped planned row (imagepuzzle/mangafoxwatermark
+    // are genuinely implemented now, so they no longer work as the lie victim).
+    const mutated = writeTempContract((doc): ContractDocument =>
+      mutateRequireShimStatus(doc, 'fmd.strings', 'implemented'),
+    );
+    const result = runDriftCheck({
+      contractPath: mutated,
+      luaDir: realLuaDir,
+      requireRegistry: registryFixture,
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.messages.join('\n')).toContain(
+      'requireShims["fmd.strings"].status: contract=implemented registry=planned',
+    );
+  });
+
+  it('fails when a stub status is upgraded behind the registry\'s back', (): void => {
+    const mutated = writeTempContract((doc): ContractDocument =>
+      mutateRequireShimStatus(doc, 'subprocess', 'implemented'),
+    );
+    const result = runDriftCheck({
+      contractPath: mutated,
+      luaDir: realLuaDir,
+      requireRegistry: registryFixture,
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.messages.join('\n')).toContain(
+      'requireShims["subprocess"].status: contract=implemented registry=stub',
+    );
+  });
+
+  it('fails when a contract row has no loader registry row', (): void => {
+    const mutated = writeTempContract((doc): ContractDocument => ({
+      ...doc,
+      requireShims: [
+        ...doc.requireShims,
+        { require: 'fmd.brandnew', fmd2Unit: 'LuaBrandNew', implementation: 'x', status: 'implemented' },
+      ],
+    }));
+    const result = runDriftCheck({
+      contractPath: mutated,
+      luaDir: realLuaDir,
+      requireRegistry: registryFixture,
+    });
+    expect(result.exitCode).toBe(1);
+    expect(result.messages.join('\n')).toContain(
+      'requireShims: contract.json row "fmd.brandnew" has no loader registry row',
+    );
+  });
+});
+
+describe('diffRequireShims — registry structural invariants', (): void => {
+  const contractRows = (statuses: readonly (readonly [string, string])[]): readonly { require: string; status: string }[] =>
+    statuses.map(([require, status]): { require: string; status: string } => ({ require, status }));
+
+  it('accepts the shipped registry shape', (): void => {
+    expect(diffRequireShims(
+      registryFixture.map((e) => ({ require: e.require, status: e.status })),
+      registryFixture,
+    )).toEqual([]);
+  });
+
+  it('rejects a partial row without a gap note', (): void => {
+    const registry: readonly RequireShimRegistryEntry[] = [
+      { require: 'fmd.fileutil', loaderKey: 'fmd.fileutil', servedBy: 'host-lib', status: 'partial' },
+    ];
+    expect(
+      diffRequireShims([{ require: 'fmd.fileutil', status: 'partial' }], registry).join('\n'),
+    ).toContain('fmd.fileutil"]: partial status requires a gap note');
+  });
+
+  it('rejects a gap note on a non-partial row', (): void => {
+    const registry: readonly RequireShimRegistryEntry[] = [
+      { require: 'fmd.env', loaderKey: 'fmd.env', servedBy: 'host-lib', status: 'implemented', gap: 'none really' },
+    ];
+    expect(
+      diffRequireShims([{ require: 'fmd.env', status: 'implemented' }], registry).join('\n'),
+    ).toContain('fmd.env"]: gap note is only allowed on partial status');
+  });
+
+  it('rejects a planned row claiming loader registration', (): void => {
+    const registry: readonly RequireShimRegistryEntry[] = [
+      { require: 'fmd.gzip', loaderKey: 'fmd.gzip', servedBy: 'host-lib', status: 'planned' },
+    ];
+    expect(
+      diffRequireShims([{ require: 'fmd.gzip', status: 'planned' }], registry).join('\n'),
+    ).toContain('fmd.gzip"]: planned status must not claim loader registration');
+  });
+
+  it('rejects a non-planned row that is not actually served', (): void => {
+    const registry: readonly RequireShimRegistryEntry[] = [
+      { require: 'fmd.strings', loaderKey: null, servedBy: 'none', status: 'implemented' },
+    ];
+    expect(
+      diffRequireShims([{ require: 'fmd.strings', status: 'implemented' }], registry).join('\n'),
+    ).toContain('fmd.strings"]: implemented status requires loader registration but servedBy=none');
+  });
+
+  it('rejects duplicate registry rows in both directions of drift', (): void => {
+    const registry: readonly RequireShimRegistryEntry[] = [
+      { require: 'pb', loaderKey: 'pb', servedBy: 'package-preload', status: 'implemented' },
+      { require: 'pb', loaderKey: 'pb', servedBy: 'package-preload', status: 'implemented' },
+    ];
+    const messages = diffRequireShims(contractRows([['pb', 'implemented']]), registry);
+    expect(messages.join('\n')).toContain('duplicate rows for "pb"');
+  });
+
+  it('rejects a registry row missing from contract.json', (): void => {
+    const registry: readonly RequireShimRegistryEntry[] = [
+      { require: 'fmd.env', loaderKey: 'fmd.env', servedBy: 'host-lib', status: 'implemented' },
+      { require: 'pb', loaderKey: 'pb', servedBy: 'package-preload', status: 'implemented' },
+    ];
+    expect(
+      diffRequireShims(contractRows([['fmd.env', 'implemented']]), registry).join('\n'),
+    ).toContain('loader registry row "pb" has no contract.json row');
   });
 });

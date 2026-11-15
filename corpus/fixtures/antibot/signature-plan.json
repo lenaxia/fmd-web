@@ -1,0 +1,86 @@
+{
+  "$comment": "checkantibot.lua:5-12 signature matrix (DETECTION fixtures) — deterministic loopback responses; 'expectHit' = what ____CheckAntiBot must return for each response shape. Statuses/header combos mirror FMD2 lua/websitebypass/checkantibot.lua:5-12 (403/429/503 + Content-Type contains 'text/html' + Server contains 'cloudflare' or 'ddos-guard', case-folded substring semantics).",
+  "signatureEntries": [
+    {
+      "fixtureId": "sig-403-cf-html",
+      "path": "/sig/403-cf-html",
+      "status": 403,
+      "contentType": "text/html; charset=utf-8",
+      "server": "cloudflare",
+      "expectHit": true,
+      "description": "canonical Cloudflare block: 403 + text/html + cloudflare Server"
+    },
+    {
+      "fixtureId": "sig-429-ddosguard-html",
+      "path": "/sig/429-ddosguard-html",
+      "status": 429,
+      "contentType": "text/html",
+      "server": "ddos-guard",
+      "expectHit": true,
+      "description": "DDoS-Guard variant: 429 + text/html + ddos-guard Server"
+    },
+    {
+      "fixtureId": "sig-503-cf-html-caps",
+      "path": "/sig/503-cf-html-caps",
+      "status": 503,
+      "contentType": "TEXT/HTML; charset=UTF-8",
+      "server": "CloudFlare",
+      "expectHit": true,
+      "description": "case-folded sniffing (Lua find on lower():, ported with toLowerCase)"
+    },
+    {
+      "fixtureId": "sig-503-ddosguard-html-caps",
+      "path": "/sig/503-ddosguard-html-caps",
+      "status": 503,
+      "contentType": "Text/HTML",
+      "server": "DDoS-Guard",
+      "expectHit": true,
+      "description": "ddos-guard with mixed-case Content-Type and Server"
+    },
+    {
+      "fixtureId": "sig-403-cf-json",
+      "path": "/sig/403-cf-json",
+      "status": 403,
+      "contentType": "application/json",
+      "server": "cloudflare",
+      "expectHit": false,
+      "description": "JSON API error is NOT an antibot page (Content-Type gate)"
+    },
+    {
+      "fixtureId": "sig-200-cf-html",
+      "path": "/sig/200-cf-html",
+      "status": 200,
+      "contentType": "text/html",
+      "server": "cloudflare",
+      "expectHit": false,
+      "description": "success page from behind Cloudflare is NOT an antibot hit (status gate)"
+    },
+    {
+      "fixtureId": "sig-403-nginx-html",
+      "path": "/sig/403-nginx-html",
+      "status": 403,
+      "contentType": "text/html",
+      "server": "nginx",
+      "expectHit": false,
+      "description": "plain 403 from nginx is NOT an antibot hit (Server gate)"
+    },
+    {
+      "fixtureId": "sig-404-cf-html",
+      "path": "/sig/404-cf-html",
+      "status": 404,
+      "contentType": "text/html",
+      "server": "cloudflare",
+      "expectHit": false,
+      "description": "404 behind Cloudflare is NOT an antibot hit (status gate)"
+    },
+    {
+      "fixtureId": "sig-403-cf-noserver",
+      "path": "/sig/403-cf-noserver",
+      "status": 403,
+      "contentType": "text/html",
+      "server": "",
+      "expectHit": false,
+      "description": "missing Server header never hits (empty-substring safety)"
+    }
+  ]
+}

@@ -1,0 +1,309 @@
+{
+  "schema": "live-smoke-report/1",
+  "generatedAt": "2026-11-15T16:28:55.546Z",
+  "environment": "live",
+  "suite": "heterogeneous-v1",
+  "siteCount": 12,
+  "sites": [
+    {
+      "name": "MangaDex",
+      "category": "json-api",
+      "url": "https://mangadex.org/title/dc07afaa-643a-4bf4-a9d0-b21ecc101736",
+      "moduleId": "d07c9c2425764da8ba056505f57cf40c",
+      "moduleFile": "modules/MangaDex.lua",
+      "gated": false,
+      "note": "JSON API (api.mangadex.org); GetInfo extracts the title GUID from the URL"
+    },
+    {
+      "name": "MangaPlus",
+      "category": "protobuf",
+      "url": "https://mangaplus.shueisha.co.jp/titles/100020",
+      "moduleId": "f239e87c7a1248d29cdd2ea8a77df36c",
+      "moduleFile": "modules/MangaPlus.lua",
+      "gated": false,
+      "note": "pb.decode protobuf RPC (title_detailV3) via the D17 pb shim"
+    },
+    {
+      "name": "KlikManga",
+      "category": "madara-template",
+      "url": "https://klikmanga.com/manga/solo-leveling/",
+      "moduleId": "8949b01268974dd8a5798fec469deb65",
+      "moduleFile": "modules/KlikManga.lua",
+      "gated": false,
+      "note": "instantiates templates/Madara.lua"
+    },
+    {
+      "name": "AsuraScans",
+      "category": "madara-family",
+      "url": "https://asurascans.com/series/solo-leveling",
+      "moduleId": "7103ae6839ea46ec80cdfc2c4b37c803",
+      "moduleFile": "modules/AsuraScans.lua",
+      "gated": false,
+      "note": "Madara-family standalone module"
+    },
+    {
+      "name": "ManhwaIndo",
+      "category": "mangathemesia",
+      "url": "https://manhwaindo.id/manga/solo-leveling/",
+      "moduleId": "b09c78407f8046bf94cb587541d4cb45",
+      "moduleFile": "modules/ManhwaIndo.lua",
+      "gated": false,
+      "note": "MangaThemesia template (id_ID)"
+    },
+    {
+      "name": "EHentai",
+      "category": "account-gated",
+      "url": "https://e-hentai.org/g/4331313/9003413817/",
+      "moduleId": "2e4294a3de6282b55817e860f970783a",
+      "moduleFile": "modules/EHentai.lua",
+      "gated": true,
+      "note": "account/login module — credentials absent in the harness = expected-skip"
+    },
+    {
+      "name": "HitomiLa",
+      "category": "json-gallery",
+      "url": "https://hitomi.la/galleries/2764271.html",
+      "moduleId": "1972cec9c85b43f6b10b11920a7aafef",
+      "moduleFile": "modules/HitomiLa.lua",
+      "gated": false,
+      "note": "JS-backed gallery; GetInfo fetches the ltn JSON"
+    },
+    {
+      "name": "18Comic",
+      "category": "imagepuzzle",
+      "url": "https://18comic.vip/gallery/483553/",
+      "moduleId": "b8a5b7a71025420fa3718fd498977e3e",
+      "moduleFile": "modules/18Comic.lua",
+      "gated": false,
+      "note": "require fmd.imagepuzzle — exercises the shims-image-libs registration"
+    },
+    {
+      "name": "ComicK",
+      "category": "json-api",
+      "url": "https://comick.live/comic/solo-leveling",
+      "moduleId": "214e30f0afec420cafddefe22b4d973c",
+      "moduleFile": "modules/ComicK.lua",
+      "gated": false,
+      "note": "json() expressions over the comic API"
+    },
+    {
+      "name": "Tapas",
+      "category": "standalone-html",
+      "url": "https://tapas.io/series/cinderella-boy",
+      "moduleId": "9f2d722f3e90432ba913d5bdddc048b4",
+      "moduleFile": "modules/Tapas.lua",
+      "gated": false,
+      "note": "TotalDirectory standalone (JS-heavy landing pages)"
+    },
+    {
+      "name": "NineManga",
+      "category": "standalone-html",
+      "url": "https://www.ninemanga.com/manga/Solo%20Leveling.html",
+      "moduleId": "68c51e4148ee471fa221cd2d05cb216a",
+      "moduleFile": "modules/NineManga.lua",
+      "gated": false,
+      "note": "multi-language directory"
+    },
+    {
+      "name": "MangaKatana",
+      "category": "standalone-html",
+      "url": "https://mangakatana.com/manga/urasekai-picnic",
+      "moduleId": "29826228ef9e4d1bad17f4c22e8d9951",
+      "moduleFile": "modules/MangaKatana.lua",
+      "gated": false,
+      "note": "standalone aggregator"
+    }
+  ],
+  "results": [
+    {
+      "site": "MangaDex",
+      "category": "json-api",
+      "url": "https://mangadex.org/title/dc07afaa-643a-4bf4-a9d0-b21ecc101736",
+      "moduleFile": "modules/MangaDex.lua",
+      "moduleId": "d07c9c2425764da8ba056505f57cf40c",
+      "status": "pass",
+      "classification": "pass",
+      "resultCode": 0,
+      "latencyMs": 3254,
+      "durationMs": 3762,
+      "detail": "title=\"I Met the Male Lead in Prison\" chapters=0"
+    },
+    {
+      "site": "MangaPlus",
+      "category": "protobuf",
+      "url": "https://mangaplus.shueisha.co.jp/titles/100020",
+      "moduleFile": "modules/MangaPlus.lua",
+      "moduleId": "f239e87c7a1248d29cdd2ea8a77df36c",
+      "status": "fail",
+      "classification": "setup",
+      "resultCode": 0,
+      "latencyMs": 32,
+      "durationMs": 32,
+      "detail": "setup failed: Init pass produced no module descriptor"
+    },
+    {
+      "site": "KlikManga",
+      "category": "madara-template",
+      "url": "https://klikmanga.com/manga/solo-leveling/",
+      "moduleFile": "modules/KlikManga.lua",
+      "moduleId": "8949b01268974dd8a5798fec469deb65",
+      "status": "pass",
+      "classification": "pass",
+      "resultCode": 0,
+      "latencyMs": 668,
+      "durationMs": 685,
+      "detail": "title=\"Solo Leveling\" chapters=0"
+    },
+    {
+      "site": "AsuraScans",
+      "category": "madara-family",
+      "url": "https://asurascans.com/series/solo-leveling",
+      "moduleFile": "modules/AsuraScans.lua",
+      "moduleId": "7103ae6839ea46ec80cdfc2c4b37c803",
+      "status": "pass",
+      "classification": "pass",
+      "resultCode": 0,
+      "latencyMs": 1421,
+      "durationMs": 1438,
+      "detail": "title=\"Solo Leveling\" chapters=201"
+    },
+    {
+      "site": "ManhwaIndo",
+      "category": "mangathemesia",
+      "url": "https://manhwaindo.id/manga/solo-leveling/",
+      "moduleFile": "modules/ManhwaIndo.lua",
+      "moduleId": "b09c78407f8046bf94cb587541d4cb45",
+      "status": "pass",
+      "classification": "pass",
+      "resultCode": 0,
+      "latencyMs": 357,
+      "durationMs": 375,
+      "detail": "title=\"\" chapters=0"
+    },
+    {
+      "site": "EHentai",
+      "category": "account-gated",
+      "url": "https://e-hentai.org/g/4331313/9003413817/",
+      "moduleFile": "modules/EHentai.lua",
+      "moduleId": "2e4294a3de6282b55817e860f970783a",
+      "status": "pass",
+      "classification": "pass",
+      "resultCode": 0,
+      "latencyMs": 301,
+      "durationMs": 315,
+      "detail": "title=\"BunnyGirlGrey-Furry [AI Generated]\" chapters=1"
+    },
+    {
+      "site": "HitomiLa",
+      "category": "json-gallery",
+      "url": "https://hitomi.la/galleries/2764271.html",
+      "moduleFile": "modules/HitomiLa.lua",
+      "moduleId": "1972cec9c85b43f6b10b11920a7aafef",
+      "status": "pass",
+      "classification": "pass",
+      "resultCode": 0,
+      "latencyMs": 1427,
+      "durationMs": 1443,
+      "detail": "title=\"\" chapters=1"
+    },
+    {
+      "site": "18Comic",
+      "category": "imagepuzzle",
+      "url": "https://18comic.vip/gallery/483553/",
+      "moduleFile": "modules/18Comic.lua",
+      "moduleId": "b8a5b7a71025420fa3718fd498977e3e",
+      "status": "pass",
+      "classification": "pass",
+      "resultCode": 0,
+      "latencyMs": 111,
+      "durationMs": 130,
+      "detail": "title=\"\" chapters=1"
+    },
+    {
+      "site": "ComicK",
+      "category": "json-api",
+      "url": "https://comick.live/comic/solo-leveling",
+      "moduleFile": "modules/ComicK.lua",
+      "moduleId": "214e30f0afec420cafddefe22b4d973c",
+      "status": "pass",
+      "classification": "pass",
+      "resultCode": 0,
+      "latencyMs": 36066,
+      "durationMs": 36090,
+      "detail": "title=\"Solo Leveling\" chapters=1774"
+    },
+    {
+      "site": "Tapas",
+      "category": "standalone-html",
+      "url": "https://tapas.io/series/cinderella-boy",
+      "moduleFile": "modules/Tapas.lua",
+      "moduleId": "9f2d722f3e90432ba913d5bdddc048b4",
+      "status": "fail",
+      "classification": "http",
+      "resultCode": 1,
+      "latencyMs": 193,
+      "durationMs": 221,
+      "detail": "net status 1 (non-zero)"
+    },
+    {
+      "site": "NineManga",
+      "category": "standalone-html",
+      "url": "https://www.ninemanga.com/manga/Solo%20Leveling.html",
+      "moduleFile": "modules/NineManga.lua",
+      "moduleId": "68c51e4148ee471fa221cd2d05cb216a",
+      "status": "pass",
+      "classification": "pass",
+      "resultCode": 0,
+      "latencyMs": 106,
+      "durationMs": 131,
+      "detail": "title=\"\" chapters=0"
+    },
+    {
+      "site": "MangaKatana",
+      "category": "standalone-html",
+      "url": "https://mangakatana.com/manga/urasekai-picnic",
+      "moduleFile": "modules/MangaKatana.lua",
+      "moduleId": "29826228ef9e4d1bad17f4c22e8d9951",
+      "status": "pass",
+      "classification": "pass",
+      "resultCode": 0,
+      "latencyMs": 888,
+      "durationMs": 905,
+      "detail": "title=\"\" chapters=0"
+    }
+  ],
+  "totals": {
+    "pass": 10,
+    "fail": 2,
+    "skip": 0
+  },
+  "passRate": 0.8333333333333334,
+  "d18": {
+    "observations": 50,
+    "findings": [],
+    "affectedModules": 0,
+    "flipRule": ">=2 modules with d18-hit findings within one week -> enable the zstd decoder and add zstd to Accept-Encoding (docs/runbook.md, D18 flip procedure)"
+  },
+  "requestLog": {
+    "count": 50,
+    "fixedUa": "fmd-web-live-smoke/1.0 (opt-in nightly suite; DESIGN.md §13.2; not a browser)",
+    "minGapMsPerHost": 1000,
+    "perHostRequests": {
+      "api.mangadex.org": 3,
+      "klikmanga.com": 1,
+      "klikmanga.org": 1,
+      "ajax": 1,
+      "api.asurascans.com": 2,
+      "manhwaindo.id": 1,
+      "manhwaindo.io": 1,
+      "e-hentai.org": 1,
+      "ltn.gold-usergeneratedcontent.net": 2,
+      "18comic.vip": 1,
+      "comick.live": 33,
+      "tapas.io": 1,
+      "www.ninemanga.com": 1,
+      "mangakatana.com": 1
+    },
+    "violations": []
+  }
+}

@@ -766,49 +766,55 @@ export function aesDecryptGCM(v: string, key: string, iv: string, aad: string): 
 // ─── EncryptString / DecryptString (uBaseUnit.pas:1556–1589) ─────────────────
 
 /**
- * uBaseUnit EncryptString/DecryptString: TDCP_rijndael.InitStr(EncryptKey,
- * TDCP_sha512) → AES-256 key = SHA512('B74945FB50E84FD58BF9FEAB8E4BEA6B')
- * [first 32 bytes]; Init(…, nil) seeds the DCP default IV = E_K(zero block)
- * (DCPblockciphers.pas:479–491); TDCP_blockcipher.EncryptString = CFB8bit +
- * base64 (DCPcrypt2.pas — the canonical 2.0.4 override). Deterministic.
+ * DCP blockcipher EncryptString/DecryptString composition
+ * (uBaseUnit.pas:1556–1589 uses it with the FMD2 hardcoded key — see
+ * `server/src/tools/import/fmd2-crypto.ts`, the ONLY holder of that key
+ * literal; everything else passes an explicit key). TDCP_rijndael
+ * .InitStr(key, TDCP_sha512) → AES-256 key = SHA512(key)[first 32 bytes]
+ * (DCP InitStr → min(512, 256) bits); Init(…, nil) seeds the DCP default
+ * IV = E_K(zero block) (DCPblockciphers.pas:479–491);
+ * TDCP_blockcipher.EncryptString = CFB8bit + base64 (canonical DCPcrypt2
+ * 2.0.4). Deterministic. The migration module owns the FMD2 constant —
+ * this composition is generic.
  */
-const ENCRYPT_KEY = 'B74945FB50E84FD58BF9FEAB8E4BEA6B';
+const CFB8_KEY_BYTES = 32;
 
-let encryptStringKey: Buffer | null = null;
-let encryptStringIv: Buffer | null = null;
+const cfb8Params = new Map<string, { key: Buffer; iv: Buffer }>();
 
-function encryptStringParams(): { key: Buffer; iv: Buffer } {
-  if (encryptStringKey === null || encryptStringIv === null) {
-    encryptStringKey = createHash('sha512').update(ENCRYPT_KEY, 'latin1').digest().subarray(0, 32);
-    const ecb = createCipheriv('aes-256-ecb', encryptStringKey, null);
+function cfb8ParamsFor(key: string): { key: Buffer; iv: Buffer } {
+  let params = cfb8Params.get(key);
+  if (params === undefined) {
+    const derived = createHash('sha512').update(key, 'latin1').digest().subarray(0, CFB8_KEY_BYTES);
+    const ecb = createCipheriv('aes-256-ecb', derived, null);
     ecb.setAutoPadding(false);
-    encryptStringIv = ecb.update(Buffer.alloc(16));
+    params = { key: derived, iv: ecb.update(Buffer.alloc(16)) };
+    cfb8Params.set(key, params);
   }
-  return { key: encryptStringKey, iv: encryptStringIv };
+  return params;
 }
 
-/** uBaseUnit.EncryptString (uBaseUnit.pas:1559–1573): '' for '' input. */
-export function encryptString(v: string): string {
+/** DCP EncryptString with an explicit key ('' for '' input). */
+export function encryptString(v: string, key: string): string {
   if (v === '') {
     return '';
   }
-  const { key, iv } = encryptStringParams();
-  const e = createCipheriv('aes-256-cfb8', key, iv);
+  const params = cfb8ParamsFor(key);
+  const e = createCipheriv('aes-256-cfb8', params.key, params.iv);
   return Buffer.concat([e.update(b(v)), e.final()]).toString('base64');
 }
 
-/** uBaseUnit.DecryptString (uBaseUnit.pas:1575–1589). */
-export function decryptString(v: string): string {
+/** DCP DecryptString with an explicit key ('' for '' input). */
+export function decryptString(v: string, key: string): string {
   if (v === '') {
     return '';
   }
   try {
-    const { key, iv } = encryptStringParams();
+    const params = cfb8ParamsFor(key);
     const data = Buffer.from(v.replace(/=/g, ''), 'base64');
     if (data.length === 0) {
       return '';
     }
-    const d = createDecipheriv('aes-256-cfb8', key, iv);
+    const d = createDecipheriv('aes-256-cfb8', params.key, params.iv);
     return s(Buffer.concat([d.update(data), d.final()]));
   } catch {
     return '';
@@ -1184,7 +1190,16 @@ export function p256GenerateKeyPair(): [string, string] | false {
   try {
     const ecdh = createECDH('prime256v1');
     ecdh.generateKeys();
-    const priv = ecdh.getPrivateKey();
+    // node's getPrivateKey() returns the MINIMAL BIGNUM encoding: a scalar
+    // with a leading zero byte comes back as 31 bytes (~1/256 of keys),
+    // which would spuriously fail the 32-byte raw contract — and make the
+    // guard non-deterministic across runs. Left-pad (value-preserving
+    // big-endian) to the Pascal raw 32-byte width; ECDH and the SEC1/SPKI
+    // DER wrappers see the same scalar either way.
+    const privRaw = ecdh.getPrivateKey();
+    const priv = privRaw.length <= 32
+      ? Buffer.concat([Buffer.alloc(32 - privRaw.length), privRaw])
+      : privRaw;
     const pub = ecdh.getPublicKey();
     if (priv.length === 32 && pub.length === 65) {
       return [s(priv), s(pub)];

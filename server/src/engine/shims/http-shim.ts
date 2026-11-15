@@ -15,6 +15,7 @@ import {  getProxy as proxyTupleFromConfig,
   type ProxyConfig,
   type ProxySelection,
 } from './http-proxy.js';
+import type { RawProxy } from './http-transport.js';
 import {
   RecordedHttpTransport,
   type HttpTransportPort,
@@ -186,6 +187,13 @@ export interface HttpShimOptions {
   readonly transport?: HttpTransportPort;
   /** Filesystem jail root for Document LoadFromFile/SaveToFile (§5.4). */
   readonly fsJail?: string;
+  /**
+   * Settings-provided default proxy (global or per-module effective
+   * config, §9/§10 settings): the shim STARTS with this config — exact
+   * SetProxy field semantics (HTTP|SOCKS4|SOCKS5; unknown types clear).
+   * A module's own SetProxy call overrides it from that point on.
+   */
+  readonly initialProxy?: ProxyConfig;
 }
 
 export interface HttpShimHandle {
@@ -237,17 +245,40 @@ export function makeHttpShim(bridge: FacadeBridge, options: HttpShimOptions): Ht
     new RecordedHttpTransport((m, u, b, mt, h) => options.resolver.resolve(m, u, b, mt, h));
 
   let terminatedExternal = false;
+  let proxyConfig: ProxyConfig = normalizeProxyConfig('', '', '', '', '');
+  if (options.initialProxy !== undefined) {
+    proxyConfig = normalizeProxyConfig(
+      options.initialProxy.type,
+      options.initialProxy.host,
+      options.initialProxy.port,
+      options.initialProxy.user,
+      options.initialProxy.pass,
+    );
+  }
+  let proxySelection: ProxySelection = describeProxySelection(proxyConfig);
+  /** The hop-level proxy descriptor (undefined = direct request). */
+  const proxyProvider = (): RawProxy | undefined => {
+    if (proxyConfig.type === '' || proxyConfig.host === '') {
+      return undefined;
+    }
+    return {
+      type: proxyConfig.type === 'HTTP' ? 'HTTP' : proxyConfig.type === 'SOCKS4' ? 'SOCKS4' : 'SOCKS5',
+      host: proxyConfig.host,
+      port: proxyConfig.port,
+      user: proxyConfig.user,
+      pass: proxyConfig.pass,
+    };
+  };
+
   const pipeline = new HttpPipeline({
     transport,
     egress,
     cookies,
     ...(options.gate !== undefined ? { gate: options.gate } : {}),
     isTerminated: () => abort.terminated || terminatedExternal,
+    proxyProvider,
   });
   const { document, headers } = pipeline;
-
-  let proxyConfig: ProxyConfig = normalizeProxyConfig('', '', '', '', '');
-  let proxySelection: ProxySelection = describeProxySelection(proxyConfig);
 
   const methods: Record<string, (...args: unknown[]) => unknown> = {
     Request: (m: unknown, url: unknown) => pipeline.request(toStr(m), toStr(url)),

@@ -182,12 +182,20 @@ export class LiveResponseResolver extends RecordedResponseResolver {
       return { status: 0, statusText: '', headers: new Headers(), body: '' };
     }
     let headerRaw = '';
-    let bodyText = '';
     try {
       headerRaw = readFileSync(headerFile, 'utf8');
-      bodyText = readFileSync(bodyFile, 'utf8');
     } catch {
       return { status: 0, statusText: '', headers: new Headers(), body: '' };
+    }
+    // Body may be absent when curl died mid-decode (error 61: claimed
+    // Content-Encoding it cannot decode — the D18 signature path): the
+    // HEADERS still arrived and carry the claimed encoding, so they are
+    // salvaged for the D18 inspector instead of discarding the evidence.
+    let bodyText = '';
+    try {
+      bodyText = readFileSync(bodyFile, 'utf8');
+    } catch {
+      bodyText = '';
     }
     const parsed = parseHeaderDump(headerRaw);
     return {

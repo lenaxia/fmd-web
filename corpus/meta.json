@@ -27,6 +27,12 @@
     "subject": "KomikStation: Change domain (#3364)",
     "note": "semantics source: baseunits/uData.pas:85-207, baseunits/XQueryEngineHTML.pas, baseunits/uBaseUnit.pas, baseunits/httpsendthread.pas:152-271; FMD2 declares the internettools submodule (3rd/internettools) without a committed gitlink, so the harness pins upstream internettools itself"
   },
+  "antibotFixtures": {
+    "$comment": "DESIGN.md §12 Phase-0 bypass fixtures (§5.9, §13.1): deterministic OFFLINE mock-server signatures + challenge pages for the antibot interceptor pipeline test — the live-capture alternative was rejected (fragile, ToS-adjacent). Manifest + constants: corpus/fixtures/antibot/manifest.json; consumer: server/test/engine/state/antibot.pipeline.integration.test.ts; evidence: docs/evidence-antibot-integration.md.",
+    "source": "synthetic-offline",
+    "manifest": "corpus/fixtures/antibot/manifest.json",
+    "entries": 6
+  },
   "harness": {
     "source": "corpus/harness/fmd_capture.pas",
     "units": ["fmdstrings.pas", "fmdnormalize.pas", "fmdselftest.pas"],

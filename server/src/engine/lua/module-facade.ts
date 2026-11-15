@@ -321,7 +321,13 @@ export class ModuleBacking {
    */
   static fromDescriptor(
     descriptor: LuaModuleDescriptor,
-    account?: { readonly enabled: boolean; readonly username: string; readonly password: string },
+    account?: {
+      readonly enabled: boolean;
+      readonly username: string;
+      readonly password: string;
+      readonly cookies?: string;
+      readonly status?: number;
+    },
     storage?: StorageStrings,
   ): ModuleBacking {
     const backing = new ModuleBacking(storage);
@@ -335,6 +341,12 @@ export class ModuleBacking {
       backing.accountEnabled = account.enabled;
       backing.accountUsername = account.username;
       backing.accountPassword = account.password;
+      // Prior-session state (FMD2 loads Account.Cookies/Status from
+      // modules.json; asChecking does not survive a reload — FMD2 resets
+      // it to asUnknown after LoadFromFile, WebsiteModules.pas:611-613).
+      const seededStatus = account.status ?? 0;
+      backing.accountStatus = (seededStatus === 1 ? 0 : seededStatus) as typeof backing.accountStatus;
+      backing.accountCookies = account.cookies ?? '';
     }
     for (const option of descriptor.options) {
       backing.options.set(option.name, {

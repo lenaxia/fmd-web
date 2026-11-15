@@ -1,0 +1,49 @@
+{
+  "site": "MangaGo",
+  "moduleId": "77c3c3cd38444bd7bb4e5f63f2c5c93c",
+  "horBlock": 4,
+  "verBlock": 4,
+  "multiply": 1,
+  "matrix": [
+    12,
+    7,
+    3,
+    14,
+    0,
+    9,
+    5,
+    10,
+    15,
+    2,
+    8,
+    1,
+    13,
+    6,
+    11,
+    4
+  ],
+  "flips": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "image": {
+    "width": 800,
+    "height": 1200
+  },
+  "expectedSha_note": "expected.png = the clean page; the shim descramble must equal it pixel-for-pixel",
+  "provenance": "SYNTHESIZED (offline workspace; see docs/evidence-shims-image.md). The scrambled page applies the MangaGo scramble convention (scrambled block i = clean block key[i], MangaGo.lua:254-262 Matrix contract) with a fixed 16-entry key in the real desckey format. expected.png = the clean source — the descramble oracle. A live-site capture (FMD2-descrambled JPEG pair) was IMPOSSIBLE here: no network (DESIGN §13) and no FPC toolchain to run the Pascal oracle."
+}

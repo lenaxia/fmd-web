@@ -4,7 +4,7 @@ import { massageUrl, resolveRedirectLocation } from './http-url.js';
 import { CookieStore } from './http-cookies.js';
 import type { EgressPolicy } from './http-egress.js';
 import type { HostGatePort } from './http-hostgate.js';
-import type { HttpTransportPort, RawHttpRequest } from './http-transport.js';
+import type { HttpTransportPort, RawHttpRequest, RawProxy } from './http-transport.js';
 
 /**
  * The §5.4 request pipeline: a faithful port of
@@ -82,6 +82,12 @@ export interface HttpPipelineOptions {
   readonly gate?: HostGatePort | undefined;
   /** The abort handle read (Terminated semantics). */
   readonly isTerminated: () => boolean;
+  /**
+   * Active proxy per hop (SetProxy semantics, httpsendthread.pas:838-874):
+   * consulted on EVERY send (redirect targets too) so a SetProxy call
+   * mid-run takes effect from the next hop on. Undefined/empty → direct.
+   */
+  readonly proxyProvider?: () => RawProxy | undefined;
 }
 
 interface HopResult {
@@ -113,6 +119,7 @@ export class HttpPipeline {
   private readonly cookies: CookieStore;
   private readonly gate: HostGatePort | undefined;
   private readonly isTerminated: () => boolean;
+  private readonly proxyProvider: (() => RawProxy | undefined) | undefined;
 
   constructor(options: HttpPipelineOptions) {
     this.transport = options.transport;
@@ -120,6 +127,7 @@ export class HttpPipeline {
     this.cookies = options.cookies;
     this.gate = options.gate;
     this.isTerminated = options.isTerminated;
+    this.proxyProvider = options.proxyProvider;
     // constructor parity: THTTPSendThread.Create runs Reset (:548)
     composeReset(this.headers, this.compress);
   }
@@ -333,12 +341,14 @@ export class HttpPipeline {
         }
       }
 
+      const proxy = this.proxyProvider?.();
       const raw: RawHttpRequest = {
         method,
         url,
         headers: requestHeaders,
         body,
         timeoutMs: this.timeout,
+        ...(proxy !== undefined ? { proxy } : {}),
       };
       const result = this.transport.send(raw);
       if (!result.ok) {

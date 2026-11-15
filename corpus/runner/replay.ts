@@ -1,3 +1,5 @@
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type {
   ModuleId,
   NormalizationEngine,
@@ -79,6 +81,22 @@ export interface CorpusReport {
   readonly modules: readonly CorpusModuleResult[];
   /** Normalization cases, sorted by fixtureId. */
   readonly normalizations: readonly NormalizationCaseResult[];
+}
+
+/**
+ * Deterministic serialization of a replay report (per-module and
+ * per-expression pass rates) — the machine artifact the corpus gate
+ * commits as docs/corpus-report.json. Byte-stable by construction: the
+ * report is sorted/timestamp-free, the indent is fixed, and engine
+ * error values (which may embed stack traces carrying absolute
+ * checkout paths) are stripped of the repo root, so the exact same
+ * bytes are produced from any checkout location. The golden test
+ * (corpus-live.test.ts) pins the committed bytes.
+ */
+export function serializeCorpusReport(report: CorpusReport): string {
+  const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  const json = JSON.stringify(report, null, 2);
+  return `${json.split(`${repoRoot}/`).join('')}\n`;
 }
 
 /** FNV-1a 32-bit — collision-averse parse-cache keying. */

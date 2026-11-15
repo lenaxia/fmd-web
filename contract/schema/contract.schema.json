@@ -251,7 +251,7 @@
           "require": { "type": "string", "minLength": 1 },
           "fmd2Unit": { "type": "string", "minLength": 1 },
           "implementation": { "type": "string", "minLength": 1 },
-          "status": { "type": "string", "enum": ["planned", "partial", "stub"] }
+          "status": { "type": "string", "enum": ["planned", "partial", "stub", "implemented"] }
         }
       }
     },

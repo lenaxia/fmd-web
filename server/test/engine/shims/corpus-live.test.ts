@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { buildFullCorpus } from '@fmd/corpus/corpus-loader';
-import { runCorpus } from '@fmd/corpus';
+import { runCorpus, serializeCorpusReport } from '@fmd/corpus';
 import type { NormalizationEngine } from '@fmd/contract';
 import { normalizeMangaInfo } from '../../../src/engine/normalize/udata.js';
 import { FontoXPathQueryEngine } from '../../../src/engine/shims/txquery-shim.js';
@@ -59,13 +59,28 @@ describe('live corpus replay (§13.1 FontoXPath engine vs FPC oracle)', () => {
   });
 
   it('matches the committed golden report (expected vs actual evidence)', () => {
-    const actual = `${JSON.stringify(report, null, 2)}\n`;
+    const actual = serializeCorpusReport(report);
     if (process.env['UPDATE_GOLDEN'] === '1') {
       mkdirSync(dirname(GOLDEN_PATH), { recursive: true });
       writeFileSync(GOLDEN_PATH, actual);
       return;
     }
     const expected = readFileSync(GOLDEN_PATH, 'utf8');
+    expect(actual).toBe(expected);
+  });
+
+  it('docs/corpus-report.json is byte-stable on replay (committed gate artifact)', () => {
+    const actual = serializeCorpusReport(report);
+    const reportPath = join(ROOT, 'docs', 'corpus-report.json');
+    if (process.env['UPDATE_GOLDEN'] === '1') {
+      mkdirSync(dirname(reportPath), { recursive: true });
+      writeFileSync(reportPath, actual);
+      return;
+    }
+    // Same bytes the corpus gate writes (serializeCorpusReport), pinned
+    // against the committed artifact — a replay that would drift the
+    // committed report fails here, before ci.sh's staleness diff.
+    const expected = readFileSync(reportPath, 'utf8');
     expect(actual).toBe(expected);
   });
 });

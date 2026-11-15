@@ -7,6 +7,10 @@ import { defineConfig } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './e2e',
+  // The compose/process stack scenario lives in its own specs driven by
+  // scripts/e2e.sh (web/playwright.compose.config.ts) — this config is
+  // the smoke run only (vite dev server + intercepted mock API).
+  testMatch: /smoke\.spec\.ts/,
   timeout: 20_000,
   fullyParallel: false,
   reporter: [['list']],

@@ -72,6 +72,7 @@ unchanged** — one ecosystem, one module set, no fork of site adapters.
 | Packing | in-memory libraries only | streaming/append strategy + budgets (§7.3, D16) |
 | Idempotency | `409 on replay` | replay returns original job; 409 = key reuse w/ different payload |
 | SQLite | write coalescing only | per-thread connections, claim discipline, checkpoint sizing (§4) |
+| Release 0.1.0 (v5) | — | full-gate release: ci.sh gate extended with both e2e phases (compose hardening asserted per run: non-root, digest pins, healthcheck, SIGTERM drain drill ≤30 s + clean exit 0); decision status table (D1–D21) published in `docs/RELEASE-NOTES.md` — 20 implemented, 1 deviated (D15 scope-out); known-broken list (83 modules / 3 flags) published in-app + release notes; COMPAT.md binding statuses carry zero `unknown`; version 0.1.0 stamped across packages, image label/tag, and `CHANGELOG.md` |
 
 ---
 
@@ -669,7 +670,9 @@ GET   /api/jobs?state=&cursor=
 WS    /ws          reconnect: client sends lastEventId → server backfills
                    missed events (ring buffer: last 1000 events per job,
                    max age 15 min — older replays get a "resync" hint),
-                   then streams live
+                   then streams live; a hello without a cursor gets the
+                   full buffered tail; slow consumers get drop-oldest +
+                   a contiguous "gap" marker (D21) instead of silent loss
 GET   /healthz /readyz
 
 First-run bootstrap: on startup with an empty data dir, module sync and
@@ -775,7 +778,7 @@ fmd-web/
 | D2 | Anti-bot: sidecar vs stub | stub default + known-broken flags; opt-in `browser` profile; global antibot serialization preserved |
 | D3 | v1-broken sites acceptable | yes, published via capability flags; ≥95 % register + corpus-pass target |
 | D4 | Desktop data compatibility | one-shot import commands (modules.json, downloadedchapters.db, EncryptString format for migration only); native storage uses deployment secret |
-| D5 | Filename/path semantics on Linux | **deliberate Windows-desktop parity** (tail-truncation, `CurrentMaxFileNameLength`; 0 = no limit); `--normalize-paths` opt-out |
+| D5 | Filename/path semantics on Linux | **deliberate Windows-desktop parity** (tail-truncation, `CurrentMaxFileNameLength`; 0 = no limit); `--normalize-paths` opt-out — **implemented**: `FMD_NORMALIZE_PATHS=1` / CLI `--normalize-paths` switches to sanitized Linux-normalized paths (same sanitization, control units C0+DEL deleted, NO tail truncation) via the single `applyFileNamePolicy` choke point in `@fmd/contract` both filename resolvers share; flag unset = byte-identical goldens |
 | D6 | Wasmoon OOM policy | engine quarantine + rebuild; job retried once; then `engine_oom` |
 | D7 | Catalog write policy | read-only ATTACH; FTS sidecar keyed by `db_sha`, double-buffered |
 | D8 | Favorites trigger semantics | **`uFavoritesManager.TFavoriteThread.DoCheck` parity** (not `uUpdateThread`): live GetInfo + immediate `CurrentChapter`/`Status` update + case-insensitive IndexOf set-difference + dual-write merge (§7.2) |
@@ -790,7 +793,8 @@ fmd-web/
 | D17 | `pb` (lua-protobuf) — Round-3 M1 | **protobufjs-backed `package.preload['pb']` shim** (`decode`/`encode`/`load`) — covers MangaPlus and `utils/protoc.lua`'s `has_pb` branch; on the §8 require allowlist; MangaPlus in Phase-0 seed |
 | D18 | zstd add-on trigger | concrete: nightly live-smoke auto-detects undecoded bodies (content-type/body mismatch); **≥2 affected modules in one week** flips the decoder on and `Accept-Encoding` gains zstd |
 | D19 | WS backfill bound | ring buffer: last 1000 events per job, 15 min max age; older → "resync" hint (§10) |
-| D20 | First-run bootstrap | auto-trigger module+catalog sync on empty data dir (default; disable via env); explicit empty-state UI |
+| D20 | First-run bootstrap | auto-trigger module+catalog sync on empty data dir (default; disable via env — **implemented**: `FMD_BOOTSTRAP_DISABLE=1` short-circuits the first-run sync entirely — zero sync jobs enqueued, zero upstream traffic, `/readyz` stays green with the lua-tree readiness check dropped); explicit empty-state UI |
+| D21 | WS slow consumers | per-subscriber bounded outbound queue; overflow → **drop-oldest + one contiguous `gap` marker** (client refetches and resets its cursor — same obligation as `resync`); the hello/replay step enqueues unbounded (ring-capped), so a backfill is never truncated by the connection's own queue; pump gate = `socket.bufferedAmount` soft cap, overridable per deployment (`canSend`) since kernels absorb writes for paused readers; dropped `resync` hints are re-emitted at the tail |
 
 ---
 

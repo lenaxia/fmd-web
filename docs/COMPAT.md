@@ -14,20 +14,21 @@ and the ≥50-module seed corpus (67 captured modules).
 | LuaBase.pas | Init globals (`print`, `sleep`, `Trim`, …) | implemented | §5.1 Init globals (print, sleep, Trim, MaybeFillHost, MangaInfoStatusIfPos, GetBetween, SeparateLeft/Right) |
 | LuaWebsiteModules.pas | module surface + 15 event dispatchers | implemented | §5.1–5.2 module surface + generated §5.2 dispatchers (contract.json as data) |
 | LuaWebsiteModuleHandler.pas | chunk re-exec on module switch | implemented | §5.3/§5.12 chunk re-exec on module switch |
+| LuaWebsiteBypass.pas + checkantibot.lua | antibot interceptor + websitebypass (OnHTTPRequest hook) | implemented | §5.9 host-level antibot interceptor: checkAntiBot heuristic (checkantibot.lua:5-12) + AntiBotInterceptor (global check serialization :94-115, per-module single-flight fallthrough :161/197-200, cookie clear-then-persist :177/:182-183, reload re-issue :184-188, AllowServerErrorResponse forced :156) — unit-tested (server/test/engine/state/antibot.test.ts) AND integration-tested offline (server/test/engine/state/antibot.pipeline.integration.test.ts): the REAL FMD2 bypass scripts (checkantibot.lua + websitebypass.lua → cloudflare.lua, require chain incl. fmd.duktape ExecJS + fmd.crypto.EncodeURLElement + utils.json) run in a real wasmoon engine against the corpus/fixtures/antibot mock server — signature matrix, IUAM challenge (answer validated → duktape shim exercised), FlareSolverr reload flow (Storage[reload]=true → re-issue), and ≥8-worker single-flight concurrency (exactly one bypass, losers not delayed); evidence: docs/evidence-antibot-integration.md. |
 | LuaHTTPSend.pas / httpsendthread.pas | `HTTP` shim | implemented | full §5.4 surface (tsk-native-trinket-stencils, mock-server verified): undici-envelope resolver + Document stream facade (ToString/WriteString/Clear/Size, success⇔Size>0), ResultCode/ResultString/LastURL, case-insensitive Headers/Cookies Values + cookie jar from Set-Cookie, GET/POST/XHR (+POST MimeType move + text/html→urlencoded rewrite), Terminated, Reset/ResetBasic/AcceptImage default sets (D13 zstd omit), URL massaging + SplitURL + redirect Location merge, redirect-follow (301/302/303/307 AS GET, Referer, MaxRedirect 5) + retry >500 bounded RetryCount + abort fail-fast, SetProxy HTTP|SOCKS4|SOCKS5, per-host connection gate (limits/delays), egress policy (RFC1918/link-local denied by default, allow-list override). Transport backends: recorded (offline) + loopback (integration/live smoke); the production non-loopback transport lands with the Phase-2 server runtime. |
 | LuaStrings.pas | TStrings facade | implemented | §5.5 full facade surface |
 | LuaXQuery.pas / LuaIXQValue.pas | CreateTXQuery + IXQValue | implemented | §5.6 full surface (oracle-verified: 100% of the seed expression corpus) — FontoXPath 3.1 + linkedom behind the InternetTools dialect transform: json()/parse-json() NODE TREES (objects → key elements, arrays → item elements, typed scalar leaves), .step shorthand, chained name()() member steps, ?map lookups, css(), fmd:not (JSONiq EBV), fmd:string/fmd:string-join (XQGlobalTrimNodes), repairing-parser preprocessing (CRLF→LF, adjacent-text merge, comment/PI drop, post-</body> text skip, bare-payload scaffold, literal CR normalization), list-fill overloads (XPathStringAll(expr[,node,]list), XPathHREFAll/XPathHREFTitleAll → TStrings mutation, order preserved), ParseHTML 1-arg reparse, swallow-to-empty + per-(module,expression) WARN dedupe. |
 | LuaCrypto.pas | fmd.crypto | implemented | §5.7 full surface (LuaCrypto.pas:429–494): node:crypto + sodium-native + pure-JS RC4/MD4; vectors in server/test/engine/shims/crypto-*.test.ts — details below |
 | LuaDuktape.pas | fmd.duktape ExecJS + JS require | implemented | v0: node:vm (5 s timeout), one heap per ExecJS (duk_peval semantics: completion value, JSON text for object/array results), Duktape.enc/dec polyfill, CommonJS require (module/exports, cached, jailed to the synced lua tree), error⇒nil, print→host log. |
-| LuaGZip.pas | fmd.gzip Inflate | deferred | single Inflate method — cost: 1/418 tree modules requires it, 0/67 seed modules. |
+| LuaGZip.pas | fmd.gzip Inflate | implemented | one method Inflate (LuaGZip.pas:47-50 + GZIPUtils.pas unzipStream): gzip/zlib/raw-deflate auto-detect, checksum-verified (CRC32/ISIZE, Adler-32), failure → nil with the Pascal’s log line, never raises (gzip-shim.ts). |
 | LuaFileUtil.pas | fmd.fileutil | partial (gap: SerializeAndMaintainNames) | implemented: ExtractFileName/ExtractFileNameOnly; GAP: SerializeAndMaintainNames (1/418 tree modules, 0 seed modules call it). |
-| LuaImagePuzzle.pas | fmd.imagepuzzle | deferred | sharp port — cost: 7/418 tree modules require it, 2/67 seed modules (18Comic, MangaGo). |
-| LuaPCRE2.pas | fmd.pcre2 | deferred | PCRE2 wasm/RE2 — cost: 0/418 tree modules require it (no seed consumer). |
+| LuaImagePuzzle.pas | fmd.imagepuzzle | implemented | raw-pixel port (imagepuzzle-core.ts, line-by-line ImagePuzzle.pas:136-305 port + imagepuzzle-shim.ts package-preload): New/Create(w,h), HorBlock/VerBlock, Matrix[]/Flips[]/Multiply, DeScramble(src,dst) incl. in-place — cost note retired: 7/418 tree modules require it, 2/67 seed modules (18Comic, MangaGo). |
+| LuaPCRE2.pas | fmd.pcre2 | implemented | API-faithful TLuaPCRE2Engine facade: exec/find/match/gmatch/gsub (LuaPCRE2.pas:237-245), PCRE2_UTF always on, V8 RegExp backend — pcre2-shim.ts; expressibility ledger in the fmd.pcre2 compatibility notes below. |
 | LuaStringsStorage.pas | MODULE.Storage | implemented | §5.1/§5.3 MODULE.Storage via the shared state service |
-| lua-protobuf (`pb.dll`) | `pb` preload shim | implemented | v0: protobufjs-backed package.preload["pb"] — load (raw .proto text + serialized FileDescriptorSet, (ret, pos) binding), decode (proto3 defaults, proto name casing), encode. |
+| lua-protobuf (`pb.dll`) | `pb` preload shim | implemented | protobufjs-backed package.preload["pb"] behind a byte-exact base64 Lua bridge (wasmoon marshals Lua strings as UTF-8 with NUL truncation — lossy for descriptor wire bytes; see the byte-strings note below). load = the lua-protobuf two-value contract: (ret, pos) = (boolean, integer) per the README pb-module table and pb.c Lpb_load — ALWAYS two values, 1-based pb_pos+1 (success = byte length+1; failure ret=false, not nil, pos = the parse-stop offset that protoc.lua:1178 concatenates). Serialized-FileDescriptorSet input only (native parity — protoc.lua is the text→descriptor compiler; no raw .proto-text path); google.protobuf descriptors preloaded eagerly (Parser.reload parity, protoc.lua:1143-1145/1188) so protoc:compile’s pb.encode('.google.protobuf.FileDescriptorSet’, …) works. decode: proto3 defaults + enum-as-name (lua-protobuf enum_as_name default; MangaPlus.lua:129 GetLang), absent message fields → nil. Verified end-to-end by server/test/engine/shims/pb-protoc.integration.test.ts: the real utils/protoc.lua has_pb branch + Parser.reload through the shim, protoc:load(MangaPlus.proto) binding (ret, pos), golden recorded-Response replay (evidence: docs/evidence-pb-fidelity.md). |
 | LuaFMD.pas | `fmd.env` host lib | implemented | v0: ExeName/Version/Revision/LuaDirectory/SelectedLanguage/Directory. |
-| LuaLogger.pas | `fmd.logger` structured logging | partial (gap: LuaLogger API) | implemented: structured host logger (print routing); GAP: LuaLogger API (1/418 tree modules use fmd.logger). |
-| LuaMangaFox.pas | `fmd.mangafoxwatermark` | deferred | sharp port + PNG assets (cost: 1/418 tree module requires it, 0 seed modules). |
+| LuaLogger.pas | `fmd.logger` structured logging | implemented | complete LuaLogger surface (LuaLogger.pas:33-45): Send/SendWarning/SendError routed to the module-correlated structured host logger with luaToString argument parity (logger-shim.ts). |
+| LuaMangaFox.pas | `fmd.mangafoxwatermark` | implemented | raw-pixel port of MangaFoxWatermark.pas (mangafoxwatermark-core.ts + -shim.ts host-lib): Otsu/PSNR matcher, white-border check, crop+rewrite; the REAL PNG template assets ship into the synced-tree layout (corpus/fixtures/lua/extras/mangafoxtemplate); Windows backslash path translation (FanFox.lua:36); FanFox.lua OnAfterImageSaved flow verified offline (evidence: docs/evidence-shims-image.md). |
 | LuaMangaInfo.pas | `MANGAINFO` facade | implemented | §5.2 field surface + unknown-key tolerance (facades story). |
 | lua/utils/ + lua/templates/ | `utils.*` / `templates.*` file packages | implemented | file-package loader from the synced lua tree (dots→slashes, package.loaded caching); utils.nodejs §5.11 sidecar pending. |
 | LuaSubprocess.pas | subprocess | deferred | denied stub unless the browser profile (§5.10–5.11) — cost: 0/418 tree modules require it. |
@@ -178,6 +179,12 @@ returns exactly (string / integer for CRC16/CRC32/tags / nil via sentinel
 for InitPull failure / **zero returns** for P256_GenerateKeyPair and
 SecretStream_Pull failure — Pascal `Result := 0` / multi-returns).
 
+The `pb` shim uses the same bridge protocol for descriptor/message wire
+bytes (`pb-shim.ts` `PB_LUA_GLUE`): `pb.load`/`pb.decode` args and
+`pb.encode` results are base64-enveloped Lua-side; `pb.load`'s
+two-value `(ret, pos)` return crosses as a real Lua multi-return
+(`pb-protoc.integration.test.ts`).
+
 **SecretStream state token (documented deviation).** The Pascal carries the
 64-byte raw `TSecretStreamState` (k 32 + nonce 12 + pad 20) through Lua as a
 binary string; the JS shim
@@ -280,3 +287,103 @@ for the local mock-server integration tests).
   preserved at the facade level, but `connection`/`transfer-encoding`/
   `content-length`/`host` etc. are sanitized by the loopback transport
   (node:http request validation rejects `Transfer-Encoding` + `Content-Length`).
+
+## fmd.gzip compatibility notes (LuaGZip.pas + GZIPUtils.pas → `gzip-shim.ts`)
+
+**Format detection (unzipStream parity).** gzip magic (`1f 8b 08`), zlib
+(CMF low-nibble 8 + CMF/FLG checksum — RFC 1950), else raw deflate. The
+Pascal's zlib test is a loose `hdr and $78 = $78` byte mask
+(GZIPUtils.pas:196); the facade uses the RFC-strict CMF/FLG check —
+identical outcomes for every real-world stream (deflate emits CMF=0x78);
+synthetic CMF≠0x78 streams route differently but fail loud→nil on both
+sides. gzip: CRC32 + ISIZE verified (GZIPUtils.pas:244-246) — node
+`gunzipSync` performs the identical checks. zlib: Adler-32 verified
+(:247-252). Raw: no trailer on either side.
+
+**Failure parity.** `unzipStream` false → the Pascal logs
+`GZip.Inflate() unzipStream failed` (MultiLog SendError) and returns no
+values (nil); the shim logs the same line through the module-correlated
+host logger (level error) and yields nil. Never a Lua error. Truncated,
+corrupted-trailer, garbage and empty inputs all take this path.
+
+**Binary fidelity (base64 bridge).** Happymh.lua feeds raw compressed
+bytes (`plain:sub(5)` after the `SC01` magic); wasmoon text marshalling
+corrupts NUL/high bytes, so Inflate's argument and result cross over the
+same pure-Lua base64 codec as fmd.crypto (idempotent-guarded globals
+`__fmd_b64enc`/`__fmd_b64dec` installed by the gzip glue). Byte-exact
+for NUL and 0x80–0xFF (0-255 roundtrip asserted).
+
+**Documented edges.** Multi-member gzip: the Pascal verifies the first
+member against the LAST 8 trailer bytes (fails → nil); node concatenates
+members and succeeds — divergence, no real-world consumers. FDICT zlib
+streams fail on both sides (the Pascal skips the 6-byte header without a
+dictionary; node throws) → nil. Detection-rule edge above (CMF≠0x78).
+
+## fmd.pcre2 compatibility notes (LuaPCRE2.pas → `pcre2-shim.ts`)
+
+**Backend (offline target).** RE2-native and pcre2-wasm are not
+vendorable in this repo (no registry access, zero-network CI), so the
+facade compiles to the host V8 RegExp engine. PCRE2_UTF without
+PCRE2_UCP keeps `\w \d \s` ASCII — JS keeps them ASCII in BOTH modes,
+so the no-`u` compile is faithful; `u` is enabled only for patterns
+needing it (named groups, `\p{...}`, `\k<name>`, `\x{...}`/`\o{...}`),
+where JS `\w \d \s` stay ASCII too (verified). Cost context (D11):
+fmd.pcre2 has 0/418 tree-module consumers and 0 seed consumers today —
+every gap below is documentation-only until a real consumer lands.
+
+**Translation layer (exact, vector-tested).** `\A`→`^`, `\z`→`$`,
+`\Z`→`(?=\n?$)`, default `$`→`(?=\n?$)` (PCRE2 matches before a final
+newline — no DOLLAR_ENDONLY), `\h/\H/\v/\V` → the exact HSPACE/VSPACE
+sets, `\N`→`.`, `\R`→`(?:\r\n|[...])`, `\a`/`\e`/`\cX` → control codes,
+`\x{hex}`→`\u{hex}`, `\o{oct}`→`\u{dec}`, `\Q..\E` quoting (class-safe;
+`-` escaped only inside classes), `(?P<name>`/`(?P=name)` aliases,
+`\g{n}`/`\g{name}` backrefs, `(?#...)` comments stripped, `(*LF)`/
+`(*UTF)`/`(*UTF8)` stripped (facade defaults: LF newline, always UTF),
+top-level `(?ims)` hoisted to compile flags (the applies-from-here
+semantics degrade to whole-pattern).
+
+**Downgrades (behavior divergence, vector-pinned).** Possessive
+quantifiers `*+ ++ ?+ {n,m}+` → greedy (backtracking allowed — the
+`".*+"` on `'"" x ""'` vector pins the divergence); atomic groups
+`(?>…)` → non-capturing.
+
+**Loud-fail ledger (each takes the Pascal compile-failure path: log +
+false/no-values/subject-unchanged — never a silent stub).** `\K`
+(match-start reset), `\C`, `\X` (grapheme cluster), `\G`, recursion
+`(?R)`/`(?n)` and subroutine calls `(?&name)`/`(?P>name)`/`(?1)`-style
+references, conditionals `(?(cond)...)`, callouts `(?C...)`, branch
+reset `(?|...)`, inline `(?x)`/`(?U)`/`(?u)`/`(?J)`/`(?n)`/`(?X)`,
+inline-flag negation `(?-i...)`, scoped inline flags `(?flags:...)`,
+`(*verbs)` beyond LF/UTF/UTF8 (ACCEPT/FAIL/MARK/PRUNE/SKIP/THEN/COMMIT/
+CR/CRLF/ANYCRLF/ANY/NUL/BSR_*), `\R` inside a character class.
+
+**Substitution-string edges.** PCRE2 `$n`/`$0`/`$$`/`${name}` expanded
+over matches; an out-of-range group number and an unknown `${name}`
+stay literal text (PCRE2 errors — the facade keeps the string; lean
+deviation). JS `$\`` / `$'` are NOT special (PCRE2 parity).
+
+**Semantic divergences (documented).** `^` never matches at a non-zero
+startoffset (PCRE2 treats startoffset as a virtual string start without
+NOTBOL; vector-pinned false). Lookbehind still sees characters before
+the start offset (PCRE2 parity). Unset capture groups return ''
+(the PCRE2_UNSET Cardinal wrap in the ovector helpers,
+pcre2.pas:290-298 — parity). `gsub` copies the whole subject out with
+substitutions from the start offset (pcre2_substitute parity); after an
+empty match the skipped character is copied and the position advances
+by one (pcre2_substitute parity). gmatch (re_gmatch's ExecNext
+iterator, LuaPCRE2.pas:165-195) continues at the match end and loops
+forever on non-advancing zero-width patterns (FMD2-identical).
+Byte-level subjects are a non-goal: PCRE2_UTF requires valid UTF-8
+anyway (invalid UTF-8 → PCRE2 match error); wasmoon's replacement-char
+normalization on invalid sequences is the documented text-mode
+deviation.
+
+## fmd.logger compatibility notes (LuaLogger.pas → `logger-shim.ts`)
+
+The complete LuaLogger API (LuaLogger.pas:33-45): `Send`/`SendWarning`/
+`SendError` — routed to the structured host logger with module-id
+correlation (§4). MultiLog level parity: Send→log, SendWarning→warn,
+SendError→error. `luaToString` coercion (LuaUtils.pas:206-213 =
+lua_tolstring): strings and numbers coerce, every other type (nil,
+booleans, tables) → '' — never a Lua error. The Pascal `Logger.Send`'s
+MultiLog level is the info level → HostLogRecord `log`.

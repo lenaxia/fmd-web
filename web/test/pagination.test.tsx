@@ -108,6 +108,24 @@ describe('BrowsePage pagination', (): void => {
     expect(screen.getByRole('button', { name: 'Open' })).toBeDisabled();
   });
 
+  it('badges the live-scrape source (§6.8) when the server served the page live', async (): Promise<void> => {
+    const { fetch } = mockFetch([
+      latestRoute(1, { body: { entries: [entryFixture('/live', 'LiveEntry')], source: 'live' } }),
+    ]);
+    renderWithProviders(<BrowsePage route={parseHash(`#/browse?catalog=${CATALOG_ID}`)} />, { fetch });
+    expect(await screen.findByRole('list')).toBeInTheDocument();
+    expect(screen.getByTitle(/live-scrape fallback/)).toHaveTextContent('live scrape');
+  });
+
+  it('does not badge catalog-sourced pages', async (): Promise<void> => {
+    const { fetch } = mockFetch([
+      latestRoute(1, { body: { entries: [entryFixture('/cat', 'CatEntry')], source: 'catalog' } }),
+    ]);
+    renderWithProviders(<BrowsePage route={parseHash(`#/browse?catalog=${CATALOG_ID}`)} />, { fetch });
+    expect(await screen.findByRole('list')).toBeInTheDocument();
+    expect(screen.queryByTitle(/live-scrape fallback/)).not.toBeInTheDocument();
+  });
+
   it('entry rows navigate to the manga detail route', async (): Promise<void> => {
     const { fetch } = mockFetch([latestRoute(1, { body: { entries: [entryFixture('/a', 'Alpha')] } })]);
     renderWithProviders(<BrowsePage route={parseHash(`#/browse?catalog=${CATALOG_ID}`)} />, { fetch });

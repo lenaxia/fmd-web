@@ -18,6 +18,12 @@ export default defineConfig({
         find: /^@fmd\/contract$/,
         replacement: fileURLToPath(new URL('./contract/types.ts', import.meta.url)),
       },
+      // The drift-check tool (requireShims status cross-check tests cross
+      // the server ↔ contract boundary in vitest, like the corpus replay).
+      {
+        find: /^@fmd\/contract\/tools\/drift-check$/,
+        replacement: fileURLToPath(new URL('./contract/tools/drift-check.ts', import.meta.url)),
+      },
       // '@fmd/corpus' subpaths resolve to runner source (the live-engine
       // replay test crosses the server ↔ corpus package boundary).
       {

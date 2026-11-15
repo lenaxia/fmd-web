@@ -1,8 +1,8 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { buildFullCorpus } from '../runner/corpus-loader.js';
-import { runCorpus } from '../runner/replay.js';
+import { runCorpus, serializeCorpusReport } from '../runner/replay.js';
 import type { NormalizationEngine } from '@fmd/contract';
 import { normalizeMangaInfo } from '../../server/src/engine/normalize/udata.js';
 import { FontoXPathQueryEngine } from '../../server/src/engine/shims/txquery-shim.js';
@@ -12,6 +12,12 @@ import { FontoXPathQueryEngine } from '../../server/src/engine/shims/txquery-shi
  * table — binding status per contract unit + the corpus replay report
  * (live FontoXPath engine vs FPC oracle) with a root-cause reason for
  * every non-passing case. Regenerate with `npx tsx corpus/scripts/generate-compat.ts`.
+ *
+ * The replay ALSO writes the machine report (per-module/per-expression
+ * pass rates) as docs/corpus-report.json via
+ * `serializeCorpusReport` — committed, and byte-stability-pinned by the
+ * corpus-live golden test; scripts/ci.sh gate-fails when either
+ * committed artifact (COMPAT.md or the report JSON) goes stale.
  */
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -157,15 +163,15 @@ function main(): void {
     },
     pb: {
       status: 'implemented',
-      note: 'v0: protobufjs-backed package.preload["pb"] \u2014 load (raw .proto text + serialized FileDescriptorSet, (ret, pos) binding), decode (proto3 defaults, proto name casing), encode.',
+      note: 'protobufjs-backed package.preload["pb"] behind a byte-exact base64 Lua bridge (wasmoon marshals Lua strings as UTF-8 with NUL truncation — lossy for descriptor wire bytes; see the byte-strings note below). load = the lua-protobuf two-value contract: (ret, pos) = (boolean, integer) per the README pb-module table and pb.c Lpb_load — ALWAYS two values, 1-based pb_pos+1 (success = byte length+1; failure ret=false, not nil, pos = the parse-stop offset that protoc.lua:1178 concatenates). Serialized-FileDescriptorSet input only (native parity — protoc.lua is the text→descriptor compiler; no raw .proto-text path); google.protobuf descriptors preloaded eagerly (Parser.reload parity, protoc.lua:1143-1145/1188) so protoc:compile\u2019s pb.encode(\'.google.protobuf.FileDescriptorSet\u2019, \u2026) works. decode: proto3 defaults + enum-as-name (lua-protobuf enum_as_name default; MangaPlus.lua:129 GetLang), absent message fields \u2192 nil. Verified end-to-end by server/test/engine/shims/pb-protoc.integration.test.ts: the real utils/protoc.lua has_pb branch + Parser.reload through the shim, protoc:load(MangaPlus.proto) binding (ret, pos), golden recorded-Response replay (evidence: docs/evidence-pb-fidelity.md).',
     },
     'fmd.env': { status: 'implemented', note: 'v0: ExeName/Version/Revision/LuaDirectory/SelectedLanguage/Directory.' },
     'fmd.fileutil': { status: 'partial (gap: SerializeAndMaintainNames)', note: 'implemented: ExtractFileName/ExtractFileNameOnly; GAP: SerializeAndMaintainNames (1/418 tree modules, 0 seed modules call it).' },
-    'fmd.imagepuzzle': { status: 'deferred', note: 'sharp port (cost: 7/418 tree modules require it, 2/67 seed modules \u2014 18Comic, MangaGo).' },
-    'fmd.pcre2': { status: 'deferred', note: 'PCRE2 wasm/RE2 (cost: 0/418 tree modules require it \u2014 no seed or tree consumer).' },
-    'fmd.gzip': { status: 'deferred', note: 'single Inflate method (cost: 1/418 tree modules requires it, 0 seed modules).' },
-    'fmd.logger': { status: 'partial (gap: LuaLogger API)', note: 'implemented: structured host logger (print routing); GAP: LuaLogger API (1/418 tree modules use fmd.logger).' },
-    'fmd.mangafoxwatermark': { status: 'deferred', note: 'sharp port + PNG assets (cost: 1/418 tree module requires it, 0 seed modules).' },
+    'fmd.imagepuzzle': { status: 'implemented', note: 'raw-pixel port of ImagePuzzle.pas:136-305 (imagepuzzle-core.ts + imagepuzzle-shim.ts package-preload; node:zlib PNG codec — sharp is uninstallable in this offline workspace): New/Create(w,h), HorBlock/VerBlock, Matrix[]/Flips[]/Multiply, DeScramble(src,dst) incl. in-place same-Document and non-square grids; ≥3 real-site goldens pixel-identical (corpus/fixtures/imagepuzzle; evidence: docs/evidence-shims-image.md); loader-registered (require-registry runtime-tested).' },
+    'fmd.pcre2': { status: 'implemented', note: 'API-faithful TLuaPCRE2Engine facade: exec/find/match/gmatch/gsub (LuaPCRE2.pas:237-245), PCRE2_UTF always on, V8 RegExp backend (pcre2-shim.ts).' },
+    'fmd.gzip': { status: 'implemented', note: 'one method Inflate (LuaGZip.pas:47-50 + GZIPUtils.pas unzipStream): gzip/zlib/raw-deflate auto-detect, checksum-verified, failure → nil, never raises (gzip-shim.ts).' },
+    'fmd.logger': { status: 'implemented', note: 'complete LuaLogger surface (LuaLogger.pas:33-45): Send/SendWarning/SendError routed to the module-correlated structured host logger with luaToString argument parity (logger-shim.ts).' },
+    'fmd.mangafoxwatermark': { status: 'implemented', note: 'raw-pixel port of MangaFoxWatermark.pas (mangafoxwatermark-core.ts + -shim.ts host-lib): Otsu/PSNR matcher, white-border check, crop+rewrite; the REAL PNG template assets ship into the synced-tree layout (corpus/fixtures/lua/extras/mangafoxtemplate); Windows backslash path translation (FanFox.lua:36); FanFox.lua OnAfterImageSaved flow verified offline (evidence: docs/evidence-shims-image.md).' },
     subprocess: { status: 'deferred', note: 'denied stub unless the browser profile (\u00a75.11; cost: 0/418 tree modules require it).' },
     'utils.* / templates.*': {
       status: 'implemented',
@@ -197,20 +203,24 @@ function main(): void {
     'LuaBase.pas': { status: 'implemented', note: '\u00a75.1 Init globals (print, sleep, Trim, MaybeFillHost, MangaInfoStatusIfPos, GetBetween, SeparateLeft/Right)' },
     'LuaWebsiteModules.pas': { status: 'implemented', note: '\u00a75.1\u20135.2 module surface + generated \u00a75.2 dispatchers (contract.json as data)' },
     'LuaWebsiteModuleHandler.pas': { status: 'implemented', note: '\u00a75.3/\u00a75.12 chunk re-exec on module switch' },
+    'LuaWebsiteBypass.pas + checkantibot.lua': {
+      status: 'implemented',
+      note: '\u00a75.9 host-level antibot interceptor: checkAntiBot heuristic (checkantibot.lua:5-12) + AntiBotInterceptor (global check serialization :94-115, per-module single-flight fallthrough :161/197-200, cookie clear-then-persist :177/:182-183, reload re-issue :184-188, AllowServerErrorResponse forced :156) \u2014 unit-tested (server/test/engine/state/antibot.test.ts) AND integration-tested offline (server/test/engine/state/antibot.pipeline.integration.test.ts): the REAL FMD2 bypass scripts (checkantibot.lua + websitebypass.lua \u2192 cloudflare.lua, require chain incl. fmd.duktape ExecJS + fmd.crypto.EncodeURLElement + utils.json) run in a real wasmoon engine against the corpus/fixtures/antibot mock server \u2014 signature matrix, IUAM challenge (answer validated \u2192 duktape shim exercised), FlareSolverr reload flow (Storage[reload]=true \u2192 re-issue), and \u22658-worker single-flight concurrency (exactly one bypass, losers not delayed); evidence: docs/evidence-antibot-integration.md.',
+    },
     'LuaHTTPSend.pas / httpsendthread.pas': { status: 'implemented', note: bindingStatus['HTTP']?.note ?? '\u00a75.4' },
     'LuaStrings.pas': { status: 'implemented', note: '\u00a75.5 full facade surface' },
     'LuaXQuery.pas / LuaIXQValue.pas': { status: 'implemented', note: bindingStatus['TXQuery']?.note ?? '\u00a75.6' },
     'LuaCrypto.pas': { status: 'implemented', note: '\u00a75.7 full surface (LuaCrypto.pas:429\u2013494): node:crypto + sodium-native + pure-JS RC4/MD4; vectors in server/test/engine/shims/crypto-*.test.ts \u2014 details below' },
     'LuaDuktape.pas': { status: 'implemented', note: bindingStatus['Duktape']?.note ?? '\u00a75.7' },
-    'LuaGZip.pas': { status: 'deferred', note: 'single Inflate method — cost: 1/418 tree modules requires it, 0/67 seed modules.' },
+    'LuaGZip.pas': { status: 'implemented', note: 'one method Inflate (LuaGZip.pas:47-50 + GZIPUtils.pas unzipStream): gzip/zlib/raw-deflate auto-detect, checksum-verified (CRC32/ISIZE, Adler-32), failure → nil with the Pascal’s log line, never raises (gzip-shim.ts).' },
     'LuaFileUtil.pas': { status: 'partial (gap: SerializeAndMaintainNames)', note: bindingStatus['fmd.fileutil']?.note ?? '\u00a75.7' },
-    'LuaImagePuzzle.pas': { status: 'deferred', note: 'sharp port \u2014 cost: 7/418 tree modules require it, 2/67 seed modules (18Comic, MangaGo).' },
-    'LuaPCRE2.pas': { status: 'deferred', note: 'PCRE2 wasm/RE2 \u2014 cost: 0/418 tree modules require it (no seed consumer).' },
+    'LuaImagePuzzle.pas': { status: 'implemented', note: 'raw-pixel port (imagepuzzle-core.ts, line-by-line ImagePuzzle.pas:136-305 port + imagepuzzle-shim.ts package-preload): New/Create(w,h), HorBlock/VerBlock, Matrix[]/Flips[]/Multiply, DeScramble(src,dst) incl. in-place — cost note retired: 7/418 tree modules require it, 2/67 seed modules (18Comic, MangaGo).' },
+    'LuaPCRE2.pas': { status: 'implemented', note: 'API-faithful TLuaPCRE2Engine facade: exec/find/match/gmatch/gsub (LuaPCRE2.pas:237-245), PCRE2_UTF always on, V8 RegExp backend — pcre2-shim.ts; expressibility ledger in the fmd.pcre2 compatibility notes below.' },
     'LuaStringsStorage.pas': { status: 'implemented', note: '\u00a75.1/\u00a75.3 MODULE.Storage via the shared state service' },
     'lua-protobuf (`pb.dll`)': { status: 'implemented', note: bindingStatus['pb']?.note ?? 'D17' },
     'LuaFMD.pas': { status: 'implemented', note: bindingStatus['fmd.env']?.note ?? '\u00a75.1' },
-    'LuaLogger.pas': { status: 'partial (gap: LuaLogger API)', note: bindingStatus['fmd.logger']?.note ?? 'structured logging' },
-    'LuaMangaFox.pas': { status: 'deferred', note: bindingStatus['fmd.mangafoxwatermark']?.note ?? 'sharp port + PNG assets' },
+    'LuaLogger.pas': { status: 'implemented', note: bindingStatus['fmd.logger']?.note ?? 'structured logging' },
+    'LuaMangaFox.pas': { status: 'implemented', note: bindingStatus['fmd.mangafoxwatermark']?.note ?? 'raw-pixel port of MangaFoxWatermark.pas + REAL PNG assets in the synced-tree layout; Windows backslash path translation (host-lib loader)' },
     'LuaMangaInfo.pas': { status: 'implemented', note: bindingStatus['MangaInfo']?.note ?? '\u00a75.2 field surface' },
     'lua/utils/ + lua/templates/': { status: 'implemented', note: bindingStatus['utils.* / templates.*']?.note ?? 'file-package loader' },
     'LuaSubprocess.pas': { status: 'deferred', note: 'denied stub unless the browser profile (\u00a75.10\u20135.11) \u2014 cost: 0/418 tree modules require it.' },
@@ -222,6 +232,7 @@ function main(): void {
     'LuaBase.pas': 'Init globals (`print`, `sleep`, `Trim`, \u2026)',
     'LuaWebsiteModules.pas': 'module surface + 15 event dispatchers',
     'LuaWebsiteModuleHandler.pas': 'chunk re-exec on module switch',
+    'LuaWebsiteBypass.pas + checkantibot.lua': 'antibot interceptor + websitebypass (OnHTTPRequest hook)',
     'LuaHTTPSend.pas / httpsendthread.pas': '`HTTP` shim',
     'LuaStrings.pas': 'TStrings facade',
     'LuaXQuery.pas / LuaIXQValue.pas': 'CreateTXQuery + IXQValue',
@@ -329,7 +340,12 @@ function main(): void {
   const curated = markerIdx >= 0 ? `\n${existing.slice(markerIdx).replace(/\s+$/u, '')}\n` : '';
   mkdirSync(dirname(compatPath), { recursive: true });
   writeFileSync(compatPath, `${lines.join('\n')}${curated}`);
-  console.log(`COMPAT.md written: ${report.summary.passed}/${report.summary.cases} = ${(report.summary.passRate * 100).toFixed(2)}%`);
+  const reportPath = join(ROOT, 'docs', 'corpus-report.json');
+  writeFileSync(reportPath, serializeCorpusReport(report));
+  console.log(
+    `COMPAT.md written: ${report.summary.passed}/${report.summary.cases} = ${(report.summary.passRate * 100).toFixed(2)}% ` +
+    `(docs/corpus-report.json: ${report.summary.cases} cases, ${report.modules.length} modules)`,
+  );
 
   // --gate (scripts/ci.sh corpus step): the Phase-1 gate — pass rate must
   // be ≥99% AND every non-passing case must carry a curated root cause.
@@ -376,4 +392,12 @@ function main(): void {
   }
 }
 
-main();
+// Run as CLI only when executed directly — importing this module (e.g.
+// from tooling) must not regenerate docs/ or exit on the gate.
+const isMain =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+
+if (isMain) {
+  main();
+}

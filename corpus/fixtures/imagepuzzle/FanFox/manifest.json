@@ -1,0 +1,13 @@
+{
+  "site": "FanFox",
+  "moduleId": "0d3653a8d9b747a381374f32e0a1641e",
+  "templateAsset": "728-01.png",
+  "templateAssetSource": "FMD2 lua/extras/mangafoxtemplate/728-01.png at the pinned sync SHA 97c903b340d2b0fd82871dba1b0aa5f04a1790e8 (copied into the synced-tree layout: corpus/fixtures/lua/extras/mangafoxtemplate/)",
+  "watermarkHeight": 90,
+  "image": {
+    "width": 728,
+    "height": 1200
+  },
+  "expected_note": "expected.png = the clean page; RemoveWatermark must crop the bottom 90 rows and the result must equal expected rows [0, 1110) pixel-for-pixel",
+  "provenance": "SYNTHESIZED watermarked sample (offline workspace): the bottom band IS the real FMD2 template asset, so the PSNR matcher hits 1e6 exactly; live capture (real watermarked FanFox page + FMD2-cleaned output) was impossible without network/FPC."
+}

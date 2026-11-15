@@ -5,7 +5,9 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    image: fmd-web:local
+    # Release tagging: FMD_WEB_IMAGE_TAG=0.1.0 docker compose build app
+    # stamps the release image; default stays `local` (e2e asserts it).
+    image: fmd-web:${FMD_WEB_IMAGE_TAG:-local}
     init: true
     ports:
       - "3000:3000"
@@ -13,6 +15,10 @@ services:
       PORT: "3000"
       NODE_ENV: production
       FMD_WEB_DATA_DIR: /app/data
+      # §5.11 browser sidecar: set together with `--profile browser`
+      # (runbook "Browser sidecar profile"); empty default = the
+      # known-broken capability flags stand.
+      FMD_WEB_BROWSER_SIDECAR_URL: ${FMD_WEB_BROWSER_SIDECAR_URL:-}
       # FMD_WEB_SECRET: set in production (account encryption, §8)
       # FMD_WEB_PASSWORD: optional single-password auth (§10)
     volumes:
@@ -20,15 +26,37 @@ services:
     restart: unless-stopped
 
   # ── Optional `browser` profile (DESIGN.md §5.11, D2) ────────────────
-  # Opt in with:  docker compose --profile browser up
-  # Provides FlareSolverr + headless Chromium so subprocess-dependent
-  # and webdriver-bypass modules run (§5.10 capability flags flip).
-  # The server reaches it via http://flaresolverr:8191 when enabled.
-  # flaresolverr:
-  #   image: ghcr.io/flaresolverr/flaresolverr:v3.3.21
-  #   profiles: ["browser"]
-  #   ports:
-  #     - "8191:8191"
+  # Opt in with:
+  #   FMD_WEB_BROWSER_SIDECAR_URL=http://flaresolverr:8191 \
+  #     docker compose --profile browser up
+  # FlareSolverr bundles headless Chromium; the app's BypassExecutor
+  # sidecar adapter (bounded concurrency 2, 60 s budget, health-gated)
+  # reaches it at http://flaresolverr:8191, the subprocess stub routes
+  # RunCommandHide to it, and the satisfied §5.10 known-broken flags
+  # flip in /api/modules. Image digest-pinned (docs/docker-pinning.md;
+  # index digest resolved from ghcr.io at 2026-11-15).
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:v3.3.21@sha256:f104ee51e5124d83cf3be9b37480649355d223f7d8f9e453d0d5ef06c6e3b31b
+    profiles: ["browser"]
+    init: true
+    environment:
+      LOG_LEVEL: info
+    ports:
+      - "8191:8191"
+    healthcheck:
+      # GET /health → 200 (the adapter's health gate polls the same path)
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8191/health', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+    restart: unless-stopped
 
 volumes:
   app-data:

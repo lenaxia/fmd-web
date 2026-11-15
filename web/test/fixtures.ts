@@ -3,7 +3,7 @@
  * GENERATED schema types (components/operations of openapi.d.ts), so
  * a snapshot drift that changes these shapes fails `tsc` here too.
  */
-import type { ModuleSummaryT, CatalogEntryT, InfoResponseT, JobT } from '../src/api/hooks';
+import type { ModuleSummaryT, CatalogEntryT, InfoResponseT, JobT, FavoriteT } from '../src/api/hooks';
 
 export const CATALOG_ID = 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6';
 export const MODULE_ID = '0f1e2d3c4b5a69788796a5b4c3d2e1f0';
@@ -18,12 +18,16 @@ export function moduleFixture(overrides?: Partial<ModuleSummaryT>): ModuleSummar
     file: 'modules/FixtureSite.lua',
     enabled: true,
     options: [],
+    proxy: null,
     capabilities: {
       requires_subprocess: false,
       requires_browser: false,
       bypass_python_gated: false,
+      requires_imagepuzzle: false,
+      requires_mangafoxwatermark: false,
       events: [],
       known_broken_flags: [],
+      live_scrape_fallback: false,
     },
     ...overrides,
   };
@@ -73,6 +77,23 @@ export function jobFixture(id: string, overrides?: Partial<JobT>): JobT {
     priority: 0,
     createdAt: '2026-11-13T00:00:00Z',
     updatedAt: '2026-11-13T00:00:00Z',
+    ...overrides,
+  };
+}
+
+/** One §7.2 favorite row (the favorites page fixture). */
+export function favoriteFixture(overrides: Partial<FavoriteT> = {}): FavoriteT {
+  return {
+    id: 'a'.repeat(32) + 'https://ex.org/manga/fav',
+    moduleId: 'a'.repeat(32),
+    url: 'https://ex.org/manga/fav',
+    title: 'Fixture Favorite',
+    status: 'Ongoing',
+    currentChapter: 12,
+    newChapterCount: 0,
+    autoDownload: false,
+    lastCheck: '2026-01-01T00:00:00Z',
+    lastUpdated: null,
     ...overrides,
   };
 }

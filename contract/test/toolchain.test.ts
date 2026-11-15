@@ -149,15 +149,35 @@ describe('compose contract (structural)', (): void => {
   const composePath = new URL('../../docker/compose.yml', import.meta.url);
   const composeText = readFileSync(composePath, 'utf8');
 
-  it('parses as YAML with exactly the app service active', (): void => {
-    const compose = parse(composeText) as { services?: Record<string, unknown> };
-    expect(Object.keys(compose.services ?? {})).toEqual(['app']);
-    expect(compose.services?.['app']).toBeDefined();
+  it('parses as YAML with exactly the app service active (extras are profile-gated)', (): void => {
+    const compose = parse(composeText) as {
+      services?: Record<string, { profiles?: string[] } | unknown>;
+    };
+    const services = compose.services ?? {};
+    expect(services['app']).toBeDefined();
+    // every NON-app service must carry profiles (nothing extra starts by default)
+    for (const [name, service] of Object.entries(services)) {
+      if (name === 'app') {
+        continue;
+      }
+      const profiles = (service as { profiles?: string[] }).profiles ?? [];
+      expect(profiles.length).toBeGreaterThan(0);
+    }
   });
 
-  it('keeps the browser profile as a commented placeholder (DESIGN §5.11)', (): void => {
+  it('carries the §5.11 browser profile as a real digest-pinned flaresolverr service', (): void => {
     expect(composeText).toMatch(/--profile browser/);
-    expect(composeText).toMatch(/#\s*flaresolverr:/);
+    const compose = parse(composeText) as {
+      services?: Record<string, { image?: string; profiles?: string[]; healthcheck?: { test?: unknown } }>;
+    };
+    const flaresolverr = compose.services?.['flaresolverr'];
+    expect(flaresolverr).toBeDefined();
+    expect(flaresolverr?.profiles).toEqual(['browser']);
+    // digest-pinned third-party image (docs/docker-pinning.md)
+    expect(flaresolverr?.image).toMatch(/^ghcr\.io\/flaresolverr\/flaresolverr:v3\.3\.21@sha256:[0-9a-f]{64}$/);
+    // healthcheck probes the adapter's health-gate path
+    const test = flaresolverr?.healthcheck?.test;
+    expect(JSON.stringify(test)).toContain('8191/health');
   });
 
   it('builds from docker/Dockerfile at the repo-root context', (): void => {

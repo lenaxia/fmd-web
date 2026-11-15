@@ -1,0 +1,69 @@
+{
+  "$comment": "Antibot/websitebypass fixture set registration (DESIGN.md §12 Phase-0 'bypass' fixtures + §13.1 corpus discipline). PROVENANCE: fully SYNTHETIC/deterministic — derived from FMD2 lua/websitebypass/{checkantibot,cloudflare,websitebypass}.lua behavior at FMD2 commit 97c903b; NOTHING is live-captured (live Cloudflare capture was rejected as fragile and ToS-adjacent). Consumed by server/test/engine/state/antibot.pipeline.integration.test.ts (100% offline: loopback sockets only).",
+  "set": "antibot",
+  "provenance": "synthetic-offline",
+  "synthesizedAt": "2026-11-15",
+  "fmd2Commit": "97c903b",
+  "fmd2Sources": [
+    "lua/websitebypass/checkantibot.lua:5-12",
+    "lua/websitebypass/websitebypass.lua",
+    "lua/websitebypass/cloudflare.lua",
+    "lua/websitebypass/websitebypass_config.json"
+  ],
+  "entries": [
+    {
+      "fixtureId": "antibot-challenge-iuam",
+      "file": "challenge-iuam.html",
+      "kind": "text",
+      "description": "Deterministic IUAM challenge page: first <script> computes jschl-answer through the same JS primitives cloudflare.lua's generated preamble wires (btoa = Duktape.enc('base64'), atob = Duktape.dec — the fixture decodes via Duktape.dec('base64') directly; the preamble's atob path depends on TextDecoder which neither real Duktape nor the node:vm heap provides, see docs/evidence-antibot-integration.md). The <form id=\"challenge-form\" action=\"/cdn-cgi/l/chk_jschl?__cf_chl_jschl_tk__=…\"> and newline-prefixed self-closing <input name=/value=/> entries match cloudflare.lua's Lua pattern extraction exactly."
+    },
+    {
+      "fixtureId": "antibot-challenge-block",
+      "file": "challenge-block.html",
+      "kind": "text",
+      "description": "Webdriver-only block page (NO jschl form): served for /media/reload-* so cloudflare.lua solveChallenge() takes ONLY the FlareSolverr/webdriver branch (a jschl form here would let the IUAM branch overwrite the webdriver result — the reload-string flow needs result==2). Body carries both creatReloadStrings() markers so the reload branch flips Storage['reload']."
+    },
+    {
+      "fixtureId": "antibot-signature-plan",
+      "file": "signature-plan.json",
+      "kind": "text",
+      "description": "checkantibot.lua:5-12 signature matrix served by the mock server at /sig/* (9 shapes: 4 hit, 5 miss)."
+    },
+    {
+      "fixtureId": "antibot-config-default",
+      "file": "websitebypass-config-default.json",
+      "kind": "text",
+      "description": "websitebypass_config.json default branch (use_webdriver=false) — the IUAM scenario config."
+    },
+    {
+      "fixtureId": "antibot-config-flaresolverr",
+      "file": "websitebypass-config-flaresolverr.json",
+      "kind": "text",
+      "description": "websitebypass_config.json webdriver branch (use_webdriver=true, loopback ip) — the FlareSolverr/reload scenario config; port materialized at test time."
+    },
+    {
+      "fixtureId": "antibot-flaresolverr-endpoints",
+      "file": "flaresolverr-endpoints.json",
+      "kind": "text",
+      "description": "FlareSolverr health body (parsed via CreateTXQuery json(*) XPathString) + solved-cookie solution returned by the stub-profile sidecar adapter."
+    }
+  ],
+  "constants": {
+    "challengeTokenB64": "dGs1MjA=",
+    "challengeTokenPlain": "tk520",
+    "expectedAnswerFormula": "base64('fmd-web:' + base64decode(challengeTokenB64)) — implemented identically by the challenge JS (Duktape.dec + btoa/Duktape.enc) and the mock validator (node Buffer)",
+    "expectedAnswer": "Zm1kLXdlYjp0azUyMA==",
+    "expectedTimeoutMs": 4000,
+    "cfClearanceValue": "bypassed-int-1",
+    "anonCookie": "anon=seed",
+    "flaresolverrMsg": "FlareSolverr is ready!",
+    "flaresolverrUserAgent": "flaresolverr-agent/1.0",
+    "flaresolverrClearance": "bypassed-flare-1",
+    "reloadStrings": [
+      "Attention Required! | Cloudflare",
+      "Enable JavaScript and cookies to continue"
+    ],
+    "iuamChallengeMediaPathPrefix": "/media/iuam-",
+    "reloadChallengeMediaPathPrefix": "/media/reload-"
+  }
+}

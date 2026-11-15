@@ -14,6 +14,7 @@
     "e2e": "playwright test"
   },
   "dependencies": {
+    "@fmd/contract": "*",
     "@tanstack/react-query": "^5.62.0",
     "openapi-fetch": "^0.17.0",
     "react": "^18.3.1",

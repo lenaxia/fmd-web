@@ -1,0 +1,23 @@
+{
+  "$comment": "FlareSolverr endpoint payloads exercised through the REAL stack: the health body is served by the mock server at GET / and parsed by cloudflare.lua with CreateTXQuery + XPathString('msg', json(*)); solvedCookies is the FlareSolverr solution cookie list the (stub-profile) sidecar adapter returns to the subprocess shim, which synthesizes the cloudflare.py stdout shape (flaresolver_status_code/flaresolver_result) that solveWithWebDriver json.decodes.",
+  "health": {
+    "status": "ok",
+    "msg": "FlareSolverr is ready!"
+  },
+  "solution": {
+    "status": 200,
+    "userAgent": "flaresolverr-agent/1.0",
+    "cookies": [
+      {
+        "name": "cf_clearance",
+        "value": "bypassed-flare-1",
+        "domain": "127.0.0.1",
+        "path": "/",
+        "expires": 1893456000,
+        "httpOnly": true,
+        "secure": false,
+        "sameSite": "Lax"
+      }
+    ]
+  }
+}

@@ -13,7 +13,7 @@ export interface paths {
         };
         /**
          * Module registry with capability + known-broken flags
-         * @description One row per registered module (§9 module_state registry columns): identity, §5.1 options (combobox options carry `items`; the STORED value is the item INDEX), and §5.10 capability detection incl. the D3 known-broken flag ids.
+         * @description One row per registered module (§9 module_state registry columns): identity, §5.1 options (combobox options carry `items`; the STORED value is the item INDEX), and §5.10 capability detection incl. the D3 known-broken flag ids. `live_scrape_fallback` (§6.8) marks modules declaring both directory events — browsable without an FMD2-DB catalog via the live walk.
          */
         get: operations["listModules"];
         put?: never;
@@ -33,10 +33,114 @@ export interface paths {
         };
         get?: never;
         /**
-         * Enable/disable a module, set options and cookies
-         * @description Option values are validated against the module descriptors: checkbox → boolean, edit → string, spinedit → integer, combobox → integer item INDEX within `items` range (§5.1). Unknown option names are rejected with 400.
+         * Enable/disable a module, set options, cookies and the proxy override
+         * @description Option values are validated against the module descriptors: checkbox → boolean, edit → string, spinedit → integer, combobox → integer item INDEX within `items` range (§5.1). Unknown option names are rejected with 400. `proxy` sets the per-module proxy override (null clears it back to "inherit the global proxy"; §9/§10 settings, SetProxy field semantics).
          */
         put: operations["updateModule"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Module accounts (§8.6/D4)
+         * @description One row per module account: username, enabled flag and the module AccountState (§5.2 account-status constants). The password is write-only — it is sealed at rest (FMD_WEB_SECRET, AES-256-GCM) and never returned.
+         */
+        get: operations["listAccounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts/{moduleId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Create/replace the account for one module
+         * @description Module-scoped account upsert (FMD2 keeps exactly one account per module). Omitted `password`/`cookies` KEEP the stored values — the credential never round-trips through the API. All three fields are sealed with FMD_WEB_SECRET before the write.
+         */
+        put: operations["upsertAccount"];
+        post?: never;
+        /**
+         * Remove the account for one module
+         * @description Deletes the sealed account row (§9 `account`). The module_state cookies are NOT touched.
+         */
+        delete: operations["deleteAccount"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/accounts/{moduleId}/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run the module OnLogin flow (event runtime)
+         * @description Dispatches the §5.2 `Login` event with the account-status constants bound and MODULE.Account seeded from the sealed row; the handler-set `MODULE.Account.Status` and `MODULE.Account.Cookies` are read back and persisted (account row + §5.3 module_state cookies). Engine/dispatch failures are 502 upstream_error.
+         */
+        post: operations["loginAccount"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Global proxy config + browser sidecar profile state
+         * @description The §9/§10 settings projection: the global proxy (SetProxy five-string semantics, httpsendthread.pas:838-874 — type HTTP|SOCKS4|SOCKS5, the empty type is "no proxy") and the §5.11 browser profile state (enabled ⇒ the D2 sidecar is wired and the satisfied §5.10 known-broken flags are dropped from /api/modules).
+         */
+        get: operations["getSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/proxy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace the global proxy config
+         * @description Full replacement with SetProxy semantics: a config with a non-empty type requires a host; the all-empty config is the SetNoProxy path. Per-module overrides (PUT /api/modules/{id} proxy) take precedence for their module.
+         */
+        put: operations["updateProxy"];
         post?: never;
         delete?: never;
         options?: never;
@@ -113,7 +217,7 @@ export interface paths {
         };
         /**
          * Catalog rows ordered by jdn DESC (§6.6)
-         * @description Page-number browse over the read-only attached catalog. No popularity ordering exists (D14).
+         * @description Page-number browse over the read-only attached catalog. No popularity ordering exists (D14). §6.8 fallback: with no catalog installed, modules declaring both directory events are served LIVE from their §5.8-normalized directory walk (TTL-cached, update-lane isolated) — every response carries `source: "catalog" | "live"` so the UI can badge it.
          */
         get: operations["catalogLatest"];
         put?: never;
@@ -133,7 +237,7 @@ export interface paths {
         };
         /**
          * Catalog rows ordered by title (§6.6)
-         * @description Page-number browse over the read-only attached catalog.
+         * @description Page-number browse over the read-only attached catalog. §6.8 fallback: catalog-less modules serve their §5.8-normalized directory walk live (title-ordered NOCASE); `source` discriminates.
          */
         get: operations["catalogByTitle"];
         put?: never;
@@ -153,7 +257,7 @@ export interface paths {
         };
         /**
          * FTS5 search with cursor pagination (§6.5, §10)
-         * @description Sanitized FTS MATCH over the sidecar, ranked; `cursor` continues a previous page (opaque, query-bound). Catalogs are read-only after install, so cursors stay stable.
+         * @description Sanitized FTS MATCH over the sidecar, ranked; `cursor` continues a previous page (opaque, query-bound). Catalogs are read-only after install, so cursors stay stable. §6.8 fallback: catalog-less modules search their §5.8-normalized directory-walk snapshot in memory (title/alttitles/summary terms, exact status, substring genre) with the SAME cursor scheme; `source` discriminates the channel.
          */
         get: operations["catalogSearch"];
         put?: never;
@@ -195,7 +299,7 @@ export interface paths {
         put?: never;
         /**
          * Create a download job (idempotent, §10)
-         * @description With `idempotencyKey`: an identical-key replay returns the ORIGINAL job with 200; key reuse with a DIFFERENT payload returns 409. Fresh creates return 201.
+         * @description With `idempotencyKey`: an identical-key replay returns the ORIGINAL job with 200 while it is live (queued/running/retry); key reuse with a DIFFERENT payload returns 409. Re-enqueueing a TERMINAL original (done/failed/cancelled) starts a FRESH job chained under the same key (`<key>#<n>`, 201) — the re-download semantic; the fresh attempt resumes from the persisted chapter markers ('D' slots skip their images). Fresh creates return 201.
          */
         post: operations["createDownloadJob"];
         delete?: never;
@@ -218,6 +322,178 @@ export interface paths {
         get: operations["listJobs"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One job snapshot
+         * @description The current §7.1 row (state, progress, error) — the polling fallback beside the WS stream.
+         */
+        get: operations["getJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * User-cancel a download job (§7.1)
+         * @description queued/running/retry → cancelled (200). A running chapter aborts its in-flight images and persists the 'W'/'D' markers, so the next enqueue of the same chapter resumes (only the remaining images are fetched). A terminal row is 409 — nothing to cancel.
+         */
+        post: operations["cancelJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/library": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Finalized chapter artifacts (§7.1 library listing)
+         * @description Newest-first page over the library rows (one per packed chapter file, `library/<module>/<manga>/<file>`). `cursor` is the keyset boundary like /api/jobs.
+         */
+        get: operations["listLibrary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/library/{id}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download one packed chapter artifact
+         * @description Streams the artifact bytes (application/octet-stream, attachment Content-Disposition). The ZIP/CBZ structure is client-validatable (central directory walk).
+         */
+        get: operations["downloadLibraryFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/favorites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Favorites listing (§7.2 DoCheck engine)
+         * @description One row per favorite (`id` = LowerCase(ModuleID+Link)): `currentChapter`/`status` from the last successful check (immediate update parity), `newChapterCount` for the UI badge, and the auto-download flag gating pipeline enqueues.
+         */
+        get: operations["listFavorites"];
+        put?: never;
+        /**
+         * Create a favorite and run its initial check
+         * @description Inserts the favorite and immediately runs the §7.2 DoCheck cycle: live GetInfoFromURL (§5.8-normalized), immediate CurrentChapter/Status update, new-chapter diff against the stored downloaded list.
+         */
+        post: operations["createFavorite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/favorites/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Tag-100 transfer-favorite bulk-ingest (D4)
+         * @description The favorites-import path: the created favorite immediately runs the transfer branch of DoCheck — every live chapter is marked downloaded in ITS stored list (global downloaded_chapters untouched), so nothing re-downloads.
+         */
+        post: operations["importFavorite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/favorites/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One favorite
+         * @description The `id` is LowerCase(ModuleID+Link), URL-encoded in the path.
+         */
+        get: operations["getFavorite"];
+        /**
+         * Update title / the auto-download toggle
+         * @description The auto-download toggle gates whether new-chapter diff results enqueue through the Phase-3 download pipeline (FMD2 OptionAutoCheckFavDownload, default off).
+         */
+        put: operations["updateFavorite"];
+        post?: never;
+        /**
+         * Delete a favorite
+         * @description Removes the favorite row; its downloaded_chapters ledger row is NOT touched.
+         */
+        delete: operations["deleteFavorite"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/favorites/{id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Manual check-now (the immediate DoCheck cycle)
+         * @description Live info → immediate CurrentChapter/Status update → case-insensitive new-chapter diff → auto-download + the :1131-1133 dual-write when the toggle is on. Returns the updated favorite, the queued download count and the new-chapter set (live order).
+         */
+        post: operations["checkFavoriteNow"];
         delete?: never;
         options?: never;
         head?: never;
@@ -273,9 +549,29 @@ export interface paths {
         };
         /**
          * Readiness
-         * @description Data dirs opened, registry restored, catalogs attached. Never gated.
+         * @description Data dirs opened, registry restored, catalogs attached. 503 + the bootstrap stage while the D20 first-run bootstrap runs.
          */
         get: operations["readyz"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Prometheus metrics exposition (§4/§15 observability)
+         * @description The §4/§15 series in Prometheus text format (version 0.0.4): queue depth per lane, job throughput/failure by state, per-module request latency + error counts, corpus pass rates, engine pool RSS + GC stats, sync progress, and the expression-failure WARN dedup counters. Mounted only when a metrics registry is bound (the production assembly always binds one).
+         */
+        get: operations["getMetrics"];
         put?: never;
         post?: never;
         delete?: never;
@@ -307,8 +603,11 @@ export interface components {
             requires_subprocess: boolean;
             requires_browser: boolean;
             bypass_python_gated: boolean;
+            requires_imagepuzzle: boolean;
+            requires_mangafoxwatermark: boolean;
             events: string[];
             known_broken_flags: string[];
+            live_scrape_fallback: boolean;
         };
         ModuleSummary: {
             id: string;
@@ -320,6 +619,21 @@ export interface components {
             enabled: boolean;
             options: components["schemas"]["ModuleOptionDescriptor"][];
             capabilities: components["schemas"]["ModuleCapabilities"];
+            proxy: components["schemas"]["ProxySettings"] | null;
+        };
+        ProxySettings: {
+            type: components["schemas"]["__schema0"];
+            host: components["schemas"]["__schema1"];
+            port: components["schemas"]["__schema2"];
+            user: components["schemas"]["__schema3"];
+            pass: components["schemas"]["__schema4"];
+        };
+        SettingsResponse: {
+            proxy: components["schemas"]["ProxySettings"];
+            browser: {
+                enabled: boolean;
+                url: string;
+            };
         };
         CatalogEntry: {
             link: string;
@@ -332,6 +646,25 @@ export interface components {
             summary: string;
             numChapter: number;
             jdn: number;
+        };
+        Favorite: {
+            id: string;
+            moduleId: string;
+            url: string;
+            title: string | null;
+            status: string | null;
+            currentChapter: number | null;
+            newChapterCount: number;
+            autoDownload: boolean;
+            lastCheck: components["schemas"]["Timestamp"] | null;
+            lastUpdated: components["schemas"]["Timestamp"] | null;
+        };
+        AccountView: {
+            moduleId: string;
+            username: string;
+            enabled: boolean;
+            /** @enum {string} */
+            status: "asUnknown" | "asChecking" | "asValid" | "asInvalid";
         };
         InfoRequest: {
             moduleId: string;
@@ -371,8 +704,22 @@ export interface components {
             createdAt: components["schemas"]["Timestamp"];
             updatedAt: components["schemas"]["Timestamp"];
         };
+        LibraryFile: {
+            id: string;
+            moduleId: string;
+            manga: string;
+            fileName: string;
+            bytes: number;
+            createdAt: components["schemas"]["Timestamp"];
+        };
         /** Format: date-time */
         Timestamp: string;
+        /** @enum {string} */
+        __schema0: "" | "HTTP" | "SOCKS4" | "SOCKS5";
+        __schema1: string;
+        __schema2: string;
+        __schema3: string;
+        __schema4: string;
     };
     responses: never;
     parameters: never;
@@ -441,6 +788,7 @@ export interface operations {
                         [key: string]: boolean | string | number;
                     };
                     cookies?: string;
+                    proxy?: components["schemas"]["ProxySettings"] | null;
                 };
             };
         };
@@ -474,6 +822,339 @@ export interface operations {
             };
             /** @description Module not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    listAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Account list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        accounts: components["schemas"]["AccountView"][];
+                        count: number;
+                    };
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    upsertAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Module id (32-hex, §5) */
+                moduleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    username: string;
+                    password?: string;
+                    cookies?: string;
+                    enabled?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Stored account projection */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        account: components["schemas"]["AccountView"];
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    deleteAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Module id (32-hex, §5) */
+                moduleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Account not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    loginAccount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Module id (32-hex, §5) */
+                moduleId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Login outcome */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        account: components["schemas"]["AccountView"];
+                        ok: boolean;
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Account not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Account disabled or the module binds no OnLogin handler */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description The module OnLogin run failed (typed error envelope) */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    getSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings snapshot */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    updateProxy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProxySettings"];
+            };
+        };
+        responses: {
+            /** @description Settings snapshot after the update */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -741,7 +1422,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Page of catalog entries */
+            /** @description Page of catalog entries (source discriminator per §6.8) */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -751,6 +1432,8 @@ export interface operations {
                         entries: components["schemas"]["CatalogEntry"][];
                         nextCursor?: string;
                         total?: number;
+                        /** @enum {string} */
+                        source: "catalog" | "live";
                     };
                 };
             };
@@ -774,6 +1457,24 @@ export interface operations {
             };
             /** @description Unhandled server failure (typed error envelope) */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Live directory walk failed */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Live scrape update lane is shutting down */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -798,7 +1499,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Page of catalog entries */
+            /** @description Page of catalog entries (source discriminator per §6.8) */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -808,6 +1509,8 @@ export interface operations {
                         entries: components["schemas"]["CatalogEntry"][];
                         nextCursor?: string;
                         total?: number;
+                        /** @enum {string} */
+                        source: "catalog" | "live";
                     };
                 };
             };
@@ -831,6 +1534,24 @@ export interface operations {
             };
             /** @description Unhandled server failure (typed error envelope) */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Live directory walk failed */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Live scrape update lane is shutting down */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -858,7 +1579,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Ranked page of catalog entries */
+            /** @description Ranked page of catalog entries (source discriminator per §6.8) */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -868,6 +1589,8 @@ export interface operations {
                         entries: components["schemas"]["CatalogEntry"][];
                         nextCursor?: string;
                         total?: number;
+                        /** @enum {string} */
+                        source: "catalog" | "live";
                     };
                 };
             };
@@ -891,6 +1614,24 @@ export interface operations {
             };
             /** @description Unhandled server failure (typed error envelope) */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Live directory walk failed */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Live scrape update lane is shutting down */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1094,6 +1835,631 @@ export interface operations {
             };
         };
     };
+    getJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Module/catalog id (32-hex, §5) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The job snapshot */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        job: components["schemas"]["Job"];
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Job not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    cancelJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Module/catalog id (32-hex, §5) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description The cancelled job snapshot */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        job: components["schemas"]["Job"];
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Job not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Job is already terminal */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    listLibrary: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Page of library files */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        files: components["schemas"]["LibraryFile"][];
+                        nextCursor?: string;
+                    };
+                };
+            };
+            /** @description Malformed cursor */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    downloadLibraryFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Module/catalog id (32-hex, §5) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The artifact bytes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Library file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Artifact file missing on disk */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    listFavorites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Favorites list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        favorites: components["schemas"]["Favorite"][];
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    createFavorite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    moduleId: string;
+                    url: string;
+                    title?: string;
+                    autoDownload?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Created favorite */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        favorite: components["schemas"]["Favorite"];
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Favorite already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Module GetInfo failed */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    importFavorite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    moduleId: string;
+                    url: string;
+                    title?: string;
+                    autoDownload?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Imported favorite */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        favorite: components["schemas"]["Favorite"];
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Module GetInfo failed */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    getFavorite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Module/catalog id (32-hex, §5) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The favorite */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        favorite: components["schemas"]["Favorite"];
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Favorite not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    updateFavorite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Module/catalog id (32-hex, §5) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    title?: string;
+                    autoDownload?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated favorite */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        favorite: components["schemas"]["Favorite"];
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Favorite not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    deleteFavorite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Module/catalog id (32-hex, §5) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Favorite not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    checkFavoriteNow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Module/catalog id (32-hex, §5) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Check result */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        favorite: components["schemas"]["Favorite"];
+                        queuedDownloads: number;
+                        newChapters: {
+                            position: number;
+                            link: string;
+                            name: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Favorite not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Module GetInfo failed */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
     login: {
         parameters: {
             query?: never;
@@ -1211,6 +2577,47 @@ export interface operations {
                         ready: boolean;
                         reason?: string;
                     };
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Bootstrap running / failed */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        ready: boolean;
+                        reason?: string;
+                    };
+                };
+            };
+        };
+    };
+    getMetrics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Metrics exposition (text/plain, Prometheus version 0.0.4) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain; version=0.0.4; charset=utf-8": string;
                 };
             };
             /** @description Unhandled server failure (typed error envelope) */
