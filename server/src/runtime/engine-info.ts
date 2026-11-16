@@ -13,6 +13,7 @@ import type { BypassExecutorPort } from '../engine/sidecar/bypass-adapter.js';
 import type { SwallowSharedDeduper } from '../engine/shims/txquery-shim.js';
 import { normalizeMangaInfo } from '../engine/normalize/udata.js';
 import type { RegistrationRecord } from '../engine/registry/capabilities.js';
+import type { ModuleSharedState } from '../engine/state/module-state.js';
 
 /**
  * Engine-backed live info (§5.8): POST /api/info runs the module's real
@@ -55,6 +56,13 @@ export interface EngineInfoOptions {
   readonly proxyFor?: (moduleId: string) => ProxyConfig | undefined;
   /** §5.11 browser sidecar adapter (undefined = denied stub stands). */
   readonly bypass?: BypassExecutorPort;
+  /**
+   * §5.3 per-module shared-state resolver (audit F-2): when wired, the
+   * module's SharedCookieJar backs BOTH the HTTP shims (request cookie
+   * injection) and the MODULE cookie methods, and the jar text persists
+   * via module_state at the end of the call.
+   */
+  readonly moduleState?: (moduleId: string) => Promise<ModuleSharedState>;
 }
 
 /** no_error / net_problem (§5.2 dispatch result codes). */
@@ -117,6 +125,13 @@ export class EngineInfoService implements InfoService {
 
       const engine = await host.createEngine();
       try {
+        // §5.3 module shared state (audit F-2): ONE jar per module id —
+        // the HTTP objects' request-cookie injection and the MODULE cookie
+        // methods run over it; the jar text persists via module_state.
+        const sharedState = this.options.moduleState !== undefined
+          ? await this.options.moduleState(descriptor.id)
+          : undefined;
+        const sharedCookies = sharedState?.cookies;
         let installed: ReturnType<typeof installShims> | undefined;
         const initialProxy = this.options.proxyFor?.(descriptor.id);
         await engine.loadModule(modulePath, (inner, bridge): void => {
@@ -128,6 +143,7 @@ export class EngineInfoService implements InfoService {
             luaRoot,
             egress: this.options.egress,
             transport: this.options.transport,
+            ...(sharedCookies !== undefined ? { sharedCookies } : {}),
             ...(initialProxy !== undefined ? { initialProxy } : {}),
             ...(this.options.bypass !== undefined ? { bypass: this.options.bypass } : {}),
             ...(this.options.swallowDeduper !== undefined
@@ -141,8 +157,12 @@ export class EngineInfoService implements InfoService {
         }
         const dispatcher = createContractDispatcher(engine, abort, logger, undefined, undefined, undefined, {
           makeHTTP: shimKit.makeHTTP,
+          ...(sharedCookies !== undefined ? { moduleCookies: () => sharedCookies } : {}),
         });
         const result = dispatcher.dispatch(descriptor, 'GetInfo', { url });
+        if (sharedState !== undefined) {
+          await sharedState.persist();
+        }
         if (result.kind === 'failed') {
           throw new ApiError(
             502,

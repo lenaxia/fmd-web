@@ -13,6 +13,7 @@ import type { BypassExecutorPort } from '../engine/sidecar/bypass-adapter.js';
 import type { SwallowSharedDeduper } from '../engine/shims/txquery-shim.js';
 import type { HostLogRecord } from '@fmd/contract';
 import { normalizeMangaInfo } from '../engine/normalize/udata.js';
+import type { ModuleSharedState } from '../engine/state/module-state.js';
 
 /**
  * §6.8 live-scrape directory walk: ONE pass of the FMD2 update-thread
@@ -76,6 +77,13 @@ export interface EngineDirectoryWalkerOptions {
   readonly proxyFor?: (moduleId: string) => ProxyConfig | undefined;
   /** §5.11 browser sidecar adapter (undefined = denied stub stands). */
   readonly bypass?: BypassExecutorPort;
+  /**
+   * §5.3 per-module shared-state resolver (audit F-2): when wired, the
+   * module's SharedCookieJar backs BOTH the HTTP shims (request cookie
+   * injection) and the MODULE cookie methods, and the jar text persists
+   * via module_state at the end of the walk.
+   */
+  readonly moduleState?: (moduleId: string) => Promise<ModuleSharedState>;
 }
 
 /** no_error / net_problem (§5.2 dispatch result codes). */
@@ -124,6 +132,13 @@ export class EngineDirectoryWalker implements DirectoryWalkPort {
 
       const engine = await host.createEngine();
       try {
+        // §5.3 module shared state (audit F-2): ONE jar per module id —
+        // the HTTP objects' request-cookie injection and the MODULE cookie
+        // methods run over it; the jar text persists via module_state.
+        const sharedState = this.options.moduleState !== undefined
+          ? await this.options.moduleState(descriptor.id)
+          : undefined;
+        const sharedCookies = sharedState?.cookies;
         let installed: ReturnType<typeof installShims> | undefined;
         const initialProxy = this.options.proxyFor?.(descriptor.id);
         await engine.loadModule(modulePath, (inner, bridge): void => {
@@ -136,6 +151,7 @@ export class EngineDirectoryWalker implements DirectoryWalkPort {
             egress: this.options.egress,
             transport: this.options.transport,
             ...(this.options.hostGate !== undefined ? { gate: this.options.hostGate } : {}),
+            ...(sharedCookies !== undefined ? { sharedCookies } : {}),
             ...(initialProxy !== undefined ? { initialProxy } : {}),
             ...(this.options.bypass !== undefined ? { bypass: this.options.bypass } : {}),
             ...(this.options.swallowDeduper !== undefined
@@ -149,9 +165,13 @@ export class EngineDirectoryWalker implements DirectoryWalkPort {
         }
         const dispatcher = createContractDispatcher(engine, abort, logger, undefined, undefined, undefined, {
           makeHTTP: shimKit.makeHTTP,
+          ...(sharedCookies !== undefined ? { moduleCookies: () => sharedCookies } : {}),
         });
         const runLua = (code: string): unknown => engine.innerEngine.doStringSync(code);
         const raw = walkDirectory(dispatcher, descriptor, runLua);
+        if (sharedState !== undefined) {
+          await sharedState.persist();
+        }
         return normalizeDirectoryEntries(raw);
       } finally {
         await engine.dispose();

@@ -145,6 +145,12 @@ export class AntiBotInterceptor {
       this.maxCheckDepth = Math.max(this.maxCheckDepth, this.checkDepth);
       try {
         return (await this.check(request.view())) === true;
+      } catch {
+        // N-4 hardening (audit): FMD2 logs-and-continues when the check
+        // itself faults (LuaWebsiteBypass.pas:112-114) — the request
+        // proceeds as NOT an antibot page; the default checkAntiBot
+        // cannot throw, only a pluggable injected check could.
+        return false;
       } finally {
         this.checkDepth -= 1;
       }

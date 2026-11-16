@@ -548,30 +548,31 @@ export class ModuleStateService {
     state.storage.loadAll(row.storage ?? {});
   }
 
-  private async persistState(state: ModuleSharedState): Promise<void> {
+   private async persistState(state: ModuleSharedState): Promise<void> {
     const persistence = this.options.persistence;
     if (persistence === undefined) {
       return;
     }
     const settings = await state.settings.snapshot();
+    // Merge the module CookieManager jar (audit F-2) into the persisted
+    // cookies text — settings pairs first, jar entries last-writer — so
+    // module server cookies survive a state-service restart (they are
+    // seeded back into the jar by seedFromPersistence). The bypass path
+    // already mirrors the jar into settings.cookies; this keeps that
+    // invariant for every jar writer.
+    const merged = new Map<string, string>();
+    for (const [k, v] of parseCookieText(settings.cookies)) {
+      merged.set(k.toLowerCase(), `${k}=${v}`);
+    }
+    for (const [k, v] of Object.entries(state.cookies.snapshotSync().entries)) {
+      merged.set(k.toLowerCase(), `${k}=${v}`);
+    }
     await persistence.save(state.moduleId, {
-      cookies: settings.cookies,
+      cookies: [...merged.values()].join(';'),
       ua: settings.userAgent,
       enabled: settings.enabled,
       options: { ...settings.options },
       storage: state.storage.snapshot(),
     });
   }
-}
-
-/** `emptySnapshot` compatibility for the §9 projection placeholder users. */
-export function emptySnapshot(moduleId: ModuleId): ModuleStateSnapshot {
-  return {
-    moduleId,
-    cookieCount: 0,
-    storageKeys: [],
-    accountStatus: 'asUnknown',
-    settings: Object.freeze({ enabled: true, cookies: '', userAgent: '', options: Object.freeze({}) }),
-    bypassBusy: false,
-  };
 }

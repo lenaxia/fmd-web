@@ -2,6 +2,7 @@ import type { LuaModuleDescriptor, ModuleOptionDescriptor } from '@fmd/contract'
 import { toBool, toInteger, toStr } from './base-globals.js';
 import type { FacadeBridge, FacadeSpec } from './facade.js';
 import { makeStorageSpec, TStringsStorageStrings, type StorageStrings } from './storage.js';
+import { CookieJar, type CookieJarPort } from '../shims/http-cookies.js';
 
 /**
  * The `NewWebsiteModule()` object surface (§5.1,
@@ -78,8 +79,24 @@ export class ModuleBacking {
   accountStatus = 0; // asUnknown
   accountCookies = '';
 
-  constructor(storage?: StorageStrings) {
+  /**
+   * The module CookieManager store (FMD2 `Module.CookieManager`,
+   * LuaWebsiteModules.pas:888-919 + httpcookiemanager.pas): the §5.3
+   * per-module shared cookie jar when a state service is wired —
+   * AddServerCookies writes here, GetServerCookies/RemoveCookies/
+   * ClearCookies read/clear here, and the same jar backs every HTTP
+   * object of the module (request injection: the jar's pairs ride the
+   * outgoing `Cookie` header). Without a shared port the methods run on
+   * a private local jar — never silent no-ops (audit F-2). Persistence
+   * rides module_state via the state service (`persistState` merges the
+   * jar into the persisted cookies text; seedFromPersistence loads it
+   * back).
+   */
+  readonly cookies: CookieJarPort;
+
+  constructor(storage?: StorageStrings, cookies?: CookieJarPort) {
     this.storage = storage ?? new TStringsStorageStrings();
+    this.cookies = cookies ?? new CookieJar();
   }
 
   /** Build the Lua facade spec backed by this registration. */
@@ -118,10 +135,24 @@ export class ModuleBacking {
         });
         return undefined;
       },
-      AddServerCookies: () => undefined,
-      GetServerCookies: () => '',
-      RemoveCookies: () => undefined,
-      ClearCookies: () => undefined,
+      AddServerCookies: (text: unknown) => {
+        addModuleServerCookies(this.cookies, toStr(text));
+        return undefined;
+      },
+      GetServerCookies: (name: unknown) => {
+        const key = toStr(name);
+        // '' = the whole store as '; '-joined `name=value` pairs — the
+        // shape MODULE.Account.Cookies carries (Madokami round-trip).
+        return key === '' ? moduleCookieText(this.cookies) : this.cookies.get(key);
+      },
+      RemoveCookies: (nameOrList: unknown) => {
+        removeModuleCookies(this.cookies, nameOrList);
+        return undefined;
+      },
+      ClearCookies: () => {
+        this.cookies.clear();
+        return undefined;
+      },
       GetOption: (name: unknown) => {
         const option = this.options.get(toStr(name));
         return option === undefined ? undefined : option.defaultValue;
@@ -293,7 +324,14 @@ export class ModuleBacking {
                 } else if (k === 'Status') {
                   this.accountStatus = toInteger(v);
                 } else if (k === 'Cookies') {
-                  this.accountCookies = toStr(v);
+                  // lua_tolstring coercion (audit F-2): FMD2's string
+                  // property setter reads the value with luaToString —
+                  // numbers/strings convert, everything else (e.g. the
+                  // HTTP.Cookies TStrings OBJECT Madokami.lua:74 assigns)
+                  // reads as '' there. Mirror that instead of
+                  // '[object Object]'.
+                  this.accountCookies =
+                    typeof v === 'string' || typeof v === 'number' ? String(v) : '';
                 }
               },
             });
@@ -329,8 +367,9 @@ export class ModuleBacking {
       readonly status?: number;
     },
     storage?: StorageStrings,
+    cookies?: CookieJarPort,
   ): ModuleBacking {
-    const backing = new ModuleBacking(storage);
+    const backing = new ModuleBacking(storage, cookies);
     backing.id = descriptor.id;
     backing.name = descriptor.name;
     backing.rootURL = descriptor.rootURL;
@@ -393,6 +432,107 @@ export class ModuleBacking {
 
 function stripOnPrefix(prop: string): string {
   return prop.startsWith(EVENT_PROP_PREFIX) ? prop.slice(EVENT_PROP_PREFIX.length) : prop;
+}
+
+/**
+ * `MODULE.AddServerCookies(text)` (audit F-2, LuaWebsiteModules.pas:888-895
+ * + httpcookiemanager.pas AddServerCookies/InternalAddServerCookie):
+ * newline-split (FMD2 splits #10); per line, the cookie is the FIRST
+ * `name=value` pair and cookie attributes (`Path=`, `Expires=`, `Secure`,
+ * …) are dropped — exactly the Set-Cookie parse. Contract moduleSurface
+ * note3: the '; '-joined form MODULE.Account.Cookies carries
+ * (`HTTP.Cookies`) is accepted too — non-attribute `name=value` segments
+ * after the first pair join the store (Madokami auth parity; a real
+ * Set-Cookie line still yields exactly its first pair because its
+ * trailing segments are all attributes).
+ */
+const COOKIE_ATTRIBUTE_NAMES = new Set([
+  'path',
+  'domain',
+  'expires',
+  'max-age',
+  'secure',
+  'httponly',
+  'samesite',
+]);
+
+export function addModuleServerCookies(jar: CookieJarPort, text: string): void {
+  const trimmed = text.trim();
+  if (trimmed === '') {
+    return;
+  }
+  for (const line of trimmed.split(/\r?\n/)) {
+    let firstPairTaken = false;
+    for (const segment of line.split(';')) {
+      const item = segment.trim();
+      if (item === '') {
+        continue;
+      }
+      const eq = item.indexOf('=');
+      if (eq <= 0) {
+        continue; // flag-only attribute (`Secure`) or junk — not a pair
+      }
+      const name = item.slice(0, eq).trim();
+      // The FIRST pair of a line is THE cookie (FMD2 InternalAddServer
+      // Cookie); later segments join only when they are real pairs, not
+      // Set-Cookie attributes (contract moduleSurface note3).
+      if (firstPairTaken && COOKIE_ATTRIBUTE_NAMES.has(name.toLowerCase())) {
+        continue;
+      }
+      jar.set(name, item.slice(eq + 1).trim());
+      firstPairTaken = true;
+    }
+  }
+}
+
+/**
+ * `MODULE.RemoveCookies(nameOrList)` (LuaWebsiteModules.pas:906-913):
+ * a name (case-insensitive, FMD2 SameText) removes that cookie; a list
+ * removes each; absent/'' removes ALL of the module's server cookies —
+ * the per-module store IS the domain scope (`SoftKomik.lua:135` calls it
+ * with no arguments to log out).
+ */
+export function removeModuleCookies(jar: CookieJarPort, nameOrList: unknown): void {
+  if (nameOrList === undefined || nameOrList === null) {
+    jar.clear();
+    return;
+  }
+  if (Array.isArray(nameOrList)) {
+    for (const item of nameOrList) {
+      if (typeof item === 'string') {
+        jar.remove(item);
+      }
+    }
+    return;
+  }
+  const name = toStr(nameOrList);
+  if (name === '') {
+    jar.clear();
+    return;
+  }
+  jar.remove(name);
+}
+
+/** `; `-joined `name=value` pairs of the module store (Account.Cookies form). */
+export function moduleCookieText(jar: CookieJarPort): string {
+  if (jar instanceof CookieJar) {
+    return jar.entries().map(([k, v]) => `${k}=${v}`).join('; ');
+  }
+  const shared = jar as CookieJarPort & {
+    snapshotSync?: () => { readonly entries: Readonly<Record<string, string>> };
+    snapshot?: () => Record<string, string>;
+  };
+  if (shared.snapshotSync !== undefined) {
+    return Object.entries(shared.snapshotSync().entries)
+      .map(([k, v]) => `${k}=${v}`)
+      .join('; ');
+  }
+  if (shared.snapshot !== undefined) {
+    return Object.entries(shared.snapshot())
+      .map(([k, v]) => `${k}=${v}`)
+      .join('; ');
+  }
+  return '';
 }
 
 /** 'OnGetInfo' etc. — the binding-mechanism string props (§5.1). */

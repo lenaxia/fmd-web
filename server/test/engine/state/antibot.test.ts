@@ -448,6 +448,32 @@ describe('interceptor flow (LuaWebsiteBypass.pas:142-209)', () => {
     expect(module.bypass.busy).toBe(false);
   });
 
+  it('a throwing pluggable CHECK is log-and-continue, not a crash (N-4, :112-114)', async () => {
+    const { module } = await makeModule();
+    let checks = 0;
+    const interceptor = new AntiBotInterceptor({
+      check: () => {
+        checks += 1;
+        throw new Error('hostile injected check exploded');
+      },
+    });
+    const executor = new FakeBypassExecutor({ ok: false });
+    const request = new FakeRequest(module, [antibotStep]);
+    // Pre-fix this propagated out of intercept(); the hardening treats the
+    // fault as "not an antibot page" — the plain result stands, the check
+    // lock releases (a later request still runs the check), no gate entry.
+    const outcome = await interceptor.intercept(request, module, { bypassExecutor: executor });
+    expect(checks).toBe(1);
+    expect(outcome).toEqual({ result: false, antibotHit: false, path: 'plain' });
+    expect(module.bypass.busy).toBe(false);
+    expect(module.bypass.entries).toBe(0);
+    const outcome2 = await interceptor.intercept(new FakeRequest(module, [antibotStep]), module, {
+      bypassExecutor: executor,
+    });
+    expect(checks).toBe(2);
+    expect(outcome2.antibotHit).toBe(false);
+  });
+
   it('stub / known-broken executor short-circuits to the plain request (:149-153)', async () => {
     const { module } = await makeModule();
     let checks = 0;

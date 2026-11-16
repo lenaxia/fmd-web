@@ -15,6 +15,7 @@ import { RecordedResponseResolver } from '../engine/shims/http-shim.js';
 import type { EgressPolicy, HttpTransportPort } from '../engine/shims/http-shim.js';
 import type { SwallowSharedDeduper } from '../engine/shims/txquery-shim.js';
 import type { RegistrationRecord } from '../engine/registry/capabilities.js';
+import type { ModuleSharedState } from '../engine/state/module-state.js';
 
 /**
  * Engine-backed account OnLogin driver (§8.6/D4 login flow): loads the
@@ -44,6 +45,13 @@ export interface EngineLoginDriverOptions {
   readonly swallowDeduper?: SwallowSharedDeduper;
   /** §4 structured-log tee. */
   readonly logSink?: (record: HostLogRecord) => void;
+  /**
+   * §5.3 per-module shared-state resolver (audit F-2): when wired, the
+   * module's SharedCookieJar backs BOTH the HTTP shims (request cookie
+   * injection) and the MODULE cookie methods, and the jar text persists
+   * via module_state at the end of the login.
+   */
+  readonly moduleState?: (moduleId: string) => Promise<ModuleSharedState>;
 }
 
 export class EngineLoginDriver implements AccountLoginDriver {
@@ -103,6 +111,13 @@ export class EngineLoginDriver implements AccountLoginDriver {
 
       const engine = await host.createEngine();
       try {
+        // §5.3 module shared state (audit F-2): ONE jar per module id —
+        // the HTTP objects' request-cookie injection and the MODULE cookie
+        // methods run over it; the jar text persists via module_state.
+        const sharedState = this.options.moduleState !== undefined
+          ? await this.options.moduleState(descriptor.id)
+          : undefined;
+        const sharedCookies = sharedState?.cookies;
         let installed: ReturnType<typeof installShims> | undefined;
         await engine.loadModule(modulePath, (inner, bridge): void => {
           installed = installShims(inner, bridge, {
@@ -113,6 +128,7 @@ export class EngineLoginDriver implements AccountLoginDriver {
             luaRoot,
             egress: this.options.egress,
             transport: this.options.transport,
+            ...(sharedCookies !== undefined ? { sharedCookies } : {}),
             ...(this.options.swallowDeduper !== undefined
               ? { swallowDeduper: this.options.swallowDeduper }
               : {}),
@@ -124,6 +140,7 @@ export class EngineLoginDriver implements AccountLoginDriver {
         }
         const dispatcher = createContractDispatcher(engine, abort, logger, undefined, undefined, undefined, {
           makeHTTP: shimKit.makeHTTP,
+          ...(sharedCookies !== undefined ? { moduleCookies: () => sharedCookies } : {}),
           account: {
             enabled: credentials.enabled,
             username: credentials.username,
@@ -131,6 +148,9 @@ export class EngineLoginDriver implements AccountLoginDriver {
           },
         });
         const result = dispatcher.dispatch(descriptor, 'Login', {});
+        if (sharedState !== undefined) {
+          await sharedState.persist();
+        }
         if (result.kind === 'failed') {
           throw new ApiError(
             502,

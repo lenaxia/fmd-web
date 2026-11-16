@@ -17,6 +17,7 @@ import { ModuleBacking } from '../lua/module-facade.js';
 import { makeMangaInfoSpec } from '../lua/mangainfo.js';
 import { makeHTTPSpec, makeTStrings } from '../lua/stubs.js';
 import { TStringsStorageStrings } from '../lua/storage.js';
+import type { CookieJarPort } from '../shims/http-cookies.js';
 import { DEFAULT_EVENT_DEADLINE_MS } from '../lua/worker-pool.js';
 import { EVENT_BINDINGS, type EventGlobalName } from './bindings.js';
 import { createDeadlineController } from './deadline.js';
@@ -48,6 +49,16 @@ export interface DispatcherShims {
     readonly cookies?: string;
     readonly status?: number;
   };
+  /**
+   * The §5.3 per-module cookie store resolver (audit F-2): the MODULE
+   * cookie methods (AddServerCookies/GetServerCookies/RemoveCookies/
+   * ClearCookies) run over the jar this returns — the same SharedCookieJar
+   * the HTTP shims back their request cookie injection with, so module
+   * server cookies merge into that module's outgoing requests and persist
+   * via module_state. Undefined → a private per-engine jar (the methods
+   * still work, just without cross-engine persistence).
+   */
+  readonly moduleCookies?: (moduleId: string) => CookieJarPort | undefined;
 }
 
 export class EventNotBoundError extends Error {
@@ -291,7 +302,12 @@ export class ContractEventDispatcher implements EventDispatcher {
         storage = new TStringsStorageStrings();
         this.storageBackings.set(descriptor.id, storage);
       }
-      const backing = ModuleBacking.fromDescriptor(descriptor, this.shims.account, storage);
+      const backing = ModuleBacking.fromDescriptor(
+        descriptor,
+        this.shims.account,
+        storage,
+        this.shims.moduleCookies?.(descriptor.id),
+      );
       facadeId = bridge.create('MODULE', backing.spec(bridge));
       this.moduleFacades.set(descriptor.id, { generation, facadeId });
     }

@@ -1,5 +1,5 @@
 import * as zlib from 'node:zlib';
-import { NameValueMap, applyAcceptImage, composeReset, composeResetBasic, moveContentTypeToMimeType } from './http-headers.js';
+import { NameValueMap, applyAcceptImage, composeReset, composeResetBasic, firstCrlfIndex, moveContentTypeToMimeType } from './http-headers.js';
 import { massageUrl, resolveRedirectLocation } from './http-url.js';
 import { CookieStore } from './http-cookies.js';
 import type { EgressPolicy } from './http-egress.js';
@@ -116,7 +116,7 @@ export class HttpPipeline {
 
   private readonly transport: HttpTransportPort;
   private readonly egress: EgressPolicy;
-  private readonly cookies: CookieStore;
+  readonly cookies: CookieStore;
   private readonly gate: HostGatePort | undefined;
   private readonly isTerminated: () => boolean;
   private readonly proxyProvider: (() => RawProxy | undefined) | undefined;
@@ -219,6 +219,29 @@ export class HttpPipeline {
 
   // --- the DefaultHTTPRequest port (:594-711) ------------------------------
 
+  /**
+   * First request-side name that would carry CR/LF onto the wire — the
+   * module-written headers plus the cookie jar's names/values (the Cookie
+   * header is injected from the jar at header-build time; a jar entry with
+   * CR/LF poisons that header). Undefined = clean. Safe to call at every
+   * attempt() entry: this.headers holds the module-written snapshot there
+   * (response headers only land after a hop and are restored away before
+   * any retry/redirect attempt).
+   */
+  private firstPoisonedHeader(): string | undefined {
+    for (const [name, value] of this.headers.entries()) {
+      if (firstCrlfIndex(name) !== -1 || firstCrlfIndex(value) !== -1) {
+        return name;
+      }
+    }
+    for (const line of this.cookies.lines()) {
+      if (firstCrlfIndex(line) !== -1) {
+        return 'Cookie';
+      }
+    }
+    return undefined;
+  }
+
   private cloneHeaders(source: NameValueMap): NameValueMap {
     const copy = new NameValueMap();
     for (const [name, value] of source.entries()) {
@@ -304,6 +327,19 @@ export class HttpPipeline {
 
   /** One transport hop + response-side state (synapse HTTPMethod). */
   private attempt(method: string, url: string): HopResult {
+    // Wire-boundary guard (audit F-1): module-controlled header values
+    // (and the cookie jar's raw names/values feeding the Cookie header)
+    // are stored FMD2-verbatim, but a CR/LF reaching the wire would split
+    // the request line. Fail THIS request fast with a typed reason —
+    // hard stop, no retry loop, transport untouched. FMD2's synapse would
+    // equally fail the socket write; we refuse before any byte is built.
+    const poisoned = this.firstPoisonedHeader();
+    if (poisoned !== undefined) {
+      this.resultCode = 0;
+      this.resultString = `header "${poisoned}" contains CR/LF — refused at the wire boundary`;
+      return { sent: false, status: 0, denied: true };
+    }
+
     // egress policy hook — checked before EVERY send (redirect targets too)
     const verdict = this.egress.check(url);
     if (!verdict.allowed) {

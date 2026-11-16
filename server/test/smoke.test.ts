@@ -8,13 +8,13 @@ import {
   canTransition,
   defaultPoolSize,
   defaultPoolOptions,
-  emptySnapshot,
   findRoute,
   isShimName,
   isValidSha,
   isAppDbTable,
   LANES,
   makePin,
+  ModuleStateService,
   SHIM_NAMES,
   startServer,
   CATALOG_SCHEMA_COLUMNS,
@@ -136,11 +136,15 @@ describe('shim registry (§5.7)', (): void => {
 });
 
 describe('module state snapshot (§5.3)', (): void => {
-  it('starts empty and unknown', (): void => {
-    const snap = emptySnapshot('0123456789abcdef0123456789abcdef');
+  it('starts empty and unknown', async (): Promise<void> => {
+    // The public path (F-3 remediation): a fresh state service's
+    // §9 projection — no persistence wired, first access creates the row.
+    const snap = await new ModuleStateService().snapshot('0123456789abcdef0123456789abcdef');
     expect(snap.cookieCount).toBe(0);
     expect(snap.storageKeys).toEqual([]);
     expect(snap.accountStatus).toBe('asUnknown');
+    expect(snap.settings.enabled).toBe(true);
+    expect(snap.bypassBusy).toBe(false);
   });
 });
 

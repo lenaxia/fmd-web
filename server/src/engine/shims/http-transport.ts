@@ -1,4 +1,5 @@
 import { Worker } from 'node:worker_threads';
+import { firstCrlfIndex } from './http-headers.js';
 
 /**
  * Transport port (DESIGN §5.4): one HTTP hop — no redirects, no
@@ -167,6 +168,14 @@ const LOOPBACK_WORKER_SCRIPT = `
 
   function isAllowedHost(h) {
     return isLoopbackHost(h) || allowedHosts.has(String(h).toLowerCase());
+  }
+
+  function crlfIndex(s) {
+    const cr = s.indexOf('\\r');
+    const lf = s.indexOf('\\n');
+    if (cr === -1) return lf;
+    if (lf === -1) return cr;
+    return Math.min(cr, lf);
   }
 
   function readReq() {
@@ -344,6 +353,16 @@ const LOOPBACK_WORKER_SCRIPT = `
       return;
     }
     const body = Buffer.from(req.bodyB64, 'base64');
+    // Wire-boundary guard, worker side (audit F-1 defense in depth):
+    // a CR/LF in a header name or value would split the request on the
+    // wire; node:http would throw mid-flight and (pre-fix) wedge this
+    // worker. Refuse the ONE request with a typed failure instead.
+    for (const [k, v] of Object.entries(req.headers)) {
+      if (crlfIndex(k) !== -1 || crlfIndex(v) !== -1) {
+        writeResult(seq, { ok: false, error: 'header "' + k + '" contains CR/LF — refused at the wire boundary', status: 0, statusText: '', headers: [], setCookie: [], bodyB64: '' });
+        return;
+      }
+    }
     // Hop-by-hop + transport-managed headers are stripped before
     // node:http validation (stale response headers re-sent by the FMD2
     // header-bleed quirk would otherwise be rejected with 400;
@@ -456,11 +475,18 @@ const LOOPBACK_WORKER_SCRIPT = `
   // watchdog can block because it does no async I/O — this worker does).
   // The interval stays referenced so the worker thread stays alive;
   // dispose() terminates it explicitly.
+  // Worker resilience (audit F-1): a poisoned request must fail THAT
+  // request with a typed result — an uncaught throw here would take the
+  // worker down and permanently wedge every subsequent request.
   setInterval(() => {
     const seq = Atomics.load(control, 0);
     if (seq !== lastSeq) {
       lastSeq = seq;
-      perform(seq, readReq());
+      try {
+        perform(seq, readReq());
+      } catch (e) {
+        writeResult(seq, { ok: false, error: 'loopback transport worker fault: ' + String((e && e.message) || e), status: 0, statusText: '', headers: [], setCookie: [], bodyB64: '' });
+      }
     }
   }, 5);
 })();
@@ -532,6 +558,23 @@ export class LoopbackHttpTransport implements HttpTransportPort {
           allowedHosts: [...this.allowedHosts],
         },
       });
+      // Lifecycle (audit F-1): a worker that dies (uncaught fault, OOM,
+      // external termination) must be FORGOTTEN so the next send()
+      // recreates a fresh transport — pre-fix this.worker stayed set and
+      // every subsequent request burned maxWaitMs against a dead worker.
+      // The 'error' handler also keeps an unhandled worker error from
+      // propagating into the parent thread.
+      const worker = this.worker;
+      worker.on('exit', () => {
+        if (this.worker === worker) {
+          this.worker = null;
+        }
+      });
+      worker.on('error', () => {
+        if (this.worker === worker) {
+          this.worker = null;
+        }
+      });
       // NOT unref'd: an unref'd worker's event loop may be starved while
       // the caller blocks in Atomics.wait; dispose() terminates it.
     }
@@ -544,6 +587,18 @@ export class LoopbackHttpTransport implements HttpTransportPort {
       return TRANSPORT_ERROR(
         `loopback transport refuses non-loopback host: ${urlHost}`,
       );
+    }
+    // Wire-boundary guard, host side (audit F-1): module-controlled
+    // header values keep FMD2-raw storage (the jar stores verbatim), but
+    // a CR/LF reaching the wire would split the request line. Refuse the
+    // ONE request with a typed error BEFORE the worker is touched — the
+    // transport (and every other module's request) stays healthy.
+    for (const [name, value] of Object.entries(request.headers)) {
+      if (firstCrlfIndex(name) !== -1 || firstCrlfIndex(value) !== -1) {
+        return TRANSPORT_ERROR(
+          `header "${name}" contains CR/LF — refused at the wire boundary`,
+        );
+      }
     }
     const worker = this.ensureWorker();
     void worker;

@@ -11,6 +11,7 @@ import type { EgressPolicy, HttpTransportPort } from '../engine/shims/http-shim.
 import type { SwallowSharedDeduper } from '../engine/shims/txquery-shim.js';
 import type { HostLogRecord, LuaModuleDescriptor } from '@fmd/contract';
 import type { RegistrationRecord } from '../engine/registry/capabilities.js';
+import type { ModuleSharedState } from '../engine/state/module-state.js';
 import type { ChapterModuleHooks, TaskWriter } from '../jobs/download/types.js';
 
 /**
@@ -52,6 +53,13 @@ export interface EngineDownloadOptions {
   readonly proxyFor?: (moduleId: string) => ProxyConfig | undefined;
   /** §5.11 browser sidecar adapter (undefined = denied stub stands). */
   readonly bypass?: BypassExecutorPort;
+  /**
+   * §5.3 per-module shared-state resolver (audit F-2): when wired, the
+   * module's SharedCookieJar backs BOTH the HTTP shims (request cookie
+   * injection) and the MODULE cookie methods, and the jar text persists
+   * via module_state at hook creation.
+   */
+  readonly moduleState?: (moduleId: string) => Promise<ModuleSharedState>;
 }
 
 type DispatchResult = ReturnType<ContractEventDispatcher['dispatch']>;
@@ -69,6 +77,7 @@ export class EngineDownloadHooks implements ChapterModuleHooks {
     private readonly host: WasmoonLuaHost,
     private readonly engine: Awaited<ReturnType<WasmoonLuaHost['createEngine']>>,
     private readonly logger: MemoryLogger,
+    private readonly sharedState?: ModuleSharedState,
   ) {
     this.taskStartHandler = descriptor.eventHandlers['TaskStart'];
     this.getPageNumberHandler = descriptor.eventHandlers['GetPageNumber'];
@@ -109,6 +118,13 @@ export class EngineDownloadHooks implements ChapterModuleHooks {
     }
     const engine = await host.createEngine();
     try {
+      // §5.3 module shared state (audit F-2): ONE jar per module id —
+      // the HTTP objects' request-cookie injection and the MODULE cookie
+      // methods run over it; the jar text persists via module_state.
+      const sharedState = options.moduleState !== undefined
+        ? await options.moduleState(descriptor.id)
+        : undefined;
+      const sharedCookies = sharedState?.cookies;
       let installed: ReturnType<typeof installShims> | undefined;
       const initialProxy: ProxyConfig | undefined = options.proxyFor?.(descriptor.id);
       await engine.loadModule(modulePath, (inner, bridge): void => {
@@ -120,6 +136,7 @@ export class EngineDownloadHooks implements ChapterModuleHooks {
           luaRoot,
           egress: options.egress,
           transport: options.transport,
+          ...(sharedCookies !== undefined ? { sharedCookies } : {}),
           ...(initialProxy !== undefined ? { initialProxy } : {}),
           ...(options.bypass !== undefined ? { bypass: options.bypass } : {}),
           ...(options.swallowDeduper !== undefined
@@ -132,8 +149,12 @@ export class EngineDownloadHooks implements ChapterModuleHooks {
       }
       const dispatcher = createContractDispatcher(engine, abort, logger, undefined, undefined, undefined, {
         makeHTTP: installed.makeHTTP,
+        ...(sharedCookies !== undefined ? { moduleCookies: () => sharedCookies } : {}),
       });
-      return new EngineDownloadHooks(dispatcher, descriptor, host, engine, logger);
+      if (sharedState !== undefined) {
+        await sharedState.persist();
+      }
+      return new EngineDownloadHooks(dispatcher, descriptor, host, engine, logger, sharedState);
     } catch (error: unknown) {
       await engine.dispose();
       await host.dispose();
@@ -141,8 +162,12 @@ export class EngineDownloadHooks implements ChapterModuleHooks {
     }
   }
 
-  /** Engine + host teardown (end of the chapter run). */
+  /** Engine + host teardown (end of the chapter run); the module cookie
+   * jar (§5.3, audit F-2) persists to module_state before disposal. */
   async dispose(): Promise<void> {
+    if (this.sharedState !== undefined) {
+      await this.sharedState.persist();
+    }
     await this.engine.dispose();
     await this.host.dispose();
   }

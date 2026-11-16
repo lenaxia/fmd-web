@@ -31,6 +31,7 @@ import { EgressPolicy } from '../engine/shims/http-egress.js';
 import { normalizeProxyConfig, type ProxyConfig } from '../engine/shims/http-proxy.js';
 import { FlareSolverrBypassExecutor } from '../engine/sidecar/bypass-adapter.js';
 import { LoopbackHttpTransport } from '../engine/shims/http-transport.js';
+import { ModuleStateService, type ModuleSharedState } from '../engine/state/module-state.js';
 import { StartupRegistryService } from '../engine/registry/startup.js';
 import { ModuleSyncService as RegistrySweep } from '../engine/registry/module-sync.js';
 import { InMemoryModuleRegistryPersistence } from '../engine/registry/persistence.js';
@@ -297,6 +298,17 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     allow: [...config.httpAllowedHosts, '127.0.0.1', 'localhost', '::1'],
   });
 
+  // ── §5.3 per-module shared state (audit F-2) ────────────────────────
+  // ONE state service per process: the module cookie jar backs BOTH the
+  // MODULE cookie methods (AddServerCookies/GetServerCookies/
+  // RemoveCookies/ClearCookies) and every module HTTP object's
+  // request-cookie injection, persisted to module_state (§9). The
+  // in-memory adapter gives process-lifetime persistence; the app.db
+  // adapter stays the db story's boundary (see the accounts comment).
+  const moduleStateService = new ModuleStateService();
+  const moduleState = (moduleId: string): Promise<ModuleSharedState> =>
+    moduleStateService.forModule(moduleId);
+
   // ── sync services ──────────────────────────────────────────────────
   const moduleSync = createModuleSyncService(config.moduleSync);
   const sweep = new RegistrySweep({ luaRoot });
@@ -356,6 +368,7 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     modules: (): readonly RegistrationRecord[] => moduleRows,
     transport,
     egress,
+    moduleState,
     // §4/§5.6: the run's shared expression-failure deduper (max 1 WARN
     // per module+expression-template per run) + the structured-log tee
     // (module print routing + swallow WARNs land as JSON lines).
@@ -400,6 +413,7 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     modules: (): readonly RegistrationRecord[] => moduleRows,
     transport,
     egress,
+    moduleState,
     hostGate: new SyncHostGate({ limit: config.liveScrapeHostLimit }),
     swallowDeduper: logger.expressionDedup,
     logSink: (record): void => {
@@ -455,6 +469,7 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
       modules: (): readonly RegistrationRecord[] => moduleRows,
       transport,
       egress,
+      moduleState,
       proxyFor,
       ...(bypass !== undefined ? { bypass } : {}),
       swallowDeduper: logger.expressionDedup,

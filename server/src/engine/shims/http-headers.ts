@@ -18,6 +18,26 @@ export const ACCEPT_ENCODING_NO_ZSTD = 'gzip, deflate, br';
 
 export const POST_MIME_REWRITE = 'application/x-www-form-urlencoded; charset=UTF-8';
 
+/**
+ * Wire-boundary guard (audit F-1): CR/LF anywhere in a header name or
+ * value would split the request line on the wire (header injection /
+ * request smuggling class). Storage stays FMD2-raw (the jar keeps values
+ * verbatim); the wire boundary refuses instead of transmitting — FMD2's
+ * synapse would equally fail the write, we fail fast with a typed reason
+ * instead of wedging the shared transport.
+ */
+export function firstCrlfIndex(s: string): number {
+  const cr = s.indexOf('\r');
+  const lf = s.indexOf('\n');
+  if (cr === -1) {
+    return lf;
+  }
+  if (lf === -1) {
+    return cr;
+  }
+  return Math.min(cr, lf);
+}
+
 /** Case-insensitive name/value map backing the Headers/Cookies facades. */
 export class NameValueMap {
   /** lower(name) → [written name, value]; first-written casing is kept. */

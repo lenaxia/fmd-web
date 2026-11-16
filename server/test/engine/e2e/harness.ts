@@ -9,6 +9,7 @@ import {
   FMD2_LUA_ROOT,
 } from '../../../src/engine/shims/install.js';
 import { RecordedResponseResolver, type RecordedResponse } from '../../../src/engine/shims/http-shim.js';
+import type { CookieJarPort } from '../../../src/engine/shims/http-cookies.js';
 import type { EventContext, EventDispatchResult, LuaModuleDescriptor } from '@fmd/contract';
 import type { MemoryLogger } from '../../../src/engine/lua/logger.js';
 import type { WasmoonLuaEngine } from '../../../src/engine/lua/engine.js';
@@ -48,6 +49,13 @@ export interface HarnessOptions {
   readonly luaRoot?: string;
   /** Module id attributed to shim logs (descriptor id once known). */
   readonly envSelectedLanguage?: string;
+  /**
+   * §5.3 per-module cookie jar (audit F-2): backed by BOTH the HTTP
+   * shims (request cookie injection) and the MODULE cookie methods —
+   * pass the state service's `SharedCookieJar` for the shared behavior,
+   * omit for the per-engine default.
+   */
+  readonly sharedCookies?: CookieJarPort;
 }
 
 export async function openSession(options: HarnessOptions): Promise<HarnessSession> {
@@ -81,6 +89,7 @@ export async function openSession(options: HarnessOptions): Promise<HarnessSessi
   }
 
   const engine = await host.createEngine();
+  const sharedCookies = options.sharedCookies;
   let installed: ReturnType<typeof installShims> | undefined;
   await engine.loadModule(options.moduleFile, (inner, bridge) => {
     // shims must exist BEFORE the chunk runs: site modules `require`
@@ -91,6 +100,7 @@ export async function openSession(options: HarnessOptions): Promise<HarnessSessi
       logger,
       moduleId: descriptor.id,
       luaRoot,
+      ...(sharedCookies !== undefined ? { sharedCookies } : {}),
     });
   });
   const shimKit = installed;
@@ -102,6 +112,7 @@ export async function openSession(options: HarnessOptions): Promise<HarnessSessi
   const dispatcher = createContractDispatcher(engine, abort, logger, undefined, undefined, undefined, {
     makeHTTP: shimKit.makeHTTP,
     ...(options.shims?.account !== undefined ? { account: options.shims.account } : {}),
+    ...(sharedCookies !== undefined ? { moduleCookies: () => sharedCookies } : {}),
   });
 
   return {
