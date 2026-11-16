@@ -619,3 +619,43 @@ provenance evidence:**
    story's deliverable claim stands unmodified: **zero uncommitted product-code changes
    attributable to the audit** — the two dirty files are attributable to the remediation
    story's worker, with the session/timestamp/transcript evidence above.
+
+### 7.2 Reviewer re-verification (in_review stage, 2026-11-16 ~01:15–01:30 UTC — all checks independently re-executed)
+
+The in_review reviewer re-verified the two review findings and the report's evidence base
+from scratch; results:
+
+1. **§3 #7 pb probe (v2) reproduces byte-identically.** Re-run:
+   `cp /tmp/opencode/probe-pb.ts /tmp/opencode/rev-pb.mts && npx tsx /tmp/opencode/rev-pb.mts`
+   → exit 0, stdout byte-identical to `/tmp/opencode/probe-pb.out` (diff clean), which is
+   the quote block in §3 #7 verbatim. (Note: the probe scripts must carry an `.mts`
+   extension or run from a `type: module` scope — plain `.ts` under /tmp resolves to CJS
+   and esbuild rejects top-level await; the committed artifacts' invocation shape is
+   recorded here so the byte-reproducibility claim is complete.)
+2. **§5 A1 verbatim error text re-derived.** A fresh minimal probe (same engine + require
+   shim + `pcall(protoc.load, protoc, __bad_proto)` setup as probe-adv.ts:21–36) printed
+   exactly `THREW utils/protoc.lua:83: <input>:1:54: '=' expected` — matching the final
+   line of `/tmp/opencode/probe-adv.out` and the §5 A1 quote. `probe-adv.ts` itself also
+   re-ran exit 0 with all A1–A4 PASS lines identical (its final THREW line is an appended
+   echo of the captured Lua error, not script stdout — now stated here).
+3. **§7.1 provenance independently confirmed at all three links.** (a) Board story
+   tsk-hilly-wagon-picnics exists, UUID `6d2d682c-…`, scoped to exactly F-1/F-2/F-3;
+   (b) workspace session `olive-juggler-mows` ("Audit fixes: CRLF transport + module
+   cookies", created 00:40:45Z, last active 00:50:38Z) is its board worker — the
+   transcript's stored `edit` diffs against http-headers.ts/http-transport.ts match the
+   working tree line-for-line, and its final message announces the ensureWorker-lifecycle
+   and send()-boundary edits that did NOT persist (5 planned edits, 3 on disk) — exactly
+   the partial-WIP state §7.1 describes; (c) the two audit commits (`86b4a25`, `81c1821`)
+   each contain ONLY `docs/AUDIT-FINAL.md` (`git show --name-only`), and no commit
+   contains the shim edits (`git log -- <shims>` ends at b33021a/9871396).
+4. **§0 gate numbers verified against the cited logs.** `/tmp/opencode/ci-run.log`
+   contains `1597 passed`, `912/912`, `100.00%`; `/tmp/opencode/coverage-run.log`
+   contains `88.28` / `81.67` — the §0 table and §4 figures quote them faithfully.
+5. **WIP completeness observation (no action, for the remediation story):** the persisted
+   worker-script edit at http-transport.ts:353 references `firstCrlfIndex` inside the
+   `LOOPBACK_WORKER_SCRIPT` template while the only interpolation in the file is
+   unrelated — the worker script scope does not receive the helper, so the dirty tree is
+   expected to fail HTTP transport tests as-is. This is consistent with paused mid-flight
+   remediation WIP (the story's own gates/tests step is still pending) and is one more
+   reason the dirty tree is NOT a valid gate surface for this audit; §0's numbers are from
+   the clean committed tree and remain the audit's evidence.
