@@ -104,6 +104,36 @@ tarball work) shares the checkout at commit time; it is excluded from this
 story's commit, and repo-wide `tsc -b`/full-`npm test` coverage of server
 code belongs to that story.
 
+## Re-review (bounce 1) — lint-gate fix
+
+**Finding (blocker)**: `scripts/capture-design-evidence.mjs` failed root
+`npm run lint` with 4× `no-undef` (`process` ×2, `window`, `console`) — the
+node-globals override in `eslint.config.js` covered `corpus/scripts/**/*.mjs`
+and `e2e/**/*.mjs` but not `scripts/**/*.mjs` (and declared no `window`), so
+ci.sh aborted at step 2 (lint), before the design-gate and visual steps.
+
+**Fix**: `eslint.config.js` — added `scripts/**/*.mjs` to the override's
+`files` and `window: 'readonly'` to its globals (the `window` reference is
+Playwright `addInitScript` source — serialized and executed in the browser,
+never under node).
+
+**Chain re-verified in ci.sh order** (with the concurrent bootstrap-fixes WIP
+in-tree, typecheck-clean):
+
+| ci.sh step | Command | Result |
+| --- | --- | --- |
+| 1 contract | `npm run contract:check` | OK — 0 mismatches |
+| 2 lint | `npm run lint` (root `eslint .`) | **clean** (was the blocker) |
+| 3 typecheck | `npm run typecheck` (`tsc -b`) | clean |
+| 4 test | `npm test` | 158 files / **1660 passed**, 3 skipped |
+| 5 design-gate | `bash scripts/design-gate.sh` | OK |
+| 6 web e2e | `npm run e2e -w @fmd/web` | 9/9 (smoke unmodified 4/4 + a11y 3/3 + perf 2/2) |
+| 7 visual | `npm run e2e:visual -w @fmd/web` | 12/12 at zero threshold |
+
+The chain now reaches and passes the design-system gate and the visual-diff
+gate. (Corpus replay and the compose e2e phases run after step 7 in ci.sh and
+predate this story unchanged; the reviewer's own verification covered them.)
+
 ## Deliberate design decisions
 
 - **Radix Tabs** for the Browse mode switcher (role=tab + roving-tabindex

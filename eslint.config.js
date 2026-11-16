@@ -90,12 +90,15 @@ export default tseslint.config(
   },
   {
     // Offline maintenance scripts + the e2e fixture/mock tooling run
-    // under plain node — node globals apply.
-    files: ['corpus/scripts/**/*.mjs', 'e2e/**/*.mjs'],
+    // under plain node — node globals apply. `window` is included for
+    // Playwright addInitScript/evaluate callbacks: that source is
+    // serialized and executed in the BROWSER, never under node.
+    files: ['corpus/scripts/**/*.mjs', 'e2e/**/*.mjs', 'scripts/**/*.mjs'],
     languageOptions: {
       globals: {
         console: 'readonly',
         process: 'readonly',
+        window: 'readonly',
         Buffer: 'readonly',
         URL: 'readonly',
         setTimeout: 'readonly',
