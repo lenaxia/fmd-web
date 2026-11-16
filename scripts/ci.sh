@@ -46,6 +46,15 @@ npm run typecheck
 echo "==> test (unit + integration — the one offline suite, DESIGN.md §13)"
 npm test
 
+echo "==> design-system gate (tokens-only styling; tsk-fuzzy-titanium-folds)"
+bash scripts/design-gate.sh
+
+echo "==> web e2e: smoke + keyboard-nav + virtualization perf (vite dev server, mock API)"
+npm run e2e -w @fmd/web
+
+echo "==> web e2e: visual regression (per-page x per-theme fixtures, zero threshold)"
+npm run e2e:visual -w @fmd/web
+
 echo "==> corpus (full seed replay vs FPC oracle; >=99% + zero undocumented mismatches)"
 npm run corpus
 

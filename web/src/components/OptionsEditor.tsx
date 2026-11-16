@@ -11,9 +11,16 @@
  * `defaultValue` only; stored §9 module_state values are not part of
  * the list response, so drafts seed from `defaultValue` (the API's
  * only visible value) until a values read model exists.
+ *
+ * Design-system retrofit: native controls keep their exact semantics
+ * (e2e selectOptions / jest-dom toBeChecked are pinned to them) but
+ * wear the token-styled Input / NativeSelect look.
  */
 import { useMemo, useState, type FormEvent, type ReactElement } from 'react';
 import type { ModuleOptionDescriptorT, ModuleSummaryT, OptionValueT } from '../api/hooks';
+import { NativeSelect } from '@/components/patterns/NativeSelect';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 /** Form draft state: checkbox → boolean; all others keep string form. */
 export type OptionDrafts = Record<string, boolean | string>;
@@ -112,70 +119,79 @@ export function OptionsEditor(props: {
         onSubmit(event);
       }}
     >
-      <fieldset>
-        <legend>Options (§5.1 — combobox values store the item INDEX)</legend>
-        {descriptors.map((descriptor): ReactElement => {
-          const controlId = `option-${props.module.id}-${descriptor.name}`;
-          if (descriptor.kind === 'checkbox') {
-            const checked = drafts[descriptor.name] === true || drafts[descriptor.name] === 'true';
+      <fieldset className="rounded-lg border px-4 py-3">
+        <legend className="px-1 text-xs text-muted-foreground">Options (§5.1 — combobox values store the item INDEX)</legend>
+        <div className="flex flex-col gap-3">
+          {descriptors.map((descriptor): ReactElement => {
+            const controlId = `option-${props.module.id}-${descriptor.name}`;
+            if (descriptor.kind === 'checkbox') {
+              const checked = drafts[descriptor.name] === true || drafts[descriptor.name] === 'true';
+              return (
+                <div className="option-row flex items-center gap-3" key={descriptor.name}>
+                  <input
+                    id={controlId}
+                    type="checkbox"
+                    className="size-4 accent-(--primary)"
+                    checked={checked}
+                    onChange={(e): void => {
+                      setDraft(descriptor.name, e.target.checked);
+                    }}
+                  />
+                  <label htmlFor={controlId} className="text-sm font-medium">
+                    {descriptor.name}
+                  </label>
+                </div>
+              );
+            }
+            if (descriptor.kind === 'combobox') {
+              const items = descriptor.items ?? [];
+              const index = Number.parseInt(String(drafts[descriptor.name] ?? ''), 10);
+              return (
+                <div className="option-row grid grid-cols-[14rem_1fr] items-center gap-3" key={descriptor.name}>
+                  <label htmlFor={controlId} className="text-sm font-medium">
+                    {descriptor.name} <span className="option-hint text-xs font-normal text-muted-foreground">(stored: item index)</span>
+                  </label>
+                  <NativeSelect
+                    id={controlId}
+                    className="max-w-56"
+                    value={Number.isInteger(index) ? String(index) : ''}
+                    onChange={(e): void => {
+                      setDraft(descriptor.name, e.target.value);
+                    }}
+                  >
+                    {items.map((item, i): ReactElement => (
+                      <option key={item} value={String(i)}>
+                        {item}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </div>
+              );
+            }
+            const inputType = descriptor.kind === 'spinedit' ? 'number' : 'text';
             return (
-              <div className="option-row" key={descriptor.name}>
-                <input
-                  id={controlId}
-                  type="checkbox"
-                  checked={checked}
-                  onChange={(e): void => {
-                    setDraft(descriptor.name, e.target.checked);
-                  }}
-                />
-                <label htmlFor={controlId}>{descriptor.name}</label>
-              </div>
-            );
-          }
-          if (descriptor.kind === 'combobox') {
-            const items = descriptor.items ?? [];
-            const index = Number.parseInt(String(drafts[descriptor.name] ?? ''), 10);
-            return (
-              <div className="option-row" key={descriptor.name}>
-                <label htmlFor={controlId}>
-                  {descriptor.name} <span className="option-hint">(stored: item index)</span>
+              <div className="option-row grid grid-cols-[14rem_1fr] items-center gap-3" key={descriptor.name}>
+                <label htmlFor={controlId} className="text-sm font-medium">
+                  {descriptor.name}
                 </label>
-                <select
+                <Input
                   id={controlId}
-                  value={Number.isInteger(index) ? String(index) : ''}
+                  className="max-w-56"
+                  type={inputType}
+                  value={String(drafts[descriptor.name] ?? '')}
                   onChange={(e): void => {
                     setDraft(descriptor.name, e.target.value);
                   }}
-                >
-                  {items.map((item, i): ReactElement => (
-                    <option key={item} value={String(i)}>
-                      {item}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
             );
-          }
-          const inputType = descriptor.kind === 'spinedit' ? 'number' : 'text';
-          return (
-            <div className="option-row" key={descriptor.name}>
-              <label htmlFor={controlId}>{descriptor.name}</label>
-              <input
-                id={controlId}
-                type={inputType}
-                value={String(drafts[descriptor.name] ?? '')}
-                onChange={(e): void => {
-                  setDraft(descriptor.name, e.target.value);
-                }}
-              />
-            </div>
-          );
-        })}
+          })}
+        </div>
       </fieldset>
-      <button type="submit" disabled={props.saving === true}>
+      <Button type="submit" size="sm" className="mt-3" disabled={props.saving === true}>
         {props.saving === true ? 'Saving…' : 'Save options'}
-      </button>
-      <p aria-live="polite" className="save-note">
+      </Button>
+      <p aria-live="polite" className="save-note mt-2 min-h-5 text-sm text-muted-foreground">
         {savedNote}
       </p>
     </form>

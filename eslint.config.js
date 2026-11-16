@@ -54,6 +54,41 @@ export default tseslint.config(
     },
   },
   {
+    // VENDORED shadcn/ui components (design system, CLI output). They
+    // are committed verbatim from the registry (patched only for token
+    // mapping — see the file headers) and re-vendored through the CLI,
+    // so hand-maintained boundary annotations are deliberately absent;
+    // type safety is enforced by tsc, token discipline by the
+    // design-system gate (scripts/design-gate.sh).
+    files: ['web/src/components/ui/**'],
+    rules: {
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
+    },
+  },
+  {
+    // DESIGN-SYSTEM COLOR BOUNDARY: raw color literals live in
+    // web/src/styles/tokens.css and NOWHERE else. Pages, patterns and
+    // feature components must reference semantic tokens (bg-background,
+    // text-state-running, …). Mirrored by scripts/design-gate.sh in CI.
+    files: ['web/src/pages/**', 'web/src/components/patterns/**', 'web/src/components/*.tsx'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'Literal[value=/#[0-9a-fA-F]{3,8}\\b/]',
+          message:
+            'Design system: raw hex color literals are forbidden — use the token utilities (bg-background, text-muted-foreground, …) from web/src/styles/tokens.css.',
+        },
+        {
+          selector:
+            "Literal[value=/\\b(rgb|rgba|hsl|hsla|oklch|oklab)\\(/]",
+          message:
+            'Design system: raw color functions are forbidden — use the token utilities from web/src/styles/tokens.css.',
+        },
+      ],
+    },
+  },
+  {
     // Offline maintenance scripts + the e2e fixture/mock tooling run
     // under plain node — node globals apply.
     files: ['corpus/scripts/**/*.mjs', 'e2e/**/*.mjs'],

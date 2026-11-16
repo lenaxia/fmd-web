@@ -16,7 +16,14 @@
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
     "types": ["vite/client"],
-    "useDefineForClassFields": true
+    "useDefineForClassFields": true,
+
+    // Design system: `@/` alias for the CLI-vendored shadcn/ui
+    // components (components.json aliases) — mirrors vite.config.ts.
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "test/**/*.tsx", "e2e/**/*.ts"],
   "exclude": ["dist"],

@@ -1,0 +1,228 @@
+/*
+ * FMD Web design tokens — the SINGLE source of visual truth.
+ *
+ * Tailwind v4 (CSS-first): this file imports the engine and exposes the
+ * token set as CSS custom properties; `@theme inline` maps them onto
+ * Tailwind's color/radius/spacing/font scales so every utility
+ * (bg-background, text-muted-foreground, rounded-lg, max-w-page…) and
+ * every shadcn/ui component under components/ui resolves through the
+ * SAME variables. Raw color values live HERE and nowhere else (enforced
+ * by scripts/design-gate.sh + the eslint no-color-literal rule).
+ *
+ * THEMING (class strategy, dark default — this is a manga app):
+ *   :root / .dark  → the dark palette (default; html carries .dark)
+ *   .light         → the light palette (toggle applies .light)
+ * A pre-hydration script in index.html picks the initial class from
+ * (persisted choice) → prefers-color-scheme → dark, so there is no
+ * flash and no JS-dependency for the first paint's colors.
+ */
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+/* Class-strategy dark variant: `dark:` utilities key off the .light/.dark
+ * document class, never off the media query (the app owns the choice). */
+@custom-variant dark (&:is(.dark, .dark *));
+
+/* ── Dark palette (default) ─────────────────────────────────────────────
+ * zinc-950 canvas, zinc-900 surfaces, violet accent, semantic job-state
+ * colors — a high-contrast reader-first dark theme. */
+:root,
+.dark {
+  color-scheme: dark;
+
+  --background: oklch(0.141 0.005 285.823);
+  --foreground: oklch(0.985 0 0);
+
+  --surface: oklch(0.185 0.005 285.9);
+  --surface-hover: oklch(0.235 0.006 286);
+
+  --card: oklch(0.21 0.006 285.885);
+  --card-foreground: oklch(0.985 0 0);
+
+  --popover: oklch(0.21 0.006 285.885);
+  --popover-foreground: oklch(0.985 0 0);
+
+  --primary: oklch(0.606 0.25 292.717);
+  --primary-foreground: oklch(0.985 0 0);
+
+  --secondary: oklch(0.274 0.006 286.033);
+  --secondary-foreground: oklch(0.985 0 0);
+
+  --muted: oklch(0.274 0.006 286.033);
+  --muted-foreground: oklch(0.712 0.013 286.067);
+
+  --accent: oklch(0.274 0.006 286.033);
+  --accent-foreground: oklch(0.985 0 0);
+
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  --success: oklch(0.596 0.145 163.225);
+  --success-foreground: oklch(0.985 0 0);
+
+  --warning: oklch(0.666 0.179 58.318);
+  --warning-foreground: oklch(0.985 0 0);
+
+  --border: oklch(0.274 0.006 286.033);
+  --input: oklch(0.274 0.006 286.033);
+  --ring: oklch(0.541 0.281 293.009);
+
+  /* Job / lifecycle states (downloads feed) */
+  --state-queued: oklch(0.44 0.017 285.786);
+  --state-queued-foreground: oklch(0.985 0 0);
+  --state-running: oklch(0.541 0.281 293.009);
+  --state-running-foreground: oklch(0.985 0 0);
+  --state-retry: oklch(0.666 0.179 58.318);
+  --state-retry-foreground: oklch(0.13 0.028 261.692);
+  --state-done: oklch(0.508 0.118 165.612);
+  --state-done-foreground: oklch(0.985 0 0);
+  --state-failed: oklch(0.577 0.245 27.325);
+  --state-failed-foreground: oklch(0.985 0 0);
+  --state-cancelled: oklch(0.371 0.01 285.823);
+  --state-cancelled-foreground: oklch(0.985 0 0);
+
+  --radius: 0.625rem;
+}
+
+/* ── Light palette ────────────────────────────────────────────────────── */
+.light {
+  color-scheme: light;
+
+  --background: oklch(0.985 0 0);
+  --foreground: oklch(0.141 0.005 285.823);
+
+  --surface: oklch(0.985 0 0);
+  --surface-hover: oklch(0.957 0.003 286.067);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.141 0.005 285.823);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.141 0.005 285.823);
+
+  --primary: oklch(0.541 0.281 293.009);
+  --primary-foreground: oklch(0.985 0 0);
+
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+
+  --muted: oklch(0.967 0.001 286.375);
+  --muted-foreground: oklch(0.552 0.016 285.938);
+
+  --accent: oklch(0.967 0.001 286.375);
+  --accent-foreground: oklch(0.21 0.006 285.885);
+
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  --success: oklch(0.448 0.119 151.328);
+  --success-foreground: oklch(0.985 0 0);
+
+  --warning: oklch(0.553 0.163 48.998);
+  --warning-foreground: oklch(0.985 0 0);
+
+  --border: oklch(0.92 0.004 286.32);
+  --input: oklch(0.92 0.004 286.32);
+  --ring: oklch(0.606 0.25 292.717);
+
+  --state-queued: oklch(0.87 0.007 286.286);
+  --state-queued-foreground: oklch(0.21 0.006 285.885);
+  --state-running: oklch(0.541 0.281 293.009);
+  --state-running-foreground: oklch(0.985 0 0);
+  --state-retry: oklch(0.795 0.184 86.047);
+  --state-retry-foreground: oklch(0.13 0.028 261.692);
+  --state-done: oklch(0.508 0.118 165.612);
+  --state-done-foreground: oklch(0.985 0 0);
+  --state-failed: oklch(0.577 0.245 27.325);
+  --state-failed-foreground: oklch(0.985 0 0);
+  --state-cancelled: oklch(0.712 0.013 286.067);
+  --state-cancelled-foreground: oklch(0.21 0.006 285.885);
+
+  --radius: 0.625rem;
+}
+
+/* ── Tailwind ↔ token bridge ────────────────────────────────────────────
+ * Every utility below resolves to a variable, so toggling .light/.dark
+ * re-themes the whole app (shadcn theme mapping included) with zero
+ * per-component color knowledge. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-state-queued: var(--state-queued);
+  --color-state-queued-foreground: var(--state-queued-foreground);
+  --color-state-running: var(--state-running);
+  --color-state-running-foreground: var(--state-running-foreground);
+  --color-state-retry: var(--state-retry);
+  --color-state-retry-foreground: var(--state-retry-foreground);
+  --color-state-done: var(--state-done);
+  --color-state-done-foreground: var(--state-done-foreground);
+  --color-state-failed: var(--state-failed);
+  --color-state-failed-foreground: var(--state-failed-foreground);
+  --color-state-cancelled: var(--state-cancelled);
+  --color-state-cancelled-foreground: var(--state-cancelled-foreground);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Spacing rhythm: page shell width + list density (patterns use these
+   * so every tab shares one layout rhythm). */
+  --container-page: 64rem;
+  --spacing-row: 2.75rem;
+
+  /* Typography */
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans', sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply bg-background text-foreground;
+  }
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+    margin: 0;
+    min-height: 100vh;
+  }
+  /* One global, token-driven focus ring (a11y smoke spec exercises it). */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+  code,
+  pre,
+  kbd {
+    @apply font-mono;
+  }
+}

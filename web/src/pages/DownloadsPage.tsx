@@ -2,19 +2,47 @@
  * Downloads (§7.1): job list with cursor pagination + live progress
  * over `WS /ws` with reconnect/backfill (D19). The WS feed patches
  * the React Query caches; a `resync` hint invalidates them.
+ *
+ * Design-system retrofit: FilterBar + NativeSelect (native semantics
+ * are pinned by e2e) + ListPanel (virtualized above the threshold).
+ * Status badges ride the semantic job-state tokens; the `.job-list` /
+ * `.job-row` / `.badge` / `.job-progress` hooks and every status text
+ * are unchanged — visual-only.
  */
 import { useState, type ReactElement } from 'react';
 import { useCancelJob, useJobsList, type JobStateT, type JobT } from '../api/hooks';
 import { useJobsFeed } from '../state/use-jobs-feed';
-import { EmptyState } from '../components/EmptyState';
-import { ErrorBanner } from '../components/ErrorBanner';
+import { EmptyState } from '@/components/patterns/EmptyState';
+import { ErrorBanner } from '@/components/patterns/ErrorBanner';
+import { FilterBar } from '@/components/patterns/FilterBar';
+import { ListPanel } from '@/components/patterns/ListPanel';
+import { PageHeader } from '@/components/patterns/PageHeader';
+import { NativeSelect } from '@/components/patterns/NativeSelect';
+import { StatPill } from '@/components/patterns/StatPill';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { cn } from 'cn';
 
 const STATES: readonly (JobStateT | '')[] = ['', 'queued', 'running', 'retry', 'done', 'failed', 'cancelled'];
 
 const CANCELLABLE: readonly JobStateT[] = ['queued', 'running', 'retry'];
 
+/** Job-state → token utilities (semantic state colors, both themes). */
+const STATE_CLASSES: Record<JobStateT, string> = {
+  queued: 'bg-state-queued text-state-queued-foreground',
+  running: 'bg-state-running text-state-running-foreground',
+  retry: 'bg-state-retry text-state-retry-foreground',
+  done: 'bg-state-done text-state-done-foreground',
+  failed: 'bg-state-failed text-state-failed-foreground',
+  cancelled: 'bg-state-cancelled text-state-cancelled-foreground',
+};
+
 function StatusBadge(props: { state: JobStateT }): ReactElement {
-  return <span className={`badge job-${props.state}`}>{props.state}</span>;
+  return (
+    <Badge variant="secondary" className={cn('badge', `job-${props.state}`, STATE_CLASSES[props.state])}>
+      {props.state}
+    </Badge>
+  );
 }
 
 function WsStatusLine(props: {
@@ -33,9 +61,11 @@ function WsStatusLine(props: {
             ? 'Connecting…'
             : 'Offline';
   return (
-    <p className="ws-status" aria-live="polite">
-      Event stream: <strong>{label}</strong>
-      {props.resyncCount > 0 ? ' · resynced after missed-event window (D19)' : ''}
+    <p className="ws-status mb-4 text-sm text-muted-foreground" aria-live="polite">
+      <StatPill className="mb-0">
+        Event stream: <strong className="font-semibold text-foreground">{label}</strong>
+        {props.resyncCount > 0 ? ' · resynced after missed-event window (D19)' : ''}
+      </StatPill>
     </p>
   );
 }
@@ -44,20 +74,25 @@ function JobRow(props: { job: JobT; onCancel: (jobId: string) => void; cancelPen
   const job = props.job;
   const cancellable = CANCELLABLE.includes(job.state);
   return (
-    <li className="job-row" data-job-id={job.id}>
-      <StatusBadge state={job.state} /> <code>{job.id.slice(0, 8)}</code>{' '}
-      <span className="job-title">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2 text-sm">
+      <StatusBadge state={job.state} />
+      <code className="rounded bg-surface px-1 py-0.5 font-mono text-xs">{job.id.slice(0, 8)}</code>
+      <span className="job-title min-w-0 flex-1 truncate font-medium">
         {job.payload['mangaTitle'] !== undefined ? String(job.payload['mangaTitle']) : job.moduleId}
         {job.payload['chapterName'] !== undefined ? ` — ${String(job.payload['chapterName'])}` : ''}
       </span>
       {job.progress !== undefined ? (
-        <span className="job-progress"> {JSON.stringify(job.progress)}</span>
+        <span className="job-progress font-mono text-xs text-muted-foreground"> {JSON.stringify(job.progress)}</span>
       ) : null}
-      {job.error !== undefined ? <span className="job-error"> error: {job.error}</span> : null}
+      {job.error !== undefined ? (
+        <span className="job-error text-xs text-destructive"> error: {job.error}</span>
+      ) : null}
       {cancellable ? (
-        <button
+        <Button
           type="button"
-          className="job-cancel"
+          variant="outline"
+          size="sm"
+          className="job-cancel ml-1 h-7"
           aria-label={`Cancel job ${job.id}`}
           disabled={props.cancelPending}
           onClick={(): void => {
@@ -65,9 +100,9 @@ function JobRow(props: { job: JobT; onCancel: (jobId: string) => void; cancelPen
           }}
         >
           {props.cancelPending ? 'Cancelling…' : 'Cancel'}
-        </button>
+        </Button>
       ) : null}
-    </li>
+    </div>
   );
 }
 
@@ -81,53 +116,73 @@ export function DownloadsPage(): ReactElement {
 
   return (
     <section aria-label="Downloads">
+      <PageHeader
+        title="Downloads"
+        description="Job queue with live progress over the event stream."
+      />
+
       <WsStatusLine status={feed.status} reconnectAttempt={feed.reconnectAttempt} resyncCount={feed.resyncCount} />
 
-      <div className="toolbar">
-        <label htmlFor="job-state-filter">Filter by state</label>
-        <select
-          id="job-state-filter"
-          value={state}
-          onChange={(e): void => {
-            setState(e.target.value as JobStateT | '');
-          }}
-        >
-          {STATES.map((s): ReactElement => (
-            <option key={s} value={s}>
-              {s === '' ? 'all states' : s}
-            </option>
-          ))}
-        </select>
-      </div>
+      <FilterBar ariaLabel="Job filters">
+        <div className="flex items-center gap-2">
+          <label htmlFor="job-state-filter" className="text-sm font-medium">
+            Filter by state
+          </label>
+          <NativeSelect
+            id="job-state-filter"
+            className="w-40"
+            value={state}
+            onChange={(e): void => {
+              setState(e.target.value as JobStateT | '');
+            }}
+          >
+            {STATES.map((s): ReactElement => (
+              <option key={s} value={s}>
+                {s === '' ? 'all states' : s}
+              </option>
+            ))}
+          </NativeSelect>
+        </div>
+      </FilterBar>
 
       {jobs.isError ? <ErrorBanner error={jobs.error} /> : null}
       {cancelJob.isError ? <ErrorBanner error={cancelJob.error} /> : null}
-      {jobs.isPending ? <p role="status">Loading jobs…</p> : null}
+      {jobs.isPending ? <p role="status" className="text-sm text-muted-foreground">Loading jobs…</p> : null}
 
       {rows.length > 0 ? (
         <>
-          <ul className="job-list">
-            {rows.map((job): ReactElement => (
+          <ListPanel
+            className="job-list"
+            ariaLabel="Download jobs"
+            items={rows}
+            itemKey={(job): string => job.id}
+            rowClassName="job-row"
+            liProps={(job): { className: string; 'data-job-id': string } => ({
+              className: 'job-row',
+              'data-job-id': job.id,
+            })}
+            renderItem={(job): ReactElement => (
               <JobRow
-                key={job.id}
                 job={job}
                 cancelPending={cancelJob.isPending}
                 onCancel={(jobId): void => {
                   void cancelJob.mutateAsync(jobId);
                 }}
               />
-            ))}
-          </ul>
+            )}
+          />
           {jobs.hasNextPage ? (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              className="mt-4"
               onClick={(): void => {
                 jobs.fetchNextPage();
               }}
               disabled={jobs.isFetchingNextPage}
             >
               {jobs.isFetchingNextPage ? 'Loading…' : 'Load more'}
-            </button>
+            </Button>
           ) : null}
         </>
       ) : null}

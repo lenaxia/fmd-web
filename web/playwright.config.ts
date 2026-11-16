@@ -9,8 +9,12 @@ export default defineConfig({
   testDir: './e2e',
   // The compose/process stack scenario lives in its own specs driven by
   // scripts/e2e.sh (web/playwright.compose.config.ts) — this config is
-  // the smoke run only (vite dev server + intercepted mock API).
-  testMatch: /smoke\.spec\.ts/,
+  // the smoke run only (vite dev server + intercepted mock API): the
+  // four page happy-paths (smoke.spec.ts), the keyboard-navigation
+  // smoke (a11y.spec.ts) and the virtualization perf smoke
+  // (perf.spec.ts). Visual regression has its own zero-threshold
+  // config (playwright.visual.config.ts).
+  testMatch: /(smoke|a11y|perf)\.spec\.ts/,
   timeout: 20_000,
   fullyParallel: false,
   reporter: [['list']],

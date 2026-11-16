@@ -11,6 +11,12 @@ export default defineConfig({
   esbuild: { target: 'es2022' },
   resolve: {
     alias: [
+      // Design system: the web workspace's `@/` alias (vendored shadcn
+      // components) — mirrors web/vite.config.ts + web/tsconfig.json.
+      {
+        find: /^@\//,
+        replacement: fileURLToPath(new URL('./web/src/', import.meta.url)),
+      },
       // Workspace-source aliases so tests never require a prior build:
       // '@fmd/contract' resolves to its TypeScript source in vitest,
       // while tsc -b resolves it through the workspace package exports.

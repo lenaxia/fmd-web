@@ -4,9 +4,13 @@
  * deletion. The badge (`new-chapter-badge`) renders `newChapterCount`
  * from the last check; every mutation invalidates the `['favorites']`
  * query so the rows re-render from server state.
+ *
+ * Design-system retrofit: PageHeader + ListPanel + EntryRow rows with
+ * token-styled controls; testids, aria-labels and texts unchanged.
  */
 import { type ReactElement } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { RefreshCw, Trash2 } from 'lucide-react';
 import {
   useCheckFavoriteNow,
   useDeleteFavorite,
@@ -14,17 +18,22 @@ import {
   useUpdateFavorite,
   type FavoriteT,
 } from '../api/hooks';
-import { EmptyState } from '../components/EmptyState';
-import { ErrorBanner } from '../components/ErrorBanner';
+import { EmptyState } from '@/components/patterns/EmptyState';
+import { ErrorBanner } from '@/components/patterns/ErrorBanner';
+import { EntryRow } from '@/components/patterns/EntryRow';
+import { ListPanel } from '@/components/patterns/ListPanel';
+import { PageHeader } from '@/components/patterns/PageHeader';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 function NewChapterBadge(props: { count: number }): ReactElement | null {
   if (props.count <= 0) {
     return null;
   }
   return (
-    <span className="badge new-chapter-badge" data-testid="new-chapter-badge">
+    <Badge variant="success" data-testid="new-chapter-badge" className="new-chapter-badge">
       {props.count} new
-    </span>
+    </Badge>
   );
 }
 
@@ -42,52 +51,71 @@ function FavoriteRow(props: { favorite: FavoriteT }): ReactElement {
   const label = favorite.title ?? favorite.url;
 
   return (
-    <li className="favorite-row" data-favorite-id={favorite.id}>
-      <span className="favorite-title">{label}</span>{' '}
-      <NewChapterBadge count={favorite.newChapterCount} />{' '}
-      <span className="favorite-status">{favorite.status ?? '—'}</span>{' '}
-      <span className="favorite-count">
-        {favorite.currentChapter === null ? 'no check yet' : `${favorite.currentChapter} chapters`}
-      </span>
-      <label className="favorite-autodownload">
-        <input
-          type="checkbox"
-          checked={favorite.autoDownload}
-          disabled={pending}
-          data-testid={`autodownload-${label}`}
-          aria-label={`Auto-download new chapters for ${label}`}
-          onChange={(event): void => {
-            update.mutate(
-              { id: favorite.id, autoDownload: event.target.checked },
-              { onSuccess: refresh },
-            );
-          }}
-        />
-        auto-download
-      </label>
-      <button
-        type="button"
-        className="favorite-check"
-        disabled={pending}
-        aria-label={`Check ${label} for new chapters now`}
-        onClick={(): void => {
-          checkNow.mutate(favorite.id, { onSuccess: refresh });
-        }}
-      >
-        {checkNow.isPending ? 'Checking…' : 'Check now'}
-      </button>
-      <button
-        type="button"
-        className="favorite-delete"
-        disabled={pending}
-        aria-label={`Remove favorite ${label}`}
-        onClick={(): void => {
-          remove.mutate(favorite.id, { onSuccess: refresh });
-        }}
-      >
-        Remove
-      </button>
-    </li>
+    <EntryRow
+      data={{ 'data-favorite-id': favorite.id }}
+      className="favorite-row"
+      title={<span className="favorite-title">{label}</span>}
+      badges={
+        <>
+          <NewChapterBadge count={favorite.newChapterCount} />
+          <Badge variant="outline" className="favorite-status">{favorite.status ?? '—'}</Badge>
+        </>
+      }
+      meta={
+        <span className="favorite-count">
+          {favorite.currentChapter === null ? 'no check yet' : `${favorite.currentChapter} chapters`}
+        </span>
+      }
+      trailing={
+        <div className="flex shrink-0 items-center gap-2">
+          <label className="favorite-autodownload flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              className="size-4 accent-(--primary)"
+              checked={favorite.autoDownload}
+              disabled={pending}
+              data-testid={`autodownload-${label}`}
+              aria-label={`Auto-download new chapters for ${label}`}
+              onChange={(event): void => {
+                update.mutate(
+                  { id: favorite.id, autoDownload: event.target.checked },
+                  { onSuccess: refresh },
+                );
+              }}
+            />
+            auto-download
+          </label>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="favorite-check h-7"
+            disabled={pending}
+            aria-label={`Check ${label} for new chapters now`}
+            onClick={(): void => {
+              checkNow.mutate(favorite.id, { onSuccess: refresh });
+            }}
+          >
+            <RefreshCw aria-hidden="true" />
+            {checkNow.isPending ? 'Checking…' : 'Check now'}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="favorite-delete h-7 text-destructive hover:bg-destructive/10"
+            disabled={pending}
+            aria-label={`Remove favorite ${label}`}
+            onClick={(): void => {
+              remove.mutate(favorite.id, { onSuccess: refresh });
+            }}
+          >
+            <Trash2 aria-hidden="true" />
+            Remove
+          </Button>
+        </div>
+      }
+    />
   );
 }
 
@@ -96,25 +124,25 @@ export function FavoritesPage(): ReactElement {
 
   if (favorites.isPending) {
     return (
-      <main>
-        <h1>Favorites</h1>
-        <p role="status">Loading favorites…</p>
-      </main>
+      <section aria-label="Favorites">
+        <PageHeader title="Favorites" description="Tracked titles with new-chapter checks on schedule." />
+        <p role="status" className="text-sm text-muted-foreground">Loading favorites…</p>
+      </section>
     );
   }
   if (favorites.isError) {
     return (
-      <main>
-        <h1>Favorites</h1>
+      <section aria-label="Favorites">
+        <PageHeader title="Favorites" description="Tracked titles with new-chapter checks on schedule." />
         <ErrorBanner error={favorites.error} />
-      </main>
+      </section>
     );
   }
   const rows = favorites.data.favorites;
   if (rows.length === 0) {
     return (
-      <main>
-        <h1>Favorites</h1>
+      <section aria-label="Favorites">
+        <PageHeader title="Favorites" description="Tracked titles with new-chapter checks on schedule." />
         <EmptyState title="No favorites yet">
           <p>
             Add favorites from a manga page — the favorites engine checks
@@ -122,17 +150,20 @@ export function FavoritesPage(): ReactElement {
             jitter) and badges the new chapters it finds.
           </p>
         </EmptyState>
-      </main>
+      </section>
     );
   }
   return (
-    <main>
-      <h1>Favorites</h1>
-      <ul className="favorite-list">
-        {rows.map((favorite): ReactElement => (
-          <FavoriteRow key={favorite.id} favorite={favorite} />
-        ))}
-      </ul>
-    </main>
+    <section aria-label="Favorites">
+      <PageHeader title="Favorites" description="Tracked titles with new-chapter checks on schedule." />
+      <ListPanel
+        className="favorite-list rounded-lg border"
+        ariaLabel="Favorites"
+        items={rows}
+        itemKey={(favorite): string => favorite.id}
+        rowClassName="favorite-row"
+        renderItem={(favorite): ReactElement => <FavoriteRow favorite={favorite} />}
+      />
+    </section>
   );
 }

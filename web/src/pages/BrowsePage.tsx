@@ -3,12 +3,27 @@
  * cursor pagination ("Load more"). The catalog id equals the site
  * module id (§6.4 catalogs are keyed per module); with no catalog
  * selected the D20 empty-state explains how to get one.
+ *
+ * Design-system retrofit: PageHeader + FilterBar (Tabs + forms; the
+ * bar collapses into the Sheet side panel on mobile) + ListPanel
+ * (virtualized above the threshold). Behavior, texts, labels and
+ * test hooks are unchanged — visual-only.
  */
 import { useState, type FormEvent, type ReactElement } from 'react';
+import { Search } from 'lucide-react';
 import type { CatalogEntryT } from '../api/hooks';
 import { useCatalogEntries, type CatalogMode } from '../api/hooks';
-import { EmptyState } from '../components/EmptyState';
-import { ErrorBanner } from '../components/ErrorBanner';
+import { EmptyState } from '@/components/patterns/EmptyState';
+import { ErrorBanner } from '@/components/patterns/ErrorBanner';
+import { FilterBar } from '@/components/patterns/FilterBar';
+import { ListPanel } from '@/components/patterns/ListPanel';
+import { EntryRow } from '@/components/patterns/EntryRow';
+import { PageHeader } from '@/components/patterns/PageHeader';
+import { StatPill } from '@/components/patterns/StatPill';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { navigate, type Route } from '../router';
 
 const PAGE_LIMIT = 20;
@@ -19,7 +34,7 @@ const MODES: readonly { value: CatalogMode; label: string }[] = [
   { value: 'search', label: 'Search' },
 ];
 
-function EntryRow(props: { entry: CatalogEntryT; catalogId: string }): ReactElement {
+function EntryRowView(props: { entry: CatalogEntryT; catalogId: string }): ReactElement {
   const { entry } = props;
   const open = (): void => {
     navigate('manga', {
@@ -30,14 +45,16 @@ function EntryRow(props: { entry: CatalogEntryT; catalogId: string }): ReactElem
     });
   };
   return (
-    <li className="catalog-entry">
-      <button type="button" className="entry-link" onClick={open}>
-        <span className="entry-title">{entry.title}</span>
+    <EntryRow
+      onClick={open}
+      buttonClassName="catalog-entry"
+      title={<span className="entry-title">{entry.title}</span>}
+      meta={
         <span className="entry-meta">
           {entry.authors !== '' ? entry.authors : 'unknown author'} · {entry.status} · {entry.numChapter} chapters
         </span>
-      </button>
-    </li>
+      }
+    />
   );
 }
 
@@ -66,88 +83,105 @@ export function BrowsePage(props: { route: Route }): ReactElement {
 
   if (catalogId === '') {
     return (
-      <EmptyState title="No catalog selected">
-        <p>
-          Browse needs a catalog id (32-hex, keyed per site module). On first run the server
-          auto-triggers module + catalog sync (D20) — check Settings for bootstrap progress,
-          then open a catalog:
-        </p>
-        <CatalogIdForm />
-      </EmptyState>
+      <section aria-label="Browse catalog">
+        <PageHeader title="Browse catalog" description="Search every synced site module's catalog." />
+        <EmptyState title="No catalog selected">
+          <p>
+            Browse needs a catalog id (32-hex, keyed per site module). On first run the server
+            auto-triggers module + catalog sync (D20) — check Settings for bootstrap progress,
+            then open a catalog:
+          </p>
+          <CatalogIdForm />
+        </EmptyState>
+      </section>
     );
   }
 
   return (
     <section aria-label="Browse catalog">
-      <p className="toolbar">
-        Catalog <code>{catalogId}</code>
-        {pages.data?.pages.at(-1)?.source === 'live' ? (
-          <span className="badge badge-capability" title="§6.8 live-scrape fallback: no FMD2-DB catalog — served live from the module's directory walk">
-            live scrape
-          </span>
-        ) : null}
-      </p>
-      <CatalogIdForm />
+      <PageHeader
+        title="Browse"
+        description={
+          <>
+            Catalog <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-xs">{catalogId}</code>
+            {pages.data?.pages.at(-1)?.source === 'live' ? (
+              <Badge variant="secondary" className="ml-2 align-middle" title="§6.8 live-scrape fallback: no FMD2-DB catalog — served live from the module's directory walk">
+                live scrape
+              </Badge>
+            ) : null}
+          </>
+        }
+      />
 
-      <div role="tablist" aria-label="Browse mode">
-        {MODES.map((m): ReactElement => (
-          <button
-            key={m.value}
-            type="button"
-            role="tab"
-            aria-selected={mode === m.value}
-            onClick={(): void => {
-              setMode(m.value);
-            }}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
+      <FilterBar ariaLabel="Catalog filters">
+        <Tabs value={mode} onValueChange={(value): void => { setMode(value as CatalogMode); }}>
+          <TabsList aria-label="Browse mode">
+            {MODES.map((m): ReactElement => (
+              <TabsTrigger key={m.value} value={m.value}>
+                {m.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
 
-      <form
-        className="search-form"
-        aria-label="Catalog search"
-        onSubmit={(event): void => {
-          onSearchSubmit(event);
-        }}
-      >
-        <label htmlFor="browse-search">Search titles</label>
-        <input
-          id="browse-search"
-          type="search"
-          value={searchText}
-          onChange={(e): void => {
-            setSearchText(e.target.value);
+        <form
+          className="flex flex-wrap items-center gap-2"
+          aria-label="Catalog search"
+          onSubmit={(event): void => {
+            onSearchSubmit(event);
           }}
-        />
-        <button type="submit">Search</button>
-      </form>
+        >
+          <label htmlFor="browse-search" className="text-sm font-medium">
+            Search titles
+          </label>
+          <Input
+            id="browse-search"
+            type="search"
+            className="w-56"
+            value={searchText}
+            onChange={(e): void => {
+              setSearchText(e.target.value);
+            }}
+          />
+          <Button type="submit" variant="secondary" size="sm">
+            <Search aria-hidden="true" />
+            Search
+          </Button>
+        </form>
+
+        <CatalogIdForm />
+      </FilterBar>
 
       {pages.isError ? <ErrorBanner error={pages.error} /> : null}
-      {pages.isPending ? <p role="status">Loading…</p> : null}
+      {pages.isPending ? <p role="status" className="text-sm text-muted-foreground">Loading…</p> : null}
 
       {entries.length > 0 ? (
         <>
-          <p role="status">
-            Showing {entries.length}
-            {total !== undefined ? ` of ${total}` : ''} entries
+          <p role="status" className="mb-2">
+            <StatPill>
+              Showing {entries.length}
+              {total !== undefined ? ` of ${total}` : ''} entries
+            </StatPill>
           </p>
-          <ul className="catalog-list">
-            {entries.map((entry): ReactElement => (
-              <EntryRow key={`${entry.jdn}-${entry.link}`} entry={entry} catalogId={catalogId} />
-            ))}
-          </ul>
+          <ListPanel
+            className="catalog-list"
+            ariaLabel="Catalog entries"
+            items={entries}
+            itemKey={(entry): string => `${entry.jdn}-${entry.link}`}
+            renderItem={(entry): ReactElement => <EntryRowView entry={entry} catalogId={catalogId} />}
+          />
           {pages.hasNextPage ? (
-            <button
+            <Button
               type="button"
+              variant="outline"
+              className="mt-4"
               onClick={(): void => {
                 pages.fetchNextPage();
               }}
               disabled={pages.isFetchingNextPage}
             >
               {pages.isFetchingNextPage ? 'Loading…' : 'Load more'}
-            </button>
+            </Button>
           ) : null}
         </>
       ) : null}
@@ -169,7 +203,7 @@ function CatalogIdForm(): ReactElement {
   const [value, setValue] = useState('');
   return (
     <form
-      className="catalog-form"
+      className="flex flex-wrap items-center gap-2"
       aria-label="Open catalog by id"
       onSubmit={(event): void => {
         event.preventDefault();
@@ -179,19 +213,22 @@ function CatalogIdForm(): ReactElement {
         }
       }}
     >
-      <label htmlFor="catalog-id">Catalog id</label>
-      <input
+      <label htmlFor="catalog-id" className="text-sm font-medium">
+        Catalog id
+      </label>
+      <Input
         id="catalog-id"
         name="catalog"
+        className="w-64 font-mono text-xs"
         placeholder="32-hex module id"
         value={value}
         onChange={(e): void => {
           setValue(e.target.value);
         }}
       />
-      <button type="submit" disabled={!/^[0-9a-f]{32}$/.test(value.trim())}>
+      <Button type="submit" size="sm" variant="secondary" disabled={!/^[0-9a-f]{32}$/.test(value.trim())}>
         Open
-      </button>
+      </Button>
     </form>
   );
 }

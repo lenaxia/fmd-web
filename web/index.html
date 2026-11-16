@@ -1,9 +1,26 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FMD Web</title>
+    <script>
+      // Pre-hydration theme resolution (mirrors src/state/theme.tsx):
+      // persisted choice → prefers-color-scheme → dark. Runs before any
+      // paint so the first frame already carries the right token palette.
+      (function () {
+        try {
+          var stored = localStorage.getItem('fmd-web-theme');
+          var light =
+            stored === 'light' ||
+            ((stored !== 'dark') && window.matchMedia('(prefers-color-scheme: light)').matches);
+          document.documentElement.classList.toggle('dark', !light);
+          document.documentElement.classList.toggle('light', light);
+        } catch (e) {
+          /* storage unavailable — the static class="dark" default stands */
+        }
+      })();
+    </script>
   </head>
   <body>
     <!-- Mount point (§11 web/); the SPA root element. -->
