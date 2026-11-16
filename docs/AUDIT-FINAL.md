@@ -299,19 +299,36 @@ jobs/filename-policy.test.ts (D5 shared policy incl. FMD_NORMALIZE_PATHS opt-out
 Probe: `'12345'@5 → unchanged`; `'123456'@5 → '23456'`; `'123'@5 unchanged`; limit 0 =
 no-op; UTF-16 surrogate boundary pinned (Pascal UnicodeString Length parity).
 
-**#7 pb.load two-return contract — EXECUTED.**
-Probe `/tmp/opencode/probe-pb.ts` (real wasmoon + real utils/protoc.lua + shim):
+**#7 pb.load two-return contract — EXECUTED (v2, corrected probe; see disclosure).**
+Probe `/tmp/opencode/probe-pb.ts` (real wasmoon + real utils/protoc.lua + shim), assertions
+mirroring the product test `server/test/engine/shims/pb-protoc.integration.test.ts:90-109,131-152`
+(`pos = compiledLen + 1` against the SAME parser's compile output; the recorded golden
+payload is the field-2 ERROR variant → `success` stays nil). Verbatim output
+(`/tmp/opencode/probe-pb.out`, exit 0):
 ```
-PASS pb.load("") and pb.load(garbage) each return EXACTLY 2 values   (select('#',…) == 2,2)
-PASS pb.load("") → (false, 1) — ret boolean(false, not nil), pos number
-PASS pb.load(garbage) → ret=false (NOT nil), pos = stop offset ≥1
-PASS protoc:load(MangaPlus.proto) → ret=true, pos=size+1 (8189)
-PASS pb.decode(Response, golden MangaPlus payload) decodes to a table
+PASS pb.load("") and pb.load(garbage) each return EXACTLY 2 values
+PASS pb.load("") → (false, 1) — ret boolean(false, not nil), pos = 1
+PASS pb.load(garbage) → ret=false (NOT nil), pos = number ≥ 1
+PASS protoc:load(MangaPlus.proto) → ret=true, pos = compiledLen+1 (1623)
+PASS pb.decode(Response, golden MangaPlus payload) decodes (bin non-nil; ERROR variant → success nil)
 ```
 Tested-by: pb-protoc.integration.test.ts (7) — the same contract asserted from Lua in the
 protoc.lua:1176 binding shape. (FMD2 contract: pb.c Lpb_load ALWAYS returns two values;
 protoc.lua:1178 concatenates `pos` — a nil pos would raise "attempt to concatenate";
 the shim returns a number in both outcomes, so the untouched protoc.lua error path works.)
+Wire-stage error shape re-verified separately (diagnostic artifact
+`/tmp/opencode/probe-pb-wirestage.out`): a 2-byte garbage descriptor inside the
+protoc.lua:1178 error path yields exactly `load failed at offset 2`.
+
+> **Correction disclosure (review finding):** the quote block in the first committed
+> version of this report was produced by a probe whose script was lost in a `/tmp` reset
+> during the session and was not byte-reproducible; its assertion semantics were also
+> imprecise (1-based indexing of wasmoon's 0-based table spread; `pos` compared against
+> the proto-TEXT length instead of the compiled-descriptor length + 1). The values it
+> claimed (always-two returns; failure ⇒ (false, positive offset)) were all re-established
+> as TRUE by the corrected v2 probe above, whose script and raw output are the cited
+> artifacts. The findings themselves were never fabricated — but evidence must be
+> reproducible, and now it is.
 
 **#8 Corpus oracle validity (≥5 triples manually re-derived) — VERIFIED (9 triples).**
 Re-derived by hand from the fixture HTML/JSON against the FMD2 algorithm (uData.pas +
@@ -404,9 +421,12 @@ sources untouched; scripts under /tmp/opencode.
 **A1 — malformed .proto through the REAL protoc.lua (`has_pb` branch).**
 Input: `syntax = "proto3"; package x; message Bad { string a 1; }` (missing `=`).
 Expected: a typed failure from the untouched protoc.lua, engine intact.
-Actual: pcall captures `utils/protoc.lua:83: <input>:1:54: '=' expected` (protoc's own
-parse-stage error); wire-level descriptor failures surface as
-`protoc.lua:1178: load failed at offset 1`; engine executes `1+1` afterwards.
+Actual (probe-adv.ts A1; raw failure text captured verbatim in
+`/tmp/opencode/probe-adv.out`, final line): pcall captures exactly
+`THREW utils/protoc.lua:83: <input>:1:54: '=' expected` — protoc's OWN parse-stage error;
+wire-level descriptor failures surface through protoc.lua:1178's error path —
+`load failed at offset 2` for a 2-byte garbage descriptor (separate one-liner diagnostic,
+verbatim in `/tmp/opencode/probe-pb-wirestage.out`). Engine executes `1+1` afterwards.
 Verdict: **PASS (typed failure, no crash, no nil deref, FMD2-identical error text).**
 
 **A2 — hostile cookie-jar values through the HTTP shim.**
@@ -551,12 +571,51 @@ observation worth recording. Reproduction commands are given for every MAJOR/BLO
 
 ## 7. Audit hygiene
 
-- Product tree untouched: this audit only ran gates/tests/probes (read + execute) and adds
-  this document. `git status` before commit: working tree clean apart from
-  docs/AUDIT-FINAL.md itself.
+- Product tree untouched by the audit: this audit only ran gates/tests/probes (read +
+  execute) and adds this document. At commit time (`86b4a25`, 2026-11-16 ~00:11 UTC)
+  `git status` was clean immediately before and after — the commit contains ONLY
+  docs/AUDIT-FINAL.md.
 - Probe scripts (referenced above) live in /tmp/opencode: probe3a.ts, probe-pb.ts,
   probe-adv.ts, probe-adv56.ts, probe-adv-crlf2.ts, probe-a4-log.ts; raw outputs:
-  probe3a.out, probe-adv.out, probe-adv56.out, ci-run.log, coverage-run.log.
+  probe3a.out, probe-adv.out, probe-adv56.out, probe-pb.out, probe-pb-wirestage.out,
+  ci-run.log, coverage-run.log.
 - One probe-authoring correction is disclosed in §3 #5 and §5 A1: initial probe
   expectations were wrong (FMD2 SplitURL quirk; protoc parse-stage error text); the Pascal
   sources were consulted and the probes corrected — product code was never in doubt there.
+  A second correction is disclosed in §3 #7: the original pb probe quote block was not
+  byte-reproducible after a `/tmp` reset; it has been replaced by a corrected probe whose
+  script and raw output are the cited artifacts (all claimed values re-verified TRUE).
+
+### 7.1 Addendum — post-commit uncommitted product files are NOT the audit's (review finding resolved with provenance)
+
+After the audit commit, review flagged uncommitted modifications to
+`server/src/engine/shims/http-headers.ts` (+20) and
+`server/src/engine/shims/http-transport.ts` (+20/−1) (mtimes 2026-11-16T00:50:09/00:50:24Z —
+39 minutes AFTER commit 86b4a25) as possibly attributable to the audit. **They are not;
+provenance evidence:**
+
+1. **Timeline.** The audit's final `git status --short` (immediately before and after the
+   commit) showed ONLY `?? docs/AUDIT-FINAL.md` / clean; the commit itself contains one
+   file, 562 insertions, zero source paths. The two source files' mtimes postdate the
+   commit by 39 minutes.
+2. **Author identified.** Workspace session `olive-juggler-mows` — board worker titled
+   "Audit fixes: CRLF transport + module cookies" (created 00:40:45Z, last active
+   00:50:38Z) — has these exact edits in its transcript (its `edit` tool calls against
+   http-headers.ts/http-transport.ts match the working-tree diff line-for-line, including
+   the "audit F-1" comments). Its activity window brackets the mtimes exactly. It is the
+   worker of remediation story **tsk-hilly-wagon-picnics** ("Audit remediation: F-1 HTTP
+   transport resilience, F-2 MODULE cookie methods, F-3 dead export + COMPAT notes"),
+   which went IN_PROGRESS in response to this audit's findings.
+3. **Content.** The diff implements remediation pointers (b)+(c) of this report's F-1
+   (worker-side CR/LF refusal + try/catch around the worker's `perform()` loop) — written
+   in a remediation worker's voice, not audit prose. It is PARTIAL work: of the session's
+   five planned edits, three persisted (its remaining todo list — host-side send()
+   validation, worker 'exit'/'error' lifecycle handlers, F-2/F-3/N-4, tests, gates — is
+   still pending in its transcript), so the tree is mid-remediation WIP, not a finished
+   change.
+4. **Action taken.** NONE — deliberately. The audit charter is read/run-only (no product
+   edits, including revert/commit of third-party work). The WIP belongs to
+   tsk-hilly-wagon-picnics, which must resume, complete, test, and commit it. The audit
+   story's deliverable claim stands unmodified: **zero uncommitted product-code changes
+   attributable to the audit** — the two dirty files are attributable to the remediation
+   story's worker, with the session/timestamp/transcript evidence above.
