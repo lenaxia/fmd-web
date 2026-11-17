@@ -10,7 +10,7 @@ import {
 } from '@fmd/contract';
 import { pascalLowerCase } from '../engine/normalize/fmdstrings.js';
 import type { RegistrationRecord } from '../engine/registry/capabilities.js';
-import { CATALOG_PAGE_DEFAULT, CATALOG_PAGE_MAX } from '../sync/db/catalog-store.js';
+import { CATALOG_PAGE_DEFAULT, CATALOG_PAGE_MAX, jdnToday } from '../sync/db/catalog-store.js';
 import type { DirectoryWalkPort } from './directory-walk.js';
 
 /**
@@ -38,6 +38,9 @@ import type { DirectoryWalkPort } from './directory-walk.js';
 
 /** §6.8 default cache TTL: 6 hours. */
 export const DEFAULT_LIVE_SCRAPE_TTL_MS = 6 * 60 * 60 * 1000;
+
+/** Cursor genre-list separator (never occurs in a genre name). */
+const CURSOR_GENRE_SEP = '\x1f';
 
 interface CacheEntry {
   readonly entries: readonly CatalogEntry[];
@@ -99,6 +102,11 @@ interface SearchCursor {
   o: number;
   g?: string;
   s?: string;
+  /** FMD2 filter-panel bindings (parity with the catalog store's cursor). */
+  a?: string;
+  gs?: string;
+  gm?: 'all' | 'any';
+  nd?: number;
 }
 
 function encodeOffsetCursor(offset: number): string {
@@ -176,14 +184,18 @@ export class LiveScrapeCatalogStore implements CatalogFallbackStore {
 
   async search(catalogId: ModuleId, query: CatalogSearchQuery): Promise<CatalogPage> {
     const { entries } = await this.entriesFor(catalogId);
-    const rawQuery = query.query;
+    const rawQuery = query.query ?? '';
     const status = query.status;
     const genre = query.genre ?? '';
+    const authors = query.authors ?? '';
+    const genres = query.genres ?? [];
+    const genresMode = query.genresMode ?? 'all';
+    const newDays = query.newDays;
     const limit = pageLimit(query.limit);
 
     // Cursor binding mirrors the catalog FTS store: a cursor carries the
-    // query (and filters) it was issued for — reuse against another
-    // query is a 400-class error, never a silent re-page.
+    // query (and FULL filter state) it was issued for — reuse against
+    // another combination is a 400-class error, never a silent re-page.
     let offset = Math.max(0, (Math.max(1, Math.trunc(query.page ?? 1)) - 1) * limit);
     if (query.cursor !== undefined && query.cursor !== '') {
       const decoded = decodeSearchCursor(query.cursor);
@@ -196,6 +208,18 @@ export class LiveScrapeCatalogStore implements CatalogFallbackStore {
       if (decoded.s !== undefined && decoded.s !== (status ?? '')) {
         throw new Error('cursor does not match the issued status filter');
       }
+      if (decoded.a !== undefined && decoded.a !== authors) {
+        throw new Error('cursor does not match the issued authors filter');
+      }
+      if (decoded.gs !== undefined || decoded.gm !== undefined) {
+        const wantKey = genres.length > 0 ? genres.join(CURSOR_GENRE_SEP) : '';
+        if (decoded.gs !== wantKey || (decoded.gm ?? 'all') !== genresMode) {
+          throw new Error('cursor does not match the issued genre filters');
+        }
+      }
+      if (decoded.nd !== undefined && decoded.nd !== newDays) {
+        throw new Error('cursor does not match the issued only-new window');
+      }
       offset = decoded.o;
     }
 
@@ -203,12 +227,27 @@ export class LiveScrapeCatalogStore implements CatalogFallbackStore {
       .split(/\s+/)
       .map((t) => t.trim())
       .filter((t) => t !== '');
+    const newThreshold = newDays === undefined ? undefined : jdnToday() - newDays;
     const filtered = entries.filter((entry) => {
       const haystack = `${entry.title} ${entry.alttitles} ${entry.summary}`;
       if (!terms.every((term) => likeContains(haystack, term))) {
         return false;
       }
       if (status !== undefined && status !== '' && entry.status !== status) {
+        return false;
+      }
+      if (authors !== '' && !likeContains(entry.authors, authors)) {
+        return false;
+      }
+      // genres ANY → OR of contains, ALL → AND (FMD2 rbAny/rbAll).
+      if (genres.length > 0) {
+        const matches = genres.map((g): boolean => likeContains(entry.genres, g));
+        const hit = genresMode === 'any' ? matches.some(Boolean) : matches.every(Boolean);
+        if (!hit) {
+          return false;
+        }
+      }
+      if (newThreshold !== undefined && entry.jdn <= newThreshold) {
         return false;
       }
       return genre === '' || likeContains(entry.genres, genre);
@@ -229,6 +268,16 @@ export class LiveScrapeCatalogStore implements CatalogFallbackStore {
       }
       if (status !== undefined && status !== '') {
         cursor.s = status;
+      }
+      if (authors !== '') {
+        cursor.a = authors;
+      }
+      if (genres.length > 0) {
+        cursor.gs = genres.join(CURSOR_GENRE_SEP);
+        cursor.gm = genresMode;
+      }
+      if (newDays !== undefined) {
+        cursor.nd = newDays;
       }
       return { ...page, nextCursor: encodeSearchCursor(cursor) };
     }

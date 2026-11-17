@@ -5,7 +5,7 @@
  *
  *   <out>/api-github/commits.json          commits-API fixture
  *   <out>/codeload/<repo>/zip/<luaSha>     fixture zipball (FMD2-<sha10>/lua/...)
- *   <out>/FMD2-DB/db/7z/<catalogId>.7z     crafted catalog archive
+ *   <out>/FMD2-DB/master/7z/<catalogId>.7z     crafted catalog archive
  *                                          (real 7za; masterlist db)
  *   <out>/site/manga/alpha-quest.html      recorded manga-info page
  *   <out>/manifest.json                    what was built (evidence)
@@ -301,7 +301,7 @@ function main() {
   fs.writeFileSync(path.join(repoDir, E2E.luaSha), zipball);
 
   // 3. crafted catalog archive: masterlist db (DBDataProcess.pas schema)
-  //    → real 7za -t7z archive at FMD2-DB/db/7z/<id>.7z
+  //    → real 7za -t7z archive at FMD2-DB/master/7z/<id>.7z
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fmd-e2e-prep-'));
   const dbFile = path.join(tmp, `${E2E.catalogId}.db`);
   const db = new Database(dbFile);
@@ -334,7 +334,7 @@ function main() {
 
   const sevenZip = require.resolve('7zip-bin/linux/x64/7za');
   fs.chmodSync(sevenZip, 0o755);
-  const sevenZipDir = path.join(out, 'FMD2-DB', 'db', '7z');
+  const sevenZipDir = path.join(out, 'FMD2-DB', 'master', '7z');
   fs.mkdirSync(sevenZipDir, { recursive: true });
   const packed = spawnSync(sevenZip, ['a', '-t7z', path.join(sevenZipDir, `${E2E.catalogId}.7z`), dbFile], {
     stdio: 'pipe',
@@ -405,7 +405,7 @@ function main() {
     `FMD2_REPO=${E2E.repo}`,
     `FMD2_LUA_SHA=${E2E.luaSha}`,
     'FMD2_CODELOAD_URL=http://e2e-mock:8081/codeload',
-    'FMD_DB_URL=http://e2e-mock:8081/FMD2-DB/db',
+    'FMD_DB_URL=http://e2e-mock:8081/FMD2-DB/master',
     'FMD_DB_API_BASE=http://e2e-mock:8081/api-github',
     'FMD_BOOTSTRAP_CATALOGS=' + E2E.catalogId,
     'FMD_HTTP_ALLOW_HOSTS=e2e-mock',

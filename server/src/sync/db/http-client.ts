@@ -27,6 +27,19 @@ export interface SyncHttpResponse {
 
 export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
 
+/**
+ * FMD2-DB answered 404 for a catalog blob — the site has NO prebuilt
+ * catalog (site-first browse taxonomy: offer the §6.8 live-scrape
+ * fallback instead of retrying; distinct from transient network
+ * failures).
+ */
+export class CatalogBlobMissingError extends Error {
+  constructor(url: string) {
+    super(`no-catalog: FMD2-DB has no catalog archive for this site (HTTP 404, ${sanitizeUrl(url)})`);
+    this.name = 'CatalogBlobMissingError';
+  }
+}
+
 export class SyncHttpClient {
   private readonly fetchImpl: FetchLike;
   private readonly token: string | undefined;
@@ -81,6 +94,9 @@ export class SyncHttpClient {
     const res: SyncHttpResponse = await this.request(url, headers);
     if (res.status === 403 || res.status === 429) {
       throw new RateLimitedError(sanitizeUrl(url), res.status);
+    }
+    if (res.status === 404) {
+      throw new CatalogBlobMissingError(url);
     }
     if (res.status !== 200 && res.status !== 304) {
       throw new Error(`sync: blob fetch failed (${sanitizeUrl(url)}): HTTP ${String(res.status)}`);

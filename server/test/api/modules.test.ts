@@ -32,6 +32,26 @@ describe('GET /api/modules', (): void => {
     void makeRegistration; // fixture factory exercised by helpers
   });
 
+  it('site-first browse join: catalogInstalled reflects the CatalogStore receipts (additive field)', async (): Promise<void> => {
+    const h = buildHarness();
+    const res = await h.app.inject({ method: 'GET', url: '/api/modules' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { modules: Array<{ id: string; catalogInstalled: boolean }> };
+    const byId = new Map(body.modules.map((m): [string, boolean] => [m.id, m.catalogInstalled]));
+    // The harness installs CATALOG_ID === MODULE_C_ID ('c'×32): exactly
+    // Gamma carries catalogInstalled true; the join is LIVE (a fresh
+    // install flips on the next read).
+    expect(byId.get(MODULE_C_ID)).toBe(true);
+    expect(byId.get(MODULE_A_ID)).toBe(false);
+    expect(byId.get(MODULE_B_ID)).toBe(false);
+
+    // Live-join proof: install MODULE_A_ID's catalog, re-read — flipped.
+    h.catalogs.install(MODULE_A_ID, []);
+    const after = await h.app.inject({ method: 'GET', url: '/api/modules' });
+    const afterBody = after.json() as { modules: Array<{ id: string; catalogInstalled: boolean }> };
+    expect(afterBody.modules.find((m) => m.id === MODULE_A_ID)?.catalogInstalled).toBe(true);
+  });
+
   it('validation failures: none for GET (no params) — but the route 404s cleanly for unknown ids via PUT', async (): Promise<void> => {
     const h = buildHarness();
     const res = await h.app.inject({ method: 'GET', url: '/api/modules' });

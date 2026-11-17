@@ -14,6 +14,13 @@ import { parseHash } from '../src/router';
 
 autoCleanup();
 
+/** Site-first browse: the registry must resolve before entries open. */
+const modulesRoute: MockRoute = {
+  method: 'GET',
+  match: (url): boolean => url.pathname === '/api/modules',
+  respond: (): { body: object } => ({ body: { modules: [], count: 0 } }),
+};
+
 function latestRoute(page: number, bodies: { status?: number; body: object }): MockRoute {
   return {
     method: 'GET',
@@ -25,6 +32,7 @@ function latestRoute(page: number, bodies: { status?: number; body: object }): M
 }
 
 const routes: MockRoute[] = [
+  modulesRoute,
   latestRoute(1, {
     body: {
       entries: [entryFixture('/a', 'Alpha'), entryFixture('/b', 'Beta')],
@@ -57,7 +65,7 @@ const routes: MockRoute[] = [
 describe('BrowsePage pagination', (): void => {
   it('latest mode walks page numbers and appends entries', async (): Promise<void> => {
     const { fetch, requests } = mockFetch(routes);
-    renderWithProviders(<BrowsePage route={parseHash(`#/browse?catalog=${CATALOG_ID}`)} />, { fetch });
+    renderWithProviders(<BrowsePage route={parseHash(`#/browse?catalog=${CATALOG_ID}`)} />, { fetch, hash: `#/browse?catalog=${CATALOG_ID}` });
 
     expect(await screen.findByText('Alpha')).toBeInTheDocument();
     expect(screen.getByText('Beta')).toBeInTheDocument();
@@ -75,16 +83,15 @@ describe('BrowsePage pagination', (): void => {
     expect(screen.queryByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
   });
 
-  it('search mode sends the opaque nextCursor back verbatim and stops without one', async (): Promise<void> => {
+  it('live search: debounced q hits /search and walks the opaque cursor', async (): Promise<void> => {
     const { fetch, requests } = mockFetch(routes);
-    renderWithProviders(<BrowsePage route={parseHash(`#/browse?catalog=${CATALOG_ID}`)} />, { fetch });
+    renderWithProviders(<BrowsePage route={parseHash(`#/browse?catalog=${CATALOG_ID}`)} />, { fetch, hash: `#/browse?catalog=${CATALOG_ID}` });
     await screen.findByText('Alpha');
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Search' }));
-    await userEvent.type(screen.getByLabelText('Search titles'), 'fix');
-    await userEvent.click(screen.getByRole('button', { name: 'Search' }));
+    // As-you-type: the debounced fetch fires with q=fix (250ms < 1s).
+    await userEvent.type(screen.getByLabelText('Search'), 'fix');
 
-    expect(await screen.findByText('Search One')).toBeInTheDocument();
+    expect(await screen.findByText('Search One', {}, { timeout: 3000 })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Load more' }));
     expect(await screen.findByText('Search Two')).toBeInTheDocument();
@@ -93,42 +100,49 @@ describe('BrowsePage pagination', (): void => {
 
     const searchCalls = requests.filter((r): boolean => r.path.includes('/search'));
     expect(searchCalls.map((r): string => r.path)).toEqual([
-      `/api/catalog/${CATALOG_ID}/search?q=fix&limit=20`,
-      `/api/catalog/${CATALOG_ID}/search?q=fix&limit=20&cursor=c1`,
+      `/api/catalog/${CATALOG_ID}/search?q=fix&limit=20&genresMode=all`,
+      `/api/catalog/${CATALOG_ID}/search?q=fix&limit=20&genresMode=all&cursor=c1`,
     ]);
   });
 
-  it('empty state (D20) guides catalog selection when none is open', async (): Promise<void> => {
-    const { fetch, requests } = mockFetch([]);
-    renderWithProviders(<BrowsePage route={parseHash('#/browse')} />, { fetch });
-    expect(await screen.findByText('No catalog selected')).toBeInTheDocument();
-    expect(screen.getByText(/auto-triggers module \+ catalog sync \(D20\)/)).toBeInTheDocument();
-    // No API call was made without a catalog id.
-    expect(requests).toEqual([]);
-    expect(screen.getByRole('button', { name: 'Open' })).toBeDisabled();
+  it('bare browse renders the site picker (hex-ID empty state deleted with CatalogIdForm)', async (): Promise<void> => {
+    const { fetch, requests } = mockFetch([modulesRoute]);
+    renderWithProviders(<BrowsePage route={parseHash('#/browse')} />, { fetch, hash: '#/browse' });
+    expect(await screen.findByText('Browse sites')).toBeInTheDocument();
+    expect(screen.getByLabelText('Search sites')).toBeInTheDocument();
+    // The hex-ID form contract is gone: no catalog-id input, no Open.
+    expect(screen.queryByLabelText('Catalog id')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Open' })).toBeNull();
+    // The picker fetches the module registry (not catalog entries).
+    expect(requests.map((r): string => r.path)).toEqual(['/api/modules']);
   });
 
   it('badges the live-scrape source (§6.8) when the server served the page live', async (): Promise<void> => {
     const { fetch } = mockFetch([
+      modulesRoute,
       latestRoute(1, { body: { entries: [entryFixture('/live', 'LiveEntry')], source: 'live' } }),
     ]);
-    renderWithProviders(<BrowsePage route={parseHash(`#/browse?catalog=${CATALOG_ID}`)} />, { fetch });
+    renderWithProviders(<BrowsePage route={parseHash(`#/browse?catalog=${CATALOG_ID}`)} />, { fetch, hash: `#/browse?catalog=${CATALOG_ID}` });
     expect(await screen.findByRole('list')).toBeInTheDocument();
     expect(screen.getByTitle(/live-scrape fallback/)).toHaveTextContent('live scrape');
   });
 
   it('does not badge catalog-sourced pages', async (): Promise<void> => {
     const { fetch } = mockFetch([
+      modulesRoute,
       latestRoute(1, { body: { entries: [entryFixture('/cat', 'CatEntry')], source: 'catalog' } }),
     ]);
-    renderWithProviders(<BrowsePage route={parseHash(`#/browse?catalog=${CATALOG_ID}`)} />, { fetch });
+    renderWithProviders(<BrowsePage route={parseHash(`#/browse?catalog=${CATALOG_ID}`)} />, { fetch, hash: `#/browse?catalog=${CATALOG_ID}` });
     expect(await screen.findByRole('list')).toBeInTheDocument();
     expect(screen.queryByTitle(/live-scrape fallback/)).not.toBeInTheDocument();
   });
 
   it('entry rows navigate to the manga detail route', async (): Promise<void> => {
-    const { fetch } = mockFetch([latestRoute(1, { body: { entries: [entryFixture('/a', 'Alpha')] } })]);
-    renderWithProviders(<BrowsePage route={parseHash(`#/browse?catalog=${CATALOG_ID}`)} />, { fetch });
+    const { fetch } = mockFetch([
+      modulesRoute,
+      latestRoute(1, { body: { entries: [entryFixture('/a', 'Alpha')] } }),
+    ]);
+    renderWithProviders(<BrowsePage route={parseHash(`#/browse?catalog=${CATALOG_ID}`)} />, { fetch, hash: `#/browse?catalog=${CATALOG_ID}` });
     const list = await screen.findByRole('list');
     const row = within(list).getByRole('button', { name: /Alpha/ });
     expect(row).toBeInTheDocument();

@@ -5,7 +5,7 @@ import type { RouteSpec } from '@fmd/contract';
  * later story; this table is the contract-driven route inventory).
  */
 export const API_ROUTES: readonly RouteSpec[] = [
-  { method: 'GET', path: '/api/modules', description: 'capability + known-broken flags' },
+  { method: 'GET', path: '/api/modules', description: 'capability + known-broken flags + catalogInstalled (CatalogStore receipts join — site-first browse)' },
   { method: 'PUT', path: '/api/modules/:id', description: 'enable/disable, options, cookies, per-module proxy override' },
   { method: 'GET', path: '/api/settings', description: 'global proxy config + §5.11 browser profile state' },
   { method: 'PUT', path: '/api/settings/proxy', description: 'replace the global proxy config (HTTP|SOCKS4|SOCKS5 + host/port/user/pass)' },
@@ -15,7 +15,8 @@ export const API_ROUTES: readonly RouteSpec[] = [
   { method: 'POST', path: '/api/sync/catalog/all', description: 'sync all FMD2-DB catalogs' },
   { method: 'GET', path: '/api/catalog/:id/latest', description: 'ordered by jdn DESC (§6.6); catalog-less modules serve the §6.8 live directory walk (§5.8-normalized, TTL-cached) — every response carries source: catalog|live' },
   { method: 'GET', path: '/api/catalog/:id/title', description: 'ordered by title (§6.6); §6.8 live fallback like /latest, source discriminator carried' },
-  { method: 'GET', path: '/api/catalog/:id/search', description: 'FTS5 search, cursor pagination (§6.5); catalog-less modules search their §6.8 live snapshot in memory with the SAME cursor scheme, source discriminator carried' },
+  { method: 'GET', path: '/api/catalog/:id/search', description: 'FTS5 search, cursor pagination (§6.5) + FMD2 filter panel (additive: authors LIKE, genres[] multi with genresMode any|all, newDays only-new jdn window; q optional when a filter is set); catalog-less modules search their §6.8 live snapshot in memory with the SAME cursor scheme, source discriminator carried' },
+  { method: 'GET', path: '/api/search', description: 'all-sites union search (FMD2 cbSearchFromAllSites parity, frmMain.pas:3411): fans out over every INSTALLED catalog (Promise.allSettled), merges by (normalized title, site), stable per-site-window cursor; per-site count facets; typed partial state — failed sites surface as warnings, catalog-less enabled sites as excluded chips' },
   { method: 'POST', path: '/api/info', description: 'live info (normalized §5.8), cached' },
   { method: 'POST', path: '/api/jobs/download', description: 'idempotent job create (replay => original while live; key reuse with different payload => 409; terminal original => chained re-enqueue)' },
   { method: 'GET', path: '/api/jobs', description: 'job list, state filter + cursor' },

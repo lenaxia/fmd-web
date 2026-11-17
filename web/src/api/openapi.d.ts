@@ -13,7 +13,7 @@ export interface paths {
         };
         /**
          * Module registry with capability + known-broken flags
-         * @description One row per registered module (§9 module_state registry columns): identity, §5.1 options (combobox options carry `items`; the STORED value is the item INDEX), and §5.10 capability detection incl. the D3 known-broken flag ids. `live_scrape_fallback` (§6.8) marks modules declaring both directory events — browsable without an FMD2-DB catalog via the live walk.
+         * @description One row per registered module (§9 module_state registry columns): identity, §5.1 options (combobox options carry `items`; the STORED value is the item INDEX), and §5.10 capability detection incl. the D3 known-broken flag ids. `live_scrape_fallback` (§6.8) marks modules declaring both directory events — browsable without an FMD2-DB catalog via the live walk. `catalogInstalled` joins the CatalogStore receipts (§6.4 getMeta): the site-first Browse picker renders it as a per-site chip and drives auto-provisioning from it (additive).
          */
         get: operations["listModules"];
         put?: never;
@@ -256,10 +256,30 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * FTS5 search with cursor pagination (§6.5, §10)
-         * @description Sanitized FTS MATCH over the sidecar, ranked; `cursor` continues a previous page (opaque, query-bound). Catalogs are read-only after install, so cursors stay stable. §6.8 fallback: catalog-less modules search their §5.8-normalized directory-walk snapshot in memory (title/alttitles/summary terms, exact status, substring genre) with the SAME cursor scheme; `source` discriminates the channel.
+         * FTS5 search with cursor pagination (§6.5, §10) + FMD2 filter panel (additive)
+         * @description Sanitized FTS MATCH over the sidecar, ranked; `cursor` continues a previous page (opaque, query-bound — it carries the FULL filter state). Catalogs are read-only after install, so cursors stay stable. FMD2 Filter-panel parity (frmMain.pas:3400, additive): `q` is optional when any filter is set (filter-only pages skip the MATCH and order by jdn DESC); `authors` is a LIKE-contains over the authors column; `genres` (repeated params or one comma-separated value) joins per `genresMode` — `all` (FMD2 rbAll default) ANDs the LIKE clauses, `any` (rbAny) ORs them; `newDays` is the only-new window (jdn > JDN(today) - newDays, FMD2 cbOnlyNew). Prefix-LIKE (`x%`) is a documented non-goal: FMD2 semantics are contains (`%x%`). §6.8 fallback: catalog-less modules search their §6.8-normalized directory-walk snapshot in memory (title/alttitles/summary terms, exact status, substring genre) with the SAME cursor scheme; `source` discriminates the channel.
          */
         get: operations["catalogSearch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * All-sites union search over installed catalogs (FMD2 cbSearchFromAllSites parity)
+         * @description FMD2 parity (frmMain.pas:3411-3416): the union runs simultaneously over every INSTALLED catalog of every enabled site — a LOCAL catalog union, never live scraping. Per-site FTS windows (width 2×limit) are merged by a documented deterministic total order — (normalized title, site id, link) — so result order and cursor bytes are identical under any permutation of the site set. `cursor` continues each site window (base64 of per-site consumed-row counts, bound to the issued filter state; page-size independent). Every row carries `site` + `siteName` (FMD2 shows the source Website on union rows, frmMain.pas:5170). Partial failure is TYPED, never silent: a broken catalog yields the rest of the union plus a `warnings[]` entry naming it; enabled sites without an installed catalog are excluded and surfaced in `excluded[]` (reason `no-catalog`) so the UI chip can explain why. `facets[]` carries per-site totals for the count chips.
+         */
+        get: operations["allSitesSearch"];
         put?: never;
         post?: never;
         delete?: never;
@@ -619,15 +639,22 @@ export interface components {
             enabled: boolean;
             options: components["schemas"]["ModuleOptionDescriptor"][];
             capabilities: components["schemas"]["ModuleCapabilities"];
+            catalogInstalled: boolean;
             proxy: components["schemas"]["ProxySettings"] | null;
         };
         ProxySettings: {
-            type: components["schemas"]["__schema0"];
-            host: components["schemas"]["__schema1"];
-            port: components["schemas"]["__schema2"];
-            user: components["schemas"]["__schema3"];
-            pass: components["schemas"]["__schema4"];
+            type: components["schemas"]["ModuleSummary0"];
+            host: components["schemas"]["ModuleSummary1"];
+            port: components["schemas"]["ModuleSummary2"];
+            user: components["schemas"]["ModuleSummary3"];
+            pass: components["schemas"]["ModuleSummary4"];
         };
+        /** @enum {string} */
+        ModuleSummary0: "" | "HTTP" | "SOCKS4" | "SOCKS5";
+        ModuleSummary1: string;
+        ModuleSummary2: string;
+        ModuleSummary3: string;
+        ModuleSummary4: string;
         SettingsResponse: {
             proxy: components["schemas"]["ProxySettings"];
             browser: {
@@ -635,6 +662,12 @@ export interface components {
                 url: string;
             };
         };
+        /** @enum {string} */
+        SettingsResponse0: "" | "HTTP" | "SOCKS4" | "SOCKS5";
+        SettingsResponse1: string;
+        SettingsResponse2: string;
+        SettingsResponse3: string;
+        SettingsResponse4: string;
         CatalogEntry: {
             link: string;
             title: string;
@@ -659,6 +692,8 @@ export interface components {
             lastCheck: components["schemas"]["Timestamp"] | null;
             lastUpdated: components["schemas"]["Timestamp"] | null;
         };
+        /** Format: date-time */
+        Timestamp: string;
         AccountView: {
             moduleId: string;
             username: string;
@@ -712,14 +747,71 @@ export interface components {
             bytes: number;
             createdAt: components["schemas"]["Timestamp"];
         };
-        /** Format: date-time */
-        Timestamp: string;
         /** @enum {string} */
-        __schema0: "" | "HTTP" | "SOCKS4" | "SOCKS5";
-        __schema1: string;
-        __schema2: string;
-        __schema3: string;
-        __schema4: string;
+        ListModules200Response0: "" | "HTTP" | "SOCKS4" | "SOCKS5";
+        ListModules200Response1: string;
+        ListModules200Response2: string;
+        ListModules200Response3: string;
+        ListModules200Response4: string;
+        /** @enum {string} */
+        UpdateModule200Response0: "" | "HTTP" | "SOCKS4" | "SOCKS5";
+        UpdateModule200Response1: string;
+        UpdateModule200Response2: string;
+        UpdateModule200Response3: string;
+        UpdateModule200Response4: string;
+        /** @enum {string} */
+        UpdateModuleBody0: "" | "HTTP" | "SOCKS4" | "SOCKS5";
+        UpdateModuleBody1: string;
+        UpdateModuleBody2: string;
+        UpdateModuleBody3: string;
+        UpdateModuleBody4: string;
+        /** @enum {string} */
+        GetSettings200Response0: "" | "HTTP" | "SOCKS4" | "SOCKS5";
+        GetSettings200Response1: string;
+        GetSettings200Response2: string;
+        GetSettings200Response3: string;
+        GetSettings200Response4: string;
+        /** @enum {string} */
+        UpdateProxy200Response0: "" | "HTTP" | "SOCKS4" | "SOCKS5";
+        UpdateProxy200Response1: string;
+        UpdateProxy200Response2: string;
+        UpdateProxy200Response3: string;
+        UpdateProxy200Response4: string;
+        /** @enum {string} */
+        UpdateProxyBody0: "" | "HTTP" | "SOCKS4" | "SOCKS5";
+        UpdateProxyBody1: string;
+        UpdateProxyBody2: string;
+        UpdateProxyBody3: string;
+        UpdateProxyBody4: string;
+        CatalogSearchQuery0: string;
+        CatalogSearchQuery1: string;
+        CatalogSearchQuery2: string;
+        CatalogSearchQuery3: components["schemas"]["CatalogSearchQuery4"][];
+        CatalogSearchQuery4: string;
+        /**
+         * @default all
+         * @enum {string}
+         */
+        CatalogSearchQuery5: "all" | "any";
+        CatalogSearchQuery6: string;
+        CatalogSearchQuery7: number;
+        CatalogSearchQuery8: string;
+        /** @default 20 */
+        CatalogSearchQuery9: number;
+        AllSitesSearchQuery0: string;
+        AllSitesSearchQuery1: string;
+        AllSitesSearchQuery2: components["schemas"]["AllSitesSearchQuery3"][];
+        AllSitesSearchQuery3: string;
+        /**
+         * @default all
+         * @enum {string}
+         */
+        AllSitesSearchQuery4: "all" | "any";
+        AllSitesSearchQuery5: string;
+        AllSitesSearchQuery6: number;
+        AllSitesSearchQuery7: string;
+        /** @default 20 */
+        AllSitesSearchQuery8: number;
     };
     responses: never;
     parameters: never;
@@ -1563,12 +1655,16 @@ export interface operations {
     };
     catalogSearch: {
         parameters: {
-            query: {
-                q: string;
-                status?: string;
-                genre?: string;
-                cursor?: string;
-                limit?: number;
+            query?: {
+                q?: components["schemas"]["CatalogSearchQuery0"];
+                status?: components["schemas"]["CatalogSearchQuery1"];
+                genre?: components["schemas"]["CatalogSearchQuery2"];
+                genres?: components["schemas"]["CatalogSearchQuery3"];
+                genresMode?: components["schemas"]["CatalogSearchQuery5"];
+                authors?: components["schemas"]["CatalogSearchQuery6"];
+                newDays?: components["schemas"]["CatalogSearchQuery7"];
+                cursor?: components["schemas"]["CatalogSearchQuery8"];
+                limit?: components["schemas"]["CatalogSearchQuery9"];
             };
             header?: never;
             path: {
@@ -1632,6 +1728,85 @@ export interface operations {
             };
             /** @description Live scrape update lane is shutting down */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    allSitesSearch: {
+        parameters: {
+            query?: {
+                q?: components["schemas"]["AllSitesSearchQuery0"];
+                status?: components["schemas"]["AllSitesSearchQuery1"];
+                genres?: components["schemas"]["AllSitesSearchQuery2"];
+                genresMode?: components["schemas"]["AllSitesSearchQuery4"];
+                authors?: components["schemas"]["AllSitesSearchQuery5"];
+                newDays?: components["schemas"]["AllSitesSearchQuery6"];
+                cursor?: components["schemas"]["AllSitesSearchQuery7"];
+                limit?: components["schemas"]["AllSitesSearchQuery8"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Merged page of site-tagged entries + facets/warnings/excluded */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        entries: {
+                            link: string;
+                            title: string;
+                            alttitles: string;
+                            authors: string;
+                            artists: string;
+                            genres: string;
+                            status: string;
+                            summary: string;
+                            numChapter: number;
+                            jdn: number;
+                            site: string;
+                            siteName: string;
+                        }[];
+                        nextCursor?: string;
+                        facets: {
+                            siteId: string;
+                            siteName: string;
+                            count?: number;
+                        }[];
+                        warnings: {
+                            siteId: string;
+                            siteName: string;
+                            error: string;
+                        }[];
+                        excluded: {
+                            siteId: string;
+                            siteName: string;
+                            /** @constant */
+                            reason: "no-catalog";
+                        }[];
+                    };
+                };
+            };
+            /** @description Malformed cursor */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

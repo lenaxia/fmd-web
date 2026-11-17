@@ -20,13 +20,16 @@ import {
   type WsHelloMessageT,
   type WsJobEventMessageT,
   type WsServerMessageT,
+  type WsSyncEventMessageT,
 } from '@fmd/contract';
 import {
+  catalogSyncJobId,
   eventJobToWire,
   type GapMessage,
   type HelloMessage,
   type JobEventMessage,
   type JobWire,
+  type SyncEventMessage,
   type WsServerMessage,
 } from '../src/state/ws-protocol';
 import { parseServerMessage } from '../src/state/ws-backfill';
@@ -52,6 +55,25 @@ describe('client parser vs the shared contract schemas', (): void => {
       expect(WsServerMessageSchema.safeParse(parsed).success).toBe(true);
     }
     return Promise.resolve();
+  });
+
+  it('catalog-provision sync frames round-trip too (site-first browse)', (): void => {
+    const syncFrame: WsServerMessageT = {
+      type: 'sync',
+      id: '11',
+      sync: {
+        jobId: catalogSyncJobId('a'.repeat(32)),
+        moduleId: 'a'.repeat(32),
+        phase: 'downloading',
+        percent: 40,
+      },
+    } as WsSyncEventMessageT;
+    const wire = frame(WsServerMessageSchema.parse(syncFrame));
+    const parsed = parseServerMessage(wire);
+    expect(parsed).toEqual(JSON.parse(wire) as WsServerMessage);
+    expect(WsServerMessageSchema.safeParse(parsed).success).toBe(true);
+    // A malformed sync payload (no jobId) is dropped, not half-parsed.
+    expect(parseServerMessage(frame({ type: 'sync', id: '12', sync: { moduleId: 'm', phase: 'checking' } }))).toBeNull();
   });
 
   it('the client hello satisfies the shared hello schema', (): void => {
@@ -90,6 +112,7 @@ describe('client parser vs the shared contract schemas', (): void => {
 describe('type-level drift pins (compile-time)', (): void => {
   it('client message types ARE the contract types (single source)', (): void => {
     expectTypeOf<JobEventMessage>().toEqualTypeOf<WsJobEventMessageT>();
+    expectTypeOf<SyncEventMessage>().toEqualTypeOf<WsSyncEventMessageT>();
     expectTypeOf<HelloMessage>().toEqualTypeOf<WsHelloMessageT>();
     expectTypeOf<WsServerMessage>().toEqualTypeOf<WsServerMessageT>();
     expectTypeOf<GapMessage['fromId']>().toEqualTypeOf<string>();

@@ -4,6 +4,9 @@ import {
   DEFAULT_CODELOAD_BASE_URL,
   DEFAULT_FMD2_PIN_SHA,
   DEFAULT_FMD2_REPO,
+  DEFAULT_TARBALL_API_BASE_URL,
+  expectedTarballRoot,
+  githubTarballUrl,
   loadModuleSyncConfig,
   ModuleSyncConfigError,
   expectedZipballRoot,
@@ -22,6 +25,7 @@ function baseConfig(overrides: Partial<ModuleSyncConfig> = {}): ModuleSyncConfig
     repo: DEFAULT_FMD2_REPO,
     sha: DEFAULT_FMD2_PIN_SHA,
     codeloadBaseUrl: DEFAULT_CODELOAD_BASE_URL,
+    tarballApiBaseUrl: DEFAULT_TARBALL_API_BASE_URL,
     dataDir: '/tmp/unused',
     luaDirOverride: undefined,
     autoBump: false,
@@ -30,12 +34,13 @@ function baseConfig(overrides: Partial<ModuleSyncConfig> = {}): ModuleSyncConfig
 }
 
 describe('module sync config (D9 upstream trust)', (): void => {
-  it('defaults: pinned FMD2 repo/SHA, codeload base, auto-bump disabled, no local override', (): void => {
+  it('defaults: pinned FMD2 repo/SHA, codeload base, tarball fallback base, auto-bump disabled, no local override', (): void => {
     const config = loadModuleSyncConfig({});
     expect(config.repo).toBe('dazedcat19/FMD2');
     expect(config.sha).toBe(DEFAULT_FMD2_PIN_SHA);
     expect(config.sha).toMatch(/^[0-9a-f]{40}$/);
     expect(config.codeloadBaseUrl).toBe('https://codeload.githubusercontent.com');
+    expect(config.tarballApiBaseUrl).toBe('https://api.github.com');
     expect(config.autoBump).toBe(false);
     expect(config.luaDirOverride).toBeUndefined();
   });
@@ -57,18 +62,20 @@ describe('module sync config (D9 upstream trust)', (): void => {
     expect(() => createModuleSyncService(baseConfig({ autoBump: false }))).not.toThrow();
   });
 
-  it('reads env overrides: repo, pin SHA, codeload base, data dir, FMD_LUA_DIR', (): void => {
+  it('reads env overrides: repo, pin SHA, codeload base, tarball base, data dir, FMD_LUA_DIR', (): void => {
     const sha = 'a'.repeat(40);
     const config = loadModuleSyncConfig({
       FMD2_REPO: 'fork-owner/FMD2',
       FMD2_LUA_SHA: sha,
       FMD2_CODELOAD_URL: 'https://codeload.fork.example',
+      FMD2_TARBALL_API_BASE: 'https://api.fork.example',
       FMD_DATA_DIR: '/tmp/fmd-data',
       FMD_LUA_DIR: '/home/dev/fmd2/lua',
     });
     expect(config.repo).toBe('fork-owner/FMD2');
     expect(config.sha).toBe(sha);
     expect(config.codeloadBaseUrl).toBe('https://codeload.fork.example');
+    expect(config.tarballApiBaseUrl).toBe('https://api.fork.example');
     expect(config.dataDir).toBe('/tmp/fmd-data');
     expect(config.luaDirOverride).toBe('/home/dev/fmd2/lua');
   });
@@ -86,5 +93,15 @@ describe('module sync config (D9 upstream trust)', (): void => {
       `https://codeload.fork.example/fork-owner/FMD2/zip/${DEFAULT_FMD2_PIN_SHA}`,
     );
     expect(expectedZipballRoot('dazedcat19/FMD2', DEFAULT_FMD2_PIN_SHA)).toBe('FMD2-97c903b340');
+  });
+
+  it('builds the api.github.com tarball fallback URL + root convention (verified live: dazedcat19-FMD2-97c903b)', (): void => {
+    expect(githubTarballUrl('dazedcat19/FMD2', DEFAULT_FMD2_PIN_SHA, DEFAULT_TARBALL_API_BASE_URL)).toBe(
+      `https://api.github.com/repos/dazedcat19/FMD2/tarball/${DEFAULT_FMD2_PIN_SHA}`,
+    );
+    expect(githubTarballUrl('fork-owner/FMD2', DEFAULT_FMD2_PIN_SHA, 'https://api.fork.example/')).toBe(
+      `https://api.fork.example/repos/fork-owner/FMD2/tarball/${DEFAULT_FMD2_PIN_SHA}`,
+    );
+    expect(expectedTarballRoot('dazedcat19/FMD2', DEFAULT_FMD2_PIN_SHA)).toBe('dazedcat19-FMD2-97c903b');
   });
 });

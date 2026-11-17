@@ -17,6 +17,7 @@ import type {
 import type { FastifyInstance } from 'fastify';
 import type { RegistrationRecord } from '../../src/engine/registry/capabilities.js';
 import { encodeCursor } from '../../src/api/cursor.js';
+import { dateToJdn } from '../../src/sync/db/jdn.js';
 import { buildApp } from '../../src/api/app.js';
 import type { AppOptions } from '../../src/api/app.js';
 import type { AuthConfig } from '../../src/api/auth.js';
@@ -161,12 +162,17 @@ export class InMemoryCatalogStore implements CatalogStore {
 
   search(catalogId: ModuleId, query: CatalogSearchQuery): CatalogPage {
     const entries = this.entries.get(catalogId) ?? [];
-    const match = query.query.trim().toLowerCase();
+    const match = (query.query ?? '').trim().toLowerCase();
     const terms = match.split(/\s+/).filter((t) => t !== '');
     const genre = query.genre?.toLowerCase() ?? '';
+    const status = query.status ?? '';
+    const authors = query.authors?.toLowerCase() ?? '';
+    const genres = query.genres ?? [];
+    const genresMode = query.genresMode ?? 'all';
+    const newDays = query.newDays;
     let offset = 0;
     if (query.cursor !== undefined) {
-      let decoded: { q?: string; g?: string; o?: number };
+      let decoded: { q?: string; g?: string; o?: number; st?: string; a?: string; gs?: string; gm?: string; nd?: number };
       try {
         decoded = JSON.parse(Buffer.from(query.cursor, 'base64url').toString('utf8')) as typeof decoded;
       } catch {
@@ -179,17 +185,58 @@ export class InMemoryCatalogStore implements CatalogStore {
       if (decoded.g !== undefined && decoded.g !== genre) {
         throw new Error('cursor does not match the issued genre filter');
       }
+      if ((decoded.st ?? '') !== status) {
+        throw new Error('cursor does not match the issued status filter');
+      }
+      if ((decoded.a ?? '') !== authors) {
+        throw new Error('cursor does not match the issued authors filter');
+      }
+      const genresKey = genres.length > 0 ? genres.join('\x1f') : '';
+      if ((decoded.gs ?? '') !== genresKey || (decoded.gm ?? 'all') !== genresMode) {
+        throw new Error('cursor does not match the issued genre filters');
+      }
+      if ((decoded.nd ?? undefined) !== newDays) {
+        throw new Error('cursor does not match the issued only-new window');
+      }
       if (typeof decoded.o !== 'number' || !Number.isInteger(decoded.o) || decoded.o < 0) {
         throw new Error('malformed cursor');
       }
       offset = decoded.o;
+    } else {
+      // Real-store parity (decodeSearchCursor): no cursor → offset from
+      // the 1-based `page` number. The union search reads per-site
+      // windows through exactly these semantics.
+      offset = (Math.max(1, Math.trunc(query.page ?? 1)) - 1) * Math.min(Math.max(query.limit ?? 20, 1), 200);
     }
+    // Today's JDN (UTC) — mirrors the store's only-new anchor.
+    const now = new Date();
+    const jdnNow = dateToJdn({
+      year: now.getUTCFullYear(),
+      month: now.getUTCMonth() + 1,
+      day: now.getUTCDate(),
+    });
+    const newThreshold = newDays === undefined ? undefined : jdnNow - newDays;
     const filtered = entries.filter((entry) => {
       const haystack = `${entry.title} ${entry.alttitles} ${entry.summary}`.toLowerCase();
       if (!terms.every((term) => haystack.includes(term))) {
         return false;
       }
-      if (query.status !== undefined && query.status !== '' && entry.status !== query.status) {
+      if (status !== '' && entry.status !== status) {
+        return false;
+      }
+      if (authors !== '' && !entry.authors.toLowerCase().includes(authors)) {
+        return false;
+      }
+      // genres ANY → OR of contains, ALL → AND (FMD2 rbAny/rbAll).
+      if (genres.length > 0) {
+        const lowered = entry.genres.toLowerCase();
+        const matches = genres.map((g): boolean => lowered.includes(g.toLowerCase()));
+        const hit = genresMode === 'any' ? matches.some(Boolean) : matches.every(Boolean);
+        if (!hit) {
+          return false;
+        }
+      }
+      if (newThreshold !== undefined && entry.jdn <= newThreshold) {
         return false;
       }
       return genre === '' || entry.genres.toLowerCase().includes(genre);
@@ -210,6 +257,10 @@ export class InMemoryCatalogStore implements CatalogStore {
       nextCursor: encodeCursor({
         q: match,
         ...(genre !== '' ? { g: genre } : {}),
+        ...(status !== '' ? { st: status } : {}),
+        ...(authors !== '' ? { a: authors } : {}),
+        ...(genres.length > 0 ? { gs: genres.join('\x1f'), gm: genresMode } : {}),
+        ...(newDays !== undefined ? { nd: newDays } : {}),
         o: offset + limit,
       }),
     };
@@ -332,7 +383,13 @@ export function buildHarness(
     ...(opts.infoTtlMs !== undefined ? { infoCacheTtlMs: opts.infoTtlMs } : {}),
     ...(opts.wsHub !== undefined ? { wsHub: opts.wsHub } : {}),
   };
-  const modules = new InMemoryModuleService(defaultRegistrations(), opts.browserProfile === true);
+  const modules = new InMemoryModuleService(
+    defaultRegistrations(),
+    opts.browserProfile === true,
+    // Site-first browse join: catalogInstalled read LIVE from the
+    // CatalogStore double (installed fixtures flip the chip).
+    (id: string): boolean => catalogs.getMeta(id) !== undefined,
+  );
   const settings = new InMemorySettingsService(
     modules,
     opts.browserProfile === true ? 'http://127.0.0.1:8191' : '',

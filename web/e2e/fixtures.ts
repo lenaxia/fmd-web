@@ -6,6 +6,9 @@
 import type { Page } from '@playwright/test';
 import type { ModuleSummaryT, CatalogEntryT, InfoResponseT, JobT } from '../src/api/hooks';
 
+/** Re-exported for specs (e.g. site-picker-smoke) that build fixture modules. */
+export type { ModuleSummaryT } from '../src/api/hooks';
+
 export const CATALOG_ID = 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6';
 export const MODULE_ID = '0f1e2d3c4b5a69788796a5b4c3d2e1f0';
 
@@ -45,6 +48,7 @@ export const module: ModuleSummaryT = {
   file: 'modules/FixtureSite.lua',
   enabled: true,
   proxy: null,
+  catalogInstalled: true,
   options: [
     { name: 'Auto-skip pages', kind: 'checkbox', defaultValue: false },
     { name: 'Quality', kind: 'combobox', defaultValue: 1, items: ['low', 'medium', 'high'] },

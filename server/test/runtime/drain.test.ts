@@ -76,7 +76,7 @@ async function bootServer(dataDir: string, port: number): Promise<Booted> {
       FMD2_REPO: e2e.repo,
       FMD2_LUA_SHA: e2e.luaSha,
       FMD2_CODELOAD_URL: `${mock.base}/codeload`,
-      FMD_DB_URL: `${mock.base}/FMD2-DB/db`,
+      FMD_DB_URL: `${mock.base}/FMD2-DB/master`,
       FMD_DB_API_BASE: `${mock.base}/api-github`,
       FMD_BOOTSTRAP_CATALOGS: e2e.catalogId,
     },

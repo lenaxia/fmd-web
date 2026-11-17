@@ -23,6 +23,13 @@ export const DEFAULT_FMD2_PIN_SHA: string = '97c903b340d2b0fd82871dba1b0aa5f04a1
 /** Codeload base for zipball downloads; configurable so forks can sync. */
 export const DEFAULT_CODELOAD_BASE_URL: string = 'https://codeload.githubusercontent.com';
 
+/**
+ * api.github.com base for the tarball fallback endpoint (launch defect
+ * (d): codeload zipball 5xx/unreachable → `<base>/repos/<repo>/tarball/
+ * <sha>` serves the same pinned commit).
+ */
+export const DEFAULT_TARBALL_API_BASE_URL: string = 'https://api.github.com';
+
 export interface ModuleSyncConfig {
   /** `owner/name` of the upstream repo. */
   readonly repo: string;
@@ -30,6 +37,8 @@ export interface ModuleSyncConfig {
   readonly sha: string;
   /** Zipball base URL (codeload shape: `<base>/<repo>/zip/<ref>`). */
   readonly codeloadBaseUrl: string;
+  /** Tarball fallback API base (`<base>/repos/<repo>/tarball/<ref>`). */
+  readonly tarballApiBaseUrl: string;
   /** App data dir — the sync installs to `<dataDir>/lua`. */
   readonly dataDir: string;
   /**
@@ -78,8 +87,9 @@ export function loadModuleSyncConfig(
     throw new ModuleSyncConfigError(`FMD2_LUA_SHA must be a full 40/64-hex commit SHA, got: ${sha}`);
   }
   const codeloadBaseUrl = envValue(env, 'FMD2_CODELOAD_URL') ?? DEFAULT_CODELOAD_BASE_URL;
+  const tarballApiBaseUrl = envValue(env, 'FMD2_TARBALL_API_BASE') ?? DEFAULT_TARBALL_API_BASE_URL;
   const dataDir = resolve(envValue(env, 'FMD_DATA_DIR') ?? join(process.cwd(), 'data'));
   const luaDirOverride = envValue(env, 'FMD_LUA_DIR');
 
-  return { repo, sha, codeloadBaseUrl, dataDir, luaDirOverride, autoBump };
+  return { repo, sha, codeloadBaseUrl, tarballApiBaseUrl, dataDir, luaDirOverride, autoBump };
 }

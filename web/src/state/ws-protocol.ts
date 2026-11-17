@@ -17,17 +17,29 @@ import type {
   WsJobEventMessageT,
   WsResyncMessageT,
   WsServerMessageT,
+  WsSyncEventMessageT,
+  CatalogSyncProgressT,
 } from '@fmd/contract';
+
+export { catalogSyncJobId, CATALOG_SYNC_JOB_PREFIX } from '@fmd/contract';
 
 /** REST-generated job snapshot shape (drift-pinned to `JobT` by test). */
 export type JobWire = components['schemas']['Job'];
-export type { JobT };
+export type { JobT, CatalogSyncProgressT };
 
 /** Client → server, sent on EVERY open (D19 backfill cursor). */
 export type HelloMessage = WsHelloMessageT;
 
 /** Server → client: one job-event snapshot (live stream or backfill). */
 export type JobEventMessage = WsJobEventMessageT;
+
+/**
+ * Server → client: one catalog-provision progress snapshot (site-first
+ * browse). Ring-buffered under `sync.jobId` (conventionally
+ * `catalog-sync:<moduleId>` via `catalogSyncJobId`) exactly like job
+ * events, so D19 backfill covers provisioning for free.
+ */
+export type SyncEventMessage = WsSyncEventMessageT;
 
 /**
  * Server → client: the requested replay window is outside the ring

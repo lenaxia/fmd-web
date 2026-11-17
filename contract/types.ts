@@ -14,6 +14,7 @@
  * so every workspace imports the whole boundary from `@fmd/contract`.
  */
 export * from './schemas.js';
+export * from './tolerance.js';
 
 /** 32-hex module ID — the join key across modules, catalogs and DB rows. */
 export type ModuleId = string;
@@ -760,8 +761,14 @@ export interface CatalogBrowseQuery {
 
 /** FTS5 search query (§10 `GET /api/catalog/:id/search`). */
 export interface CatalogSearchQuery {
-  /** FTS5 MATCH expression (raw user query, sanitized by the store). */
-  readonly query: string;
+  /**
+   * FTS5 MATCH expression (raw user query, sanitized by the store).
+   * Optional when any of the row filters below is present (FMD2 Filter
+   * panel parity — frmMain.pas:3400 filters the list with empty title
+   * text); at least one of `query`/`status`/`authors`/`genres`/
+   * `newDays` must be set.
+   */
+  readonly query?: string;
   /** Opaque cursor from a previous page; takes priority over `page`. */
   readonly cursor?: string;
   /** 1-based page number used when no cursor is given (default 1). */
@@ -772,6 +779,25 @@ export interface CatalogSearchQuery {
   readonly status?: string;
   /** Filter: `genres` must contain this token (FTS secondary match). */
   readonly genre?: string;
+  /**
+   * Filter (FMD2 Filter panel parity, additive): each genre must appear
+   * in the `genres` column (LIKE contains). Composed per `genresMode`:
+   * `'all'` (FMD2 `rbAll` default) ANDs the LIKE clauses, `'any'`
+   * (`rbAny`) ORs them — DBDataProcess.pas:1416-1427 parity.
+   */
+  readonly genres?: readonly string[];
+  /** How `genres` clauses join: `'all'` (default, FMD2 rbAll) | `'any'`. */
+  readonly genresMode?: 'all' | 'any';
+  /**
+   * Filter (FMD2 parity): `authors` column LIKE contains. FMD2's
+   * `AddSQLSimpleFilter('authors', …)` (DBDataProcess.pas:1394).
+   */
+  readonly authors?: string;
+  /**
+   * Only-new window (FMD2 `cbOnlyNew` parity, jdn-based):
+   * `jdn > DateToJDN(today) - newDays` — DBDataProcess.pas:1382-1385.
+   */
+  readonly newDays?: number;
 }
 
 /** Install state of one catalog (§9 `catalog_meta`). */

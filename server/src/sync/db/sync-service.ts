@@ -44,6 +44,21 @@ export const FMD2_DB_REPO_DEFAULT = {
   ref: 'master',
 } as const;
 
+/**
+ * Default catalog blob base — the LIVE FMD2-DB layout is
+ * `<base>/7z/<ID>.7z` (FMD2 dist config.json db_url:
+ * `https://raw.githubusercontent.com/dazedcat19/FMD2-DB/master/7z/
+ * <website>.7z`). Launch defect (b): the historical default carried a
+ * phantom `/db` segment (`.../master/db`) that 404s on every catalog
+ * fetch — this constant is the corrected, live-verified default.
+ */
+export const DEFAULT_FMD2_DB_URL: string = `https://raw.githubusercontent.com/${FMD2_DB_REPO_DEFAULT.owner}/${FMD2_DB_REPO_DEFAULT.name}/${FMD2_DB_REPO_DEFAULT.ref}`;
+
+/** Composed catalog blob URL (§6.2): `<dbUrl>/7z/<ID>.7z`. */
+export function catalogBlobUrl(dbUrl: string, catalogId: ModuleId): string {
+  return `${dbUrl.replace(/\/+$/, '')}/7z/${catalogId}.7z`;
+}
+
 export interface CatalogSyncOptions {
   /** Data root: catalogs/, fts/, tmp/ and the batch state live here. */
   readonly dataDir: string;
@@ -100,9 +115,7 @@ export class CatalogSync implements CatalogSyncService {
   constructor(options: CatalogSyncOptions) {
     this.dataDir = options.dataDir;
     this.repo = options.repo ?? FMD2_DB_REPO_DEFAULT;
-    this.dbUrl =
-      options.dbUrl ??
-      `https://raw.githubusercontent.com/${this.repo.owner}/${this.repo.name}/${this.repo.ref}/db`;
+    this.dbUrl = options.dbUrl ?? DEFAULT_FMD2_DB_URL;
     this.apiBase = options.apiBase ?? 'https://api.github.com';
     const clock: SyncClock = options.clock ?? systemClock;
     this.budget =
@@ -170,18 +183,29 @@ export class CatalogSync implements CatalogSyncService {
     };
   }
 
-  /** §6.2–§6.3 — fetch + extract + atomic install of one catalog. */
-  async syncCatalog(catalogId: ModuleId): Promise<CatalogSyncResult> {
+  /**
+   * §6.2–§6.3 — fetch + extract + atomic install of one catalog.
+   * `onProgress` receives the fine-grained phases (downloading →
+   * extracting → installing) so the WS hub can stream provisioning
+   * progress (site-first browse); it is optional and purely observative.
+   */
+  async syncCatalog(
+    catalogId: ModuleId,
+    onProgress?: (phase: 'downloading' | 'extracting' | 'installing') => void,
+  ): Promise<CatalogSyncResult> {
     if (!isValidCatalogId(catalogId)) {
       return { id: catalogId, state: 'failed', error: `invalid catalog id: ${catalogId}` };
     }
-    const url: string = `${this.dbUrl}/7z/${catalogId}.7z`;
+    const url: string = catalogBlobUrl(this.dbUrl, catalogId);
     const etag: string = this.state.load().etags[catalogId] ?? '';
+    onProgress?.('downloading');
     let response;
     try {
       response = await this.http.getBlob(url, etag);
     } catch (err: unknown) {
       // Pending keeps the id → resumable; the error string is surfaced.
+      // CatalogBlobMissingError keeps its stable `no-catalog:` prefix —
+      // the site-first browse taxonomy keys on it (no prebuilt catalog).
       return { id: catalogId, state: 'failed', error: String((err as Error).message) };
     }
     if (response.status === 304) {
@@ -190,7 +214,14 @@ export class CatalogSync implements CatalogSyncService {
       return { id: catalogId, state: 'unchanged' };
     }
     try {
-      const meta: { dbSha: string; bytes: number } = await this.installBlob(catalogId, response.body);
+      onProgress?.('extracting');
+      const meta: { dbSha: string; bytes: number } = await this.installBlob(
+        catalogId,
+        response.body,
+        (): void => {
+          onProgress?.('installing');
+        },
+      );
       this.state.markFetched(catalogId, response.etag);
       return { id: catalogId, state: 'updated', dbSha: meta.dbSha, bytes: meta.bytes };
     } catch (err: unknown) {
@@ -204,7 +235,11 @@ export class CatalogSync implements CatalogSyncService {
    * Never in-place: the rename either fully lands the new file or (on
    * a crash before it) leaves the previous state untouched.
    */
-  private async installBlob(catalogId: ModuleId, blob: Buffer): Promise<{ dbSha: string; bytes: number }> {
+  private async installBlob(
+    catalogId: ModuleId,
+    blob: Buffer,
+    onInstalling?: () => void,
+  ): Promise<{ dbSha: string; bytes: number }> {
     const tmpDir: string = path.join(this.dataDir, 'tmp');
     fs.mkdirSync(tmpDir, { recursive: true });
     const nonce: string = `${Date.now()}-${process.pid}`;
@@ -217,6 +252,7 @@ export class CatalogSync implements CatalogSyncService {
 
       // ── crash window under test: extraction done, rename next ──
       this.onBeforeInstall?.(catalogId);
+      onInstalling?.();
 
       const dbs: string[] = listFiles(extractDir).filter((f) => f.endsWith('.db'));
       if (dbs.length !== 1) {

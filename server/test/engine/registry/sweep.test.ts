@@ -77,6 +77,14 @@ describe('full-tree sweep (417 files, offline Init pass)', () => {
     expect(sync.discoverFiles().length).toBe(417);
   });
 
+  it('annotates the failure count against the SHARED tolerance policy (sweep + sync, one source)', () => {
+    // The real tree: 5 failures of 417 files — inside the tolerance
+    // (contract/tolerance.ts, the same constants the staged sync gate
+    // consults; the sweep itself never blocks, this is the annotation).
+    expect(sweep.summary.failedFiles).toBe(5);
+    expect(sweep.summary.withinTolerance).toBe(true);
+  });
+
   it('registers ≥95% of files (D3 target) with a non-empty module_state row each', () => {
     const { registeredFiles, totalFiles } = sweep.summary;
     expect(registeredFiles / totalFiles).toBeGreaterThanOrEqual(0.95);

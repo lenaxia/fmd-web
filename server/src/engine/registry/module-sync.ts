@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { HostLogRecord } from '@fmd/contract';
+import { maxToleratedSyncFailures } from '@fmd/contract';
 import { createLuaHost, type WasmoonLuaHost } from '../lua/host.js';
 import { createMemoryLogger, type MemoryLogger } from '../lua/logger.js';
 import { DeadlineAbortHandle, createDeadlineCells } from '../lua/abort.js';
@@ -58,6 +59,13 @@ export interface SweepSummary {
   readonly knownBroken: Readonly<Record<string, readonly string[]>>;
   /** §5.2 event → number of modules declaring an On* handler. */
   readonly eventCoverage: Readonly<Record<string, number>>;
+  /**
+   * Whether the failure count sits within the SHARED tolerance policy
+   * (contract/tolerance.ts — the same constants the staged sync gate
+   * uses). The sweep itself is always per-file isolated; this flag is
+   * the single-source annotation surfaces read (no second opinion).
+   */
+  readonly withinTolerance: boolean;
 }
 
 export interface SweepResult {
@@ -212,6 +220,7 @@ export class ModuleSyncService {
         .map((f) => ({ file: f.file, error: f.error ?? 'Init pass registered no module' })),
       knownBroken,
       eventCoverage,
+      withinTolerance: results.filter((f) => !f.ok).length <= maxToleratedSyncFailures(files.length),
     };
   }
 }

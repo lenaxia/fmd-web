@@ -17,6 +17,7 @@
   "scripts": {
     "build": "tsc -b tsconfig.json",
     "test": "vitest run",
+    "test:live": "FMD_LIVE=1 vitest run server/test/live",
     "test:coverage": "vitest run --coverage",
     "lint": "eslint .",
     "typecheck": "tsc -b tsconfig.json",

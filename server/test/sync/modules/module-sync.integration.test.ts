@@ -11,9 +11,9 @@ import {
   DEFAULT_FMD2_REPO,
   ModuleSyncError,
   safeSubtreeRelative,
+  type ModuleArchiveFetcher,
   type ModuleSyncConfig,
   type ModuleSyncResult,
-  type ZipballFetcher,
 } from '../../../src/index.js';
 import {
   buildFixtureZipball,
@@ -108,6 +108,7 @@ describe('ModuleSyncService — fixture zipball integration (loopback, offline)'
       repo: FIXTURE_REPO,
       sha: FIXTURE_SHA,
       codeloadBaseUrl: upstream.baseUrl,
+      tarballApiBaseUrl: upstream.baseUrl,
       dataDir,
       luaDirOverride: undefined,
       autoBump: false,
@@ -309,19 +310,52 @@ describe('ModuleSyncService — fixture zipball integration (loopback, offline)'
     expect(() => safeSubtreeRelative('outside/lua/x.lua', prefix)).toThrow(/escapes the lua\/ subtree/);
   });
 
-  it('refuses a broken module file in the staged tree — no swap, previous tree intact', async (): Promise<void> => {
+  it('tolerates ONE upstream-broken module file (small-tree floor) — installs with failures[] recorded', async (): Promise<void> => {
+    serveV1();
+    const first = await syncNow();
+    const stateBeforeFingerprint = treeFingerprint(first.targetDir);
+
+    upstream.serve(buildFixtureZipball(zipballRootFor('FMD2', FIXTURE_SHA), fixtureTreeWithBrokenModule()));
+    const result = await syncNow();
+
+    // Tolerance admits a single never-registered broken file on any
+    // non-empty tree (whole-file rounding — see contract/tolerance.ts).
+    expect(result.report.failures).toEqual([
+      { file: 'modules/Broken.lua', firstError: expect.stringContaining('Broken.lua') },
+    ]);
+    expect(result.report.failures[0]?.firstError.length ?? 0).toBeGreaterThan(0);
+    // the tree swapped (Broken.lua installed; the registry sweep drops it)
+    expect(existsSync(join(result.targetDir, 'modules', 'Broken.lua'))).toBe(true);
+    expect(treeFingerprint(result.targetDir)).not.toBe(stateBeforeFingerprint);
+    expect(stagingLeftovers()).toEqual([]);
+
+    // sync_state carries the failures for the Settings surface
+    const state = JSON.parse(readFileSync(join(dataDir, 'sync-state.json'), 'utf8')) as {
+      repos: Record<string, { report: { failures: readonly { file: string }[] } }>;
+    };
+    expect(state.repos[FIXTURE_REPO]?.report.failures.map((f) => f.file)).toEqual(['modules/Broken.lua']);
+  });
+
+  it('refuses over-threshold breakage (2 of 5 module files) — no swap, previous tree intact', async (): Promise<void> => {
     serveV1();
     const installed = await syncNow();
     const fingerprint = treeFingerprint(installed.targetDir);
     const stateBefore = readFileSync(join(dataDir, 'sync-state.json'), 'utf8');
 
-    upstream.serve(buildFixtureZipball(zipballRootFor('FMD2', FIXTURE_SHA), fixtureTreeWithBrokenModule()));
+    upstream.serve(
+      buildFixtureZipball(zipballRootFor('FMD2', FIXTURE_SHA), [
+        ...fixtureTreeV1(),
+        { path: 'modules/Broken.lua', content: 'function Init(\n  not lua }} }\n' },
+        { path: 'modules/Broken2.lua', content: 'function Init(\n  also not lua }} }\n' },
+      ]),
+    );
     const refusal = await refusalOf(syncNow());
 
     expect(refusal.reason).toBe('staged-init-failed');
+    expect(refusal.message).toContain('over-threshold');
     expect(refusal.message).toContain('modules/Broken.lua');
     const failures = refusal.details['failures'] as readonly { file: string; errors: readonly string[] }[];
-    expect(failures.map((f) => f.file)).toEqual(['modules/Broken.lua']);
+    expect(failures.map((f) => f.file)).toEqual(['modules/Broken.lua', 'modules/Broken2.lua']);
     expect(failures[0]?.errors.length).toBeGreaterThan(0);
     // previous tree + sync_state untouched
     expect(treeFingerprint(installed.targetDir)).toBe(fingerprint);
@@ -329,11 +363,41 @@ describe('ModuleSyncService — fixture zipball integration (loopback, offline)'
     expect(stagingLeftovers()).toEqual([]);
   });
 
-  it('refuses a broken tree on FIRST install — data/lua is never created', async (): Promise<void> => {
-    upstream.serve(buildFixtureZipball(zipballRootFor('FMD2', FIXTURE_SHA), fixtureTreeWithBrokenModule()));
+  it('REGRESSION: refuses when a previously-registered module goes broken — previous tree intact', async (): Promise<void> => {
+    serveV1();
+    const installed = await syncNow();
+    const fingerprint = treeFingerprint(installed.targetDir);
+    const stateBefore = readFileSync(join(dataDir, 'sync-state.json'), 'utf8');
+
+    // 11Toon.lua registered on the first sync; breaking it now is a
+    // regression even though the failure count would be tolerated.
+    const broken = fixtureTreeV1().map((f): (typeof f) =>
+      f.path === 'modules/11Toon.lua' ? { path: f.path, content: 'function Init(\n  broken }}\n' } : f,
+    );
+    upstream.serve(buildFixtureZipball(zipballRootFor('FMD2', FIXTURE_SHA), broken));
     const refusal = await refusalOf(syncNow());
 
     expect(refusal.reason).toBe('staged-init-failed');
+    expect(refusal.message).toContain('regression');
+    expect(refusal.message).toContain('modules/11Toon.lua');
+    expect(refusal.details['toleranceReason']).toBe('regression');
+    expect(treeFingerprint(installed.targetDir)).toBe(fingerprint);
+    expect(readFileSync(join(dataDir, 'sync-state.json'), 'utf8')).toBe(stateBefore);
+    expect(stagingLeftovers()).toEqual([]);
+  });
+
+  it('refuses an over-threshold broken tree on FIRST install — data/lua is never created', async (): Promise<void> => {
+    upstream.serve(
+      buildFixtureZipball(zipballRootFor('FMD2', FIXTURE_SHA), [
+        ...fixtureTreeV1(),
+        { path: 'modules/Broken.lua', content: 'function Init(\n  not lua }} }\n' },
+        { path: 'modules/Broken2.lua', content: 'function Init(\n  also not lua }} }\n' },
+      ]),
+    );
+    const refusal = await refusalOf(syncNow());
+
+    expect(refusal.reason).toBe('staged-init-failed');
+    expect(refusal.details['toleranceReason']).toBe('over-threshold');
     expect(existsSync(join(dataDir, 'lua'))).toBe(false);
     expect(existsSync(join(dataDir, 'sync-state.json'))).toBe(false);
     expect(stagingLeftovers()).toEqual([]);
@@ -361,7 +425,9 @@ describe('ModuleSyncService — fixture zipball integration (loopback, offline)'
     await dead.ready();
     const deadUrl = dead.baseUrl;
     await dead.close();
-    const refusal = await refusalOf(syncNow({ codeloadBaseUrl: deadUrl }));
+    // BOTH legs dead (the tarball fallback would otherwise rescue the
+    // sync from a dead codeload — that rescue has its own test).
+    const refusal = await refusalOf(syncNow({ codeloadBaseUrl: deadUrl, tarballApiBaseUrl: deadUrl }));
 
     expect(refusal.reason).toBe('fetch-failed');
     expect(treeFingerprint(installed.targetDir)).toBe(fingerprint);
@@ -377,9 +443,9 @@ describe('ModuleSyncService — fixture zipball integration (loopback, offline)'
           mkdirSync(dirname(target), { recursive: true });
           writeFileSync(target, file.content);
         }
-        const fetcher: ZipballFetcher & { calls: number } = {
+        const fetcher: ModuleArchiveFetcher & { calls: number } = {
           calls: 0,
-          async fetchZipball(): Promise<Uint8Array> {
+          async fetchArchive(): Promise<never> {
             this.calls += 1;
             throw new Error('fetch must never run under FMD_LUA_DIR');
           },

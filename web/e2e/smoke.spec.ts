@@ -23,10 +23,9 @@ test('Browse: catalog latest list with cursor pagination + search', async ({ pag
   await expect(page.getByRole('button', { name: /Beta Trails/ })).toBeVisible();
   await expect(page.getByText('Showing 2 of 2 entries')).toBeVisible();
 
-  // search mode: opaque cursor flows back to the server
-  await page.getByRole('tab', { name: 'Search' }).click();
-  await page.getByLabel('Search titles').fill('alpha');
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  // live search (250ms debounce): typing flows to /search; the
+  // debounced result renders without any submit action
+  await page.getByLabel('Search').fill('alpha');
   await expect(page.getByRole('button', { name: /Alpha Quest/ })).toBeVisible();
 });
 

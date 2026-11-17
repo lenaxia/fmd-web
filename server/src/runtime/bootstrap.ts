@@ -31,7 +31,14 @@ export interface BootstrapDeps {
   /** Data dir (receipt/tree existence = the empty-dir test). */
   readonly dataDir: string;
   /** Module sync (fetch → stage → validate → atomic swap). */
-  readonly syncModules: () => Promise<{ sha: string; report: { modules: number } }>;
+  readonly syncModules: () => Promise<{
+    sha: string;
+    report: {
+      modules: number;
+      /** Tolerated upstream-broken files (surfaced as bootstrap warnings). */
+      failures?: readonly { file: string; firstError: string }[];
+    };
+  }>;
   /** Registry boot (Init sweep, SHA-gated). */
   readonly bootRegistry: () => Promise<{ source: string; modules: number }>;
   /** Catalog sync for one id (fetch 7z → extract → install). */
@@ -117,6 +124,19 @@ export class BootstrapRunner {
         this.deps.log(
           `bootstrap: module sync installed sha ${result.sha.slice(0, 10)} (${String(result.report.modules)} modules)`,
         );
+        // Tolerated upstream-broken files are WARNED, never silent: the
+        // tree installed, but these files registered nothing (excluded
+        // from the registry) — the sync-state report carries the same
+        // list for the Settings surface.
+        const failures = result.report.failures ?? [];
+        if (failures.length > 0) {
+          this.deps.log(
+            `bootstrap: WARNING — module sync tolerated ${String(failures.length)} upstream-broken file(s):`,
+          );
+          for (const failure of failures) {
+            this.deps.log(`bootstrap:   - ${failure.file}: ${failure.firstError}`);
+          }
+        }
       }
       this.checkCancelled();
 

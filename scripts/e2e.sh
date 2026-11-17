@@ -152,7 +152,7 @@ if [[ "$MODE" == "process" ]]; then
   FMD2_REPO="$E2E_REPO" \
   FMD2_LUA_SHA="$E2E_SHA" \
   FMD2_CODELOAD_URL="http://127.0.0.1:8091/codeload" \
-  FMD_DB_URL="http://127.0.0.1:8091/FMD2-DB/db" \
+  FMD_DB_URL="http://127.0.0.1:8091/FMD2-DB/master" \
   FMD_DB_API_BASE="http://127.0.0.1:8091/api-github" \
   FMD_BOOTSTRAP_CATALOGS="$E2E_CATALOG" \
   node server/dist/src/runtime-entry.js >"$APP_LOG" 2>&1 &
@@ -209,7 +209,7 @@ def find(prefix):
     return next((p for p in paths if p.startswith(prefix)), None)
 zipball = find("/codeload/")
 commits = find("/api-github/repos/")
-catalog = find("/FMD2-DB/db/7z/")
+catalog = find("/FMD2-DB/master/7z/")
 site = find("/manga/alpha-quest")
 missing = [n for n, v in [("zipball", zipball), ("commits", commits), ("catalog .7z", catalog), ("site page", site)] if v is None]
 assert not missing, f"mock upstream never served: {missing} (offline proof incomplete)"

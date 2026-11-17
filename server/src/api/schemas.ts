@@ -171,6 +171,14 @@ export const ModuleSummarySchema = z.object({
   options: z.array(ModuleOptionDescriptorSchema),
   capabilities: ModuleCapabilitiesSchema,
   /**
+   * Catalog install state joined from the CatalogStore receipts
+   * (§6.4 getMeta — installed true/false). The site-first Browse
+   * picker renders this as a chip and drives auto-provisioning from
+   * it; it is NEVER a hex id the user must read (FMD2 parity:
+   * cbSelectManga lists sites BY NAME, frmMain.pas:6186).
+   */
+  catalogInstalled: z.boolean(),
+  /**
    * Per-module proxy override (§9/§10 settings). null = inherit the
    * global proxy; a config = EXACT SetProxy semantics for this module's
    * HTTP objects (a module's own SetProxy call still overrides at
@@ -289,15 +297,149 @@ export const CatalogBrowseQuerySchema = z.object({
 });
 export type CatalogBrowseQueryT = z.infer<typeof CatalogBrowseQuerySchema>;
 
-export const CatalogSearchQuerySchema = z.object({
-  /** FTS5 user query (sanitized downstream by the store, §6.5). */
-  q: z.string().min(1),
-  status: z.string().optional(),
-  genre: z.string().optional(),
-  cursor: z.string().optional(),
-  limit: z.coerce.number().int().min(1).max(200).default(20),
-});
+export const CatalogSearchQuerySchema = z
+  .object({
+    /** FTS5 user query (sanitized downstream by the store, §6.5).
+     * Optional when any row filter is set (FMD2 Filter-panel parity —
+     * frmMain.pas:3400 filters with empty title text). */
+    q: z.string().max(500).optional(),
+    status: z.string().max(100).optional(),
+    genre: z.string().max(100).optional(),
+    /**
+     * FMD2 parity (additive): genre multi-select, joined per
+     * `genresMode`. Wire forms: repeated params (`?genres=A&genres=B`,
+     * the openapi-fetch array form) OR one comma-separated param
+     * (`?genres=A,B` — FMD2 custom-genres semantics; the route
+     * normalizes both to this array).
+     */
+    genres: z.array(z.string().min(1).max(100)).max(64).optional(),
+    /** `'all'` (FMD2 rbAll default) ANDs genre clauses; `'any'` ORs them. */
+    genresMode: z.enum(['all', 'any']).default('all'),
+    /** FMD2 parity (additive): authors column LIKE contains. */
+    authors: z.string().max(200).optional(),
+    /** FMD2 cbOnlyNew parity (jdn-based): jdn > JDN(today) - newDays. */
+    newDays: z.coerce.number().int().min(1).max(365).optional(),
+    cursor: z.string().max(4096).optional(),
+    limit: z.coerce.number().int().min(1).max(200).default(20),
+  })
+  .refine(
+    (q): boolean =>
+      (q.q !== undefined && q.q !== '') ||
+      (q.status !== undefined && q.status !== '') ||
+      (q.genre !== undefined && q.genre !== '') ||
+      (q.genres !== undefined && q.genres.length > 0) ||
+      (q.authors !== undefined && q.authors !== '') ||
+      q.newDays !== undefined,
+    { message: 'search requires q or at least one filter' },
+  );
 export type CatalogSearchQueryT = z.infer<typeof CatalogSearchQuerySchema>;
+
+/**
+ * Normalize raw `genres` query input into the array wire form before
+ * zod parsing: a single string becomes a one-element list and every
+ * element is comma-split (FMD2 custom-genres semantics — "Separate
+ * multiple genres with ','"; empty fragments dropped).
+ */
+export function normalizeGenresParam(raw: unknown): unknown {
+  if (raw === undefined) {
+    return undefined;
+  }
+  const list: unknown[] = Array.isArray(raw) ? raw : [raw];
+  return list.flatMap((item): unknown[] =>
+    typeof item === 'string'
+      ? item.split(',').map((part): string => part.trim()).filter((part) => part !== '')
+      : [item],
+  );
+}
+
+// ── all-sites union search (FMD2 cbSearchFromAllSites parity) ────────
+
+/**
+ * One catalog row tagged with its SOURCE SITE — FMD2 parity
+ * (frmMain.pas:5170 vtMangaListGetHint shows RS_InfoWebsite +
+ * TModuleContainer(Module).Name when FilterAllSites): every union
+ * result row carries the website it came from.
+ */
+export const SearchEntrySchema = CatalogEntrySchema.extend({
+  /** The 32-hex module id of the site whose catalog served this row. */
+  site: z.string(),
+  /** Human site name (the /api/modules join — never a hex id in the UI). */
+  siteName: z.string(),
+});
+export type SearchEntryT = z.infer<typeof SearchEntrySchema>;
+
+/** Per-site result count for the facet chips (count absent = unknown). */
+export const SearchFacetSchema = z.object({
+  siteId: z.string(),
+  siteName: z.string(),
+  count: z.number().int().nonnegative().optional(),
+});
+export type SearchFacetT = z.infer<typeof SearchFacetSchema>;
+
+/**
+ * Typed partial-failure state (never silent, never full failure): one
+ * installed catalog that failed to answer — the rest of the union
+ * still returns, and the UI shows a warning chip naming this site.
+ */
+export const SiteSearchFailureSchema = z.object({
+  siteId: z.string(),
+  siteName: z.string(),
+  /** Why the site's search failed (store error message). */
+  error: z.string(),
+});
+export type SiteSearchFailureT = z.infer<typeof SiteSearchFailureSchema>;
+
+/**
+ * An ENABLED site excluded from the union because no catalog is
+ * installed (FMD2 parity: the all-sites filter unions INSTALLED local
+ * DBs — a site without one is never scraped live to fill the gap).
+ */
+export const ExcludedSiteSchema = z.object({
+  siteId: z.string(),
+  siteName: z.string(),
+  reason: z.literal('no-catalog'),
+});
+export type ExcludedSiteT = z.infer<typeof ExcludedSiteSchema>;
+
+/**
+ * GET /api/search query — the same filter vocabulary as the per-site
+ * search (q optional when a filter is set, FMD2 Filter-panel parity).
+ * The union runs over INSTALLED catalogs only.
+ */
+export const AllSitesSearchQuerySchema = z
+  .object({
+    q: z.string().max(500).optional(),
+    status: z.string().max(100).optional(),
+    genres: z.array(z.string().min(1).max(100)).max(64).optional(),
+    genresMode: z.enum(['all', 'any']).default('all'),
+    authors: z.string().max(200).optional(),
+    newDays: z.coerce.number().int().min(1).max(365).optional(),
+    cursor: z.string().max(4096).optional(),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+  })
+  .refine(
+    (q): boolean =>
+      (q.q !== undefined && q.q !== '') ||
+      (q.status !== undefined && q.status !== '') ||
+      (q.genres !== undefined && q.genres.length > 0) ||
+      (q.authors !== undefined && q.authors !== '') ||
+      q.newDays !== undefined,
+    { message: 'search requires q or at least one filter' },
+  );
+export type AllSitesSearchQueryT = z.infer<typeof AllSitesSearchQuerySchema>;
+
+export const AllSitesSearchResponseSchema = z.object({
+  entries: z.array(SearchEntrySchema),
+  /** Opaque union cursor; absent on the last page. */
+  nextCursor: z.string().optional(),
+  /** Per-site totals (facet chips). */
+  facets: z.array(SearchFacetSchema),
+  /** Installed catalogs that failed — typed partial state. */
+  warnings: z.array(SiteSearchFailureSchema),
+  /** Enabled sites skipped because no catalog is installed. */
+  excluded: z.array(ExcludedSiteSchema),
+});
+export type AllSitesSearchResponseT = z.infer<typeof AllSitesSearchResponseSchema>;
 
 // ── live info (§5.8 pipeline, cached) ────────────────────────────────
 

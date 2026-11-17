@@ -3,6 +3,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { buildRuntime, loadRuntimeConfig, type RuntimeConfig } from '../../src/runtime/assembly.js';
+import { DEFAULT_BOOTSTRAP_CATALOGS } from '../../src/runtime/catalog-defaults.js';
+import { DEFAULT_FMD2_PIN_SHA } from '../../src/index.js';
 import { registerStatic } from '../../src/runtime/static.js';
 import { buildApp } from '../../src/api/app.js';
 import {
@@ -33,11 +35,17 @@ let upstreamRoot: string;
 beforeAll(async (): Promise<void> => {
   // The catalog entry links embed the mock base, so the mock binds
   // first (port grabbed from the loopback stack) and the tree is built
-  // INTO its root afterwards — every request happens post-build.
+  // INTO its root afterwards — every request happens post-build. The
+  // curated DEFAULT bootstrap catalogs get blobs too (the defaults-
+  // driven test boots with zero FMD2_*/FMD_BOOTSTRAP_* env).
   upstreamRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fmd-runtime-upstream-'));
   const started = await startMock(upstreamRoot);
   mock = started.mock;
-  upstream = buildUpstreamTree({ mockBase: started.base, outDir: upstreamRoot });
+  upstream = buildUpstreamTree({
+    mockBase: started.base,
+    outDir: upstreamRoot,
+    extraCatalogIds: DEFAULT_BOOTSTRAP_CATALOGS,
+  });
 }, 60_000);
 
 afterAll((): void => {
@@ -56,11 +64,13 @@ function runtimeConfig(dataDir: string, mockBase: string, bootstrapDisabled = fa
       repo: e2e.repo,
       sha: e2e.luaSha,
       codeloadBaseUrl: `${mockBase}/codeload`,
+      tarballApiBaseUrl: `${mockBase}/api-github`,
       dataDir,
       luaDirOverride: undefined,
       autoBump: false,
     },
-    dbUrl: `${mockBase}/FMD2-DB/db`,
+    // LIVE-layout mirror: the mock bakes `<base>/FMD2-DB/master/7z/<id>.7z`
+    dbUrl: `${mockBase}/FMD2-DB/master`,
     dbApiBase: `${mockBase}/api-github`,
     bootstrapCatalogIds: [e2e.catalogId],
     httpAllowedHosts: [],
@@ -108,7 +118,7 @@ describe('D20 auto-bootstrap (offline, real pipelines, real mock script)', (): v
     const mockLog = await (await fetch(`${mock.base}/_requests`)).json() as { requests: { path: string }[] };
     const paths = mockLog.requests.map((r) => r.path);
     expect(paths.some((p) => p.startsWith('/api-github/repos/dazedcat19/FMD2-DB/commits'))).toBe(true);
-    expect(paths.some((p) => p.startsWith(`/FMD2-DB/db/7z/${e2e.catalogId}.7z`))).toBe(true);
+    expect(paths.some((p) => p.startsWith(`/FMD2-DB/master/7z/${e2e.catalogId}.7z`))).toBe(true);
 
     // The lua tree landed through the REAL sync pipeline.
     expect(fs.existsSync(path.join(dataDir, 'lua', 'modules', 'E2ESeed.lua'))).toBe(true);
@@ -143,6 +153,61 @@ describe('D20 auto-bootstrap (offline, real pipelines, real mock script)', (): v
     const page = latestApi.json();
     expect(page.total).toBe(5);
     expect(page.entries[0].link).toBe(`${mock.base}/manga/alpha-quest`);
+
+    await runtime.dispose();
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  }, 120_000);
+
+  it('defaults only (no FMD2_*/FMD_BOOTSTRAP_* env): empty data dir → >=4 curated catalogs → ready', async (): Promise<void> => {
+    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fmd-runtime-defaults-'));
+    const logs: string[] = [];
+    // Everything default: default pin (DEFAULT_FMD2_PIN_SHA), default
+    // repo, default (curated) bootstrap catalogs — only the network
+    // endpoints point at the loopback mock (tests never leave the box).
+    const config = loadRuntimeConfig({
+      FMD_WEB_DATA_DIR: dataDir,
+      PORT: '0',
+      FMD2_CODELOAD_URL: `${mock.base}/codeload`,
+      FMD2_TARBALL_API_BASE: `${mock.base}/api-github`,
+      FMD_DB_URL: `${mock.base}/FMD2-DB/master`,
+      FMD_DB_API_BASE: `${mock.base}/api-github`,
+    });
+    expect(config.bootstrapCatalogIds).toEqual([...DEFAULT_BOOTSTRAP_CATALOGS]);
+    expect(config.moduleSync.sha).toBe(DEFAULT_FMD2_PIN_SHA);
+    expect(config.moduleSync.tarballApiBaseUrl).toBe(`${mock.base}/api-github`);
+
+    const runtime = await buildRuntime({
+      config,
+      log: (message): void => {
+        logs.push(message);
+      },
+      version: '0.1.0-test',
+    });
+    await runtime.bootstrap.run();
+
+    // The default ID list is what got installed (>=4 curated catalogs,
+    // each actually fetched through the §6.2 pipeline from the mock).
+    expect(logs).toContainEqual(expect.stringContaining('bootstrap: done'));
+    const mockLog = await (await fetch(`${mock.base}/_requests`)).json() as { requests: { path: string }[] };
+    const paths = mockLog.requests.map((r) => r.path);
+    for (const id of DEFAULT_BOOTSTRAP_CATALOGS) {
+      expect(paths).toContain(`/FMD2-DB/master/7z/${id}.7z`);
+    }
+    expect(DEFAULT_BOOTSTRAP_CATALOGS.length).toBeGreaterThanOrEqual(4);
+
+    // readyz green + every default catalog browsable through its db.
+    const ready = await runtime.app.inject({ method: 'GET', url: '/readyz' });
+    expect(ready.statusCode).toBe(200);
+    let installed = 0;
+    for (const id of DEFAULT_BOOTSTRAP_CATALOGS) {
+      const meta = runtime.services.catalogs.getMeta(id);
+      if (meta !== undefined) {
+        installed += 1;
+      }
+      const page = await runtime.app.inject({ method: 'GET', url: `/api/catalog/${id}/latest?limit=5` });
+      expect(page.statusCode).toBe(200);
+    }
+    expect(installed).toBe(DEFAULT_BOOTSTRAP_CATALOGS.length);
 
     await runtime.dispose();
     fs.rmSync(dataDir, { recursive: true, force: true });
@@ -354,7 +419,10 @@ describe('runtime config (env surface)', (): void => {
     const defaults = loadRuntimeConfig({});
     expect(defaults.port).toBe(3000);
     expect(defaults.staticDir).toBeUndefined();
-    expect(defaults.bootstrapCatalogIds).toEqual([]);
+    // Curated, live-verified defaults (launch defect (c)) — the env csv
+    // overrides them entirely (asserted above with 'aaaa,bbbb').
+    expect(defaults.bootstrapCatalogIds).toEqual([...DEFAULT_BOOTSTRAP_CATALOGS]);
+    expect(defaults.dbUrl).toBeUndefined(); // CatalogSync composes the corrected default
     expect(defaults.httpAllowedHosts).toEqual([]);
     expect(defaults.bootstrapDisabled).toBe(false);
 

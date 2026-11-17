@@ -75,6 +75,8 @@ echo "==> e2e phase-3 (download gate: enqueue → WS progress → pack → libra
 bash scripts/e2e.sh --phase3
 
 if [[ "$LIVE_SMOKE" == "1" ]]; then
+  echo "==> live defaults check (--live: HEAD-verify curated default catalogs against real FMD2-DB)"
+  npm run test:live
   echo "==> live smoke (--live: rotating nightly sample; external network — never in unattended CI)"
   npx tsx server/tools/smoke/run.ts --live
 fi

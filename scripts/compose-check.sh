@@ -91,7 +91,7 @@ if not any(v.get("target") == "/app/data" for v in vols):
 env = app.get("environment") or {}
 required_env = {
     "FMD2_CODELOAD_URL": "http://e2e-mock:8081/codeload",
-    "FMD_DB_URL": "http://e2e-mock:8081/FMD2-DB/db",
+    "FMD_DB_URL": "http://e2e-mock:8081/FMD2-DB/master",
     "FMD_DB_API_BASE": "http://e2e-mock:8081/api-github",
     "FMD_HTTP_ALLOW_HOSTS": "e2e-mock",
     "FMD_STATIC_DIR": "/app/web/dist-web",

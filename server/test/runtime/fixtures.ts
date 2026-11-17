@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import Database from 'better-sqlite3';
+import { DEFAULT_FMD2_PIN_SHA } from '../../src/index.js';
 import { buildFixtureZipball, zipballRootFor } from '../sync/modules/fixture-zipball.js';
 
 /**
@@ -161,11 +162,16 @@ export interface UpstreamTree {
 
 /**
  * Build the mock upstream tree — same layout prep.mjs produces for the
- * compose stack:
+ * compose stack (mirroring the LIVE FMD2-DB layout, launch defect (b)):
  *   api-github/commits.json · codeload/<repo>/zip/<luaSha>
- *   FMD2-DB/db/7z/<catalogId>.7z · site/manga/alpha-quest.html
+ *   FMD2-DB/master/7z/<catalogId>.7z · site/manga/alpha-quest.html
  */
-export function buildUpstreamTree(options: { mockBase: string; outDir?: string }): UpstreamTree {
+export function buildUpstreamTree(options: {
+  mockBase: string;
+  outDir?: string;
+  /** Extra catalog ids to pack blobs for (defaults get served too). */
+  extraCatalogIds?: readonly string[];
+}): UpstreamTree {
   const e2e = e2eConstants();
   const root = options.outDir ?? fs.mkdtempSync(path.join(os.tmpdir(), 'fmd-runtime-upstream-'));
   const ownDir = options.outDir === undefined;
@@ -183,53 +189,69 @@ export function buildUpstreamTree(options: { mockBase: string; outDir?: string }
   const zipball = buildFixtureZipball(zipballRoot, files);
   fs.mkdirSync(path.join(root, 'codeload', e2e.repo, 'zip'), { recursive: true });
   fs.writeFileSync(path.join(root, 'codeload', e2e.repo, 'zip', e2e.luaSha), zipball.bytes);
+  // ALSO serve the fixture tree under the DEFAULT production pin: the
+  // defaults-driven runtime test (loadRuntimeConfig with no FMD2_* pin
+  // env) pins DEFAULT_FMD2_PIN_SHA and the mock must answer for it.
+  fs.writeFileSync(
+    path.join(root, 'codeload', e2e.repo, 'zip', DEFAULT_FMD2_PIN_SHA),
+    buildFixtureZipball(zipballRootFor('FMD2', DEFAULT_FMD2_PIN_SHA), files).bytes,
+  );
 
-  // masterlist db (DBDataProcess.pas:137-153 schema) → real 7za archive
+  // masterlist db (DBDataProcess.pas:137-153 schema) → real 7za archives.
+  // LIVE-layout mirror (launch defect (b)): the real FMD2-DB serves
+  // `<base>/master/7z/<id>.7z` — the mock bakes the same shape, packing
+  // one blob per catalog id (the fixture id + any extras).
   const require = createRequire(path.join(repoRoot, 'package.json'));
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'fmd-runtime-db-'));
-  const dbFile = path.join(tmp, `${e2e.catalogId}.db`);
-  const db = new Database(dbFile);
-  try {
-    db.exec(
-      'CREATE TABLE masterlist (' +
-        '"link" TEXT NOT NULL PRIMARY KEY,"title" TEXT,"alttitles" TEXT,"authors" TEXT,' +
-        '"artists" TEXT,"genres" TEXT,"status" TEXT,"summary" TEXT,"numchapter" INTEGER,"jdn" INTEGER)',
-    );
-    const insert = db.prepare(
-      'INSERT INTO masterlist ("link","title","alttitles","authors","artists","genres","status","summary","numchapter","jdn") ' +
-        'VALUES (?,?,?,?,?,?,?,?,?,?)',
-    );
-    const entries = fixtureEntries(options.mockBase);
-    db.transaction((): void => {
-      for (const entry of entries) {
-        insert.run(
-          entry.link,
-          entry.title,
-          entry.alttitles,
-          entry.authors,
-          entry.artists,
-          entry.genres,
-          entry.status,
-          entry.summary,
-          entry.numchapter,
-          entry.jdn,
-        );
-      }
-    })();
-  } finally {
-    db.close();
-  }
   const sevenZip = require.resolve('7zip-bin/linux/x64/7za');
   fs.chmodSync(sevenZip, 0o755);
-  const sevenZipDir = path.join(root, 'FMD2-DB', 'db', '7z');
+  const sevenZipDir = path.join(root, 'FMD2-DB', 'master', '7z');
   fs.mkdirSync(sevenZipDir, { recursive: true });
-  const packed = spawnSync(
-    sevenZip,
-    ['a', '-t7z', path.join(sevenZipDir, `${e2e.catalogId}.7z`), dbFile],
-    { encoding: 'utf8' },
-  );
-  if (packed.status !== 0) {
-    throw new Error(`7za failed: ${String(packed.stderr)}`);
+  const packCatalog = (catalogId: string): void => {
+    const dbFile = path.join(tmp, `${catalogId}.db`);
+    const db = new Database(dbFile);
+    try {
+      db.exec(
+        'CREATE TABLE masterlist (' +
+          '"link" TEXT NOT NULL PRIMARY KEY,"title" TEXT,"alttitles" TEXT,"authors" TEXT,' +
+          '"artists" TEXT,"genres" TEXT,"status" TEXT,"summary" TEXT,"numchapter" INTEGER,"jdn" INTEGER)',
+      );
+      const insert = db.prepare(
+        'INSERT INTO masterlist ("link","title","alttitles","authors","artists","genres","status","summary","numchapter","jdn") ' +
+          'VALUES (?,?,?,?,?,?,?,?,?,?)',
+      );
+      const entries = fixtureEntries(options.mockBase);
+      db.transaction((): void => {
+        for (const entry of entries) {
+          insert.run(
+            entry.link,
+            entry.title,
+            entry.alttitles,
+            entry.authors,
+            entry.artists,
+            entry.genres,
+            entry.status,
+            entry.summary,
+            entry.numchapter,
+            entry.jdn,
+          );
+        }
+      })();
+    } finally {
+      db.close();
+    }
+    const packed = spawnSync(
+      sevenZip,
+      ['a', '-t7z', path.join(sevenZipDir, `${catalogId}.7z`), dbFile],
+      { encoding: 'utf8' },
+    );
+    if (packed.status !== 0) {
+      throw new Error(`7za failed: ${String(packed.stderr)}`);
+    }
+  };
+  packCatalog(e2e.catalogId);
+  for (const id of options.extraCatalogIds ?? []) {
+    packCatalog(id);
   }
   fs.rmSync(tmp, { recursive: true, force: true });
 

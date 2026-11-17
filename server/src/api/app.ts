@@ -17,6 +17,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import type {
   CatalogFallbackStore,
   CatalogPage,
+  CatalogSearchQuery,
   HealthStatus,
   ReadinessStatus,
 } from '@fmd/contract';
@@ -24,11 +25,18 @@ import { CatalogFallbackError } from '@fmd/contract';
 import type { FmdMetrics } from '../observability/metrics.js';
 import { ApiError, toErrorBody, notFound } from './errors.js';
 import {
+  AccountListResponseSchema,
+  AccountLoginResponseSchema,
+  AccountResponseSchema,
+  AccountUpsertRequestSchema,
+  AllSitesSearchQuerySchema,
+  AllSitesSearchResponseSchema,
   CatalogBrowseQuerySchema,
   CatalogPageResponseSchema,
   CatalogSearchQuerySchema,
   CatalogSyncAllResponseSchema,
   CatalogSyncResponseSchema,
+  normalizeGenresParam,
   HealthzResponseSchema,
   InfoRequestSchema,
   InfoResponseSchema,
@@ -47,10 +55,6 @@ import {
   ReadyzResponseSchema,
   SettingsResponseSchema,
   SyncModulesResponseSchema,
-  AccountListResponseSchema,
-  AccountLoginResponseSchema,
-  AccountResponseSchema,
-  AccountUpsertRequestSchema,
   FavoriteCheckResponseSchema,
   FavoriteCreateRequestSchema,
   FavoriteIdSchema,
@@ -63,6 +67,7 @@ import {
   type AccountLoginResponseT,
   type AccountResponseT,
   type CatalogPageResponseT,
+  type AllSitesSearchResponseT,
   type FavoriteCheckResponseT,
   type FavoriteResponseT,
   type FavoriteT,
@@ -95,6 +100,7 @@ import {
   type SettingsService,
   type SyncService,
 } from './services.js';
+import { UnionSearchService } from './search-service.js';
 
 /** Aggregate of the §10 domain seams (all required; tests pass fakes). */
 export interface ApiServices {
@@ -497,18 +503,63 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
 
   app.get('/api/catalog/:id/search', async (req): Promise<CatalogPageResponseT> => {
     const id = parseOr400(ModuleIdSchema, (req.params as Record<string, unknown>)['id'], 'catalog id');
-    const query = parseOr400(CatalogSearchQuerySchema, req.query, 'search query');
-    const searchInput = {
-      query: query.q,
+    // Boundary normalization: `genres` accepts repeated params or one
+    // comma-separated param (FMD2 custom-genres semantics) — both
+    // become the array wire form before zod parsing.
+    const rawQuery: Record<string, unknown> = { ...(req.query as Record<string, unknown>) };
+    const genres: unknown = normalizeGenresParam(rawQuery['genres']);
+    if (Array.isArray(genres) && genres.length > 0) {
+      rawQuery['genres'] = genres;
+    } else {
+      delete rawQuery['genres'];
+    }
+    const query = parseOr400(CatalogSearchQuerySchema, rawQuery, 'search query');
+    const searchInput: CatalogSearchQuery = {
+      ...(query.q !== undefined && query.q !== '' ? { query: query.q } : {}),
       ...(query.cursor !== undefined ? { cursor: query.cursor } : {}),
       limit: query.limit,
-      ...(query.status !== undefined ? { status: query.status } : {}),
-      ...(query.genre !== undefined ? { genre: query.genre } : {}),
+      ...(query.status !== undefined && query.status !== '' ? { status: query.status } : {}),
+      ...(query.genre !== undefined && query.genre !== '' ? { genre: query.genre } : {}),
+      ...(query.authors !== undefined && query.authors !== '' ? { authors: query.authors } : {}),
+      ...(query.genres !== undefined && query.genres.length > 0 ? { genres: query.genres } : {}),
+      genresMode: query.genresMode,
+      ...(query.newDays !== undefined ? { newDays: query.newDays } : {}),
     };
     return resolveCatalogPage(
       id,
       (): CatalogPage => services.catalogs.search(id, searchInput),
       (fb): Promise<CatalogPage> => fb.search(id, searchInput),
+    );
+  });
+
+  // ── all-sites union search (FMD2 cbSearchFromAllSites parity) ────
+  // GET /api/search fans out over every INSTALLED catalog (never the
+  // §6.8 live fallback — the FMD2 union is over local DBs), merges by
+  // the documented comparator, and surfaces typed partial state.
+  const unionSearch = new UnionSearchService(services.modules, services.catalogs);
+
+  app.get('/api/search', async (req): Promise<AllSitesSearchResponseT> => {
+    // Boundary normalization: `genres` accepts repeated params or one
+    // comma-separated param (same wire forms as the per-site search).
+    const rawQuery: Record<string, unknown> = { ...(req.query as Record<string, unknown>) };
+    const genres: unknown = normalizeGenresParam(rawQuery['genres']);
+    if (Array.isArray(genres) && genres.length > 0) {
+      rawQuery['genres'] = genres;
+    } else {
+      delete rawQuery['genres'];
+    }
+    const query = parseOr400(AllSitesSearchQuerySchema, rawQuery, 'all-sites search query');
+    return AllSitesSearchResponseSchema.parse(
+      await unionSearch.search({
+        ...(query.q !== undefined && query.q !== '' ? { q: query.q } : {}),
+        ...(query.status !== undefined && query.status !== '' ? { status: query.status } : {}),
+        ...(query.genres !== undefined && query.genres.length > 0 ? { genres: query.genres } : {}),
+        genresMode: query.genresMode,
+        ...(query.authors !== undefined && query.authors !== '' ? { authors: query.authors } : {}),
+        ...(query.newDays !== undefined ? { newDays: query.newDays } : {}),
+        ...(query.cursor !== undefined ? { cursor: query.cursor } : {}),
+        limit: query.limit,
+      }),
     );
   });
 

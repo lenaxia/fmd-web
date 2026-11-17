@@ -6,8 +6,9 @@ import type { HostLogger } from '@fmd/contract';
 import { createMemoryLogger } from '../../engine/lua/logger.js';
 import type { ModuleSyncConfig } from './config.js';
 import { ModuleSyncConfigError } from './config.js';
-import type { ZipballFetcher } from './fetcher.js';
-import { CodeloadZipballFetcher } from './fetcher.js';
+import { codeloadZipballUrl } from './config.js';
+import type { ModuleArchiveFetcher } from './fetch.js';
+import { CodeloadArchiveFetcher, expectedTarballRoot, githubTarballUrl, ModuleSyncFetchError } from './fetch.js';
 import type { SyncStateEntry, SyncStateStore, ModuleSyncReport } from './state.js';
 import { FileSyncStateStore } from './state.js';
 import type { ModuleInventoryEntry } from './diff.js';
@@ -15,6 +16,7 @@ import { diffModuleInventories } from './diff.js';
 import type { StagedTreeValidation } from './validate.js';
 import { StagedInitError, validateStagedLuaTree } from './validate.js';
 import { installStagedTree } from './swap.js';
+import { readTarGz } from './tarball.js';
 import { readZipball, type ZipballEntry } from './zipball.js';
 
 /**
@@ -57,7 +59,7 @@ export interface ModuleSyncResult {
 }
 
 export interface ModuleSyncDeps {
-  readonly fetcher?: ZipballFetcher;
+  readonly fetcher?: ModuleArchiveFetcher;
   readonly stateStore?: SyncStateStore;
   readonly logger?: HostLogger;
   /** Injectable clock for deterministic `fetched_at` (tests). */
@@ -90,7 +92,7 @@ export function createModuleSyncService(
         'a pin bump is a deployment act (PR + module-diff report).',
     );
   }
-  const fetcher = deps.fetcher ?? new CodeloadZipballFetcher();
+  const fetcher = deps.fetcher ?? new CodeloadArchiveFetcher();
   const stateStore = deps.stateStore ?? new FileSyncStateStore(join(config.dataDir, 'sync-state.json'));
   const logger = deps.logger ?? createMemoryLogger();
   const now = deps.now ?? ((): string => new Date().toISOString());
@@ -110,18 +112,18 @@ export function createModuleSyncService(
         if (source === 'local-dir') {
           stageLocalDir(config.luaDirOverride as string, stagedDir);
         } else {
-          await stageZipballSubtree(config, fetcher, stagedDir, workDir);
+          await stageArchiveSubtree(config, fetcher, stagedDir);
         }
 
         let validation: StagedTreeValidation;
         try {
-          validation = await validateStagedLuaTree(stagedDir, logger);
+          validation = await validateStagedLuaTree(stagedDir, logger, { previousInventory });
         } catch (error) {
           if (error instanceof StagedInitError) {
             throw new ModuleSyncError(
               'staged-init-failed',
               `refusing to install: staged tree failed Init-pass validation — ${error.message}`,
-              { failures: error.failures },
+              { failures: error.failures, ...(error.toleranceReason !== undefined ? { toleranceReason: error.toleranceReason } : {}) },
             );
           }
           throw error;
@@ -141,6 +143,10 @@ export function createModuleSyncService(
           otherFiles: validation.otherFiles,
           modules: validation.inventory.length,
           warnings: validation.warnings,
+          failures: validation.failures.map((failure) => ({
+            file: failure.file,
+            firstError: failure.errors[0] ?? 'unknown error',
+          })),
           diff: diffModuleInventories(previousInventory, validation.inventory),
           inventory: validation.inventory,
         };
@@ -175,31 +181,46 @@ function stageLocalDir(luaDir: string, stagedDir: string): void {
 }
 
 /**
- * Fetch the pinned zipball, verify its root directory against the pin, and
- * extract only the `lua/` subtree into the staging dir.
+ * Fetch the pinned tree (zipball → tarball fallback chain), verify its
+ * root directory against the pin (per-format convention), and extract
+ * only the `lua/` subtree into the staging dir.
  */
-async function stageZipballSubtree(
+async function stageArchiveSubtree(
   config: ModuleSyncConfig,
-  fetcher: ZipballFetcher,
+  fetcher: ModuleArchiveFetcher,
   stagedDir: string,
-  workDir: string,
 ): Promise<void> {
   const pin: SyncPin = { repo: config.repo, sha: config.sha };
-  let archive: Uint8Array;
+  const urls = {
+    zipball: codeloadZipballUrl(config.repo, config.sha, config.codeloadBaseUrl),
+    tarball: githubTarballUrl(config.repo, config.sha, config.tarballApiBaseUrl),
+  };
+  let archive: Awaited<ReturnType<ModuleArchiveFetcher['fetchArchive']>>;
   try {
-    archive = await fetcher.fetchZipball(pin, config.codeloadBaseUrl);
+    archive = await fetcher.fetchArchive(urls);
   } catch (error) {
+    if (error instanceof ModuleSyncFetchError) {
+      throw new ModuleSyncError('fetch-failed', error.message, {
+        repo: pin.repo,
+        sha: pin.sha,
+        fetchKind: error.kind,
+        attempts: error.attempts,
+      });
+    }
     throw new ModuleSyncError('fetch-failed', errorMessage(error), { repo: pin.repo, sha: pin.sha });
   }
 
   let entries: ZipballEntry[];
   try {
-    entries = readZipball(archive);
+    entries = archive.format === 'zip' ? readZipball(archive.bytes) : readTarGz(archive.bytes);
   } catch (error) {
-    throw new ModuleSyncError('zip-corrupt', `zipball for ${pin.sha} is not a readable archive: ${errorMessage(error)}`);
+    throw new ModuleSyncError(
+      'zip-corrupt',
+      `${archive.endpoint} for ${config.sha} is not a readable archive: ${errorMessage(error)}`,
+    );
   }
 
-  const root = verifyZipballRoot(entries, config.repo, config.sha);
+  const root = verifyArchiveRoot(entries, config.repo, config.sha, archive.format);
   // explicit trailing slash: posix.join(root, 'lua', '') drops it, which
   // would leave a leading '/' on every sliced relative path
   const subtreePrefix = `${root}/lua/`;
@@ -207,7 +228,7 @@ async function stageZipballSubtree(
   if (subtree.length === 0) {
     throw new ModuleSyncError(
       'zip-corrupt',
-      `zipball for ${config.sha} contains no lua/ subtree (expected ${subtreePrefix}*)`,
+      `${archive.endpoint} for ${config.sha} contains no lua/ subtree (expected ${subtreePrefix}*)`,
     );
   }
   for (const entry of subtree) {
@@ -224,8 +245,6 @@ async function stageZipballSubtree(
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, entry.data);
   }
-  // keep the archive bytes out of scope promptly; workDir holds the staging
-  void workDir;
 }
 
 /**
@@ -249,28 +268,37 @@ export function safeSubtreeRelative(entryName: string, subtreePrefix: string): s
   return relative;
 }
 
-/** The single zipball root dir must be exactly `<Repo>-<sha10>` for the pin. */
-function verifyZipballRoot(entries: readonly ZipballEntry[], repo: string, sha: string): string {
+/**
+ * The archive root dir must be exactly the pin's expected root for the
+ * format: `<Repo>-<sha10>` (zipball/codeload) or `<owner>-<Repo>-<sha7>`
+ * (tarball/api.github.com — verified live).
+ */
+function verifyArchiveRoot(
+  entries: readonly ZipballEntry[],
+  repo: string,
+  sha: string,
+  format: 'zip' | 'tar-gzip',
+): string {
   const roots = new Set<string>();
   for (const entry of entries) {
     const firstSegment = entry.name.split('/')[0];
     if (firstSegment === undefined || firstSegment === '') {
-      throw new ModuleSyncError('zip-corrupt', `zipball entry escapes the archive root: ${entry.name}`);
+      throw new ModuleSyncError('zip-corrupt', `archive entry escapes the archive root: ${entry.name}`);
     }
     roots.add(firstSegment);
   }
   if (roots.size !== 1) {
     throw new ModuleSyncError(
       'zip-corrupt',
-      `zipball must contain a single root directory, found: ${[...roots].sort().join(', ') || '(none)'}`,
+      `archive must contain a single root directory, found: ${[...roots].sort().join(', ') || '(none)'}`,
     );
   }
   const root = [...roots][0] as string;
-  const expected = expectedZipballRoot(repo, sha);
+  const expected = format === 'zip' ? expectedZipballRoot(repo, sha) : expectedTarballRoot(repo, sha);
   if (root.toLowerCase() !== expected.toLowerCase()) {
     throw new ModuleSyncError(
       'sha-mismatch',
-      `SHA mismatch: requested ${sha} but the zipball root is "${root}" ` +
+      `SHA mismatch: requested ${sha} but the ${format === 'zip' ? 'zipball' : 'tarball'} root is "${root}" ` +
         `(expected "${expected}") — refusing to install`,
       { expectedRoot: expected, actualRoot: root, sha },
     );

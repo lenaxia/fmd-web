@@ -9,7 +9,7 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SettingsPage } from '../src/pages/SettingsPage';
 import { autoCleanup, mockFetch, renderWithProviders, type MockRoute } from './helpers';
-import { MODULE_ID } from './fixtures';
+import { MODULE_ID, moduleFixture } from './fixtures';
 
 autoCleanup();
 
@@ -97,5 +97,63 @@ describe('SettingsPage D20 bootstrap empty state', (): void => {
     await userEvent.click(screen.getByRole('button', { name: 'Run module sync now' }));
     expect(await screen.findByText('Module sync running…')).toBeInTheDocument();
     releaseSync?.();
+  });
+
+  it('surfaces tolerated upstream-broken files (failures[]) from the sync summary', async (): Promise<void> => {
+    const routes: MockRoute[] = [
+      {
+        method: 'GET',
+        match: (url): boolean => url.pathname === '/api/modules',
+        // A populated registry: the sync status block renders in the
+        // main Settings view, where failures[] is listed in full.
+        respond: (): { body: object } => ({
+          body: {
+            modules: [moduleFixture({ id: MODULE_ID, name: 'KLManga' })],
+            count: 1,
+          },
+        }),
+      },
+      {
+        method: 'GET',
+        match: (url): boolean => url.pathname === '/api/settings',
+        respond: (): { body: object } => ({
+          body: { proxy: { type: '', host: '', port: '', user: '', pass: '' }, browser: { enabled: false, url: '' } },
+        }),
+      },
+      {
+        method: 'POST',
+        match: (url): boolean => url.pathname === '/api/sync/modules',
+        respond: (): { body: object } => ({
+          body: {
+            ok: true,
+            summary: {
+              treeSha: 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+              totalFiles: 417,
+              registeredFiles: 412,
+              failedFiles: 5,
+              totalModules: 454,
+              failures: [
+                { file: 'modules/JapScan.lua', error: 'luaL_loadbufferx(modules/JapScan.lua) failed: 3' },
+                { file: 'modules/dm5.lua', error: 'luaL_loadbufferx(modules/dm5.lua) failed: 3' },
+              ],
+              knownBroken: {},
+              eventCoverage: {},
+            },
+          },
+        }),
+      },
+    ];
+    const { fetch } = mockFetch(routes);
+    renderWithProviders(<SettingsPage />, { fetch });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Sync modules' }));
+    expect(await screen.findByText(/Module sync: 412\/417 files registered/)).toBeInTheDocument();
+    // the tolerated failures list, in full, in the Settings surface
+    expect(await screen.findByText(/2 upstream-broken file\(s\) tolerated/)).toBeInTheDocument();
+    const list = screen.getByLabelText('Tolerated broken module files');
+    expect(list.querySelectorAll('li')).toHaveLength(2);
+    expect(list.textContent).toContain('modules/JapScan.lua');
+    expect(list.textContent).toContain('luaL_loadbufferx(modules/dm5.lua) failed: 3');
+    expect(fetch).toBeDefined();
   });
 });

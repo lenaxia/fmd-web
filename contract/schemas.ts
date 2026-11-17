@@ -105,9 +105,68 @@ export type WsGapMessageT = z.infer<typeof WsGapMessageSchema>;
 export const WsResyncMessageSchema = z.object({ type: z.literal('resync') });
 export type WsResyncMessageT = z.infer<typeof WsResyncMessageSchema>;
 
+// ── catalog provisioning progress (site-first browse, §6.2–§6.3) ─────
+
+/**
+ * Fine-grained phases of one catalog provision (the DBUpdaterThread
+ * parity surface). `checking` = update check/starting, `downloading` =
+ * FMD2-DB 7z blob fetch, `extracting` = 7zz unpack, `installing` =
+ * atomic rename imminent, `done`/`failed` = terminal.
+ */
+export const CatalogSyncPhaseSchema = z.enum([
+  'checking',
+  'downloading',
+  'extracting',
+  'installing',
+  'done',
+  'failed',
+]);
+export type CatalogSyncPhaseT = z.infer<typeof CatalogSyncPhaseSchema>;
+
+/**
+ * Terminal provision outcomes. `no-catalog` is the FMD2-DB 404 case:
+ * no prebuilt catalog exists for the site (§6.8 live-scrape territory).
+ * `cancelled` is client-side (fetch abort) and never crosses the wire.
+ */
+export const CatalogSyncOutcomeSchema = z.enum(['updated', 'unchanged', 'failed', 'no-catalog']);
+export type CatalogSyncOutcomeT = z.infer<typeof CatalogSyncOutcomeSchema>;
+
+/** One catalog-provision progress snapshot (WS `sync` frame payload). */
+export const CatalogSyncProgressSchema = z.object({
+  /**
+   * Ring-buffer correlation key — `catalog-sync:<moduleId>` (see
+   * `catalogSyncJobId`). The hub buffers sync frames under this key
+   * exactly like job events, so D19 backfill covers them for free.
+   */
+  jobId: z.string().min(1),
+  moduleId: z.string().min(1),
+  phase: CatalogSyncPhaseSchema,
+  outcome: CatalogSyncOutcomeSchema.optional(),
+  detail: z.string().optional(),
+  /** 0..100 when the current phase has a determinate measure. */
+  percent: z.number().min(0).max(100).optional(),
+});
+export type CatalogSyncProgressT = z.infer<typeof CatalogSyncProgressSchema>;
+
+/** The canonical sync-job ring key for one module's catalog provision. */
+export const CATALOG_SYNC_JOB_PREFIX = 'catalog-sync:';
+export function catalogSyncJobId(moduleId: string): string {
+  return `${CATALOG_SYNC_JOB_PREFIX}${moduleId}`;
+}
+
+/** Hub → client: one catalog-provision progress snapshot. */
+export const WsSyncEventMessageSchema = z.object({
+  type: z.literal('sync'),
+  /** Monotonic event id — the client's backfill cursor (D19). */
+  id: WsEventIdSchema,
+  sync: CatalogSyncProgressSchema,
+});
+export type WsSyncEventMessageT = z.infer<typeof WsSyncEventMessageSchema>;
+
 /** Every server → client frame (discriminated on `type`). */
 export const WsServerMessageSchema = z.discriminatedUnion('type', [
   WsJobEventMessageSchema,
+  WsSyncEventMessageSchema,
   WsGapMessageSchema,
   WsResyncMessageSchema,
 ]);

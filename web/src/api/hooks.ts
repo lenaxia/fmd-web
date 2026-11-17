@@ -36,6 +36,7 @@ export type SettingsT = operations['getSettings']['responses'][200]['content']['
 export type ProxySettingsT = components['schemas']['ProxySettings'];
 export type SyncModulesT = operations['syncModules']['responses'][200]['content']['application/json'];
 export type SyncAllT = operations['syncAllCatalogs']['responses'][200]['content']['application/json'];
+export type CatalogSyncOneT = operations['syncCatalog']['responses'][200]['content']['application/json'];
 
 type FetchResult<TData> = {
   data?: TData;
@@ -131,9 +132,102 @@ export function useSyncAllCatalogs(): UseMutationResult<SyncAllT, ApiError, void
   });
 }
 
+// ── single-catalog provisioning (site-first browse) ─────────────────
+
+export interface ProvisionCatalogInput {
+  readonly moduleId: string;
+}
+
+/**
+ * POST /api/sync/catalog/:id for the auto-provision flow (site-first
+ * browse). Progress streams over WS (`sync` frames, see
+ * useSyncCatalogProgress); THIS promise's resolution is the REST
+ * terminal truth (state updated|unchanged|failed + error taxonomy via
+ * the `no-catalog:` error prefix). Cancel is UX-level (the provision
+ * view is withdrawn): the sync itself is one idempotent request, and a
+ * late completion merely flips the site's chip — never a partial state.
+ */
+export function useProvisionCatalog(): UseMutationResult<CatalogSyncOneT, ApiError, ProvisionCatalogInput> {
+  const client = useApiClient();
+  return useMutation<CatalogSyncOneT, ApiError, ProvisionCatalogInput>({
+    mutationFn: (input): Promise<CatalogSyncOneT> =>
+      unwrap(
+        client.POST('/api/sync/catalog/{id}', {
+          params: { path: { id: input.moduleId } },
+          body: {},
+        }),
+      ),
+  });
+}
+
 // ── catalog browse/search (§6.6, cursor pagination) ─────────────────
 
 export type CatalogMode = 'latest' | 'title' | 'search';
+
+/** All-sites union search page (GET /api/search). */
+export type AllSitesSearchPageT = operations['allSitesSearch']['responses'][200]['content']['application/json'];
+export type SearchEntryT = AllSitesSearchPageT['entries'][number];
+export type SearchFacetT = NonNullable<AllSitesSearchPageT['facets']>[number];
+export type SiteSearchFailureT = NonNullable<AllSitesSearchPageT['warnings']>[number];
+export type ExcludedSiteT = NonNullable<AllSitesSearchPageT['excluded']>[number];
+
+export interface AllSitesSearchInput {
+  readonly q?: string;
+  readonly status?: string;
+  readonly authors?: string;
+  readonly genres?: readonly string[];
+  readonly genresMode?: 'all' | 'any';
+  readonly newDays?: number;
+  readonly limit: number;
+  readonly enabled: boolean;
+}
+
+/**
+ * GET /api/search — the FMD2 cbSearchFromAllSites union: fans out over
+ * every installed catalog server-side; `warnings` carry typed partial
+ * failures (a broken catalog never fails the page) and `excluded`
+ * names enabled sites without a catalog (installed-only semantics).
+ */
+export function useAllSitesSearch(
+  input: AllSitesSearchInput,
+): UseInfiniteQueryResult<InfiniteData<AllSitesSearchPageT, { cursor?: string }>, ApiError> {
+  const client = useApiClient();
+  const q = input.q ?? '';
+  const status = input.status ?? '';
+  const authors = input.authors ?? '';
+  const genres = input.genres ?? [];
+  const genresMode = input.genresMode ?? 'all';
+  const newDays = input.newDays;
+  return useInfiniteQuery<AllSitesSearchPageT, ApiError, InfiniteData<AllSitesSearchPageT, { cursor?: string }>, QueryKey, { cursor?: string }>({
+    queryKey: ['search-all', q, status, authors, genres, genresMode, newDays, input.limit],
+    enabled:
+      input.enabled &&
+      (q !== '' || status !== '' || authors !== '' || genres.length > 0 || newDays !== undefined),
+    initialPageParam: {},
+    queryFn: async ({ pageParam, signal }): Promise<AllSitesSearchPageT> => {
+      const compatible: AbortSignal | undefined = requestCompatibleSignal(signal);
+      return unwrap(
+        client.GET('/api/search', {
+          params: {
+            query: {
+              ...(q !== '' ? { q } : {}),
+              limit: input.limit,
+              ...(status !== '' ? { status } : {}),
+              ...(authors !== '' ? { authors } : {}),
+              ...(genres.length > 0 ? { genres: [...genres] } : {}),
+              genresMode,
+              ...(newDays !== undefined ? { newDays } : {}),
+              ...(pageParam.cursor !== undefined ? { cursor: pageParam.cursor } : {}),
+            },
+          },
+          ...(compatible !== undefined ? { signal: compatible } : {}),
+        }),
+      );
+    },
+    getNextPageParam: (lastPage): { cursor?: string } | undefined =>
+      lastPage.nextCursor !== undefined ? { cursor: lastPage.nextCursor } : undefined,
+  });
+}
 
 /** Page cursor: page number for latest/title, opaque cursor for search. */
 export interface CatalogPageParam {
@@ -145,8 +239,38 @@ export interface CatalogQueryInput {
   readonly catalogId: string;
   readonly mode: CatalogMode;
   readonly q?: string;
+  /** FMD2 filter-panel params (additive search extension). */
+  readonly status?: string;
+  readonly authors?: string;
+  readonly genres?: readonly string[];
+  readonly genresMode?: 'all' | 'any';
+  readonly newDays?: number;
   readonly limit: number;
   readonly enabled: boolean;
+}
+
+/**
+ * Realm-guarded AbortSignal pass-through. openapi-fetch constructs
+ * `new Request(url, { signal })`, which validates the signal against
+ * the CURRENT realm's AbortSignal — under jsdom (vitest) the queryFn
+ * signal can come from a different realm than the undici `Request`
+ * and the constructor rejects it ("Expected signal … to be an instance
+ * of AbortSignal"), breaking every catalog query in the unit suite.
+ * Probe compatibility: pass the signal through when the realms match
+ * (browsers — true network aborts reach fetch); drop it when they
+ * don't (react-query's own cancellation still rejects the queryFn
+ * promise, so superseded queries never land).
+ */
+export function requestCompatibleSignal(signal: AbortSignal | undefined): AbortSignal | undefined {
+  if (signal === undefined || typeof Request === 'undefined') {
+    return undefined;
+  }
+  try {
+    new Request('about:blank', { signal });
+    return signal;
+  } catch {
+    return undefined;
+  }
 }
 
 export function useCatalogEntries(
@@ -155,22 +279,36 @@ export function useCatalogEntries(
   const client = useApiClient();
   const { catalogId, mode, limit } = input;
   const q = input.q ?? '';
+  const status = input.status ?? '';
+  const authors = input.authors ?? '';
+  const genres = input.genres ?? [];
+  const genresMode = input.genresMode ?? 'all';
+  const newDays = input.newDays;
   return useInfiniteQuery<CatalogPageT, ApiError, InfiniteData<CatalogPageT, CatalogPageParam>, QueryKey, CatalogPageParam>({
-    queryKey: ['catalog', catalogId, mode, q, limit],
-    enabled: input.enabled && catalogId !== '' && (mode !== 'search' || q !== ''),
+    queryKey: ['catalog', catalogId, mode, q, status, authors, genres, genresMode, newDays, limit],
+    enabled: input.enabled && catalogId !== '' && (mode !== 'search' || q !== '' || status !== '' || authors !== '' || genres.length > 0 || newDays !== undefined),
     initialPageParam: { page: 1 },
-    queryFn: async ({ pageParam }): Promise<CatalogPageT> => {
+    queryFn: async ({ pageParam, signal }): Promise<CatalogPageT> => {
+      // exactOptionalPropertyTypes: never pass an explicit undefined
+      // signal — spread it in only when the realm guard returns one.
+      const compatible: AbortSignal | undefined = requestCompatibleSignal(signal);
       if (mode === 'search') {
         return unwrap(
           client.GET('/api/catalog/{id}/search', {
             params: {
               path: { id: catalogId },
               query: {
-                q,
+                ...(q !== '' ? { q } : {}),
                 limit,
+                ...(status !== '' ? { status } : {}),
+                ...(authors !== '' ? { authors } : {}),
+                ...(genres.length > 0 ? { genres: [...genres] } : {}),
+                genresMode,
+                ...(newDays !== undefined ? { newDays } : {}),
                 ...(pageParam.cursor !== undefined ? { cursor: pageParam.cursor } : {}),
               },
             },
+            ...(compatible !== undefined ? { signal: compatible } : {}),
           }),
         );
       }
@@ -178,6 +316,7 @@ export function useCatalogEntries(
       return unwrap(
         client.GET(path, {
           params: { path: { id: catalogId }, query: { page: pageParam.page, limit } },
+          ...(compatible !== undefined ? { signal: compatible } : {}),
         }),
       );
     },

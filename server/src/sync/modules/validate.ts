@@ -1,19 +1,30 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 import type { HostLogger } from '@fmd/contract';
+import { TolerancePolicy, SYNC_FAILURE_TOLERANCE, type ToleranceRefusalReason } from '@fmd/contract';
 import { LuaFactory } from 'wasmoon';
 import { WasmoonChunkCache } from '../../engine/lua/chunk-cache.js';
 import { createLuaHost } from '../../engine/lua/host.js';
+import { DeadlineAbortHandle, createDeadlineCells } from '../../engine/lua/abort.js';
+import { RecordedResponseResolver } from '../../engine/shims/http-shim.js';
+import { initShimsHook } from '../../engine/shims/install.js';
 
 /**
  * Staged-tree validation (DESIGN.md §5.1 + §6 sync gate): before anything
  * touches `data/lua/`, the staged tree must prove itself — every `.lua`
  * file in the tree parses (compile-only check via the chunk cache), and
  * every `modules/*.lua` file passes the real Init pass (parse + register).
+ *
  * The production Init pass is tolerant (errors are logged, the module is
- * dropped) — the sync gate is strict: any error-level record for a module
- * file is a fatal validation failure, so a broken module refuses the whole
- * sync before the swap.
+ * dropped) — and the sync gate is tolerance-gated the SAME way, via the
+ * shared contract TolerancePolicy: a handful of upstream-broken files
+ * (≤5 AND ≤1% of module files, whole-file rounding, none of them
+ * previously registered) is ADMITTED — the sync proceeds and the report
+ * carries `failures[]`. Anything over the thresholds, or a file that
+ * used to register (regression), refuses the whole sync before the
+ * swap. Zero-tolerance is gone: the real FMD2 tree permanently carries
+ * ~5 upstream-broken files and a zero-tolerance gate could never pass
+ * on it (launch defect (a)).
  */
 
 export interface StagedFileFailure {
@@ -30,6 +41,8 @@ export interface StagedTreeValidation {
   readonly moduleFiles: number;
   /** Files carried without validation (assets such as `.proto`). */
   readonly otherFiles: number;
+  /** Tolerated failures (file + full error list) — empty on a clean tree. */
+  readonly failures: readonly StagedFileFailure[];
   /** Non-fatal findings (e.g. a module file that registered nothing). */
   readonly warnings: readonly string[];
 }
@@ -44,10 +57,21 @@ export class StagedInitError extends Error {
   constructor(
     message: string,
     readonly failures: readonly StagedFileFailure[],
+    /** Why the tolerance policy refused ('regression' | 'over-threshold'). */
+    readonly toleranceReason?: ToleranceRefusalReason,
   ) {
     super(message);
     this.name = 'StagedInitError';
   }
+}
+
+export interface StagedValidationOptions {
+  /**
+   * Previous sync's registered inventory (the regression guard input):
+   * a failing file that appears here used to work and refuses the sync.
+   * Omitted on first install.
+   */
+  readonly previousInventory?: readonly { readonly sourceFile: string }[];
 }
 
 const MODULES_DIR = 'modules';
@@ -55,6 +79,7 @@ const MODULES_DIR = 'modules';
 export async function validateStagedLuaTree(
   stagedDir: string,
   logger: HostLogger,
+  options: StagedValidationOptions = {},
 ): Promise<StagedTreeValidation> {
   const allFiles = walk(stagedDir).sort(comparePosix);
   const moduleFiles = allFiles.filter(
@@ -78,18 +103,31 @@ export async function validateStagedLuaTree(
     }
   }
 
-  // 2. Real Init pass over modules/*.lua, strict on any error record.
-  //    Parse failures throw out of the chunk cache (outside the registry's
+  // 2. Real Init pass over modules/*.lua — the SAME shim wiring the
+  //    registry sweep runs (§5.7 require shim resolving against the
+  //    tree root, offline resolver, deadline cells): without it, every
+  //    module that requires a template/util fails Lua's native
+  //    package.path lookup and the staged failure count explodes past
+  //    any tolerance (the deeper half of the D20 launch defect). Parse
+  //    failures throw out of the chunk cache (outside the registry's
   //    tolerant DoInit catch) — both paths land in `failures`.
   const inventory: StagedInventoryEntry[] = [];
   const host = createLuaHost(logger);
   try {
     for (const file of moduleFiles) {
       const before = logger.records.length;
+      const abort = new DeadlineAbortHandle(createDeadlineCells());
+      const hook = initShimsHook({
+        resolver: new RecordedResponseResolver([]), // offline: no Init-time network
+        abort,
+        logger,
+        moduleId: file,
+        luaRoot: stagedDir,
+      });
       let descriptors: readonly { id: string; name: string; sourceFile: string }[] = [];
       let thrown: string | undefined;
       try {
-        descriptors = await host.registry.loadFile(file, readFileSync(join(stagedDir, file), 'utf8'));
+        descriptors = await host.registry.loadFile(file, readFileSync(join(stagedDir, file), 'utf8'), hook);
       } catch (error) {
         thrown = error instanceof Error ? error.message : String(error);
       }
@@ -116,17 +154,34 @@ export async function validateStagedLuaTree(
     await host.dispose();
   }
 
-  if (failures.length > 0) {
+  const decision = TolerancePolicy.decide(
+    failures.map((failure) => ({ file: failure.file, firstError: failure.errors[0] ?? 'unknown error' })),
+    moduleFiles.length,
+    options.previousInventory ?? [],
+  );
+  if (decision.decision === 'refuse') {
     const detail = failures
       .map((failure) => `  ${failure.file}:\n${failure.errors.map((e) => `    ${e}`).join('\n')}`)
       .join('\n');
+    const why =
+      decision.reason === 'regression'
+        ? `regression: previously-registered file(s) went broken — ${decision.offenders.map((o) => o.file).join(', ')}`
+        : `over-threshold: ${failures.length} failing file(s) exceed the tolerance (≤${String(SYNC_FAILURE_TOLERANCE.maxFiles)} AND ≤1% of ${String(moduleFiles.length)} module files)`;
     throw new StagedInitError(
-      `staged tree failed Init-pass validation (${failures.length} file(s)):\n${detail}`,
+      `staged tree failed Init-pass validation (${failures.length} file(s), ${why}):\n${detail}`,
       failures,
+      decision.reason,
     );
   }
 
-  return { inventory, luaFiles: moduleFiles.length + parseOnlyFiles.length, moduleFiles: moduleFiles.length, otherFiles, warnings };
+  return {
+    inventory,
+    luaFiles: moduleFiles.length + parseOnlyFiles.length,
+    moduleFiles: moduleFiles.length,
+    otherFiles,
+    failures,
+    warnings,
+  };
 }
 
 function parseErrorMessage(error: unknown): string {

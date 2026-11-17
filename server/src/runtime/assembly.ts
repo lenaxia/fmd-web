@@ -4,12 +4,14 @@ import type { ReadinessStatus } from '@fmd/contract';
 import { buildApp, type ApiServices, type AppOptions, DEFAULT_INFO_CACHE_TTL_MS } from '../api/app.js';
 import {
   type CatalogSyncOutcome,
+  type CatalogSyncPhaseCb,
   type InfoService,
   type JobService,
   type ModuleService,
   type NormalizedInfo,
   type SyncModulesOutcome,
   type SyncService,
+  WsPublishingSyncService,
 } from '../api/services.js';
 import { ApiError } from '../api/errors.js';
 import { WsHub } from '../api/ws/hub.js';
@@ -40,6 +42,7 @@ import type { ModuleSummaryT, OptionValueT } from '../api/schemas.js';
 import { createModuleSyncService } from '../sync/modules/service.js';
 import { loadModuleSyncConfig, type ModuleSyncConfig } from '../sync/modules/config.js';
 import { CatalogSync } from '../sync/db/sync-service.js';
+import { DEFAULT_BOOTSTRAP_CATALOGS } from './catalog-defaults.js';
 import { DEFAULT_LIVE_SCRAPE_TTL_MS, LiveScrapeCatalogStore } from '../catalog/live-scrape-store.js';
 import { UpdateLaneScrapeGate } from '../catalog/update-lane-gate.js';
 import { EngineDirectoryWalker } from '../catalog/directory-walk.js';
@@ -86,7 +89,7 @@ export interface RuntimeConfig {
   readonly dbUrl: string | undefined;
   /** Commits API base; default = api.github.com. */
   readonly dbApiBase: string | undefined;
-  /** D20 bootstrap catalogs (FMD_BOOTSTRAP_CATALOGS, csv). */
+  /** D20 bootstrap catalogs: FMD_BOOTSTRAP_CATALOGS csv override, else the curated defaults. */
   readonly bootstrapCatalogIds: readonly string[];
   /** Extra (non-loopback) hosts module HTTP may reach (compose mock). */
   readonly httpAllowedHosts: readonly string[];
@@ -147,6 +150,10 @@ export function loadRuntimeConfig(env: Record<string, string | undefined> = proc
   const favIntervalParsed = favIntervalRaw !== '' ? Number.parseInt(favIntervalRaw, 10) : DEFAULT_INTERVAL_MS;
   const favJitterRaw = env['FMD_FAVORITE_JITTER_MS'] ?? '';
   const favJitterParsed = favJitterRaw !== '' ? Number.parseInt(favJitterRaw, 10) : DEFAULT_JITTER_MS;
+  // D20 catalogs: an explicit FMD_BOOTSTRAP_CATALOGS csv OVERRIDES the
+  // curated defaults entirely (compose/e2e/dev stay override-driven);
+  // unset/empty = the curated, live-verified DEFAULT_BOOTSTRAP_CATALOGS.
+  const bootstrapCsv = csvEnv(env['FMD_BOOTSTRAP_CATALOGS']);
   return {
     dataDir,
     port,
@@ -154,7 +161,7 @@ export function loadRuntimeConfig(env: Record<string, string | undefined> = proc
     moduleSync: loadModuleSyncConfig({ ...env, FMD_DATA_DIR: dataDir }),
     dbUrl: env['FMD_DB_URL'],
     dbApiBase: env['FMD_DB_API_BASE'],
-    bootstrapCatalogIds: csvEnv(env['FMD_BOOTSTRAP_CATALOGS']),
+    bootstrapCatalogIds: bootstrapCsv.length > 0 ? bootstrapCsv : [...DEFAULT_BOOTSTRAP_CATALOGS],
     httpAllowedHosts: csvEnv(env['FMD_HTTP_ALLOW_HOSTS']),
     bootstrapStageDelayMs: Number.isInteger(delayParsed) && delayParsed > 0 ? delayParsed : 0,
     // Exactly '1' disables (D20 disable switch); every other value keeps
@@ -228,12 +235,13 @@ class RefreshableModuleService implements ModuleService {
   constructor(
     rows: readonly RegistrationRecord[],
     private readonly browserProfileEnabled: boolean = false,
+    private readonly catalogInstalled: (id: string) => boolean = (): boolean => false,
   ) {
-    this.current = new InMemoryModuleService(rows, browserProfileEnabled);
+    this.current = new InMemoryModuleService(rows, browserProfileEnabled, catalogInstalled);
   }
 
   refresh(rows: readonly RegistrationRecord[]): void {
-    this.current = new InMemoryModuleService(rows, this.browserProfileEnabled);
+    this.current = new InMemoryModuleService(rows, this.browserProfileEnabled, this.catalogInstalled);
   }
 
   list(): ModuleSummaryT[] {
@@ -351,7 +359,14 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
   // API projection. Without it the adapter is undefined and the denied
   // stub + known-broken flags stand.
   const browserProfileEnabled = config.browserSidecarUrl !== '';
-  const moduleService = new RefreshableModuleService([], browserProfileEnabled);
+  // Site-first browse join: /api/modules catalogInstalled is read LIVE
+  // from the CatalogStore receipts — a finished provision flips the
+  // chip on the next modules read, no cache invalidation needed.
+  const moduleService = new RefreshableModuleService(
+    [],
+    browserProfileEnabled,
+    (id: string): boolean => catalogSync.store.getMeta(id) !== undefined,
+  );
   const bypass = browserProfileEnabled
     ? new FlareSolverrBypassExecutor({ baseUrl: config.browserSidecarUrl })
     : undefined;
@@ -518,7 +533,7 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
 
   const syncService: SyncService = {
     syncModules: async (): Promise<SyncModulesOutcome> => {
-      await moduleSync.sync();
+      const result = await moduleSync.sync();
       const boot = await bootRegistry();
       moduleService.refresh(moduleRows);
       const summary = boot.summary;
@@ -527,16 +542,26 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
           treeSha: summary?.treeSha ?? sweep.treeSha(),
           totalFiles: sweep.discoverFiles().length,
           registeredFiles: summary === undefined ? boot.modules : summary.modules.length,
-          failedFiles: 0,
+          failedFiles: result.report.failures.length,
           totalModules: boot.modules,
-          failures: [],
+          failures: result.report.failures.map((failure) => ({
+            file: failure.file,
+            error: failure.firstError,
+          })),
           knownBroken: registry.knownBroken(),
           eventCoverage: {},
         },
       };
     },
-    syncCatalog: async (id: string): Promise<CatalogSyncOutcome> => {
-      const result = await catalogSync.syncCatalog(id);
+    syncCatalog: async (id: string, onProgress?: CatalogSyncPhaseCb): Promise<CatalogSyncOutcome> => {
+      const result = await catalogSync.syncCatalog(
+        id,
+        onProgress === undefined
+          ? undefined
+          : (phase): void => {
+              onProgress(phase);
+            },
+      );
       // §6.8: a fresh install flips the module back to the catalog read
       // side — drop the live-walk snapshot so the cache cannot outlive it.
       if (result.state === 'updated') {
@@ -565,7 +590,10 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     dataDir: config.dataDir,
     syncModules: async () => {
       const result = await moduleSync.sync();
-      return { sha: result.sha, report: { modules: result.report.modules } };
+      return {
+        sha: result.sha,
+        report: { modules: result.report.modules, failures: result.report.failures },
+      };
     },
     bootRegistry: async () => {
       const boot = await bootRegistry();
@@ -637,7 +665,15 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     jobs,
     library: libraryService,
     favorites: favoritesService,
-    sync: new InstrumentedSyncService(syncService, metrics),
+    // Site-first browse: catalog provisions stream WS `sync` frames
+    // (progress toast) keyed `catalog-sync:<moduleId>`; REST contract
+    // unchanged (the decorator is pass-through on the wire).
+    sync: new InstrumentedSyncService(
+      new WsPublishingSyncService(syncService, (event): void => {
+        wsHub.publishSync(event);
+      }),
+      metrics,
+    ),
     readiness,
   };
 

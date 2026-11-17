@@ -60,8 +60,16 @@ export function mockFetch(routes: readonly MockRoute[]): {
 
 export function renderWithProviders(
   ui: ReactElement,
-  options?: { fetch?: typeof fetch },
+  options?: { fetch?: typeof fetch; hash?: string },
 ): RenderResult & { client: ApiClient } {
+  // Seed the live hash when given — useRoute subscribers parse
+  // globalThis.location.hash on mount, so jsdom renders must start on
+  // the URL under test (production always mounts on a real hash).
+  // Auto-clearing happens in autoCleanup's afterEach (a bare '' here
+  // would stomp a hash a suite's own helper seeded before render).
+  if (options?.hash !== undefined) {
+    globalThis.location.hash = options.hash;
+  }
   const client = createApiClient(options?.fetch);
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -77,5 +85,8 @@ export function renderWithProviders(
 export function autoCleanup(): void {
   afterEach((): void => {
     cleanup();
+    // Deterministic URL state per test — later renders parse the hash
+    // on mount, so earlier tests' navigations must not leak.
+    globalThis.location.hash = '';
   });
 }

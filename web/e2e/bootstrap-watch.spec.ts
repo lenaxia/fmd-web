@@ -2,7 +2,9 @@
  * Bootstrap-watch (D20 UI-asserted auto-bootstrap): run IMMEDIATELY
  * after the stack starts, before scripts/e2e.sh waits on /readyz.
  * Asserts, in the browser:
- *   1. the D20 empty state renders while the server bootstraps;
+ *   1. the site-first Browse picker renders while the server
+ *      bootstraps (the hex-ID empty state was deleted with
+ *      CatalogIdForm — bare #/browse is the SitePicker now);
  *   2. the bootstrap progress banner appears (server stage surfaced);
  *   3. the banner clears when /readyz flips ready (200).
  */
@@ -22,14 +24,15 @@ async function gotoWithRetry(page: Page, attempts = 60): Promise<void> {
   throw last instanceof Error ? last : new Error('app never accepted connections');
 }
 
-test('empty-state → bootstrap progress → ready', async ({ page, request }): Promise<void> => {
+test('site picker → bootstrap progress → ready', async ({ page, request }): Promise<void> => {
   await gotoWithRetry(page);
 
-  // The app shell is up; with no catalog selected the D20 empty state
-  // explains the first-run bootstrap (always rendered on bare /#/browse).
+  // The app shell is up; bare #/browse is the site picker (sites by
+  // NAME — the D20 first-run note explains an empty registry).
   await expect(page.getByRole('heading', { name: 'FMD Web' })).toBeVisible();
-  await expect(page.getByText('No catalog selected')).toBeVisible();
-  await expect(page.getByText(/auto-triggers module \+ catalog sync \(D20\)/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Browse sites' })).toBeVisible();
+  await expect(page.getByLabel('Search sites')).toBeVisible();
+  await expect(page.getByText(/first-run module sync/)).toBeVisible();
 
   // Bootstrap progress: the banner surfaces the server's stage. It may
   // already be on screen when the browser attaches; allow a window.

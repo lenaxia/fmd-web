@@ -108,7 +108,15 @@ test('Browse catalog: 1200 rows render virtualized, scroll to the tail without j
     });
   });
   // readyz + modules for the shell queries (catch-all from installMockApi
-  // was unrouted; re-add the minimal set the shell needs).
+  // was unrouted; re-add the minimal set the shell needs — the site-first
+  // browse gate requires the registry to resolve before entries open).
+  await page.route(/^https?:\/\/[^/]+\/api\/modules/, (route): void => {
+    void route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ modules: [], count: 0 }),
+    });
+  });
   await page.route(/^https?:\/\/[^/]+\/api\/readyz/, (route): void => {
     void route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ready: true, reason: 'ready' }) });
   });

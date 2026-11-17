@@ -45,7 +45,7 @@
       "get": {
         "operationId": "listModules",
         "summary": "Module registry with capability + known-broken flags",
-        "description": "One row per registered module (§9 module_state registry columns): identity, §5.1 options (combobox options carry `items`; the STORED value is the item INDEX), and §5.10 capability detection incl. the D3 known-broken flag ids. `live_scrape_fallback` (§6.8) marks modules declaring both directory events — browsable without an FMD2-DB catalog via the live walk.",
+        "description": "One row per registered module (§9 module_state registry columns): identity, §5.1 options (combobox options carry `items`; the STORED value is the item INDEX), and §5.10 capability detection incl. the D3 known-broken flag ids. `live_scrape_fallback` (§6.8) marks modules declaring both directory events — browsable without an FMD2-DB catalog via the live walk. `catalogInstalled` joins the CatalogStore receipts (§6.4 getMeta): the site-first Browse picker renders it as a per-site chip and drives auto-provisioning from it (additive).",
         "tags": [
           "modules"
         ],
@@ -1405,8 +1405,8 @@
     "/api/catalog/{id}/search": {
       "get": {
         "operationId": "catalogSearch",
-        "summary": "FTS5 search with cursor pagination (§6.5, §10)",
-        "description": "Sanitized FTS MATCH over the sidecar, ranked; `cursor` continues a previous page (opaque, query-bound). Catalogs are read-only after install, so cursors stay stable. §6.8 fallback: catalog-less modules search their §5.8-normalized directory-walk snapshot in memory (title/alttitles/summary terms, exact status, substring genre) with the SAME cursor scheme; `source` discriminates the channel.",
+        "summary": "FTS5 search with cursor pagination (§6.5, §10) + FMD2 filter panel (additive)",
+        "description": "Sanitized FTS MATCH over the sidecar, ranked; `cursor` continues a previous page (opaque, query-bound — it carries the FULL filter state). Catalogs are read-only after install, so cursors stay stable. FMD2 Filter-panel parity (frmMain.pas:3400, additive): `q` is optional when any filter is set (filter-only pages skip the MATCH and order by jdn DESC); `authors` is a LIKE-contains over the authors column; `genres` (repeated params or one comma-separated value) joins per `genresMode` — `all` (FMD2 rbAll default) ANDs the LIKE clauses, `any` (rbAny) ORs them; `newDays` is the only-new window (jdn > JDN(today) - newDays, FMD2 cbOnlyNew). Prefix-LIKE (`x%`) is a documented non-goal: FMD2 semantics are contains (`%x%`). §6.8 fallback: catalog-less modules search their §6.8-normalized directory-walk snapshot in memory (title/alttitles/summary terms, exact status, substring genre) with the SAME cursor scheme; `source` discriminates the channel.",
         "tags": [
           "catalog"
         ],
@@ -1514,10 +1514,9 @@
           {
             "name": "q",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": "string",
-              "minLength": 1,
+              "$ref": "#/components/schemas/CatalogSearchQuery0",
               "description": "string-coerced on the wire"
             }
           },
@@ -1526,7 +1525,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string",
+              "$ref": "#/components/schemas/CatalogSearchQuery1",
               "description": "string-coerced on the wire"
             }
           },
@@ -1535,7 +1534,43 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string",
+              "$ref": "#/components/schemas/CatalogSearchQuery2",
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "genres",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CatalogSearchQuery3",
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "genresMode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CatalogSearchQuery5",
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "authors",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CatalogSearchQuery6",
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "newDays",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/CatalogSearchQuery7",
               "description": "string-coerced on the wire"
             }
           },
@@ -1544,7 +1579,7 @@
             "in": "query",
             "required": false,
             "schema": {
-              "type": "string",
+              "$ref": "#/components/schemas/CatalogSearchQuery8",
               "description": "string-coerced on the wire"
             }
           },
@@ -1553,10 +1588,269 @@
             "in": "query",
             "required": false,
             "schema": {
-              "default": 20,
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 200,
+              "$ref": "#/components/schemas/CatalogSearchQuery9",
+              "description": "string-coerced on the wire"
+            }
+          }
+        ]
+      }
+    },
+    "/api/search": {
+      "get": {
+        "operationId": "allSitesSearch",
+        "summary": "All-sites union search over installed catalogs (FMD2 cbSearchFromAllSites parity)",
+        "description": "FMD2 parity (frmMain.pas:3411-3416): the union runs simultaneously over every INSTALLED catalog of every enabled site — a LOCAL catalog union, never live scraping. Per-site FTS windows (width 2×limit) are merged by a documented deterministic total order — (normalized title, site id, link) — so result order and cursor bytes are identical under any permutation of the site set. `cursor` continues each site window (base64 of per-site consumed-row counts, bound to the issued filter state; page-size independent). Every row carries `site` + `siteName` (FMD2 shows the source Website on union rows, frmMain.pas:5170). Partial failure is TYPED, never silent: a broken catalog yields the rest of the union plus a `warnings[]` entry naming it; enabled sites without an installed catalog are excluded and surfaced in `excluded[]` (reason `no-catalog`) so the UI chip can explain why. `facets[]` carries per-site totals for the count chips.",
+        "tags": [
+          "catalog"
+        ],
+        "responses": {
+          "200": {
+            "description": "Merged page of site-tagged entries + facets/warnings/excluded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "link": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "alttitles": {
+                            "type": "string"
+                          },
+                          "authors": {
+                            "type": "string"
+                          },
+                          "artists": {
+                            "type": "string"
+                          },
+                          "genres": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string"
+                          },
+                          "summary": {
+                            "type": "string"
+                          },
+                          "numChapter": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "jdn": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "site": {
+                            "type": "string"
+                          },
+                          "siteName": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "link",
+                          "title",
+                          "alttitles",
+                          "authors",
+                          "artists",
+                          "genres",
+                          "status",
+                          "summary",
+                          "numChapter",
+                          "jdn",
+                          "site",
+                          "siteName"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "nextCursor": {
+                      "type": "string"
+                    },
+                    "facets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "siteId": {
+                            "type": "string"
+                          },
+                          "siteName": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "siteId",
+                          "siteName"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "siteId": {
+                            "type": "string"
+                          },
+                          "siteName": {
+                            "type": "string"
+                          },
+                          "error": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "siteId",
+                          "siteName",
+                          "error"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "excluded": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "siteId": {
+                            "type": "string"
+                          },
+                          "siteName": {
+                            "type": "string"
+                          },
+                          "reason": {
+                            "type": "string",
+                            "const": "no-catalog"
+                          }
+                        },
+                        "required": [
+                          "siteId",
+                          "siteName",
+                          "reason"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "entries",
+                    "facets",
+                    "warnings",
+                    "excluded"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed cursor",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AllSitesSearchQuery0",
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AllSitesSearchQuery1",
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "genres",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AllSitesSearchQuery2",
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "genresMode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AllSitesSearchQuery4",
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "authors",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AllSitesSearchQuery5",
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "newDays",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AllSitesSearchQuery6",
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AllSitesSearchQuery7",
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AllSitesSearchQuery8",
               "description": "string-coerced on the wire"
             }
           }
@@ -3228,6 +3522,9 @@
           "capabilities": {
             "$ref": "#/components/schemas/ModuleCapabilities"
           },
+          "catalogInstalled": {
+            "type": "boolean"
+          },
           "proxy": {
             "anyOf": [
               {
@@ -3249,6 +3546,7 @@
           "enabled",
           "options",
           "capabilities",
+          "catalogInstalled",
           "proxy"
         ]
       },
@@ -3256,19 +3554,19 @@
         "type": "object",
         "properties": {
           "type": {
-            "$ref": "#/components/schemas/__schema0"
+            "$ref": "#/components/schemas/ModuleSummary0"
           },
           "host": {
-            "$ref": "#/components/schemas/__schema1"
+            "$ref": "#/components/schemas/ModuleSummary1"
           },
           "port": {
-            "$ref": "#/components/schemas/__schema2"
+            "$ref": "#/components/schemas/ModuleSummary2"
           },
           "user": {
-            "$ref": "#/components/schemas/__schema3"
+            "$ref": "#/components/schemas/ModuleSummary3"
           },
           "pass": {
-            "$ref": "#/components/schemas/__schema4"
+            "$ref": "#/components/schemas/ModuleSummary4"
           }
         },
         "required": [
@@ -3278,6 +3576,27 @@
           "user",
           "pass"
         ]
+      },
+      "ModuleSummary0": {
+        "type": "string",
+        "enum": [
+          "",
+          "HTTP",
+          "SOCKS4",
+          "SOCKS5"
+        ]
+      },
+      "ModuleSummary1": {
+        "type": "string"
+      },
+      "ModuleSummary2": {
+        "type": "string"
+      },
+      "ModuleSummary3": {
+        "type": "string"
+      },
+      "ModuleSummary4": {
+        "type": "string"
       },
       "SettingsResponse": {
         "type": "object",
@@ -3305,6 +3624,27 @@
           "proxy",
           "browser"
         ]
+      },
+      "SettingsResponse0": {
+        "type": "string",
+        "enum": [
+          "",
+          "HTTP",
+          "SOCKS4",
+          "SOCKS5"
+        ]
+      },
+      "SettingsResponse1": {
+        "type": "string"
+      },
+      "SettingsResponse2": {
+        "type": "string"
+      },
+      "SettingsResponse3": {
+        "type": "string"
+      },
+      "SettingsResponse4": {
+        "type": "string"
       },
       "CatalogEntry": {
         "type": "object",
@@ -3437,6 +3777,11 @@
           "lastCheck",
           "lastUpdated"
         ]
+      },
+      "Timestamp": {
+        "type": "string",
+        "format": "date-time",
+        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
       },
       "AccountView": {
         "type": "object",
@@ -3656,12 +4001,7 @@
           "createdAt"
         ]
       },
-      "Timestamp": {
-        "type": "string",
-        "format": "date-time",
-        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
-      },
-      "__schema0": {
+      "ListModules200Response0": {
         "type": "string",
         "enum": [
           "",
@@ -3670,17 +4010,220 @@
           "SOCKS5"
         ]
       },
-      "__schema1": {
+      "ListModules200Response1": {
         "type": "string"
       },
-      "__schema2": {
+      "ListModules200Response2": {
         "type": "string"
       },
-      "__schema3": {
+      "ListModules200Response3": {
         "type": "string"
       },
-      "__schema4": {
+      "ListModules200Response4": {
         "type": "string"
+      },
+      "UpdateModule200Response0": {
+        "type": "string",
+        "enum": [
+          "",
+          "HTTP",
+          "SOCKS4",
+          "SOCKS5"
+        ]
+      },
+      "UpdateModule200Response1": {
+        "type": "string"
+      },
+      "UpdateModule200Response2": {
+        "type": "string"
+      },
+      "UpdateModule200Response3": {
+        "type": "string"
+      },
+      "UpdateModule200Response4": {
+        "type": "string"
+      },
+      "UpdateModuleBody0": {
+        "type": "string",
+        "enum": [
+          "",
+          "HTTP",
+          "SOCKS4",
+          "SOCKS5"
+        ]
+      },
+      "UpdateModuleBody1": {
+        "type": "string"
+      },
+      "UpdateModuleBody2": {
+        "type": "string"
+      },
+      "UpdateModuleBody3": {
+        "type": "string"
+      },
+      "UpdateModuleBody4": {
+        "type": "string"
+      },
+      "GetSettings200Response0": {
+        "type": "string",
+        "enum": [
+          "",
+          "HTTP",
+          "SOCKS4",
+          "SOCKS5"
+        ]
+      },
+      "GetSettings200Response1": {
+        "type": "string"
+      },
+      "GetSettings200Response2": {
+        "type": "string"
+      },
+      "GetSettings200Response3": {
+        "type": "string"
+      },
+      "GetSettings200Response4": {
+        "type": "string"
+      },
+      "UpdateProxy200Response0": {
+        "type": "string",
+        "enum": [
+          "",
+          "HTTP",
+          "SOCKS4",
+          "SOCKS5"
+        ]
+      },
+      "UpdateProxy200Response1": {
+        "type": "string"
+      },
+      "UpdateProxy200Response2": {
+        "type": "string"
+      },
+      "UpdateProxy200Response3": {
+        "type": "string"
+      },
+      "UpdateProxy200Response4": {
+        "type": "string"
+      },
+      "UpdateProxyBody0": {
+        "type": "string",
+        "enum": [
+          "",
+          "HTTP",
+          "SOCKS4",
+          "SOCKS5"
+        ]
+      },
+      "UpdateProxyBody1": {
+        "type": "string"
+      },
+      "UpdateProxyBody2": {
+        "type": "string"
+      },
+      "UpdateProxyBody3": {
+        "type": "string"
+      },
+      "UpdateProxyBody4": {
+        "type": "string"
+      },
+      "CatalogSearchQuery0": {
+        "type": "string",
+        "maxLength": 500
+      },
+      "CatalogSearchQuery1": {
+        "type": "string",
+        "maxLength": 100
+      },
+      "CatalogSearchQuery2": {
+        "type": "string",
+        "maxLength": 100
+      },
+      "CatalogSearchQuery3": {
+        "maxItems": 64,
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/CatalogSearchQuery4"
+        }
+      },
+      "CatalogSearchQuery4": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100
+      },
+      "CatalogSearchQuery5": {
+        "default": "all",
+        "type": "string",
+        "enum": [
+          "all",
+          "any"
+        ]
+      },
+      "CatalogSearchQuery6": {
+        "type": "string",
+        "maxLength": 200
+      },
+      "CatalogSearchQuery7": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 365
+      },
+      "CatalogSearchQuery8": {
+        "type": "string",
+        "maxLength": 4096
+      },
+      "CatalogSearchQuery9": {
+        "default": 20,
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 200
+      },
+      "AllSitesSearchQuery0": {
+        "type": "string",
+        "maxLength": 500
+      },
+      "AllSitesSearchQuery1": {
+        "type": "string",
+        "maxLength": 100
+      },
+      "AllSitesSearchQuery2": {
+        "maxItems": 64,
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/AllSitesSearchQuery3"
+        }
+      },
+      "AllSitesSearchQuery3": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100
+      },
+      "AllSitesSearchQuery4": {
+        "default": "all",
+        "type": "string",
+        "enum": [
+          "all",
+          "any"
+        ]
+      },
+      "AllSitesSearchQuery5": {
+        "type": "string",
+        "maxLength": 200
+      },
+      "AllSitesSearchQuery6": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 365
+      },
+      "AllSitesSearchQuery7": {
+        "type": "string",
+        "maxLength": 4096
+      },
+      "AllSitesSearchQuery8": {
+        "default": 20,
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
       }
     },
     "securitySchemes": {

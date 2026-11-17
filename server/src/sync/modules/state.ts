@@ -12,6 +12,13 @@ import type { ModuleInventoryEntry } from './diff.js';
  * can diff against the previous pin without re-running the Init pass.
  */
 
+export interface ModuleSyncReportFailure {
+  /** Tree-relative file path (e.g. `modules/JapScan.lua`). */
+  readonly file: string;
+  /** First error line for the file (the report keeps one line per file). */
+  readonly firstError: string;
+}
+
 export interface ModuleSyncReport {
   readonly repo: string;
   readonly sha: string;
@@ -26,6 +33,13 @@ export interface ModuleSyncReport {
   readonly otherFiles: number;
   readonly modules: number;
   readonly warnings: readonly string[];
+  /**
+   * Tolerated staged-validation failures (upstream-broken files the
+   * TolerancePolicy admitted — file + first error). Empty on a clean
+   * tree; populated on the real FMD2 tree (its ~5 permanently broken
+   * files). Surfaced in Settings + the bootstrap log.
+   */
+  readonly failures: readonly ModuleSyncReportFailure[];
   readonly diff: ModuleDiffReport;
   /** Inventory of the installed tree — the input for the NEXT diff. */
   readonly inventory: readonly ModuleInventoryEntry[];

@@ -23,7 +23,7 @@
  *   lastEventId and invokes onResync exactly once per hint.)
  */
 import type { components } from '../api/openapi';
-import type { JobEventMessage, WsServerMessage, HelloMessage } from './ws-protocol';
+import type { JobEventMessage, SyncEventMessage, CatalogSyncProgressT, WsServerMessage, HelloMessage } from './ws-protocol';
 
 export type WsStatus = 'idle' | 'connecting' | 'open' | 'backfilling' | 'reconnecting';
 
@@ -41,7 +41,12 @@ export type WebSocketFactory = (url: string) => WsLike;
 
 export interface WsBackfillOptions {
   readonly url: string;
-  readonly onEvent: (event: JobEventMessage) => void;
+  /** Job-event snapshots (live or backfill). Optional consumers (e.g. a
+   * sync-progress-only subscriber) may omit it. */
+  readonly onEvent?: (event: JobEventMessage) => void;
+  /** Catalog-provision progress snapshots (`sync` frames, site-first
+   * browse). Optional; the jobs feed omits it and ignores sync frames. */
+  readonly onSyncEvent?: (event: SyncEventMessage) => void;
   /** Fired on a `resync` hint: refetch full job state (D19). */
   readonly onResync: () => void;
   readonly webSocketFactory?: WebSocketFactory;
@@ -188,7 +193,15 @@ export class WsBackfillController {
       case 'event': {
         if (this.statusValue === 'backfilling') this.setStatus('open');
         this.lastEventIdValue = message.id;
-        this.opts.onEvent(message);
+        this.opts.onEvent?.(message);
+        break;
+      }
+      case 'sync': {
+        // Same stream discipline as job events (shared id space, D19
+        // cursor applies); only sync-progress subscribers care.
+        if (this.statusValue === 'backfilling') this.setStatus('open');
+        this.lastEventIdValue = message.id;
+        this.opts.onSyncEvent?.(message);
         break;
       }
       case 'resync':
@@ -248,6 +261,17 @@ export function parseServerMessage(data: unknown): WsServerMessage | null {
   }
   if (record['type'] === 'event' && typeof record['id'] === 'string' && typeof record['job'] === 'object' && record['job'] !== null) {
     return { type: 'event', id: record['id'], job: record['job'] as components['schemas']['Job'] };
+  }
+  if (
+    record['type'] === 'sync' &&
+    isEventId(record['id']) &&
+    typeof record['sync'] === 'object' &&
+    record['sync'] !== null &&
+    typeof (record['sync'] as Record<string, unknown>)['jobId'] === 'string' &&
+    (record['sync'] as Record<string, unknown>)['jobId'] !== '' &&
+    typeof (record['sync'] as Record<string, unknown>)['phase'] === 'string'
+  ) {
+    return { type: 'sync', id: record['id'], sync: record['sync'] as CatalogSyncProgressT };
   }
   return null;
 }

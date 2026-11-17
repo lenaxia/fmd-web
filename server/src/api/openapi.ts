@@ -11,6 +11,8 @@
 import { z } from 'zod';
 import {
   ApiErrorEnvelopeSchema,
+  AllSitesSearchQuerySchema,
+  AllSitesSearchResponseSchema,
   CatalogEntrySchema,
   HealthzResponseSchema,
   InfoRequestSchema,
@@ -134,7 +136,9 @@ const OPERATIONS: readonly RouteOperation[] = [
       'One row per registered module (§9 module_state registry columns): identity, §5.1 options ' +
       '(combobox options carry `items`; the STORED value is the item INDEX), and §5.10 capability ' +
       'detection incl. the D3 known-broken flag ids. `live_scrape_fallback` (§6.8) marks modules ' +
-      'declaring both directory events — browsable without an FMD2-DB catalog via the live walk.',
+      'declaring both directory events — browsable without an FMD2-DB catalog via the live walk. ' +
+      '`catalogInstalled` joins the CatalogStore receipts (§6.4 getMeta): the site-first Browse ' +
+      'picker renders it as a per-site chip and drives auto-provisioning from it (additive).',
     tags: ['modules'],
     responses: {
       200: { description: 'Module list', schema: ModuleListResponseSchema },
@@ -336,11 +340,18 @@ const OPERATIONS: readonly RouteOperation[] = [
     method: 'get',
     path: '/api/catalog/{id}/search',
     operationId: 'catalogSearch',
-    summary: 'FTS5 search with cursor pagination (§6.5, §10)',
+    summary: 'FTS5 search with cursor pagination (§6.5, §10) + FMD2 filter panel (additive)',
     description:
       'Sanitized FTS MATCH over the sidecar, ranked; `cursor` continues a previous page ' +
-      '(opaque, query-bound). Catalogs are read-only after install, so cursors stay stable. ' +
-      '§6.8 fallback: catalog-less modules search their §5.8-normalized directory-walk snapshot ' +
+      '(opaque, query-bound — it carries the FULL filter state). Catalogs are read-only after ' +
+      'install, so cursors stay stable. FMD2 Filter-panel parity (frmMain.pas:3400, additive): ' +
+      '`q` is optional when any filter is set (filter-only pages skip the MATCH and order by ' +
+      'jdn DESC); `authors` is a LIKE-contains over the authors column; `genres` (repeated ' +
+      'params or one comma-separated value) joins per `genresMode` — `all` (FMD2 rbAll default) ' +
+      'ANDs the LIKE clauses, `any` (rbAny) ORs them; `newDays` is the only-new window ' +
+      '(jdn > JDN(today) - newDays, FMD2 cbOnlyNew). Prefix-LIKE (`x%`) is a documented ' +
+      'non-goal: FMD2 semantics are contains (`%x%`). ' +
+      '§6.8 fallback: catalog-less modules search their §6.8-normalized directory-walk snapshot ' +
       'in memory (title/alttitles/summary terms, exact status, substring genre) with the SAME ' +
       'cursor scheme; `source` discriminates the channel.',
     tags: ['catalog'],
@@ -348,6 +359,31 @@ const OPERATIONS: readonly RouteOperation[] = [
     responses: {
       200: { description: 'Ranked page of catalog entries (source discriminator per §6.8)', schema: CatalogPageResponseSchema },
       ...errors(validation(), malformedCursor(), notFound('Catalog'), upstream('Live directory walk failed'), errorResponse(503, 'Live scrape update lane is shutting down'), internal()),
+    },
+  },
+  {
+    method: 'get',
+    path: '/api/search',
+    operationId: 'allSitesSearch',
+    summary: 'All-sites union search over installed catalogs (FMD2 cbSearchFromAllSites parity)',
+    description:
+      'FMD2 parity (frmMain.pas:3411-3416): the union runs simultaneously over every ' +
+      'INSTALLED catalog of every enabled site — a LOCAL catalog union, never live scraping. ' +
+      'Per-site FTS windows (width 2×limit) are merged by a documented deterministic total ' +
+      'order — (normalized title, site id, link) — so result order and cursor bytes are ' +
+      'identical under any permutation of the site set. `cursor` continues each site window ' +
+      '(base64 of per-site consumed-row counts, bound to the issued filter state; page-size ' +
+      'independent). Every row carries `site` + `siteName` (FMD2 shows the source Website on ' +
+      'union rows, frmMain.pas:5170). Partial failure is TYPED, never silent: a broken ' +
+      'catalog yields the rest of the union plus a `warnings[]` entry naming it; enabled ' +
+      'sites without an installed catalog are excluded and surfaced in `excluded[]` ' +
+      "(reason `no-catalog`) so the UI chip can explain why. `facets[]` carries per-site " +
+      'totals for the count chips.',
+    tags: ['catalog'],
+    query: AllSitesSearchQuerySchema,
+    responses: {
+      200: { description: 'Merged page of site-tagged entries + facets/warnings/excluded', schema: AllSitesSearchResponseSchema },
+      ...errors(validation(), malformedCursor(), internal()),
     },
   },
   {
@@ -626,6 +662,11 @@ const OPERATIONS: readonly RouteOperation[] = [
   },
 ];
 
+/** `catalogSearch` → `CatalogSearch` (component-name prefix helper). */
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 type MutableSchema = Record<string, unknown>;
 
 /** Rewrite `#/$defs/X` refs to `#/components/schemas/X` (recursive). */
@@ -645,10 +686,75 @@ function rewriteRefs(node: unknown, seen: Set<object>): void {
   }
 }
 
-/** Convert one zod schema, stripping `$schema` and hoisting `$defs`. */
-function convertSchema(schema: z.ZodType, io: 'input' | 'output'): MutableSchema {
+/** Rewrite `#/$defs/<old>` refs per a rename map (recursive). */
+function applyDefRenames(node: unknown, renames: ReadonlyMap<string, string>, seen: Set<object>): void {
+  if (node === null || typeof node !== 'object' || seen.has(node)) {
+    return;
+  }
+  seen.add(node);
+  const record = node as MutableSchema;
+  const ref: unknown = record['$ref'];
+  if (typeof ref === 'string' && ref.startsWith('#/$defs/')) {
+    const key: string = ref.slice('#/$defs/'.length);
+    const renamed: string | undefined = renames.get(key);
+    if (renamed !== undefined) {
+      record['$ref'] = `#/$defs/${renamed}`;
+    }
+  }
+  for (const value of Object.values(record)) {
+    if (value !== null && typeof value === 'object') {
+      applyDefRenames(value, renames, seen);
+    }
+  }
+}
+
+/**
+ * Rename zod's auto-generated `$defs` keys (`__schemaN`) to a stable
+ * per-call-site prefix. zod names reused subschemas PER CONVERSION, so
+ * one operation's `__schema0` is an unrelated schema to another's —
+ * hoisting both into the shared `components.schemas` under the same
+ * auto-name would corrupt one of them (first write wins). A prefix
+ * derived from the operation makes every hoisted name unique.
+ */
+function prefixGeneratedDefs(converted: MutableSchema, defsPrefix: string | undefined): void {
+  if (defsPrefix === undefined) {
+    return;
+  }
+  const defs = converted['$defs'];
+  if (defs === undefined || typeof defs !== 'object') {
+    return;
+  }
+  const renames: Map<string, string> = new Map();
+  for (const key of Object.keys(defs as Record<string, unknown>)) {
+    const m: RegExpExecArray | null = /^__schema(\d+)$/.exec(key);
+    if (m !== null) {
+      renames.set(key, `${defsPrefix}${m[1] as string}`);
+    }
+  }
+  if (renames.size === 0) {
+    return;
+  }
+  const renamed: Record<string, unknown> = {};
+  for (const [key, def] of Object.entries(defs as Record<string, unknown>)) {
+    renamed[renames.get(key) ?? key] = def;
+  }
+  converted['$defs'] = renamed;
+  applyDefRenames(converted, renames, new Set<object>());
+}
+
+/**
+ * Convert one zod schema, stripping `$schema`, renaming auto-generated
+ * `$defs` keys to the per-call-site prefix, and rewriting `$defs` refs
+ * to `#/components/schemas/…`.
+ */
+function convertSchema(
+  schema: z.ZodType,
+  io: 'input' | 'output',
+  defsPrefix?: string,
+): MutableSchema {
   const converted = z.toJSONSchema(schema, { io, reused: 'ref', unrepresentable: 'any' }) as MutableSchema;
   delete converted['$schema'];
+  prefixGeneratedDefs(converted, defsPrefix);
   rewriteRefs(converted, new Set<object>());
   return converted;
 }
@@ -677,9 +783,19 @@ function pathParameters(path: string): unknown[] {
   return params;
 }
 
-/** zod query object → OpenAPI `parameters` entries. */
-function queryParameters(query: z.ZodType): unknown[] {
-  const json = convertSchema(query, 'input');
+/**
+ * zod query object → OpenAPI `parameters` entries. The converted
+ * schema's `$defs` (any reused subschema — e.g. when the zod object
+ * carries a `.refine`, zod $defs EVERY property) are hoisted into the
+ * document's components under the operation-unique prefix.
+ */
+function queryParameters(
+  query: z.ZodType,
+  defsPrefix: string,
+  hoist: (converted: MutableSchema) => void,
+): unknown[] {
+  const json = convertSchema(query, 'input', defsPrefix);
+  hoist(json);
   const properties = (json['properties'] ?? {}) as Record<string, MutableSchema>;
   const required = new Set((json['required'] as readonly string[] | undefined) ?? []);
   return Object.entries(properties).map(([name, schema]) => ({
@@ -732,13 +848,25 @@ export function generateOpenApiDocument(version: string): OpenApiDocument {
     if (!(id in components)) {
       // Converting a registry-registered schema at the root yields
       // `{ $ref: '#/$defs/<id>', $defs: { <id>: <definition> } }` —
-      // the component IS the definition, not a self-pointer.
-      const converted = convertSchema(schema, 'input');
+      // the component IS the definition, not a self-pointer. Sibling
+      // `$defs` entries (auto-named subschemas the definition
+      // references, e.g. ProxySettings' property unions) are hoisted
+      // too — under the registry id's prefix, never zod's colliding
+      // `__schemaN` auto-names — or the refs inside the definition
+      // would dangle.
+      const converted = convertSchema(schema, 'input', id);
       const defs = converted['$defs'];
       const self =
         defs !== undefined && typeof defs === 'object' ? (defs as Record<string, unknown>)[id] : undefined;
       if (self !== undefined) {
         components[id] = self;
+        if (defs !== undefined && typeof defs === 'object') {
+          for (const [name, def] of Object.entries(defs as Record<string, unknown>)) {
+            if (name !== id && !(name in components)) {
+              components[name] = def;
+            }
+          }
+        }
         delete converted['$defs'];
       } else {
         components[id] = converted;
@@ -755,7 +883,11 @@ export function generateOpenApiDocument(version: string): OpenApiDocument {
       }
       const response: Record<string, unknown> = { description: entry.description };
       if (entry.schema !== undefined) {
-        const converted = convertSchema(entry.schema, 'output');
+        const converted = convertSchema(
+          entry.schema,
+          'output',
+          `${capitalize(op.operationId)}${status}Response`,
+        );
         hoist(converted);
         response['content'] = { [entry.contentType ?? 'application/json']: { schema: converted } };
       }
@@ -769,12 +901,17 @@ export function generateOpenApiDocument(version: string): OpenApiDocument {
       tags: [...op.tags],
       responses,
     };
-    const parameters = [...pathParameters(op.path), ...(op.query !== undefined ? queryParameters(op.query) : [])];
+    const parameters = [
+      ...pathParameters(op.path),
+      ...(op.query !== undefined
+        ? queryParameters(op.query, `${capitalize(op.operationId)}Query`, hoist)
+        : []),
+    ];
     if (parameters.length > 0) {
       operation['parameters'] = parameters;
     }
     if (op.body !== undefined) {
-      const converted = convertSchema(op.body, 'input');
+      const converted = convertSchema(op.body, 'input', `${capitalize(op.operationId)}Body`);
       hoist(converted);
       operation['requestBody'] = {
         required: op.bodyRequired ?? true,

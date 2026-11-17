@@ -13,7 +13,8 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import type { RegistrationRecord } from '../engine/registry/capabilities.js';
-import type { CatalogStore } from '@fmd/contract';
+import type { CatalogStore, CatalogSyncProgressT, CatalogSyncPhaseT } from '@fmd/contract';
+import { catalogSyncJobId } from '@fmd/contract';
 import type {
   FavoriteCheckResponseT,
   FavoriteCreateRequestT,
@@ -83,6 +84,7 @@ function toSummary(
   enabled: boolean,
   proxy: ProxySettingsT | null,
   browserProfileEnabled: boolean,
+  catalogInstalled: (id: string) => boolean,
 ): ModuleSummaryT {
   return {
     id: row.id,
@@ -98,6 +100,7 @@ function toSummary(
         : { name: o.name, kind: o.kind, defaultValue: o.defaultValue, items: [...o.items] },
     ),
     proxy,
+    catalogInstalled: catalogInstalled(row.id),
     capabilities: applyBrowserProfile(
       {
         requires_subprocess: row.capabilities.requires_subprocess,
@@ -164,6 +167,13 @@ export class InMemoryModuleService implements ModuleService {
     private readonly rows: readonly RegistrationRecord[],
     /** §5.11 flip input (config-driven; default off = known-broken stand). */
     private readonly browserProfileEnabled: boolean = false,
+    /**
+     * Catalog install-state lookup (CatalogStore receipts join,
+     * site-first browse). Evaluated per list()/get() call so a finished
+     * provision is reflected on the next /api/modules read without any
+     * cache invalidation. Default: nothing installed.
+     */
+    private readonly catalogInstalled: (id: string) => boolean = (): boolean => false,
   ) {
     for (const row of rows) {
       this.enabled.set(row.id, true);
@@ -172,7 +182,13 @@ export class InMemoryModuleService implements ModuleService {
 
   list(): ModuleSummaryT[] {
     return this.rows.map((row) =>
-      toSummary(row, this.enabled.get(row.id) ?? true, this.proxy.get(row.id) ?? null, this.browserProfileEnabled),
+      toSummary(
+        row,
+        this.enabled.get(row.id) ?? true,
+        this.proxy.get(row.id) ?? null,
+        this.browserProfileEnabled,
+        this.catalogInstalled,
+      ),
     );
   }
 
@@ -181,7 +197,13 @@ export class InMemoryModuleService implements ModuleService {
     if (row === undefined) {
       return undefined;
     }
-    return toSummary(row, this.enabled.get(id) ?? true, this.proxy.get(id) ?? null, this.browserProfileEnabled);
+    return toSummary(
+      row,
+      this.enabled.get(id) ?? true,
+      this.proxy.get(id) ?? null,
+      this.browserProfileEnabled,
+      this.catalogInstalled,
+    );
   }
 
   update(
@@ -654,10 +676,102 @@ export interface CatalogSyncOutcome {
   error?: string;
 }
 
+/**
+ * Fine-grained catalog provision phases surfaced to the sync-port
+ * caller (the WS-publishing decorator streams them as `sync` frames —
+ * site-first browse progress toast).
+ */
+export type CatalogSyncPhaseCb = (phase: 'downloading' | 'extracting' | 'installing') => void;
+
 export interface SyncService {
   syncModules(): Promise<SyncModulesOutcome>;
-  syncCatalog(id: string): Promise<CatalogSyncOutcome>;
+  /**
+   * Provision/sync one catalog. `onProgress` is optional and purely
+   * observative (WS streaming); implementors that cannot report phases
+   * simply never invoke it.
+   */
+  syncCatalog(id: string, onProgress?: CatalogSyncPhaseCb): Promise<CatalogSyncOutcome>;
   syncAllCatalogs(): Promise<readonly CatalogSyncOutcome[]>;
+}
+
+/**
+ * Stable error prefix marking "FMD2-DB has no prebuilt catalog for this
+ * site" (HTTP 404 — CatalogBlobMissingError) — distinct from transient
+ * network failures. The site-first browse taxonomy keys on it.
+ */
+export const NO_CATALOG_ERROR_PREFIX = 'no-catalog:';
+
+/** Map a CatalogSyncOutcome onto the WS terminal outcome taxonomy. */
+export function catalogSyncOutcomeToTerminal(
+  outcome: CatalogSyncOutcome,
+): 'updated' | 'unchanged' | 'failed' | 'no-catalog' {
+  if (outcome.state === 'failed') {
+    return outcome.error !== undefined && outcome.error.startsWith(NO_CATALOG_ERROR_PREFIX)
+      ? 'no-catalog'
+      : 'failed';
+  }
+  return outcome.state;
+}
+
+/**
+ * Site-first browse decorator: streams one catalog provision as WS
+ * `sync` frames on the §10 hub — `checking` at entry, the service's
+ * fine-grained phases verbatim, and a terminal frame whose `outcome`
+ * follows the no-catalog/transient taxonomy. REST responses are passed
+ * through UNCHANGED (the sync API contract does not move; the frames
+ * are additive WS surface keyed `catalog-sync:<moduleId>`).
+ */
+export class WsPublishingSyncService implements SyncService {
+  constructor(
+    private readonly inner: SyncService,
+    private readonly publish: (sync: CatalogSyncProgressT) => void,
+  ) {}
+
+  syncModules(): Promise<SyncModulesOutcome> {
+    return this.inner.syncModules();
+  }
+
+  syncCatalog(id: string, onProgress?: CatalogSyncPhaseCb): Promise<CatalogSyncOutcome> {
+    const jobId: string = catalogSyncJobId(id);
+    const emit = (phase: CatalogSyncPhaseT): void => {
+      this.publish({ jobId, moduleId: id, phase });
+    };
+    const emitDetail = (phase: CatalogSyncPhaseT, detail: string): void => {
+      this.publish({ jobId, moduleId: id, phase, detail });
+    };
+    emit('checking');
+    return this.inner
+      .syncCatalog(
+        id,
+        onProgress === undefined
+          ? (phase): void => {
+              emit(phase);
+            }
+          : (phase): void => {
+              emit(phase);
+              onProgress(phase);
+            },
+      )
+      .then((outcome): CatalogSyncOutcome => {
+        this.publish({
+          jobId,
+          moduleId: id,
+          phase: 'done',
+          outcome: catalogSyncOutcomeToTerminal(outcome),
+          ...(outcome.error !== undefined ? { detail: outcome.error } : {}),
+        });
+        return outcome;
+      })
+      .catch((err: unknown): CatalogSyncOutcome => {
+        const detail: string = err instanceof Error ? err.message : String(err);
+        emitDetail('failed', detail);
+        throw err;
+      });
+  }
+
+  syncAllCatalogs(): Promise<readonly CatalogSyncOutcome[]> {
+    return this.inner.syncAllCatalogs();
+  }
 }
 
 /** Scripted sync service for dev/tests (production wires the real syncers). */

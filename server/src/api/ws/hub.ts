@@ -48,11 +48,21 @@ import {
   WsServerMessageSchema,
   WS_RING_CAPACITY,
   WS_RING_MAX_AGE_MS,
-  type WsServerMessageT,
+  CatalogSyncProgressSchema,
+  type CatalogSyncProgressT,
   type WsJobEventMessageT,
+  type WsServerMessageT,
+  type WsSyncEventMessageT,
   type JobT,
 } from '@fmd/contract';
 import { JobEventRingBuffer } from './ring-buffer.js';
+
+/**
+ * Every buffered stream event (job snapshot or catalog-sync progress)
+ * — both share the id/ring/replay machinery, so D19 backfill covers
+ * catalog provisioning for free.
+ */
+export type WsStreamEventT = WsJobEventMessageT | WsSyncEventMessageT;
 
 /** Minimal socket surface the hub needs (the `ws` server socket satisfies it). */
 export interface HubSocket {
@@ -124,7 +134,7 @@ interface SubscriberState extends WsSubscription {
 }
 
 export class WsHub {
-  private readonly buffers = new Map<string, JobEventRingBuffer<WsJobEventMessageT>>();
+  private readonly buffers = new Map<string, JobEventRingBuffer<WsStreamEventT>>();
   private readonly subscribers = new Map<number, SubscriberState>();
   private readonly capacity: number;
   private readonly maxAgeMs: number;
@@ -172,14 +182,40 @@ export class WsHub {
     const id = this.nextId;
     this.nextId += 1;
     const message: WsJobEventMessageT = { type: 'event', id: String(id), job };
-    let buffer = this.buffers.get(job.id);
+    this.bufferStreamEvent(job.id, id, message);
+    return message;
+  }
+
+  /**
+   * Publish one catalog-provision progress snapshot (site-first
+   * browse): same id assignment, same per-key ring buffering (key =
+   * `sync.jobId`, conventionally `catalog-sync:<moduleId>`) and the
+   * same live fanout as job events — D19 backfill/replay machinery is
+   * shared verbatim.
+   */
+  publishSync(rawSync: CatalogSyncProgressT): WsSyncEventMessageT {
+    if (this.closedHub) {
+      throw new Error('hub is closed');
+    }
+    const sync: CatalogSyncProgressT = CatalogSyncProgressSchema.parse(rawSync);
+    this.sweepAll();
+    const id = this.nextId;
+    this.nextId += 1;
+    const message: WsSyncEventMessageT = { type: 'sync', id: String(id), sync };
+    this.bufferStreamEvent(sync.jobId, id, message);
+    return message;
+  }
+
+  /** Assign one stream event into its per-key ring and fan out live. */
+  private bufferStreamEvent(jobId: string, id: number, message: WsStreamEventT): void {
+    let buffer = this.buffers.get(jobId);
     if (buffer === undefined) {
-      buffer = new JobEventRingBuffer<WsJobEventMessageT>({
+      buffer = new JobEventRingBuffer<WsStreamEventT>({
         capacity: this.capacity,
         maxAgeMs: this.maxAgeMs,
         now: this.clock,
       });
-      this.buffers.set(job.id, buffer);
+      this.buffers.set(jobId, buffer);
     }
     buffer.append(id, message);
     this.evictedWatermark = Math.max(this.evictedWatermark, buffer.lastEvictedId);
@@ -188,7 +224,6 @@ export class WsHub {
         this.enqueue(sub, message);
       }
     }
-    return message;
   }
 
   /** Register one accepted socket; the connection idles (unbounded
@@ -340,8 +375,8 @@ export class WsHub {
    * arrives are absorbed by the ring buffers, so the tail is exact
    * however the timing falls.
    */
-  private planReplay(lastEventId: string | undefined): readonly WsJobEventMessageT[] | 'resync' {
-    const tail: WsJobEventMessageT[] = [];
+  private planReplay(lastEventId: string | undefined): readonly WsStreamEventT[] | 'resync' {
+    const tail: WsStreamEventT[] = [];
     for (const buffer of this.buffers.values()) {
       for (const entry of buffer.replay(0)) {
         tail.push(entry.value);

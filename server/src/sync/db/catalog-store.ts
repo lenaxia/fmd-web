@@ -33,6 +33,7 @@ import type {
   CatalogStore,
   ModuleId,
 } from '@fmd/contract';
+import { dateToJdn } from './jdn.js';
 
 /** Page bounds (§10 `page=` / FTS cursors). */
 export const CATALOG_PAGE_DEFAULT = 20;
@@ -242,50 +243,67 @@ export class CatalogFileStore implements CatalogStore {
 
   /** FTS search with cursor pagination. Sidecar rebuilds (db_sha
    * mismatch) are double-buffered: concurrent readers of the previous
-   * sidecar keep their open handle and finish deterministically. */
+   * sidecar keep their open handle and finish deterministically.
+   *
+   * FMD2 Filter-panel parity (additive): beside the legacy `genre`
+   * FTS-phrase filter, row filters compose AFTER the MATCH clause —
+   * status equality, authors LIKE-contains, genres[] multi with
+   * ANY→OR / ALL→AND of LIKE-contains (DBDataProcess.pas:1416-1427),
+   * and the only-new jdn window (:1382-1385). With `q` absent the
+   * MATCH clause is skipped entirely and the page serves the filtered
+   * `entry` table ordered by jdn DESC (latest parity). */
   search(catalogId: ModuleId, query: CatalogSearchQuery): CatalogPage {
     const sidecar: SidecarHandle = this.ensureSidecar(catalogId);
-    const match: string = buildMatchQuery(query.query);
-    const status: string | undefined = query.status;
+    const rawQ: string = query.query ?? '';
+    const match: string | undefined = rawQ === '' ? undefined : buildMatchQuery(rawQ);
+    const filters: SearchRowFilters = {
+      ...(query.status !== undefined && query.status !== '' ? { status: query.status } : {}),
+      ...(query.authors !== undefined && query.authors !== '' ? { authors: query.authors } : {}),
+      ...(query.genres !== undefined && query.genres.length > 0 ? { genres: query.genres } : {}),
+      genresMode: query.genresMode ?? 'all',
+      ...(query.newDays !== undefined ? { newDays: query.newDays } : {}),
+    };
     const genre: string | undefined = query.genre;
 
-    // Cursor binding: a cursor carries the query (+genre) it was issued
-    // for — reusing it against another query is rejected, never silently
-    // re-paged (pagination stays deterministic).
-    const { limit, offset, cursorQuery, cursorGenre } = decodeSearchCursor(query);
-    if (cursorQuery !== undefined && cursorQuery !== match) {
+    // Cursor binding: a cursor carries the query + FULL filter state it
+    // was issued for — reusing it against any other combination is
+    // rejected, never silently re-paged (pagination stays
+    // deterministic).
+    const { limit, offset, cursor } = decodeSearchCursor(query);
+    if (cursor !== undefined && !searchCursorMatches(cursor, match, genre, filters)) {
       throw new Error('cursor does not match the issued query');
-    }
-    if (cursorGenre !== undefined && cursorGenre !== (genre ?? '')) {
-      throw new Error('cursor does not match the issued genre filter');
     }
     const genreFilter: string =
       genre === undefined || genre === '' ? '' : ` AND genres : "${escapeFtsPhrase(genre)}"`;
-    const fullMatch: string = `(${match})${genreFilter}`;
+    const fullMatch: string | undefined =
+      match === undefined ? undefined : `(${match})${genreFilter}`;
 
-    const withStatus: boolean = status !== undefined && status !== '';
+    const rowFilters: { sql: string; params: readonly (string | number)[] } =
+      composeRowFilters(filters);
+    const withMatch: boolean = fullMatch !== undefined;
     const sql: string = `
       SELECT e."link" AS link, e."title" AS title, e."alttitles" AS alttitles,
              e."authors" AS authors, e."artists" AS artists, e."genres" AS genres,
              e."status" AS status, e."summary" AS summary,
              e."numchapter" AS numchapter, e."jdn" AS jdn
-      FROM search_index s
-      JOIN entry e ON e.rowid = s.rowid
-      WHERE search_index MATCH ?
-      ${withStatus ? 'AND e."status" = ?' : ''}
-      ORDER BY rank, e.rowid
+      ${withMatch ? 'FROM search_index s JOIN entry e ON e.rowid = s.rowid' : 'FROM entry e'}
+      ${withMatch ? 'WHERE search_index MATCH ?' : 'WHERE 1=1'}${rowFilters.sql}
+      ORDER BY ${withMatch ? 'rank, e.rowid' : 'e."jdn" DESC, e.rowid'}
       LIMIT ? OFFSET ?`;
-    const params: (string | number)[] = withStatus ? [fullMatch, status as string] : [fullMatch];
-    params.push(limit + 1, offset);
+    const params: (string | number)[] = withMatch ? [fullMatch as string] : [];
+    params.push(...rowFilters.params, limit + 1, offset);
     const rows: CatalogRow[] = sidecar.db.prepare(sql).all(...params) as CatalogRow[];
 
     const hasMore: boolean = rows.length > limit;
     const entries: CatalogEntry[] = (hasMore ? rows.slice(0, limit) : rows).map(toEntry);
-    const page: CatalogPage = { entries, total: countMatches(sidecar.db, fullMatch, withStatus ? status : undefined) };
+    const page: CatalogPage = {
+      entries,
+      total: countMatches(sidecar.db, fullMatch, filters),
+    };
     if (hasMore) {
       return {
         ...page,
-        nextCursor: encodeSearchCursor(match, offset + limit, genre ?? ''),
+        nextCursor: encodeSearchCursor(match ?? '', offset + limit, genre ?? '', filters),
       };
     }
     return page;
@@ -478,19 +496,104 @@ function readSidecarSha(db: Database.Database): string {
   }
 }
 
-function countMatches(db: Database.Database, match: string, status: string | undefined): number {
-  const withStatus: boolean = status !== undefined && status !== '';
+function countMatches(
+  db: Database.Database,
+  match: string | undefined,
+  filters: SearchRowFilters,
+): number {
+  const rowFilters: { sql: string; params: readonly (string | number)[] } =
+    composeRowFilters(filters);
+  const withMatch: boolean = match !== undefined;
   try {
     const row: { n: number } | undefined = db
       .prepare(
-        `SELECT COUNT(*) AS n FROM search_index s JOIN entry e ON e.rowid = s.rowid
-         WHERE search_index MATCH ? ${withStatus ? 'AND e."status" = ?' : ''}`,
+        `
+        SELECT COUNT(*) AS n
+        ${withMatch ? 'FROM search_index s JOIN entry e ON e.rowid = s.rowid' : 'FROM entry e'}
+        ${withMatch ? 'WHERE search_index MATCH ?' : 'WHERE 1=1'}${rowFilters.sql}`,
       )
-      .get(...(withStatus ? [match, status as string] : [match])) as { n: number } | undefined;
+      .get(...(withMatch ? [match as string, ...rowFilters.params] : [...rowFilters.params])) as
+      | { n: number }
+      | undefined;
     return row === undefined ? 0 : row.n;
   } catch {
     return 0;
   }
+}
+
+// ── FMD2 Filter-panel row filters (WHERE composition) ───────────────
+
+/** Row filters composed after the FTS MATCH clause (FMD2 parity). */
+export interface SearchRowFilters {
+  /** Exact `status` column equality (FMD2 stStatus, DBDataProcess:1404). */
+  readonly status?: string;
+  /** `authors` column LIKE-contains (DBDataProcess:1394). */
+  readonly authors?: string;
+  /** Each genre must appear in `genres` (LIKE-contains). */
+  readonly genres?: readonly string[];
+  /** `'all'` (FMD2 rbAll default) ANDs the genre clauses; `'any'` ORs. */
+  readonly genresMode: 'all' | 'any';
+  /** Only-new window: `jdn > JDN(today) - newDays` (DBDataProcess:1382). */
+  readonly newDays?: number;
+}
+
+/** JDN of today (UTC) — the only-new window anchor (FMD2 uses local
+ * `Now`; UTC is the server-side deterministic default). */
+export function jdnToday(): number {
+  const now: Date = new Date();
+  return dateToJdn({
+    year: now.getUTCFullYear(),
+    month: now.getUTCMonth() + 1,
+    day: now.getUTCDate(),
+  });
+}
+
+/** Escape SQL LIKE wildcards in a user value (`%`/`_` are literal). */
+export function escapeLikeValue(value: string): string {
+  return value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_');
+}
+
+/**
+ * Compose the post-MATCH WHERE fragment (each clause starts with its
+ * own ` AND`, so callers append it after `WHERE 1=1` / the MATCH).
+ *
+ * Genres: FMD2 parity is a LIKE-contains per genre joined by OR
+ * (`rbAny`/one-of) or AND (`rbAll`/all — the FMD2 default). SQLite
+ * LIKE is already case-insensitive for ASCII, matching FMD2's
+ * LIKE-based AddSQLSimpleFilter. Note (documented fast-path): SQLite
+ * can only use an index over a LIKE when the pattern is a literal
+ * PREFIX (`LIKE 'x%'`) — contains-matching (`%x%`) scans; the catalogs
+ * are read-only attached files where the FTS sidecar already carries
+ * the hot path, so contains-parity is kept and the prefix fast-path
+ * is deliberately NOT taken (it would change FMD2 semantics).
+ */
+export function composeRowFilters(filters: SearchRowFilters): {
+  sql: string;
+  params: readonly (string | number)[];
+} {
+  const parts: string[] = [];
+  const params: (string | number)[] = [];
+  if (filters.status !== undefined) {
+    parts.push(` AND e."status" = ?`);
+    params.push(filters.status);
+  }
+  if (filters.authors !== undefined) {
+    parts.push(` AND e."authors" LIKE ? ESCAPE '\\'`);
+    params.push(`%${escapeLikeValue(filters.authors)}%`);
+  }
+  const genres: readonly string[] = filters.genres ?? [];
+  if (genres.length > 0) {
+    const clauses: string[] = genres.map((): string => `e."genres" LIKE ? ESCAPE '\\'`);
+    const genreParams: string[] = genres.map((g): string => `%${escapeLikeValue(g)}%`);
+    const join: string = filters.genresMode === 'any' ? ' OR ' : ' AND ';
+    parts.push(` AND (${clauses.join(join)})`);
+    params.push(...genreParams);
+  }
+  if (filters.newDays !== undefined) {
+    parts.push(` AND e."jdn" > ?`);
+    params.push(jdnToday() - filters.newDays);
+  }
+  return { sql: parts.join(''), params };
 }
 
 // ── pagination + query plumbing ─────────────────────────────────────
@@ -534,10 +637,28 @@ interface OffsetCursor {
   o: number;
 }
 
+/**
+ * Search cursor payload — binds the FULL issued filter state (FMD2
+ * filter fields + match expression + offset) so a cursor can never be
+ * silently re-paged against a different filter combination. `g` is the
+ * legacy single-genre FTS phrase filter.
+ */
 interface SearchCursor {
   q: string;
   o: number;
   g?: string;
+  st?: string;
+  a?: string;
+  gs?: string;
+  gm?: 'all' | 'any';
+  nd?: number;
+}
+
+/** Genres join separator (a char that never occurs in a genre name). */
+const CURSOR_GENRE_SEP = '\x1f';
+
+function cursorGenreKey(genres: readonly string[]): string {
+  return genres.join(CURSOR_GENRE_SEP);
 }
 
 function encodeOffsetCursor(offset: number): string {
@@ -545,10 +666,29 @@ function encodeOffsetCursor(offset: number): string {
   return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
 }
 
-function encodeSearchCursor(match: string, offset: number, genre: string): string {
+function encodeSearchCursor(
+  match: string,
+  offset: number,
+  genre: string,
+  filters: SearchRowFilters,
+): string {
   const payload: SearchCursor = { q: match, o: offset };
   if (genre !== '') {
     payload.g = genre;
+  }
+  if (filters.status !== undefined) {
+    payload.st = filters.status;
+  }
+  if (filters.authors !== undefined) {
+    payload.a = filters.authors;
+  }
+  const genres: readonly string[] = filters.genres ?? [];
+  if (genres.length > 0) {
+    payload.gs = cursorGenreKey(genres);
+    payload.gm = filters.genresMode;
+  }
+  if (filters.newDays !== undefined) {
+    payload.nd = filters.newDays;
   }
   return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
 }
@@ -556,8 +696,7 @@ function encodeSearchCursor(match: string, offset: number, genre: string): strin
 interface DecodedSearchCursor {
   limit: number;
   offset: number;
-  cursorQuery?: string;
-  cursorGenre?: string;
+  cursor?: SearchCursor;
 }
 
 function decodeSearchCursor(query: CatalogSearchQuery): DecodedSearchCursor {
@@ -575,15 +714,42 @@ function decodeSearchCursor(query: CatalogSearchQuery): DecodedSearchCursor {
     if (typeof payload.o !== 'number' || payload.o < 0) {
       throw new Error('malformed cursor');
     }
-    const out: DecodedSearchCursor = { limit, offset: Math.trunc(payload.o) };
-    if (typeof payload.q === 'string') {
-      out.cursorQuery = payload.q;
-    }
-    if (typeof payload.g === 'string') {
-      out.cursorGenre = payload.g;
-    }
-    return out;
+    return { limit, offset: Math.trunc(payload.o), cursor: payload };
   }
   const page: number = Math.max(1, Math.trunc(query.page ?? 1));
   return { limit, offset: (page - 1) * limit };
+}
+
+/** A decoded cursor must match the issued match expression, legacy
+ * genre filter, and every row filter — else the caller 400s. */
+function searchCursorMatches(
+  cursor: SearchCursor,
+  match: string | undefined,
+  genre: string | undefined,
+  filters: SearchRowFilters,
+): boolean {
+  if (cursor.q !== (match ?? '')) {
+    return false;
+  }
+  if ((cursor.g ?? '') !== (genre ?? '')) {
+    return false;
+  }
+  if ((cursor.st ?? '') !== (filters.status ?? '')) {
+    return false;
+  }
+  if ((cursor.a ?? '') !== (filters.authors ?? '')) {
+    return false;
+  }
+  const genres: readonly string[] = filters.genres ?? [];
+  if (genres.length > 0) {
+    if (cursor.gs !== cursorGenreKey(genres) || (cursor.gm ?? 'all') !== filters.genresMode) {
+      return false;
+    }
+  } else if (cursor.gs !== undefined) {
+    return false;
+  }
+  if ((cursor.nd ?? undefined) !== filters.newDays) {
+    return false;
+  }
+  return true;
 }

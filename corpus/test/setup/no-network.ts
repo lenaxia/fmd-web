@@ -118,6 +118,13 @@ export function installNetGuard(): void {
   if (g[GUARD_FLAG] === true) return;
   g[GUARD_FLAG] = true;
 
+  // FMD_LIVE=1 is the explicit, single-purpose live-test gate (same
+  // posture as the --live smoke CLI): the run opts INTO external
+  // network for server/test/live/** (HEAD-verifying default catalog
+  // IDs against the real FMD2-DB). The guard stays armed for every
+  // normal vitest invocation.
+  if (process.env['FMD_LIVE'] === '1') return;
+
   const realConnect = net.connect.bind(net) as (...args: unknown[]) => unknown;
   const realCreateConnection = net.createConnection.bind(
     net,
