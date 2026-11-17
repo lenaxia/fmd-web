@@ -17,6 +17,9 @@ export default defineConfig({
   testDir: './e2e',
   testMatch: /visual\.spec\.ts/,
   timeout: 30_000,
+  // CI-load budget (see playwright.config.ts): first test pays vite
+  // cold-transform + theme hydration under parallel load.
+  expect: { timeout: 10_000 },
   fullyParallel: false,
   workers: 1,
   reporter: [['list']],

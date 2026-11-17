@@ -14,8 +14,12 @@ export default defineConfig({
   // smoke (a11y.spec.ts) and the virtualization perf smoke
   // (perf.spec.ts). Visual regression has its own zero-threshold
   // config (playwright.visual.config.ts).
-  testMatch: /(smoke|a11y|perf)\.spec\.ts/,
+  testMatch: /(smoke|a11y|perf|search)\.spec\.ts/,
   timeout: 20_000,
+  // CI-load budget: the first test pays vite cold-transform + mock-API
+  // hydration under parallel load; 5s (Playwright default) loses that
+  // race on busy runners — observed as a cold-start flake in ci.sh.
+  expect: { timeout: 10_000 },
   fullyParallel: false,
   reporter: [['list']],
   use: {

@@ -30,9 +30,9 @@ test('browse latest → search → live info → dry-run enqueue → Downloads q
   await expect(page.getByRole('button', { name: /Zeta Landing/ })).toBeVisible();
 
   // ── 2. FTS search ─────────────────────────────────────────────────
-  await page.getByRole('tab', { name: 'Search' }).click();
-  await page.getByLabel('Search titles').fill(E2E.searchQuery);
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  // v0.2.0 live-search UX (FMD2 parity): no Search tab/submit — the
+  // always-visible SearchBar fires as-you-type (250ms debounce).
+  await page.getByLabel('Search').fill(E2E.searchQuery);
   await expect(page.getByRole('button', { name: /Alpha Quest/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Beta Trails/ })).toHaveCount(0);
   await expect(page.getByText('Showing 1 of 1 entries')).toBeVisible();

@@ -23,6 +23,9 @@ import { defineConfig } from '@playwright/test';
 export default defineConfig({
   testDir: './e2e',
   timeout: 60_000,
+  // CI-load budget (see playwright.config.ts): first test pays vite
+  // cold-transform + app bootstrap under parallel load.
+  expect: { timeout: 10_000 },
   fullyParallel: false,
   workers: 1,
   reporter: [['list']],
