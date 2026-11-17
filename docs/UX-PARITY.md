@@ -7,6 +7,12 @@ matrix: PARITY (replicate), ADAPT (web-native equivalent), SKIP (obsolete or
 desktop-only, justified). The v0.3.0 stories implement the PARITY/ADAPT rows;
 this file records the SKIPs and deferrals so nothing is silently dropped.
 
+## Product rulings (owner, permanent — never relitigate)
+
+- **R1 — No in-browser reader. EVER.** fmd-web is the *acquisition layer*; consumption belongs to dedicated servers (Kavita/Komga/...) fed by the library output. This is an architectural line, not a backlog item: any proposal containing a page-turner, double-tap zoom, or reading mode is rejected on principle. (Library file download links are the boundary; an OPDS/feed *export* for consumption tools is the only sanctioned direction if ever requested.)
+- **R2 — No multi-user. EVER.** Single-operator, self-hosted. The single-user model is a feature (simplicity of auth, data model, and trust), not a limitation awaiting removal. No per-user queues/favorites/permissions — not "later", not behind a flag.
+- **R3 — Mobile and desktop are EQUAL first-class citizens.** Every feature works on both; layout adapts, capability does not. Consequences: (a) no hover-only affordances — every popover/tooltip must have a tap/focus activation path; (b) touch targets >= 44px; (c) navigation must be thumb-reachable on mobile (bottom tab bar) — desktop top tabs are not the mobile pattern; (d) visual regression and e2e run at BOTH viewports; (e) virtualized lists scroll-tested on mobile; (f) keyboard shortcuts are desktop parity, never the only path to a feature.
+
 Adaptation principle (owner ruling): features follow **web design patterns,
 never blind desktop replication** — hover popovers not native tooltips,
 bottom sheets not modal dialogs, toasts not balloon hints, URL-synced
