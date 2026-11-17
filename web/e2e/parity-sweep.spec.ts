@@ -61,24 +61,24 @@ test.describe('open-by-URL (M14)', (): void => {
   });
 
   test('paste-and-go resolves by host and navigates to the manga page', async ({ page }): Promise<void> => {
-    await page.goto('/#/browse');
+    await page.goto('/#/browse?sites=1');
     await page.getByRole('textbox', { name: 'Open by URL' }).fill('https://hostsite.example/manga/hosted');
-    await page.getByRole('button', { name: 'Open' }).click();
+    await page.getByRole('button', { name: 'Open', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`#/manga\\?module=${SITE_ID}&url=`));
     await expect(page.getByText('Hosted Manga')).toBeVisible();
   });
 
   test('unknown host surfaces the typed no-site error, no navigation', async ({ page }): Promise<void> => {
-    await page.goto('/#/browse');
+    await page.goto('/#/browse?sites=1');
     await page.getByRole('textbox', { name: 'Open by URL' }).fill('https://nowhere.example/manga/x');
-    await page.getByRole('button', { name: 'Open' }).click();
+    await page.getByRole('button', { name: 'Open', exact: true }).click();
     await expect(page.getByTestId('open-by-url-error')).toHaveText(/No site matches this URL/);
-    await expect(page).toHaveURL(/#\/browse$/);
+    await expect(page).toHaveURL(/#\/browse\?sites=1$/);
   });
 
   test('Ctrl+Shift+V paste-and-go reads the clipboard and navigates', async ({ page, context }): Promise<void> => {
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
-    await page.goto('/#/browse');
+    await page.goto('/#/browse?sites=1');
     await page.evaluate((): Promise<void> => globalThis.navigator.clipboard.writeText('https://hostsite.example/manga/clip'));
     const input = page.getByRole('textbox', { name: 'Open by URL' });
     await input.click();

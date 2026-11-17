@@ -72,6 +72,42 @@ describe('RuntimeJobService (§10 idempotency over the SQLite lane)', (): void =
     }
   });
 
+  it('R5 arrival: list `since` floors on the row last transition (updatedAt)', (): void => {
+    const { service, queue, close } = makeService();
+    try {
+      const base = {
+        moduleId: DOWNLOAD_PAYLOAD.moduleId,
+        mangaUrl: DOWNLOAD_PAYLOAD.mangaUrl,
+      };
+      const a = service.createDownload(
+        { ...base, chapterLink: DOWNLOAD_PAYLOAD.chapterLink },
+        'since-key-1',
+      );
+      const b = service.createDownload(
+        { ...base, chapterLink: 'https://example.invalid/manga/x/2' },
+        'since-key-2',
+      );
+      // A terminal transition bumps updated_at (cancel → cancelled).
+      // The harness clock is a FROZEN FakeClock — derive the floors from
+      // the rows' own stamps instead of Date.now().
+      queue.cancel(a.job.id);
+      const stamp = Date.parse(b.job.updatedAt);
+      const future = new Date(stamp + 60_000).toISOString();
+      const past = new Date(stamp - 60_000).toISOString();
+      // Nothing transitioned after `future` — the away-summary
+      // 'nothing new' shape.
+      expect(
+        service.list({ since: future, limit: 10 }).jobs.map((job): string => job.id),
+      ).toEqual([]);
+      // Both rows transitioned (created) after `past`.
+      const fresh = service.list({ since: past, limit: 10 }).jobs.map((job): string => job.id);
+      expect(fresh).toContain(a.job.id);
+      expect(fresh).toContain(b.job.id);
+    } finally {
+      close();
+    }
+  });
+
   it('replays the ORIGINAL live job on an identical key (200 path)', (): void => {
     const { service, close } = makeService();
     try {

@@ -8,6 +8,8 @@
  */
 import { useEffect, useState, type FormEvent, type ReactElement } from 'react';
 import { Activity, FileClock, FileText, HeartPulse, Info } from 'lucide-react';
+import { toast } from 'sonner';
+import { promptInstall, useInstallAvailability } from '../../state/pwa-install';
 import {
   useHealthz,
   useSettings,
@@ -341,6 +343,19 @@ export function DiagnosticsSection(): ReactElement {
 export function AboutSection(): ReactElement {
   const health = useHealthz();
   const version: string = health.data?.version ?? '…';
+  // R5 arrival: the install surface appears ONLY when the browser
+  // fired beforeinstallprompt (Chromium installability); iOS Safari's
+  // share-sheet path never does, by design (docs/UX-PARITY.md).
+  const install = useInstallAvailability();
+  const onInstall = (): void => {
+    void promptInstall().then((outcome): void => {
+      if (outcome === 'accepted') {
+        toast.success('FMD Web installed — find it on your home screen / desktop.');
+      } else if (outcome === 'dismissed') {
+        toast.message('Install dismissed — the browser re-offers after its cooldown.');
+      }
+    });
+  };
   return (
     <section aria-label="About" className="about-section mb-6" data-testid="about-section">
       <h2 className="mb-1 flex items-center gap-2 text-lg font-semibold">
@@ -351,6 +366,16 @@ export function AboutSection(): ReactElement {
         <span>
           fmd-web <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-xs">{version}</code>
         </span>
+        {install.available && !install.installed ? (
+          <Button
+            type="button"
+            size="sm"
+            data-testid="install-app-action"
+            onClick={onInstall}
+          >
+            Install app
+          </Button>
+        ) : null}
         <a className="underline underline-offset-4" href={RELEASES_URL} target="_blank" rel="noreferrer">
           Releases
         </a>

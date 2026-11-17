@@ -109,7 +109,10 @@ export function AllSitesSearchPage(props: { route: Route }): ReactElement {
         <AllSitesToggle
           checked
           onChange={(): void => {
-            navigate('browse', {});
+            // Toggle-off leaves union mode back to the site picker
+            // (site-first secondary mode — the pre-search-home target
+            // of this control, preserved).
+            navigate('browse', { sites: '1' });
           }}
         />
       </FilterBar>

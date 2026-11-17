@@ -15,18 +15,18 @@ test('Browse: catalog latest list with cursor pagination + search', async ({ pag
   await page.goto(`/#/browse?catalog=${CATALOG_ID}`);
 
   await expect(page.getByRole('heading', { name: 'FMD Web' })).toBeVisible();
-  const firstEntry = page.getByRole('button', { name: /Alpha Quest/ });
+  const firstEntry = page.getByRole('button', { name: /^Alpha Quest/ });
   await expect(firstEntry).toBeVisible();
 
   // page 1 → page 2 via the Load-more cursor
   await page.getByRole('button', { name: 'Load more' }).click();
-  await expect(page.getByRole('button', { name: /Beta Trails/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Beta Trails/ })).toBeVisible();
   await expect(page.getByText('Showing 2 of 2 entries')).toBeVisible();
 
   // live search (250ms debounce): typing flows to /search; the
   // debounced result renders without any submit action
   await page.getByLabel('Search').fill('alpha');
-  await expect(page.getByRole('button', { name: /Alpha Quest/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Alpha Quest/ })).toBeVisible();
 });
 
 test('Manga: live info display, chapter list, enqueue dry-run', async ({ page }: { page: Page }): Promise<void> => {
@@ -82,11 +82,13 @@ test('Downloads: job list, cursor load-more, WS progress updates live', async ({
     JSON.stringify({
       type: 'event',
       id: 'evt-1',
-      job: { ...job, state: 'running', progress: { pages: '3/40' } },
+      job: { ...job, state: 'running', progress: { done: 3, total: 40 } },
     }),
   );
-  await expect(page.locator('.job-list').getByText('running', { exact: true })).toBeVisible();
-  await expect(page.getByText('{"pages":"3/40"}')).toBeVisible();
+  // job-status maps running-without-a-stage to the 'preparing' label
+  // (downloads parity) — the live patch is what this test pins.
+  await expect(page.locator('.job-list').getByText('preparing', { exact: true })).toBeVisible();
+  await expect(page.locator('.job-list').getByTestId('job-progress-count')).toHaveText('3/40');
 
   // cursor pagination still works
   await page.getByRole('button', { name: 'Load more' }).click();

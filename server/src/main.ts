@@ -98,7 +98,7 @@ export function createApp(services: ApiServices = createDefaultServices()): Retu
     ...(password !== undefined || apiTokenEnv !== undefined
       ? {
           auth: {
-            ...(password !== undefined ? { password } : {}),
+            password,
             // R4: the env pin OVERRIDES any stored value (headless runs);
             // the in-memory entry here has no settings store, so the pin
             // is the only token source.

@@ -35,7 +35,7 @@ interface SettingsMockState {
 function installSettingsMockApi(page: Page, state: SettingsMockState): void {
   installMockApi(page);
 
-  void page.route(API('settings'), (route): void => {
+  void page.route(API('settings$'), (route): void => {
     void route.fulfill(
       json({
         proxy: { type: '', host: '', port: '', user: '', pass: '' },
@@ -81,7 +81,7 @@ function installSettingsMockApi(page: Page, state: SettingsMockState): void {
     state.bulkWrites.push(body);
     const enabled: boolean = body['enabled'] === true;
     const category: string | undefined = typeof body['category'] === 'string' ? (body['category'] as string) : undefined;
-    const targets = state.modules.filter((m): boolean =>
+    const targets = state.modules.filter((_m): boolean =>
       category !== undefined ? category === fixtureModule.category : true,
     );
     for (const target of targets) {
@@ -228,7 +228,7 @@ test('Settings: bulk category Disable all rewrites module_state; the site picker
   await expect(enabledBox).not.toBeChecked();
 
   // And the site picker hides the disabled site right away.
-  await page.goto('/#/browse');
+  await page.goto('/#/browse?sites=1');
   await expect(page.getByText(/Pick a site/i)).toBeVisible();
   await expect(page.getByText('FixtureSite')).toHaveCount(0);
 
@@ -237,13 +237,36 @@ test('Settings: bulk category Disable all rewrites module_state; the site picker
   await page.getByRole('button', { name: 'Select all' }).click();
   const checkbox = page.getByLabel('FixtureSite', { exact: true });
   await expect(checkbox).toBeChecked();
-  await page.goto('/#/browse');
+  await page.goto('/#/browse?sites=1');
   await expect(page.getByText('FixtureSite').first()).toBeVisible();
 
   // Exactly two bulk writes: category disable + global enable.
   expect(bulkWrites).toHaveLength(2);
   expect(bulkWrites[0]).toMatchObject({ enabled: false, category: 'Fixtures' });
   expect(bulkWrites[1]).toMatchObject({ enabled: true });
+});
+
+test('Settings: per-site Re-sync catalog (update-list parity) runs the sync endpoint behind a progress toast', async ({
+  page,
+}: {
+  page: Page;
+}): Promise<void> => {
+  await page.goto('/#/settings');
+
+  const syncs: string[] = [];
+  page.on('request', (req): void => {
+    if (req.method() === 'POST' && /\/api\/sync\/catalog\//.test(req.url())) {
+      syncs.push(req.url());
+    }
+  });
+
+  // The row action (only sites with an INSTALLED catalog carry it).
+  await page.getByRole('button', { name: 'Re-sync catalog for FixtureSite' }).click();
+
+  // The mock answers state:'updated' — the toast resolves to success.
+  await expect(page.getByText('FixtureSite catalog sync updated')).toBeVisible();
+  expect(syncs).toHaveLength(1);
+  expect(syncs[0]).toContain(`/api/sync/catalog/${MODULE_ID}`);
 });
 
 test('Settings: module search narrows by name and category', async ({ page }: { page: Page }): Promise<void> => {

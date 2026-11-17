@@ -338,6 +338,8 @@ export interface Harness {
   readonly library: InMemoryLibraryService;
   readonly favorites: import('../../src/api/services.js').FavoriteService;
   readonly accounts: import('../../src/accounts/account-service.js').AccountService;
+  /** The settings service (R4 token storage tests rotate through it). */
+  readonly settings: import('../../src/api/services.js').InMemorySettingsService;
 }
 
 /** In-memory accounts double builder (route tests). */
@@ -398,11 +400,20 @@ export function buildHarness(
      *  upstream ids for the catalogInstalled join regression). */
     extraRegistrations?: import('../../src/engine/registry/capabilities.js').RegistrationRecord[];
     /** Real catalog store override (default: in-memory double). When set,
-     *  the site-first join exercises the REAL path-safety assert chain. */
+     * the site-first join exercises the REAL path-safety assert chain. */
     catalogStore?: import('../../src/sync/db/catalog-store.js').CatalogFileStore;
+    /** R4: settings service override (token rotation tests drive it). */
+    settings?: import('../../src/api/services.js').InMemorySettingsService;
+    /** §4/§15: metrics registry (auth-label request counters). */
+    metrics?: import('../../src/observability/metrics.js').FmdMetrics;
+    /** R4: audit sink (token regeneration assertions). */
+    onAudit?: (event: import('../../src/api/app.js').SettingsAuditEvent) => void;
+    /** Downloads parity: job service override (action-matrix tests wire
+     * an artifact deleter through it). */
+    jobs?: import('../../src/api/services.js').InMemoryJobService;
   } = {},
 ): Harness {
-  const jobs = new InMemoryJobService();
+  const jobs = opts.jobs ?? new InMemoryJobService();
   const library = new InMemoryLibraryService();
   const favorites = opts.favorites ?? new InMemoryFavoriteService();
   const accounts = opts.accounts ?? new InMemoryAccountService();
@@ -414,6 +425,8 @@ export function buildHarness(
     ...(opts.auth !== undefined ? { auth: opts.auth } : {}),
     ...(opts.infoTtlMs !== undefined ? { infoCacheTtlMs: opts.infoTtlMs } : {}),
     ...(opts.wsHub !== undefined ? { wsHub: opts.wsHub } : {}),
+    ...(opts.metrics !== undefined ? { metrics: opts.metrics } : {}),
+    ...(opts.onAudit !== undefined ? { onAudit: opts.onAudit } : {}),
   };
   const modules = new InMemoryModuleService(
     [...defaultRegistrations(), ...(opts.extraRegistrations ?? [])],
@@ -422,10 +435,12 @@ export function buildHarness(
     // CatalogStore double (installed fixtures flip the chip).
     (id: string): boolean => catalogs.getMeta(id) !== undefined,
   );
-  const settings = new InMemorySettingsService(
-    modules,
-    opts.browserProfile === true ? 'http://127.0.0.1:8191' : '',
-  );
+  const settings =
+    opts.settings ??
+    new InMemorySettingsService(
+      modules,
+      opts.browserProfile === true ? 'http://127.0.0.1:8191' : '',
+    );
   const app = buildApp(
     {
       modules,
@@ -441,7 +456,7 @@ export function buildHarness(
     },
     options,
   );
-  return { app, modules, jobs, catalogs, info, sync, library, favorites, accounts };
+  return { app, modules, jobs, catalogs, info, sync, library, favorites, accounts, settings };
 }
 
 

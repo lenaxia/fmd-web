@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { QueryClient, InfiniteData } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
+import type { components } from '../api/openapi';
 import type { JobT, JobsPageT } from '../api/hooks';
 import { wsEndpointUrl } from '../api/client';
 import {
@@ -36,13 +37,25 @@ export interface JobsFeed {
   readonly resyncCount: number;
 }
 
+/** Where an event came from: the live stream, or a reconnect backfill. */
+export type JobsEventPhase = 'live' | 'backfill';
+
 export function useJobsFeed(options: {
   enabled: boolean;
   webSocketFactory?: WebSocketFactory;
+  /**
+   * R5 arrival: per-event tap (post-cache-patch) with the phase —
+   * 'backfill' marks replayed events after a reconnect (consumers
+   * suppress transient reactions like completion toasts for them;
+   * the away summary covers offline gaps instead).
+   */
+  onJobEvent?: (job: components['schemas']['Job'], phase: JobsEventPhase) => void;
 }): JobsFeed {
   const queryClient: QueryClient = useQueryClient();
   const { enabled } = options;
   const factoryRef = useRef<WebSocketFactory | undefined>(options.webSocketFactory);
+  const onJobEventRef = useRef(options.onJobEvent);
+  onJobEventRef.current = options.onJobEvent;
   const [feed, setFeed] = useState<JobsFeed>({
     status: enabled ? 'connecting' : 'idle',
     lastEventId: undefined,
@@ -57,11 +70,15 @@ export function useJobsFeed(options: {
       ...(factoryRef.current !== undefined ? { webSocketFactory: factoryRef.current } : {}),
       onEvent: (event): void => {
         // Infinite-query caches hold InfiniteData — patch every page.
+        const wire = eventJobToWire(event);
         queryClient.setQueriesData<InfiniteData<JobsPageT>>({ queryKey: ['jobs'] }, (data) =>
           data === undefined
             ? data
-            : { ...data, pages: data.pages.map((page): JobsPageT => patchJobsPage(page, eventJobToWire(event))) },
+            : { ...data, pages: data.pages.map((page): JobsPageT => patchJobsPage(page, wire)) },
         );
+        // 'backfilling' status = replayed events after a reconnect
+        // (D19): everything else is live.
+        onJobEventRef.current?.(wire, controller.status === 'backfilling' ? 'backfill' : 'live');
         setFeed((prev) => ({
           ...prev,
           status: controller.status,

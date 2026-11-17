@@ -58,18 +58,18 @@
 
 | Claim | Proof (re-run 2026-11-17) |
 |---|---|
-| Batch check scope matrix + cancel | `npx vitest run server/test/api/favorites-batch-transfer.test.ts` — 17 passed (scope all/enabled/disabled, cancel mid-run via gated service, typed 400/409, per-row new-chapter sets) |
-| Transfer incl. invalid-target report | same file — preview valid/not-found/no-catalog/get-info-failed, apply remap (new id, old key gone), invalid apply = 409 envelope, clearDownloadedList reload |
+| Batch check scope matrix + cancel | `npx vitest run server/test/api/favorites-batch-transfer.test.ts` (re-run 2026-11-17 11:01) — 21 passed (scope all/enabled/disabled, cancel mid-run via gated service, typed 400/409, per-row new-chapter sets) |
+| Transfer incl. invalid-target report | favorites-batch-transfer.test.ts (21 above) — preview valid + `not-found` AND the full miss taxonomy `no-catalog`/`get-info-failed` through the route (double's transferIndex extended to reason-bearing misses), apply remap (new id, old key gone), invalid apply = 409 envelope (taxonomy targets too), clearDownloadedList reload; the REAL engine taxonomy (`server/test/jobs/favorites/service.test.ts`:252) covers no-catalog/get-info-failed against the production store |
 | Production transfer + batch on the REAL engine/store | `npx vitest run server/test/jobs/favorites/service.test.ts` — 13 passed (6 new: preview reasons, field carry-over, tag-100 reload, scope matrix + failed-row sweep, concurrent 409) |
-| Scheduler runtime interval | `npx vitest run server/test/jobs/favorites/scheduler.test.ts` — 10 passed (2 new: shorter interval re-arms due-now, interval 0 clears wakes) |
-| rename/saveTo/enabled persistence | favorites-batch-transfer.test.ts (`PUT /api/favorites/:id` block) + service.test.ts (field carry-over through the real store) |
+| Scheduler runtime interval | `npx vitest run server/test/jobs/favorites/scheduler.test.ts` — 9 passed (2 new: shorter interval re-arms due-now, interval 0 clears wakes) |
+| rename/saveTo/enabled persistence + DELETE | favorites-batch-transfer.test.ts (`PUT /api/favorites/:id` block incl. the empty-patch 400; `DELETE /api/favorites/:id` block: 200 {ok:true}, listing drops the row, repeat/unknown delete = typed 404 `not_found`) + service.test.ts (field carry-over through the real store) |
 | Settings surface | favorites-batch-transfer.test.ts (`PUT /api/settings/favorites` block) — round-trip through GET, 0 legal, negative 400 |
-| Store migration + full server gate | `npx vitest run server/test` — 34 files / 260 tests passed (library store round-trips the new columns; ALTERs idempotent) |
+| Store migration + server favorites gate | `npx vitest run server/test/api/favorites-batch-transfer.test.ts server/test/jobs/favorites` (re-run 2026-11-17 11:01) — 5 files / 61 tests passed (library store round-trips the new columns; ALTERs idempotent). The WIDER `server/test` tree currently carries 10 failed files / 34 failed tests — ALL in the parallel in-flight engine/module-sync refactor (hostFactory now required by `ModuleSyncOptions`, `LuaHost.dispose` removed: runtime/drain, runtime.test, sync/modules/*, accounts/account-login-engine) with zero favorites-file intersections; same shared-workspace pattern as the web note in Known scope |
 | Sheet decision state | `npx vitest run web/test/new-chapters-sheet.test.tsx` — 4 passed (auto rows pre-decided, decide/decideAll only-pending, reset on new rows) |
 | Page surface (columns, toolbar, sheet, menus, import) | `npx vitest run web/test/favorites-page.test.tsx` — 17 passed |
 | End-to-end on mock | `npx playwright test e2e/favorites-parity.spec.ts` (in web/) — 2 passed: create-from-manga-page → columns → check scope → sheet → Download all → downloads page lists the two created jobs; auto row pre-queued, 0 pending decisions |
 | Import round-trips existing endpoint | favorites-page.test.ts import suite (1 ok + 1 failed row report; only the resolvable entry POSTs `/api/favorites/import`) |
-| Types/lint/contract | `npm run build` 0 errors; `npx eslint <all touched files>` clean; `npm run contract:check` OK; openapi snapshot + client drift tests green |
+| Types/lint/contract (re-run 2026-11-17 11:01) | `npx eslint` on every favorites-touched file (pages, components/favorites/*, tests, e2e, api app/services/schemas, runtime/favorites-service, jobs/favorites, jobs/library/store) — 0 problems, exit 0. `npx tsc -b --pretty false 2>&1 | grep -E 'favorites|api/services'` — ZERO hits (no favorites-touched file has a type error; the test file's earlier indexed-access/override strictness errors were fixed in this pass). `npm run contract:check` — OK, 0 mismatches. The full `tsc -b` still fails ONLY inside the same parallel engine refactor (module-sync.ts TS2741 hostFactory, directory-walk/account-login TS2339 LuaHost.dispose, assembly TS6133/TS2345 Lua wiring, tools/smoke TS2322 FacadeBridge) — favorites files typecheck through the same projects once that story lands its refactor |
 
 ## Known scope
 
@@ -82,3 +82,7 @@
   queued are skipped).
 - Pre-existing failures in `web/test/settings-bootstrap.test.tsx` / `web/test/browse-list-polish.test.tsx` belong to the
   parallel in-flight settings/browse story (verified identical with my changes disabled).
+- The full-tree `tsc -b` + `server/test` failures current at this writing (10 files / 34 tests, all engine/module-sync:
+  `ModuleSyncOptions.hostFactory` now required, `LuaHost.dispose` removed, `FacadeBridge` reworked) belong to the parallel
+  in-flight engine refactor in this SHARED uncommitted workspace — every favorites-scoped gate above is green and no
+  favorites-touched file appears in the type-error list. Re-run the favorites commands if the tree moves again.

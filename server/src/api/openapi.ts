@@ -23,6 +23,7 @@ import {
   FavoriteCheckBatchRequestSchema,
   FavoriteCheckBatchResponseSchema,
   FavoriteCreateRequestSchema,
+  FavoriteListQuerySchema,
   FavoriteListResponseSchema,
   FavoriteResponseSchema,
   FavoriteSchema,
@@ -624,7 +625,10 @@ const OPERATIONS: readonly RouteOperation[] = [
       '(csv multi-select of the §7.1 states), `q` (case-insensitive substring over the job\'s ' +
       'mangaTitle/chapterName) and `addedFrom`/`addedTo` (inclusive created-at calendar days, UTC ' +
       '— the client maps FMD2\'s History windows Today/7d/Month/Older and custom From/To into this ' +
-      'range). `state` (single) predates the multi-select and stays for back-compat.',
+      'range). `state` (single) predates the multi-select and stays for back-compat. ' +
+      'R5 arrival adds `since` (ISO 8601 UTC timestamp): a floor on the row\'s LAST TRANSITION ' +
+      '(`updatedAt`) — combined with `state=done` it selects chapters FINISHED since the ' +
+      "timestamp, the 'While you were away' summary's download-news source.",
     tags: ['jobs'],
     query: JobsListQuerySchema,
     responses: {
@@ -781,8 +785,12 @@ const OPERATIONS: readonly RouteOperation[] = [
     description:
       'One row per favorite (`id` = LowerCase(ModuleID+Link)): `currentChapter`/`status` from the ' +
       'last successful check (immediate update parity), `newChapterCount` for the UI badge, and the ' +
-      'auto-download flag gating pipeline enqueues.',
+      'auto-download flag gating pipeline enqueues. R5 arrival (additive): `?since=<ISO 8601 UTC>` ' +
+      "switches each row's `newsSince` flag on — true when a check ran at/after `since` AND found " +
+      'new chapters (`lastCheck >= since && newChapterCount > 0`) — the favorites half of the ' +
+      "'While you were away' summary. Without the param the flag is omitted (pre-R5 shape).",
     tags: ['favorites'],
+    query: FavoriteListQuerySchema,
     responses: {
       200: { description: 'Favorites list', schema: FavoriteListResponseSchema },
       ...errors(validation(), internal()),

@@ -47,19 +47,23 @@ for component in button input select command tabs dialog badge card table \
   fi
 done
 for pattern in PageHeader ListPanel EntryRow FilterBar StatPill EmptyState \
-               ErrorBanner ProgressToast; do
+               ErrorBanner ProgressToast BottomTabNav; do
   if [[ ! -f "web/src/components/patterns/${pattern}.tsx" ]]; then
     err "missing pattern: web/src/components/patterns/${pattern}.tsx"
   fi
 done
 
-# Visual fixtures: every page × theme must have a committed screenshot.
+# Visual fixtures: every page × theme × VIEWPORT must have a committed
+# screenshot (R3: desktop AND mobile are locked — 6 pages × 2 themes
+# × 2 viewports = 24 fixtures; mobile shots carry the bottom-nav shell).
 for page in browse manga downloads favorites library settings; do
   for theme in dark light; do
-    if ! ls web/e2e/visual/fixtures/*/ > /dev/null 2>&1 \
-       || ! find web/e2e/visual/fixtures -name "${page}-${theme}.png" | grep -q .; then
-      err "missing visual fixture: ${page}-${theme}.png (npm run e2e:visual:update -w @fmd/web)"
-    fi
+    for viewport in "" "-mobile"; do
+      if ! ls web/e2e/visual/fixtures/*/ > /dev/null 2>&1 \
+         || ! find web/e2e/visual/fixtures -name "${page}${viewport}-${theme}.png" | grep -q .; then
+        err "missing visual fixture: ${page}${viewport}-${theme}.png (npm run e2e:visual:update -w @fmd/web)"
+      fi
+    done
   done
 done
 

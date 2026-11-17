@@ -137,30 +137,77 @@ snapshot + web client regenerated (`api:snapshot` + `gen:api`).
 
 ## 5. Gate status
 
-Run at story completion (shared working tree — two other stories were
-mid-landing during this sweep):
+Re-run at the final commit, at repo ROOT (the first landing claimed
+per-file scoping that did not hold — this section quotes one full
+root-level run; numbers below are the exact tail lines):
 
-- contract:check — **PASS** (`contract drift-check: OK — 0 mismatches`)
-- corpus — **PASS** (`912/912 = 100.00%`, `corpus gate passed: >=99% with zero undocumented mismatches`)
-- lint — **PASS** for every [parity-sweep]-touched file
-- typecheck — **PASS** for every [parity-sweep]-touched file (server + web +
-  contract); the residual tree-wide errors at run time were the parallel
-  stories' in-flight files (favorites batch-transfer, favorites page
-  components), outside this story's scope
-- tests — full suite at landing: **1945 passed / 1952** (3 failing + file-level
-  drain skip are the parallel [downloads-parity]/[favorites-parity] in-flight
-  files; every suite this story touched is green):
-  browse-filter-state, catalog-store-search-filters (SQL matrix),
-  catalog-search-filters (routes), settings (round-trips + defaults),
-  info (M14 host-resolution matrix), retention (fake clock),
-  output-rename-options, download-lane-knobs, parity-sweep-ui (9/9),
-  pagination (picker assertion updated for the open-by-URL input)
+- contract:check — **PASS** (`contract drift-check: OK — 0 mismatches
+  (events + TXQuery/Storage/ImagePuzzle/Duktape/Crypto facades +
+  requireShims statuses vs FMD2/baseunits/lua + shim loader registry)`)
+- lint — **PASS** (`eslint .` over the whole monorepo, zero findings —
+  including the `server/src/api/services.ts` prefer-const the review
+  flagged)
+- typecheck — **PASS** (`tsc -b tsconfig.json`, root project graph —
+  server + web + contract, zero errors). The review-blocker
+  TS2532 in `web/test/pagination.test.tsx` is fixed with the repo's
+  guard idiom (`openButtons.at(0)` + `toBeDefined()` + optional chain).
+  The TS18048 (`favorites-batch-transfer.test.ts`) and TS6133
+  (`web/e2e/settings-parity.spec.ts`) findings are likewise fixed.
+  The TS2739 (`server/test/runtime/runtime.test.ts` missing
+  `password`/`apiTokenEnv`) was PRE-EXISTING from 00dcd24 — called out
+  per the review; it is fixed in this commit (explicit
+  `password: undefined, apiTokenEnv: undefined` in the harness default).
+- tests — full suite, one run, zero failures, zero unloadable files:
+  **`Test Files 196 passed (196) / Tests 2024 passed | 3 skipped
+  (2027)`** (0 failed, no unhandled errors; the 3 skips are the
+  long-standing suite-level drain skips). Story-touched suites all
+  green: browse-filter-state, catalog-store-search-filters (SQL
+  matrix), catalog-search-filters (routes), settings (round-trips +
+  defaults), info (M14 host-resolution matrix), retention (fake
+  clock), output-rename-options, download-lane-knobs,
+  parity-sweep-ui, pagination.
+- corpus — **PASS** (`COMPAT.md written: 912/912 = 100.00%`,
+  `corpus gate passed: >=99% with zero undocumented mismatches`;
+  `git diff --exit-code -- docs/COMPAT.md docs/corpus-report.json`
+  clean — committed artifacts not stale)
+- design-gate — **PASS** (`design-gate: OK (tokens-only styling,
+  inventory + visual fixtures present)`)
+- engine-boundary-gate — **PASS** (exit 0)
+- web e2e (`npm run e2e -w @fmd/web`, desktop + mobile projects) —
+  **90 passed / 10 skipped / 0 failed**, including
+  `web/e2e/parity-sweep.spec.ts` **4/4** (paste-and-go navigates,
+  unknown host typed error, Ctrl+Shift+V, `!Ecchi` exclude-chip +
+  URL round-trip) and `all-sites-search.spec.ts` green (the union
+  seam the shared tree broke mid-sweep is complete again — verified
+  failing at HEAD 0eb423e, passing at this commit)
+- visual (`npm run e2e:visual -w @fmd/web`) — **32/32** (the suite
+  grew from 12 to 32 pages: the parallel [mobile-parity]/
+  [search-first-home] stories added mobile/palette/search-home
+  fixtures; settings fixtures carry this story's new sections)
 - OpenAPI snapshot + web client regenerated (`api:snapshot` + `gen:api`;
-  snapshot byte-for-byte test green)
-- Playwright — `web/e2e/parity-sweep.spec.ts` **4/4** (paste-and-go
-  navigates, unknown host typed error, Ctrl+Shift+V, exclude-chip distinct
-  rendering + URL round-trip)
-- visual — settings fixtures regenerated for the new sections
-  (`e2e:visual:update`, intentional diff), gate **12/12** in the same window
-  (browse fixtures also refreshed for the coalescing [browse-list-polish]
-  work in the shared tree)
+  snapshot byte-for-byte test green inside the suite run above)
+- NOT run in this window: compose-stack e2e phase-2/phase-3
+  (`scripts/e2e.sh`) — the web Playwright gates above ran against the
+  Vite dev server + mocked API per the review's requested gate list.
+
+### 5.1 Review-remediation ledger (fail by tinted-granary-plumbs)
+
+- **blocker** pagination.test.tsx TS2532 → fixed with the guard idiom
+  (`.at(0)` + `toBeDefined()` + `?.`), root `npm run typecheck` PASS.
+- **major** gate-red coalesced hunks → completed, not stripped:
+  `web/src/state/downloads-filter-state.ts` now exists (DownloadsPage
+  import resolves; the 2 vitest files load), `FULL_SETTINGS` is
+  exported from `web/test/helpers.tsx` (proxy-settings +
+  settings-bootstrap import it), favorites-batch-transfer TS18048 and
+  settings-parity TS6133 fixed, services.ts prefer-const fixed.
+  Additional coalesced-completion work from the parallel DONE stories
+  ([settings-parity], [browse-list-polish], [downloads-parity],
+  [mobile-parity], [search-first-home], [api-scripting]) and the
+  in-flight [arrival-experience] story lands in the same commit to
+  keep the committed tree self-consistent and gate-green (splitting
+  interleaved shared files — helpers.tsx, App.tsx, e2e fixtures —
+  would have re-created the half-hunk failure mode the review
+  rejected). The commit message attributes the coalesced work.
+- **minor** evidence numbers → re-quoted above from the final-commit
+  rerun; e2e/visual are now verifiable (app builds; the DownloadsPage
+  import fix restored the dev server).

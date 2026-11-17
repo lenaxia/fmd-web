@@ -38,7 +38,12 @@ describe('App bootstrap banner (D20 progress)', (): void => {
 
     // Next poll reports ready → the banner disappears.
     expect(await screen.findByText('FMD Web')).toBeInTheDocument();
-    await screen.findByText('Browse');
+    // The shell rendered — the NAV tabs. R3 responsive shell: BOTH
+    // surfaces carry the same Browse destination (top tabs >=768px,
+    // the BottomTabNav twin below — CSS picks per viewport; jsdom
+    // renders both, the e2e shell spec asserts the switch).
+    const browseLinks = await screen.findAllByRole('link', { name: 'Browse' });
+    expect(browseLinks.length).toBeGreaterThanOrEqual(2);
     expect(
       await (async (): Promise<boolean> => {
         // The next 1s poll reports ready → the banner unmounts.

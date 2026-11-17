@@ -6,8 +6,20 @@
  * Download (active jobs) / Add to queue (paused jobs) / Dismiss.
  * Favorites with auto-download on were already queued server-side by
  * the check — their rows render pre-queued and keep no pending action.
+ *
+ * R3 mobile: the bottom sheet is DRAG-DISMISSABLE — a grabber handle
+ * tracks a downward pointer drag on the sheet and closes past the
+ * threshold (the thumb-native dismissal path; the Close button and
+ * scrim tap remain). Pointer events cover touch, pen and mouse.
  */
-import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { Download, ListPlus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,6 +31,9 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
+
+/** Downward drag (px) past which a release dismisses the sheet. */
+const DRAG_DISMISS_THRESHOLD = 72;
 
 /** What the user decided for one favorite's new chapters. */
 export type NewChapterDecision =
@@ -139,6 +154,54 @@ export function NewChaptersSheet(props: {
   const { open, onClose, rows, onDownload, onQueue } = props;
   const { decisions, decide, decideAll, pendingCount } = useNewChapterDecisions(rows);
 
+  // Drag-dismiss (R3): track a DOWNWARD pointer drag from the grabber;
+  // release past the threshold closes the sheet, otherwise it snaps
+  // back. The refs hold the grabbing pointer id + its start Y so only
+  // the grabbing pointer moves the sheet; the state drives the translate.
+  const dragPointer = useRef<number | null>(null);
+  const dragStartY = useRef(0);
+  const [dragY, setDragY] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  useEffect((): void => {
+    if (!open) {
+      dragPointer.current = null;
+      setDragY(0);
+      setDragging(false);
+    }
+  }, [open]);
+
+  const onHandlePointerDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (event.pointerType === 'mouse' && event.button !== 0) {
+      return;
+    }
+    dragPointer.current = event.pointerId;
+    dragStartY.current = event.clientY;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDragging(true);
+  };
+  const onHandlePointerMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (dragPointer.current !== event.pointerId) {
+      return;
+    }
+    // Downward only — an upward drag fights the open animation.
+    setDragY(Math.max(0, event.clientY - dragStartY.current));
+  };
+  const onHandlePointerUp = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (dragPointer.current !== event.pointerId) {
+      return;
+    }
+    dragPointer.current = null;
+    setDragging(false);
+    // Read the drag from the pointer positions (not the state) — the
+    // last pointermove's setState may not have flushed into this
+    // handler's closure yet.
+    if (Math.max(0, event.clientY - dragStartY.current) > DRAG_DISMISS_THRESHOLD) {
+      onClose();
+    } else {
+      setDragY(0);
+    }
+  };
+
   const act = (row: NewChapterRow, action: NewChapterAction): void => {
     decide(row.favoriteId, action);
     if (action === 'download') {
@@ -167,8 +230,26 @@ export function NewChaptersSheet(props: {
         side="bottom"
         className="new-chapters-sheet flex max-h-[70vh] flex-col gap-0"
         data-testid="new-chapters-sheet"
+        style={{
+          transform: dragY > 0 ? `translateY(${dragY}px)` : undefined,
+          transition: dragging ? 'none' : 'transform 200ms ease-out',
+        }}
       >
-        <SheetHeader className="pb-2">
+        {/* Drag-dismiss grabber (R3): the whole header strip drags.
+         * Decorative (aria-hidden) — dismissal paths are the drag itself,
+         * the Close button, the scrim and Escape (Radix Dialog). */}
+        <div
+          data-testid="new-chapters-drag-handle"
+          aria-hidden="true"
+          className="flex min-h-touch-target w-full cursor-grab touch-none flex-col items-center justify-center"
+          onPointerDown={onHandlePointerDown}
+          onPointerMove={onHandlePointerMove}
+          onPointerUp={onHandlePointerUp}
+          onPointerCancel={onHandlePointerUp}
+        >
+          <span className="h-1.5 w-10 rounded-full bg-muted-foreground/40" />
+        </div>
+        <SheetHeader className="pb-2 pt-0">
           <SheetTitle className="new-chapters-title">
             New chapters found ({rows.length} {rows.length === 1 ? 'title' : 'titles'})
           </SheetTitle>

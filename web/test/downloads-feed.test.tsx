@@ -22,7 +22,7 @@ function jobsRoutes(state: string, jobs: ReturnType<typeof jobFixture>[], opts?:
     method: 'GET',
     match: (url): boolean =>
       url.pathname === '/api/jobs' &&
-      (state === '' ? url.searchParams.get('state') === null : url.searchParams.get('state') === state) &&
+      (state === '' ? url.searchParams.get('states') === null : url.searchParams.get('states') === state) &&
       (page === 1 ? url.searchParams.get('cursor') === null : url.searchParams.get('cursor') === 'c9'),
     respond: (): { body: object } => ({
       body: {
@@ -30,6 +30,16 @@ function jobsRoutes(state: string, jobs: ReturnType<typeof jobFixture>[], opts?:
         ...(opts?.nextCursor !== undefined ? { nextCursor: opts.nextCursor } : {}),
       },
     }),
+  };
+}
+
+/** R5 arrival: the app-level activity query (nav badge source). */
+function activityRoute(): MockRoute {
+  return {
+    method: 'GET',
+    match: (url): boolean =>
+      url.pathname === '/api/jobs' && url.searchParams.get('states') === 'queued,running',
+    respond: (): { body: object } => ({ body: { jobs: [] } }),
   };
 }
 
@@ -47,6 +57,7 @@ describe('patchJobsPage (cache patch)', (): void => {
 describe('DownloadsPage', (): void => {
   it('renders jobs, filters by state, and loads more via cursor', async (): Promise<void> => {
     const { fetch, requests } = mockFetch([
+      activityRoute(),
       jobsRoutes('', [jobFixture('j1')], { nextCursor: 'c9' }),
       jobsRoutes('', [jobFixture('j2')], { page: 2 }),
       jobsRoutes('done', [jobFixture('j3', { state: 'done' })]),
@@ -61,17 +72,23 @@ describe('DownloadsPage', (): void => {
     // both pages' rows are in the DOM (appended, not replaced)
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
 
-    await userEvent.selectOptions(screen.getByLabelText('Filter by state'), 'done');
-    expect(requests.some((r): boolean => r.path.includes('state=done'))).toBe(true);
-    expect(requests.filter((r): boolean => r.path.startsWith('/api/jobs')).map((r): string => r.path)).toEqual([
+    await userEvent.click(screen.getByTestId('state-chip-done'));
+    expect(requests.some((r): boolean => r.path.includes('states=done'))).toBe(true);
+    const jobsCalls = requests
+      .filter((r): boolean => r.path.startsWith('/api/jobs'))
+      .map((r): string => r.path);
+    // R5 arrival: the shell's activity query (nav badge) rides the same
+    // endpoint — its own call, independent of the page's listings.
+    expect(jobsCalls).toContain('/api/jobs?limit=100&states=queued%2Crunning');
+    expect(jobsCalls.filter((path): boolean => !path.includes('states=queued'))).toEqual([
       '/api/jobs?limit=20',
       '/api/jobs?limit=20&cursor=c9',
-      '/api/jobs?limit=20&state=done',
+      '/api/jobs?limit=20&states=done',
     ]);
   });
 
   it('shows the empty-state guidance when there are no jobs', async (): Promise<void> => {
-    const { fetch } = mockFetch([jobsRoutes('', [])]);
+    const { fetch } = mockFetch([activityRoute(), jobsRoutes('', [])]);
     renderWithProviders(<DownloadsPage />, { fetch });
     expect(await screen.findByText('No download jobs')).toBeInTheDocument();
     expect(screen.getByText(/Enqueue chapters from a/)).toBeInTheDocument();
@@ -94,7 +111,7 @@ describe('DownloadsPage', (): void => {
     }
     vi.stubGlobal('WebSocket', NoSocket);
     try {
-      const { fetch } = mockFetch([jobsRoutes('', [jobFixture('j1')])]);
+      const { fetch } = mockFetch([activityRoute(), jobsRoutes('', [jobFixture('j1')])]);
       renderWithProviders(<DownloadsPage />, { fetch });
       expect(await screen.findByText('Fixture Manga — Chapter 1')).toBeInTheDocument();
       expect(attempts.count).toBe(1);

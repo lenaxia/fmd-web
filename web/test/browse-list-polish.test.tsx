@@ -15,7 +15,7 @@
  *   when favorited, POSTs when not.
  */
 import { describe, expect, it, beforeEach } from 'vitest';
-import { screen, within, cleanup } from '@testing-library/react';
+import { act, screen, within, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowsePage } from '../src/pages/BrowsePage';
 import { AllSitesSearchPage } from '../src/pages/AllSitesSearchPage';
@@ -41,8 +41,36 @@ globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserv
 
 const OLD_JDN = todayJdn() - 400;
 
+/**
+ * Hover affordances schedule radix timers (HoverCard openDelay 200 /
+ * closeDelay 100, Tooltip delayDuration 0) whose callbacks setState
+ * after the assertions finish. Under full-suite load those timers can
+ * outlive the file's jsdom environment (post-teardown
+ * `window is not defined` unhandled error). Close whatever overlay is
+ * open (a MODAL dropdown sets `pointer-events: none` on body — an
+ * unhover through it throws), unhover, and drain the timers BEFORE
+ * the test ends so no radix timer crosses the teardown boundary.
+ * Every call site settles as its LAST act, so the Escape is inert to
+ * assertions (it only closes the affordance under test).
+ */
+async function settleHoverTimers(): Promise<void> {
+  await userEvent.keyboard('{Escape}');
+  // A still-open modal layer keeps `pointer-events: none` on body
+  // (Radix restores it only in its close effect, which races the
+  // teardown this helper exists to protect). The settle's job is to
+  // drain radix timers, not to assert interactivity — lift the guard
+  // so the unhover can run, then drain everything.
+  document.body.style.pointerEvents = '';
+  await userEvent.unhover(document.body);
+  await act(async (): Promise<void> => {
+    await new Promise((resolve): void => {
+      setTimeout(resolve, 350);
+    });
+  });
+}
+
 /** The accent-matrix quartet: new / completed / both / none. */
-function matrixEntries(): Parameters<typeof entryFixture>[0][] {
+function matrixEntries(): ReturnType<typeof entryFixture>[] {
   return [
     entryFixture('https://ex.org/new-ongoing', 'New Ongoing', {
       jdn: todayJdn(),
@@ -65,7 +93,7 @@ interface Harness {
   readonly favoritePosts: unknown[];
 }
 
-function buildRoutes(entries: Parameters<typeof entryFixture>[0][], opts: { favorites?: unknown[] } = {}): {
+function buildRoutes(entries: ReturnType<typeof entryFixture>[], opts: { favorites?: unknown[] } = {}): {
   routes: MockRoute[];
   harness: Omit<Harness, 'requests'>;
 } {
@@ -128,7 +156,7 @@ function buildRoutes(entries: Parameters<typeof entryFixture>[0][], opts: { favo
   return { routes, harness: { favoritesRows, batchCalls, favoritePosts } };
 }
 
-async function renderBrowse(entries: Parameters<typeof entryFixture>[0][], opts: { favorites?: unknown[]; hash?: string } = {}): Promise<Harness> {
+async function renderBrowse(entries: ReturnType<typeof entryFixture>[], opts: { favorites?: unknown[]; hash?: string } = {}): Promise<Harness> {
   const { routes, harness } = buildRoutes(entries, { ...(opts.favorites !== undefined ? { favorites: opts.favorites } : {}) });
   const { fetch, requests } = mockFetch(routes);
   const hash = opts.hash ?? `#/browse?site=${MODULE_ID}`;
@@ -173,6 +201,8 @@ describe('EntryMetadataPopover (vtMangaListGetHint parity)', (): void => {
     // catalog data only (the /api/info mock route also THROWS, so any
     // live fetch would fail this test loudly).
     expect(harness.requests.filter((r): boolean => r.path.includes('/api/info'))).toEqual([]);
+
+    await settleHoverTimers();
   });
 
   it('omits empty fields (pas:5172-5226 — only non-empty sections render)', async (): Promise<void> => {
@@ -183,6 +213,8 @@ describe('EntryMetadataPopover (vtMangaListGetHint parity)', (): void => {
     expect(within(popover).queryByText('Artists')).not.toBeInTheDocument();
     expect(within(popover).queryByText('Summary')).not.toBeInTheDocument();
     expect(within(popover).getByText('Completed')).toBeInTheDocument(); // status still shows
+
+    await settleHoverTimers();
   });
 
   it('leads with the Website line in all-sites union mode (pas:5166-5170)', async (): Promise<void> => {
@@ -216,6 +248,8 @@ describe('EntryMetadataPopover (vtMangaListGetHint parity)', (): void => {
     // siteName renders inside it, scoped away from the row's badge.
     expect(within(popover).getByText('Website')).toBeInTheDocument();
     expect(within(popover).getByText('FixtureSite')).toBeInTheDocument();
+
+    await settleHoverTimers();
   });
 });
 
@@ -346,6 +380,8 @@ describe('EntryRowMenu (pmMangaList parity)', (): void => {
     await userEvent.hover(item);
     expect(await screen.findByText('Already in favorites')).toBeInTheDocument();
     expect(harness.favoritePosts).toHaveLength(0);
+
+    await settleHoverTimers();
   });
 
   it('Add to favorites POSTs when not favorited', async (): Promise<void> => {

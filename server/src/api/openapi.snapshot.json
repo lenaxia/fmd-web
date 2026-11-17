@@ -2973,7 +2973,7 @@
       "get": {
         "operationId": "listJobs",
         "summary": "Job list with filters + keyset cursor (Downloads parity)",
-        "description": "Newest-first page (`limit` ≤ 100). `cursor` is the keyset boundary (the last job id of the previous page) — stable under concurrent inserts: newly created jobs never shift pages. Downloads parity filters (FMD2 tsDownload filter tree + search box, web-adapted): `states` (csv multi-select of the §7.1 states), `q` (case-insensitive substring over the job's mangaTitle/chapterName) and `addedFrom`/`addedTo` (inclusive created-at calendar days, UTC — the client maps FMD2's History windows Today/7d/Month/Older and custom From/To into this range). `state` (single) predates the multi-select and stays for back-compat.",
+        "description": "Newest-first page (`limit` ≤ 100). `cursor` is the keyset boundary (the last job id of the previous page) — stable under concurrent inserts: newly created jobs never shift pages. Downloads parity filters (FMD2 tsDownload filter tree + search box, web-adapted): `states` (csv multi-select of the §7.1 states), `q` (case-insensitive substring over the job's mangaTitle/chapterName) and `addedFrom`/`addedTo` (inclusive created-at calendar days, UTC — the client maps FMD2's History windows Today/7d/Month/Older and custom From/To into this range). `state` (single) predates the multi-select and stays for back-compat. R5 arrival adds `since` (ISO 8601 UTC timestamp): a floor on the row's LAST TRANSITION (`updatedAt`) — combined with `state=done` it selects chapters FINISHED since the timestamp, the 'While you were away' summary's download-news source.",
         "tags": [
           "jobs"
         ],
@@ -3080,6 +3080,17 @@
             "schema": {
               "type": "string",
               "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
               "description": "string-coerced on the wire"
             }
           },
@@ -3919,7 +3930,7 @@
       "get": {
         "operationId": "listFavorites",
         "summary": "Favorites listing (§7.2 DoCheck engine)",
-        "description": "One row per favorite (`id` = LowerCase(ModuleID+Link)): `currentChapter`/`status` from the last successful check (immediate update parity), `newChapterCount` for the UI badge, and the auto-download flag gating pipeline enqueues.",
+        "description": "One row per favorite (`id` = LowerCase(ModuleID+Link)): `currentChapter`/`status` from the last successful check (immediate update parity), `newChapterCount` for the UI badge, and the auto-download flag gating pipeline enqueues. R5 arrival (additive): `?since=<ISO 8601 UTC>` switches each row's `newsSince` flag on — true when a check ran at/after `since` AND found new chapters (`lastCheck >= since && newChapterCount > 0`) — the favorites half of the 'While you were away' summary. Without the param the flag is omitted (pre-R5 shape).",
         "tags": [
           "favorites"
         ],
@@ -3966,7 +3977,20 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$",
+              "description": "string-coerced on the wire"
+            }
+          }
+        ]
       },
       "post": {
         "operationId": "createFavorite",
@@ -5951,6 +5975,9 @@
                 "type": "null"
               }
             ]
+          },
+          "newsSince": {
+            "type": "boolean"
           }
         },
         "required": [

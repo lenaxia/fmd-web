@@ -6,6 +6,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, type RenderResult } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { JobsActivityProvider } from '../src/state/jobs-activity';
 import { ApiClientProvider } from '../src/api/context';
 import type { ApiClient } from '../src/api/client';
 import { createApiClient } from '../src/api/client';
@@ -22,6 +23,68 @@ if (typeof globalThis.ResizeObserver !== 'function') {
     disconnect(): void {}
   }
   globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
+}
+
+// jsdom (this suite's environment) ships no matchMedia at all — the
+// app's responsive signals (R3) would never settle. Unit tests
+// exercise the DESKTOP surface by default: `(hover: hover)` matches
+// (the HoverCard popover paths keep their pre-mobile semantics under
+// test) and narrow/portrait queries do not. Touch-branch suites
+// override per-suite via stubTouchMedia (the inverse).
+class FakeMediaQueryList implements MediaQueryList {
+  readonly media: string;
+  readonly onchange: ((this: MediaQueryList, ev: MediaQueryListEvent) => unknown) | null = null;
+  private readonly listeners = new Set<EventListener>();
+  constructor(media: string, private readonly matchesNow: boolean) {
+    this.media = media;
+  }
+  get matches(): boolean {
+    return this.matchesNow;
+  }
+  addEventListener(_type: string, listener: EventListener): void {
+    this.listeners.add(listener);
+  }
+  removeEventListener(_type: string, listener: EventListener): void {
+    this.listeners.delete(listener);
+  }
+  addListener(listener: (ev: MediaQueryListEvent) => void): void {
+    this.listeners.add(listener as EventListener);
+  }
+  removeListener(listener: (ev: MediaQueryListEvent) => void): void {
+    this.listeners.delete(listener as EventListener);
+  }
+  dispatchEvent(): boolean {
+    return true;
+  }
+}
+
+/** The desktop-answer table: hover-capable pointer, wide viewport. */
+function desktopMatches(query: string): boolean {
+  return query === '(hover: hover)';
+}
+
+if (typeof globalThis.matchMedia !== 'function') {
+  globalThis.matchMedia = (query: string): MediaQueryList => new FakeMediaQueryList(query, desktopMatches(query));
+}
+
+const nativeMatchMedia: (query: string) => MediaQueryList = globalThis.matchMedia.bind(globalThis);
+if (nativeMatchMedia('(hover: hover)').matches !== true) {
+  // A native matchMedia exists but answers false to everything (bare
+  // jsdom) — force the desktop answers through the same fake.
+  globalThis.matchMedia = (query: string): MediaQueryList => new FakeMediaQueryList(query, desktopMatches(query));
+}
+
+/** Per-suite inverse stub: force the TOUCH (no-hover) narrow surface. */
+export function stubTouchMedia(): void {
+  globalThis.matchMedia = (query: string): MediaQueryList => {
+    const matches =
+      query === '(hover: none)' || query === '(max-width: 767px)'
+        ? true
+        : query === '(hover: hover)'
+          ? false
+          : desktopMatches(query);
+    return new FakeMediaQueryList(query, matches);
+  };
 }
 
 export interface RecordedRequest {
@@ -88,7 +151,11 @@ export function renderWithProviders(
   });
   const view = render(
     <QueryClientProvider client={queryClient}>
-      <ApiClientProvider client={client}>{ui}</ApiClientProvider>
+      <ApiClientProvider client={client}>
+        {/* R5 arrival: the app shell mounts the jobs feed provider — jsdom
+            renders get the SAME shell shape (DownloadsPage consumes it). */}
+        <JobsActivityProvider>{ui}</JobsActivityProvider>
+      </ApiClientProvider>
     </QueryClientProvider>,
   );
   return { ...view, client };
@@ -102,3 +169,27 @@ export function autoCleanup(): void {
     globalThis.location.hash = '';
   });
 }
+
+/**
+ * [parity-sweep] The canonical FULL /api/settings body every settings
+ * test spreads (proxy/output/favorites/performance/retention/
+ * filenamePolicy/diagnostics/browser) — the wire shape the
+ * regenerated client types demand.
+ */
+export const FULL_SETTINGS = {
+  proxy: { type: '', host: '', port: '', user: '', pass: '' },
+  output: {
+    format: 'zip',
+    chapterNameTemplate: '',
+    unicodeReplacement: false,
+    unicodeReplacementChar: '_',
+    digitPadding: 0,
+    removeMangaName: false,
+  },
+  favorites: { intervalMinutes: 60, checkAtStartup: true },
+  performance: { requestTimeoutSeconds: 15, retryCount: 2, parallelChapters: 1, threadsPerChapter: 1 },
+  retention: { days: 30 },
+  filenamePolicy: { normalizePaths: false },
+  diagnostics: { logEnabled: true, logLevel: 'info' },
+  browser: { enabled: false, url: '' },
+} as const;

@@ -35,6 +35,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { cn } from 'cn';
 import { navigate, type Route } from '../router';
+import { pushRecentManga } from '../state/recents';
 
 export function MangaPage(props: { route: Route }): ReactElement {
   const moduleId = props.route.query['module'] ?? '';
@@ -49,6 +50,21 @@ export function MangaPage(props: { route: Route }): ReactElement {
   const [view, setView] = useState<ChapterViewOptions>(DEFAULT_CHAPTER_VIEW_OPTIONS);
   const [extras, setExtras] = useState<EnqueueExtras>({ paused: false, saveTo: '' });
   const createJob = useCreateDownloadJob();
+
+  // Recents plumbing (search home + command palette): every opened
+  // manga feeds the shared recent-manga store — the deep-link params
+  // EXACTLY as this page received them, so a palette re-open replays
+  // the same route. Re-opens move to the front (deduped, capped).
+  useEffect((): void => {
+    if (moduleId !== '' && url !== '' && title !== '') {
+      pushRecentManga({
+        moduleId,
+        url,
+        title,
+        ...(catalogId !== '' ? { catalogId } : {}),
+      });
+    }
+  }, [moduleId, url, title, catalogId]);
 
   // Per-manga save-to recall (FMD2 persists the override per favorite).
   useEffect((): void => {
@@ -164,7 +180,7 @@ export function MangaPage(props: { route: Route }): ReactElement {
                       href={info.data.url}
                       target="_blank"
                       rel="noopener"
-                      className="inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-sm font-medium transition-colors hover:bg-surface-hover"
+                      className="inline-flex h-8 max-md:min-h-touch-target items-center gap-1.5 rounded-md border px-3 text-sm font-medium transition-colors hover:bg-surface-hover"
                     >
                       <ExternalLink aria-hidden="true" className="size-4" />
                       Read online

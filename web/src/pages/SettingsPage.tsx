@@ -29,6 +29,7 @@ import {
   type ProxySettingsT,
 } from '../api/hooks';
 import { AccountsSection } from '../components/AccountsSection';
+import { ApiTokenSection } from '../components/ApiTokenSection';
 import { CapabilityBadges } from '../components/CapabilityBadges';
 import { ModuleListSearch, GlobalBulkControls, CategoryBulkControls } from '../components/ModuleListControls';
 import { OutputDefaultsForm } from '../components/OutputDefaultsForm';
@@ -490,6 +491,9 @@ export function SettingsPage(): ReactElement {
       ) : null}
 
       <ProxySettingsSection />
+
+      {/* R4 single app-wide API token (Settings → API) */}
+      <ApiTokenSection />
 
       {/* [parity-sweep] audit M2/M4/M10/M12/M13 groups */}
       <PerformanceSection />

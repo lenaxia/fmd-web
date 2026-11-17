@@ -21,7 +21,7 @@
  * themes) — no FMD2 hex colors are copied; the PALETTE maps, the TOKEN
  * paints.
  */
-import type { JobStateT, JobT } from '../api/hooks';
+import type { JobT } from '../api/hooks';
 
 /** The FMD2 status palette, web-named. */
 export type JobStatusKind =

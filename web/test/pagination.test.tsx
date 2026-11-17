@@ -21,6 +21,16 @@ const modulesRoute: MockRoute = {
   respond: (): { body: object } => ({ body: { modules: [], count: 0 } }),
 };
 
+/**
+ * R5 arrival: renderWithProviders mounts the app shell's
+ * JobsActivityProvider, whose activity query fires one
+ * /api/jobs?…states=queued,running request per render. These
+ * assertions cover PAGE-level fetching — the shell feed is not the
+ * page under test, so it is filtered out of the exact lists.
+ */
+const pageRequests = (requests: readonly { method: string; path: string }[]): { method: string; path: string }[] =>
+  requests.filter((r): boolean => !r.path.startsWith('/api/jobs?'));
+
 function latestRoute(page: number, bodies: { status?: number; body: object }): MockRoute {
   return {
     method: 'GET',
@@ -105,9 +115,25 @@ describe('BrowsePage pagination', (): void => {
     ]);
   });
 
-  it('bare browse renders the site picker (hex-ID empty state deleted with CatalogIdForm)', async (): Promise<void> => {
+  it('bare browse renders the SEARCH home; ?sites=1 renders the site picker (search-first IA)', async (): Promise<void> => {
+    // The default #/browse is the search-first home (R5): union search
+    // over every installed catalog — NOT the picker.
+    const { fetch: homeFetch, requests: homeRequests } = mockFetch([modulesRoute]);
+    renderWithProviders(<BrowsePage route={parseHash('#/browse')} />, {
+      fetch: homeFetch,
+      hash: '#/browse',
+    });
+    expect(await screen.findByLabelText('Search all sites')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Browse sites/ })).toBeInTheDocument();
+    expect(pageRequests(homeRequests).map((r): string => r.path)).toEqual(['/api/modules']);
+  });
+
+  it('?sites=1 renders the site picker (hex-ID empty state deleted with CatalogIdForm)', async (): Promise<void> => {
     const { fetch, requests } = mockFetch([modulesRoute]);
-    renderWithProviders(<BrowsePage route={parseHash('#/browse')} />, { fetch, hash: '#/browse' });
+    renderWithProviders(<BrowsePage route={parseHash('#/browse?sites=1')} />, {
+      fetch,
+      hash: '#/browse?sites=1',
+    });
     expect(await screen.findByText('Browse sites')).toBeInTheDocument();
     expect(screen.getByLabelText('Search sites')).toBeInTheDocument();
     // The hex-ID form contract is gone: no catalog-id input; the only
@@ -116,9 +142,11 @@ describe('BrowsePage pagination', (): void => {
     expect(screen.queryByLabelText('Catalog id')).toBeNull();
     const openButtons = screen.getAllByRole('button', { name: 'Open' });
     expect(openButtons).toHaveLength(1);
-    expect(openButtons[0].closest('[data-testid="open-by-url"]')).not.toBeNull();
+    const openButton: HTMLElement | undefined = openButtons.at(0);
+    expect(openButton).toBeDefined();
+    expect(openButton?.closest('[data-testid="open-by-url"]')).not.toBeNull();
     // The picker fetches the module registry (not catalog entries).
-    expect(requests.map((r): string => r.path)).toEqual(['/api/modules']);
+    expect(pageRequests(requests).map((r): string => r.path)).toEqual(['/api/modules']);
   });
 
   it('badges the serving channel: muted source badge when the page came from the site', async (): Promise<void> => {

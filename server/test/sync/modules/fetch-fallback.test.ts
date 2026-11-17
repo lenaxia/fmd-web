@@ -14,6 +14,7 @@ import {
   type ModuleSyncConfig,
   type ModuleSyncResult,
 } from '../../../src/index.js';
+import { createLuaHostFactory } from '../../../src/engine/lua/host.js';
 import {
   buildFixtureZipball,
   fixtureTreeV1,
@@ -148,7 +149,7 @@ describe('module-archive fetch chain — zipball → tarball fallback (canned up
     mock.setZipball(500);
     mock.setTarball(200, buildTarGz(`dazedcat19-FMD2-${FIXTURE_SHA.slice(0, 7)}`, fixtureTreeV1()));
 
-    const result: ModuleSyncResult = await createModuleSyncService(makeConfig()).sync();
+    const result: ModuleSyncResult = await createModuleSyncService(makeConfig(), { hostFactory: createLuaHostFactory() }).sync();
 
     expect(result.report.modules).toBe(4);
     expect(result.report.failures).toEqual([]);
@@ -164,7 +165,7 @@ describe('module-archive fetch chain — zipball → tarball fallback (canned up
     mock.setZipball(500);
     mock.setTarball(503);
 
-    const error = await capture(createModuleSyncService(makeConfig()).sync());
+    const error = await capture(createModuleSyncService(makeConfig(), { hostFactory: createLuaHostFactory() }).sync());
     expect(error).toBeInstanceOf(ModuleSyncError);
     expect(error?.reason).toBe('fetch-failed');
     expect(error?.details).toMatchObject({
@@ -182,7 +183,7 @@ describe('module-archive fetch chain — zipball → tarball fallback (canned up
     mock.setZipball(404);
     mock.setTarball(200, buildTarGz(`dazedcat19-FMD2-${FIXTURE_SHA.slice(0, 7)}`, fixtureTreeV1()));
 
-    const error = await capture(createModuleSyncService(makeConfig()).sync());
+    const error = await capture(createModuleSyncService(makeConfig(), { hostFactory: createLuaHostFactory() }).sync());
     expect(error?.reason).toBe('fetch-failed');
     expect(error?.details).toMatchObject({
       fetchKind: 'http-error',
@@ -199,7 +200,7 @@ describe('module-archive fetch chain — zipball → tarball fallback (canned up
     await dead.close();
 
     const config: ModuleSyncConfig = { ...makeConfig(), codeloadBaseUrl: deadUrl, tarballApiBaseUrl: deadUrl };
-    const error = await capture(createModuleSyncService(config).sync());
+    const error = await capture(createModuleSyncService(config, { hostFactory: createLuaHostFactory() }).sync());
     expect(error?.reason).toBe('fetch-failed');
     expect(error?.details).toMatchObject({
       fetchKind: 'unreachable',
@@ -215,7 +216,7 @@ describe('module-archive fetch chain — zipball → tarball fallback (canned up
     mock.setZipball(500);
     mock.setTarball(200, buildTarGz('dazedcat19-FMD2-0000000', fixtureTreeV1()));
 
-    const error = await capture(createModuleSyncService(makeConfig()).sync());
+    const error = await capture(createModuleSyncService(makeConfig(), { hostFactory: createLuaHostFactory() }).sync());
     expect(error?.reason).toBe('sha-mismatch');
     expect(error?.message).toContain('dazedcat19-FMD2-0000000');
   });

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { ModuleSyncService, type SweepResult } from '../../../src/engine/registry/module-sync.js';
 import { scanRequires } from '../../../src/engine/registry/capabilities.js';
+import { createLuaHostFactory } from '../../../src/engine/lua/host.js';
 import { FMD2_LUA_ROOT } from '../../../src/engine/shims/install.js';
 
 /**
@@ -39,7 +40,7 @@ interface RegistrationArtifact {
   };
 }
 
-const sync = new ModuleSyncService({ luaRoot: FMD2_LUA_ROOT });
+const sync = new ModuleSyncService({ luaRoot: FMD2_LUA_ROOT, hostFactory: createLuaHostFactory() });
 let sweep: SweepResult;
 let artifact: RegistrationArtifact;
 

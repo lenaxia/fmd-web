@@ -2,9 +2,9 @@
  * Bootstrap-watch (D20 UI-asserted auto-bootstrap): run IMMEDIATELY
  * after the stack starts, before scripts/e2e.sh waits on /readyz.
  * Asserts, in the browser:
- *   1. the site-first Browse picker renders while the server
- *      bootstraps (the hex-ID empty state was deleted with
- *      CatalogIdForm — bare #/browse is the SitePicker now);
+ *   1. the site-first Browse picker (?sites=1 — the search home is
+ *      the bare #/browse default since the search-first IA) renders
+ *      while the server bootstraps;
  *   2. the bootstrap progress banner appears (server stage surfaced);
  *   3. the banner clears when /readyz flips ready (200).
  */
@@ -14,7 +14,7 @@ async function gotoWithRetry(page: Page, attempts = 60): Promise<void> {
   let last: unknown;
   for (let i = 0; i < attempts; i += 1) {
     try {
-      await page.goto('/', { waitUntil: 'domcontentloaded' });
+      await page.goto('/#/browse?sites=1', { waitUntil: 'domcontentloaded' });
       return;
     } catch (error: unknown) {
       last = error;
@@ -27,8 +27,8 @@ async function gotoWithRetry(page: Page, attempts = 60): Promise<void> {
 test('site picker → bootstrap progress → ready', async ({ page, request }): Promise<void> => {
   await gotoWithRetry(page);
 
-  // The app shell is up; bare #/browse is the site picker (sites by
-  // NAME — the D20 first-run note explains an empty registry).
+  // The app shell is up; #/browse?sites=1 is the site picker (sites
+  // by NAME — the D20 first-run note explains an empty registry).
   await expect(page.getByRole('heading', { name: 'FMD Web' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Browse sites' })).toBeVisible();
   await expect(page.getByLabel('Search sites')).toBeVisible();

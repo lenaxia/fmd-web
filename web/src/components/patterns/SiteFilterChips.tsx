@@ -45,7 +45,7 @@ export function SiteFilterChips(props: {
       <button
         type="button"
         className={cn(
-          'site-chip site-chip-all rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+          'site-chip site-chip-all max-md:min-h-touch-target max-md:min-w-touch-target rounded-full border px-3 py-1 text-xs font-medium transition-colors',
           all
             ? 'border-transparent bg-primary text-primary-foreground'
             : 'border-border text-muted-foreground hover:bg-surface-hover hover:text-foreground',
@@ -63,7 +63,7 @@ export function SiteFilterChips(props: {
             key={facet.category}
             type="button"
             className={cn(
-              'site-chip rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+              'site-chip max-md:min-h-touch-target max-md:min-w-touch-target rounded-full border px-3 py-1 text-xs font-medium transition-colors',
               props.selected.includes(facet.category)
                 ? 'border-transparent bg-primary text-primary-foreground'
                 : 'border-border text-muted-foreground hover:bg-surface-hover hover:text-foreground',

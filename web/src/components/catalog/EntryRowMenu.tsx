@@ -106,8 +106,10 @@ export function EntryRowMenu(props: EntryRowMenuProps): ReactElement {
           <TooltipProvider delayDuration={0}>
             <Tooltip>
               <TooltipTrigger asChild>
-                {/* Span wrapper: disabled menu items swallow pointer events. */}
-                <span className="block" data-testid="menu-add-favorite-wrap">
+                {/* Span wrapper: disabled menu items swallow pointer events.
+                 * Focusable (tabIndex) so the tooltip's FOCUS activation
+                 * path is real — R3a: no hover-only affordance. */}
+                <span className="block" tabIndex={0} data-testid="menu-add-favorite-wrap">
                   <DropdownMenuItem disabled data-testid="menu-add-favorite">
                     <Heart aria-hidden="true" />
                     Add to favorites

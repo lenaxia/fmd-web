@@ -59,7 +59,7 @@ export function EnqueueOptions(props: {
       aria-label="Enqueue options"
       className={cn('flex flex-wrap items-center gap-x-4 gap-y-2', props.className)}
     >
-      <label htmlFor="enqueue-start-paused" className="flex cursor-pointer items-center gap-2 text-sm">
+      <label htmlFor="enqueue-start-paused" className="flex cursor-pointer items-center gap-2 text-sm max-md:min-h-touch-target">
         <input
           id="enqueue-start-paused"
           type="checkbox"
@@ -71,7 +71,7 @@ export function EnqueueOptions(props: {
         />
         Start paused
       </label>
-      <label htmlFor="enqueue-save-to" className="flex items-center gap-2 text-sm">
+      <label htmlFor="enqueue-save-to" className="flex items-center gap-2 text-sm max-md:min-h-touch-target">
         <FolderInput aria-hidden="true" className="size-4 text-muted-foreground" />
         <span className="text-muted-foreground">Save to</span>
         <Input

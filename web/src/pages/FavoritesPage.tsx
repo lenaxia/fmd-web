@@ -163,7 +163,7 @@ function FavoriteListRow(props: {
 
   const actionsCell = (
     <div className="flex shrink-0 items-center gap-2">
-      <label className="favorite-autodownload flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+      <label className="favorite-autodownload flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground max-md:min-h-touch-target max-md:min-w-touch-target max-md:rounded-md max-md:px-1.5">
         <input
           type="checkbox"
           className="size-4 accent-(--primary)"

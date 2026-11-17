@@ -127,7 +127,10 @@ export function installMockApi(page: Page): void {
   });
   // [parity-sweep] Settings groups + About version: the default GETs
   // every Settings section issues (kept deterministic for fixtures).
-  void page.route(API('settings'), (route): void => {
+  // ANCHORED (`settings$`) — an unanchored pattern would also swallow
+  // /api/settings/api-token with this body (no token/mode fields) and
+  // crash ApiTokenSection's mask(); the subpath gets its own route.
+  void page.route(API('settings$'), (route): void => {
     void route.fulfill(
       json({
         proxy: { type: '', host: '', port: '', user: '', pass: '' },
@@ -147,6 +150,11 @@ export function installMockApi(page: Page): void {
         browser: { enabled: false, url: '' },
       }),
     );
+  });
+  // R4 API-token state: the SettingsPage fetches this on every render
+  // (ApiTokenSection). Deterministic "no auth configured" answer.
+  void page.route(API('settings/api-token'), (route): void => {
+    void route.fulfill(json({ token: null, envManaged: false, mode: 'none' }));
   });
   void page.route(/\/healthz$/, (route): void => {
     void route.fulfill(json({ status: 'ok', version: '0.3.0-e2e' }));

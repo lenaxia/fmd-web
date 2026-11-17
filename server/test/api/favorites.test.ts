@@ -97,6 +97,62 @@ describe('GET /api/favorites (+ /:id) — listing', (): void => {
     expect(missing.statusCode).toBe(404);
     expectEnvelope(missing.body, 'not_found');
   });
+
+  // R5 arrival (additive): `?since=` switches the per-row newsSince
+  // flag on — the away-summary favorites half. The in-memory double's
+  // lastCheck is the fixed '2026-01-01T00:00:00Z' stamp, which is all
+  // the truth table needs (the flag compares against it).
+  it('R5 `since` marks rows newsSince only when a check ran at/after it AND found chapters', async (): Promise<void> => {
+    const newsy = buildHarness({
+      favorites: new InMemoryFavoriteService(behavior({ newChapterCount: 3 })),
+    });
+    await newsy.app.inject({
+      method: 'POST',
+      url: '/api/favorites',
+      payload: { moduleId: MODULE_A_ID, url: FAV_URL, title: 'Newsy' },
+    });
+
+    const quiet = buildHarness({
+      favorites: new InMemoryFavoriteService(behavior({ newChapterCount: 0 })),
+    });
+    await quiet.app.inject({
+      method: 'POST',
+      url: '/api/favorites',
+      payload: { moduleId: MODULE_A_ID, url: FAV_URL, title: 'Quiet' },
+    });
+
+    // since BEFORE the check stamp + news → newsSince: true.
+    const before = await newsy.app.inject({
+      method: 'GET',
+      url: '/api/favorites?since=2025-12-31T00%3A00%3A00.000Z',
+    });
+    expect(before.statusCode).toBe(200);
+    const beforeRows = before.json().favorites as Array<Record<string, unknown>>;
+    expect(beforeRows[0]?.['newsSince']).toBe(true);
+
+    // since AFTER the check stamp → the same newsy row is NOT news.
+    const after = await newsy.app.inject({
+      method: 'GET',
+      url: '/api/favorites?since=2026-06-01T00%3A00%3A00.000Z',
+    });
+    expect((after.json().favorites as Array<Record<string, unknown>>)[0]?.['newsSince']).toBeUndefined();
+
+    // a check ran at/after since but found nothing → NOT news.
+    const noNews = await quiet.app.inject({
+      method: 'GET',
+      url: '/api/favorites?since=2025-12-31T00%3A00%3A00.000Z',
+    });
+    expect((noNews.json().favorites as Array<Record<string, unknown>>)[0]?.['newsSince']).toBeUndefined();
+
+    // no since param → the flag is absent everywhere (pre-R5 shape).
+    const plain = await newsy.app.inject({ method: 'GET', url: '/api/favorites' });
+    expect((plain.json().favorites as Array<Record<string, unknown>>)[0]?.['newsSince']).toBeUndefined();
+
+    // malformed since is a typed 400.
+    const bad = await newsy.app.inject({ method: 'GET', url: '/api/favorites?since=yesterday' });
+    expect(bad.statusCode).toBe(400);
+    expectEnvelope(bad.body, 'validation_error');
+  });
 });
 
 describe('PUT /api/favorites/:id — title + auto-download toggle', (): void => {

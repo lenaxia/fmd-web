@@ -18,6 +18,7 @@
 import { useState, type ReactElement, type ReactNode } from 'react';
 import { navigate } from '../../router';
 import { isNewEntry } from '../../state/highlight-new';
+import { useMediaQuery } from '../../state/use-media-query';
 import { EntryRow } from '@/components/patterns/EntryRow';
 import { EntryMetadataPopover } from '@/components/catalog/EntryMetadataPopover';
 import { EntryRowMenu } from '@/components/catalog/EntryRowMenu';
@@ -76,8 +77,14 @@ export function CatalogEntryRow(props: CatalogEntryRowProps): ReactElement {
     { highlightNew: props.highlightNew, ...(props.newDays !== undefined ? { newDays: props.newDays } : {}) },
   );
   // The popover and the row menu are independent affordances — the menu
-  // WINS: while it is open the hover popover is suppressed (two
-  // overlapping overlays would fight for the row).
+  // WINS: while it is open the metadata popover is suppressed (two
+  // overlapping overlays would fight for the row). R3a activation is
+  // pointer-class driven: hover pointers keep the hover popover (row
+  // click navigates, unchanged); touch pointers have no hover — the row
+  // TAP opens the metadata (Radix Popover semantics) and the popover's
+  // own Open button navigates. '(hover: none)' keeps hover-capable as
+  // the stable first-render default (no branch-flip remount).
+  const noHover: boolean = useMediaQuery('(hover: none)');
   const [hoverOpen, setHoverOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const open = (): void => {
@@ -94,9 +101,12 @@ export function CatalogEntryRow(props: CatalogEntryRowProps): ReactElement {
       {...(props.website !== undefined ? { website: props.website } : {})}
       open={hoverOpen && !menuOpen}
       onOpenChange={setHoverOpen}
+      {...(noHover ? { onOpen: open } : {})}
     >
       <EntryRow
-        onClick={open}
+        onClick={noHover ? (): void => {
+          setHoverOpen((previous): boolean => !previous && !menuOpen);
+        } : open}
         buttonClassName={cn(
           'catalog-entry',
           accent === 'new' && 'bg-primary/5',

@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ModuleSyncService } from '../../../src/engine/registry/module-sync.js';
+import { createLuaHostFactory } from '../../../src/engine/lua/host.js';
 import { FMD2_LUA_ROOT } from '../../../src/engine/shims/install.js';
 
 /**
@@ -70,7 +71,7 @@ describe('corrupted-file isolation', () => {
     for (const bad of CORRUPTED_FILES) {
       writeFileSync(join(modulesDir, bad.file), bad.content);
     }
-    sync = new ModuleSyncService({ luaRoot: FMD2_LUA_ROOT, modulesDir });
+    sync = new ModuleSyncService({ luaRoot: FMD2_LUA_ROOT, modulesDir, hostFactory: createLuaHostFactory() });
   });
 
   afterAll(() => {

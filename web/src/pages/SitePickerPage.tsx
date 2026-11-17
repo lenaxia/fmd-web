@@ -138,7 +138,9 @@ export function SitePickerPage(props: {
 
   const onCatsChange = (next: readonly string[]): void => {
     // Discrete facet change → PUSH (back/forward restore the chips).
-    navigate('browse', serializeCats(next));
+    // The picker PRESERVES its own address (`?sites=1`, the site-first
+    // secondary mode) — only the category facet changes in the URL.
+    navigate('browse', { sites: '1', ...serializeCats(next) });
   };
 
   const onSearchSubmit = (event: FormEvent<HTMLFormElement>): void => {

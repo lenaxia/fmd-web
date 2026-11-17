@@ -158,6 +158,69 @@ FMD_WEB_BROWSER_SIDECAR_URL=http://flaresolverr:8191 \
   present only with `--profile browser`, pin, healthcheck) on hosts
   with the docker CLI.
 
+## API token (R4) — lifecycle, env pinning, auth modes
+
+The scriptable API is authenticated by a SINGLE app-wide token
+(Sonarr/Radarr model, docs/UX-PARITY.md R4): one 32-byte-hex value per
+deployment, `Authorization: Bearer <token>` on every `/api` route and
+the `/ws` upgrade (`?token=` query param for browser WS clients).
+Never multiple tokens, lists, per-user or per-scope tokens — a future
+need that sounds like "another token" is a regenerate of the one key.
+
+### Lifecycle
+
+1. **First-run generation** — when a deployment starts with
+   `FMD_WEB_PASSWORD` set, no stored token and no env pin, one is
+   generated (32-byte hex), persisted in the app_settings store
+   (`api.token`) and logged as
+   `auth: api token generated on first run — copy it from Settings → API`.
+   Default no-env deployments (no password, no pin) stay token-less —
+   "both unset → auth off" — so out-of-box no-auth flows (incl. the
+   e2e harness) are untouched.
+2. **Settings → API** — the key is shown masked with a reveal toggle,
+   a copy button and **Regenerate** behind a confirm dialog
+   ("Revokes the current key immediately — update your scripts").
+   The value only ever travels on the credential-gated
+   `GET /api/settings/api-token` (never on `GET /api/settings`).
+3. **Regeneration / immediate revocation** — rotation replaces the ONE
+   value in place; the old key is rejected on its very NEXT request
+   (constant-time compare against the live value). Rotation is
+   audit-logged as a settings change
+   (`{"event":"audit","setting":"api_token","action":"regenerate"}`)
+   — the log never carries the token value. Scripts may rotate the key
+   themselves (the endpoint accepts the current token).
+4. **Env pinning (headless/compose)** — `FMD_WEB_API_TOKEN` (non-empty)
+   OVERRIDES the stored value: **precedence env > settings**. The UI
+   shows "Managed via environment" and hides Regenerate; the
+   regenerate endpoint refuses with `409` (rotate the environment
+   instead — the secret stays out of the settings store).
+
+### Auth-modes matrix
+
+| `FMD_WEB_PASSWORD` | token (effective) | Behavior |
+| --- | --- | --- |
+| set | set | Either credential grants the gated set (state-changing routes, the token-settings read, `/ws`): session cookie or Bearer. Plain reads stay open (pre-login SPA). |
+| unset | set | **API-only mode** — every `/api` route (reads included) and `/ws` require the token. The SPA cannot authenticate (no login exists) — scripts are the interface. |
+| set | unset | Today's cookie flow unchanged: login mints the session, writes gated, reads open. |
+| unset | unset | Auth off — everything open. |
+
+Notes:
+
+- Wrong/missing token when required → `401` typed envelope;
+  comparison is constant-time (SHA-256 fingerprints).
+- Token-authenticated requests bypass the login rate limit (10/min).
+- `/healthz` + `/readyz` are never gated (Docker healthchecks).
+- The startup log states the active auth modes (never the value):
+  `fmd: auth: api-token (password off, api token on, env-pinned)`.
+- Metrics: `fmd_http_requests_total{auth="none|cookie|token",…}`.
+- Entering API-only mode WITHOUT an env pin: run once with a password
+  (a token is auto-generated), copy it, then drop the password — the
+  stored token keeps the API token-only. The regenerate endpoint
+  refuses when no auth is configured at all (no silent mode flip).
+
+Key-rotation walk-through (executed): docs/API.md § *Key-rotation
+runbook* and docs/evidence-api-scripting.md § 14.
+
 ## Proxy settings (§9/§10, SetProxy parity)
 
 Settings → Proxy (and `GET/PUT /api/settings`, `PUT
@@ -267,6 +330,8 @@ A green run leaves no trace artifacts (retained on failure only).
   stage skips when its artifact is installed, so restarts resume.
   Three start-order retries cover compose service races.
 - Env surface: `FMD_WEB_DATA_DIR` (data root), `PORT`,
+  `FMD_WEB_PASSWORD` / `FMD_WEB_API_TOKEN` (auth — § *API token (R4)*
+  below), `FMD_WEB_SECRET` (account sealing),
   `FMD2_REPO` / `FMD2_LUA_SHA` / `FMD2_CODELOAD_URL` (module pin, D9),
   `FMD_DB_URL` / `FMD_DB_API_BASE` (catalog upstream override),
   `FMD_BOOTSTRAP_CATALOGS`, `FMD_BOOTSTRAP_DISABLE` (D20 disable,

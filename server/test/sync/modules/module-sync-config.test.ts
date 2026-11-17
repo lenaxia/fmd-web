@@ -13,6 +13,7 @@ import {
   createModuleSyncService,
   type ModuleSyncConfig,
 } from '../../../src/index.js';
+import { createLuaHostFactory } from '../../../src/engine/lua/host.js';
 
 /**
  * Config defaults + the D9 posture: auto-bump is DISABLED by default and
@@ -57,9 +58,9 @@ describe('module sync config (D9 upstream trust)', (): void => {
   });
 
   it('refuses a constructed autoBump=true config at service creation', (): void => {
-    expect(() => createModuleSyncService(baseConfig({ autoBump: true }))).toThrow(ModuleSyncConfigError);
-    expect(() => createModuleSyncService(baseConfig({ autoBump: true }))).toThrow(/auto-bump/);
-    expect(() => createModuleSyncService(baseConfig({ autoBump: false }))).not.toThrow();
+    expect(() => createModuleSyncService(baseConfig({ autoBump: true }), { hostFactory: createLuaHostFactory() })).toThrow(ModuleSyncConfigError);
+    expect(() => createModuleSyncService(baseConfig({ autoBump: true }), { hostFactory: createLuaHostFactory() })).toThrow(/auto-bump/);
+    expect(() => createModuleSyncService(baseConfig({ autoBump: false }), { hostFactory: createLuaHostFactory() })).not.toThrow();
   });
 
   it('reads env overrides: repo, pin SHA, codeload base, tarball base, data dir, FMD_LUA_DIR', (): void => {

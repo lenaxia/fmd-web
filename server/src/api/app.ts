@@ -79,6 +79,7 @@ import {
   FavoriteCreateRequestSchema,
   FavoriteIdSchema,
   FavoriteImportRequestSchema,
+  FavoriteListQuerySchema,
   FavoriteListResponseSchema,
   FavoriteResponseSchema,
   FavoriteSchedulerSettingsUpdateRequestSchema,
@@ -965,6 +966,7 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
       ...(query.q !== undefined ? { q: query.q } : {}),
       ...(query.addedFrom !== undefined ? { addedFrom: query.addedFrom } : {}),
       ...(query.addedTo !== undefined ? { addedTo: query.addedTo } : {}),
+      ...(query.since !== undefined ? { since: query.since } : {}),
       ...(query.cursor !== undefined ? { cursor: query.cursor } : {}),
       limit: query.limit,
     });
@@ -1068,8 +1070,24 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
   });
 
   // ── favorites (§7.2 DoCheck engine + scheduler) ───────────────────
-  app.get('/api/favorites', async (): Promise<FavoriteListResponseT> => {
-    const favorites: FavoriteT[] = services.favorites.list();
+  // R5 arrival (additive): `?since=<ISO>` switches each row's additive
+  // `newsSince` flag on — "a check ran at/after `since` and found new
+  // chapters" — the favorites half of the away summary. Without the
+  // param the rows are exactly the pre-R5 shape (flag omitted).
+  app.get('/api/favorites', async (req): Promise<FavoriteListResponseT> => {
+    const query = parseOr400(FavoriteListQuerySchema, req.query, 'favorites query');
+    const sinceMs = query.since !== undefined ? Date.parse(query.since) : undefined;
+    const favorites: FavoriteT[] = services.favorites.list().map((favorite): FavoriteT => {
+      if (
+        sinceMs === undefined ||
+        favorite.lastCheck === null ||
+        favorite.newChapterCount <= 0 ||
+        Date.parse(favorite.lastCheck) < sinceMs
+      ) {
+        return favorite;
+      }
+      return { ...favorite, newsSince: true };
+    });
     return FavoriteListResponseSchema.parse({ favorites });
   });
 

@@ -195,6 +195,16 @@
   --container-page: 64rem;
   --spacing-row: 2.75rem;
 
+  /* R3 mobile-first touch rhythm: the 44px minimum tappable
+   * (Apple HIG / WCAG 2.5.5) and the bottom tab-bar band it lives in.
+   * Every interactive control resolves to --spacing-touch-target at
+   * <md via `max-md:` utilities (see Button/Input/Select/menu items);
+   * the fixed bottom nav reserves --spacing-bottom-nav plus the
+   * notched-device safe inset for the shell's content padding. */
+  --spacing-touch-target: 2.75rem;
+  --spacing-bottom-nav: 3.5rem;
+  --spacing-safe-bottom: env(safe-area-inset-bottom, 0px);
+
   /* Typography */
   --font-sans:
     system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
@@ -219,6 +229,15 @@
   /* One global, token-driven focus ring (a11y smoke spec exercises it). */
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-ring;
+  }
+  /* R3 bottom-nav occlusion: below md every scrollIntoView (anchor
+   * links, focus, find-in-page, test drivers) must clear the fixed
+   * bottom tab bar + safe inset — scroll-padding reserves that band
+   * on the scroll container itself. */
+  @media (max-width: 767.98px) {
+    html {
+      scroll-padding-bottom: calc(var(--spacing-bottom-nav) + var(--spacing-safe-bottom) + 1rem);
+    }
   }
   code,
   pre,

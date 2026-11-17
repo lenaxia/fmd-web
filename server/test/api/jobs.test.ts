@@ -221,3 +221,64 @@ describe('GET /api/jobs — state filter + keyset cursor', (): void => {
     expectEnvelope(badCursor.body, 'bad_request');
   });
 });
+
+describe('GET /api/jobs — R5 arrival `since` (last-transition floor)', (): void => {
+  it('state=done&since returns only rows FINISHED at/after the timestamp', async (): Promise<void> => {
+    const h = buildHarness();
+    // Two done rows with distinct finished-at stamps + one newer queued
+    // row (its updatedAt is "now" but its state is not done — the
+    // away-summary call composes state=done + since).
+    const ids: string[] = [];
+    for (let i = 1; i <= 3; i += 1) {
+      const created = await h.app.inject({
+        method: 'POST',
+        url: '/api/jobs/download',
+        payload: downloadBody({ chapterLink: `https://ex.org/manga/x/${String(i)}` }),
+      });
+      ids.push((created.json().job as { id: string }).id);
+    }
+    const finishedEarly = '2026-11-17T09:00:00.000Z';
+    const finishedLate = '2026-11-17T10:30:00.000Z';
+    const between = '2026-11-17T10:00:00.000Z';
+    Object.assign(h.jobs.get(ids[0] as string) as object, { state: 'done', updatedAt: finishedEarly });
+    Object.assign(h.jobs.get(ids[1] as string) as object, { state: 'done', updatedAt: finishedLate });
+
+    const news = await h.app.inject({
+      method: 'GET',
+      url: `/api/jobs?state=done&since=${encodeURIComponent(between)}`,
+    });
+    expect(news.statusCode).toBe(200);
+    expect((news.json() as { jobs: Array<{ id: string }> }).jobs.map((j) => j.id)).toEqual([ids[1]]);
+
+    // since BEFORE both finishes → both done rows, newest-first.
+    const all = await h.app.inject({
+      method: 'GET',
+      url: `/api/jobs?state=done&since=${encodeURIComponent('2026-11-17T08:00:00.000Z')}`,
+    });
+    expect((all.json() as { jobs: Array<{ id: string }> }).jobs.map((j) => j.id)).toEqual([ids[1], ids[0]]);
+
+    // since AFTER everything → empty (the 'nothing new' away state).
+    const none = await h.app.inject({
+      method: 'GET',
+      url: `/api/jobs?since=${encodeURIComponent('2026-11-17T23:00:00.000Z')}`,
+    });
+    expect((none.json() as { jobs: unknown[] }).jobs).toEqual([]);
+  });
+
+  it('a malformed since is a typed 400; absence keeps the pre-R5 shape', async (): Promise<void> => {
+    const h = buildHarness();
+    await h.app.inject({ method: 'POST', url: '/api/jobs/download', payload: downloadBody() });
+    const bad = await h.app.inject({ method: 'GET', url: '/api/jobs?since=not-a-timestamp' });
+    expect(bad.statusCode).toBe(400);
+    expectEnvelope(bad.body, 'validation_error');
+
+    // Offset-bearing ISO is rejected (TimestampSchema discipline).
+    const offset = await h.app.inject({ method: 'GET', url: '/api/jobs?since=2026-11-17T10:00:00%2B01:00' });
+    expect(offset.statusCode).toBe(400);
+    expectEnvelope(offset.body, 'validation_error');
+
+    const plain = await h.app.inject({ method: 'GET', url: '/api/jobs' });
+    expect(plain.statusCode).toBe(200);
+    expect((plain.json() as { jobs: unknown[] }).jobs).toHaveLength(1);
+  });
+});

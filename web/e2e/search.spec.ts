@@ -51,12 +51,12 @@ test('as-you-type: results update while typing (debounced, single fetch for the 
   const { searchRequests } = installDynamicSearch(page);
   await page.goto(`/#/browse?site=${CATALOG_ID}`);
 
-  await expect(page.getByRole('button', { name: /Alpha Quest/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Alpha Quest/ })).toBeVisible();
 
   // Type a query that filters to ONE entry — results update while typing.
   await page.getByLabel('Search').pressSequentially('bet', { delay: 60 });
-  await expect(page.getByRole('button', { name: /Beta Trails/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Alpha Quest/ })).toBeHidden();
+  await expect(page.getByRole('button', { name: /^Beta Trails/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Alpha Quest/ })).toBeHidden();
 
   // URL carries q (shareable); the mode label shows the filtered state.
   expect(page.url()).toContain('q=bet');
@@ -77,7 +77,7 @@ test('genre filter: URL updates; back/forward restore the previous state', async
 }): Promise<void> => {
   installDynamicSearch(page);
   await page.goto(`/#/browse?site=${CATALOG_ID}`);
-  await expect(page.getByRole('button', { name: /Alpha Quest/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Alpha Quest/ })).toBeVisible();
   const urlBefore: string = page.url();
 
   // Open the filter panel, check Drama (ALL default) → push + filtered results.
@@ -85,19 +85,19 @@ test('genre filter: URL updates; back/forward restore the previous state', async
   // (click, not check(): the controlled checkbox re-renders through the
   // URL-sync cycle — the URL + results below prove the applied state)
   await page.getByRole('checkbox', { name: 'Drama' }).click();
-  await expect(page.getByRole('button', { name: /Beta Trails/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Alpha Quest/ })).toBeHidden();
+  await expect(page.getByRole('button', { name: /^Beta Trails/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Alpha Quest/ })).toBeHidden();
   expect(page.url()).toContain('genres=Drama');
   expect(page.url()).not.toContain('mode=any'); // ALL default omits mode
 
   // Back → the unfiltered latest view + URL restore.
   await page.goBack();
-  await expect(page.getByRole('button', { name: /Alpha Quest/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Alpha Quest/ })).toBeVisible();
   expect(page.url()).not.toContain('genres=');
   expect(page.url()).toBe(urlBefore);
 
   // Forward → the filtered state returns.
   await page.goForward();
-  await expect(page.getByRole('button', { name: /Beta Trails/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Beta Trails/ })).toBeVisible();
   expect(page.url()).toContain('genres=Drama');
 });

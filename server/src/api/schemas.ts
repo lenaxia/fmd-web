@@ -790,6 +790,11 @@ export type JobBatchCreatedResponseT = z.infer<typeof JobBatchCreatedResponseSch
  * `addedFrom`/`addedTo` bound the created-at window (calendar dates,
  * `addedTo` inclusive of its day — the client computes the FMD2 History
  * windows Today/7d/Month/Older and custom From/To into this range).
+ *
+ * R5 arrival (additive): `since` is an ISO-timestamp floor on the
+ * row's LAST TRANSITION (`updatedAt`) — with `state=done` it selects
+ * chapters FINISHED since the timestamp, the 'While you were away'
+ * summary's download news source. Absent → unfiltered (back-compat).
  */
 export const JobsListQuerySchema = z.object({
   state: JobStateSchema.optional(),
@@ -797,6 +802,7 @@ export const JobsListQuerySchema = z.object({
   q: z.string().min(1).max(200).optional(),
   addedFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD').optional(),
   addedTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD').optional(),
+  since: z.iso.datetime({ offset: false }).optional(),
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
@@ -892,8 +898,26 @@ export const FavoriteSchema = z.object({
   enabled: z.boolean(),
   /** Creation stamp (FMD2 DateAdded). */
   dateAdded: TimestampSchema.nullable(),
+  /**
+   * R5 arrival (additive, list-call only): does this favorite have
+   * news relative to the caller's `since` query param — a check ran at
+   * or after `since` AND found new chapters (`lastCheck >= since &&
+   * newChapterCount > 0`)? Absent (no `since` on the call, or a
+   * single-favorite route) → undefined.
+   */
+  newsSince: z.boolean().optional(),
 });
 export type FavoriteT = z.infer<typeof FavoriteSchema>;
+
+/**
+ * R5 arrival (additive): favorites-list query. `since` (ISO timestamp,
+ * the client's last-visit stamp) switches each row's additive
+ * `newsSince` flag on. No other list behavior changes.
+ */
+export const FavoriteListQuerySchema = z.object({
+  since: z.iso.datetime({ offset: false }).optional(),
+});
+export type FavoriteListQueryT = z.infer<typeof FavoriteListQuerySchema>;
 
 export const FavoriteListResponseSchema = z.object({ favorites: z.array(FavoriteSchema) });
 export type FavoriteListResponseT = z.infer<typeof FavoriteListResponseSchema>;

@@ -172,10 +172,11 @@ describe('All-sites union search UI', () => {
       expect(globalThis.location.hash).toBe('#/browse?allsites=1&q=union');
     });
 
-    // Toggle off → back to the picker (no allsites flag).
+    // Toggle off → back to the picker (no allsites flag; the picker
+    // lives at ?sites=1 since the search-first home took bare browse).
     await user.click(screen.getByRole('checkbox', { name: /All sites/ }));
     await waitFor((): void => {
-      expect(globalThis.location.hash).toBe('#/browse');
+      expect(globalThis.location.hash).toBe('#/browse?sites=1');
     });
     void CATALOG_ID;
   });

@@ -38,6 +38,8 @@ import type { CatalogEntryT, ModuleSummaryT } from '../api/hooks';
 import { useModules, useProvisionCatalog } from '../api/hooks';
 import { SitePickerPage } from './SitePickerPage';
 import { AllSitesSearchPage } from './AllSitesSearchPage';
+import { SearchHomePage } from './SearchHomePage';
+import { pushRecentSite } from '../state/recents';
 import { EmptyState } from '@/components/patterns/EmptyState';
 import { ErrorBanner } from '@/components/patterns/ErrorBanner';
 import { FilterBar } from '@/components/patterns/FilterBar';
@@ -85,7 +87,13 @@ export function BrowsePage(props: { route: Route }): ReactElement {
   }
   // ?site= is canonical; ?catalog= is kept as a legacy alias (old links).
   const siteId = route.query['site'] ?? route.query['catalog'] ?? '';
-  if (siteId === '') {
+  if (siteId !== '') {
+    return <SiteBrowse siteId={siteId} route={route} />;
+  }
+  // ?sites=1 — the full site picker (site-first SECONDARY mode: one
+  // tap from the search home, and the 'Change site' target — FMD2
+  // refugees keep the combobox-era flow intact).
+  if (route.query['sites'] === '1') {
     return (
       <SitePickerPage
         route={route}
@@ -95,7 +103,9 @@ export function BrowsePage(props: { route: Route }): ReactElement {
       />
     );
   }
-  return <SiteBrowse siteId={siteId} route={route} />;
+  // Default = the SEARCH-FIRST home (R5): union search over every
+  // installed catalog; deep links (?site=/?catalog=) never land here.
+  return <SearchHomePage route={route} />;
 }
 
 /** The resolved terminal state: WS machine first, REST outcome as truth. */
@@ -150,6 +160,17 @@ function SiteBrowse(props: { siteId: string; route: Route }): ReactElement {
   // Directory capability (§5.10): the module can serve its list
   // straight from the site when no prebuilt catalog exists.
   const directoryCapable = module?.capabilities.live_scrape_fallback ?? false;
+
+  // Recents plumbing: every OPENED site (resolved to its name — the
+  // hex id never reaches the UI) feeds the shared recent-sites store
+  // (search home row + command palette). Re-opens move to the front.
+  const resolvedSiteId = module?.id;
+  const resolvedSiteName = module?.name;
+  useEffect((): void => {
+    if (resolvedSiteId !== undefined && resolvedSiteName !== undefined) {
+      pushRecentSite({ id: resolvedSiteId, name: resolvedSiteName });
+    }
+  }, [resolvedSiteId, resolvedSiteName]);
 
   const progress = useSyncCatalogProgress({
     ...(needsProvision ? { jobId: catalogSyncJobId(props.siteId) } : {}),
@@ -258,7 +279,10 @@ function SiteBrowse(props: { siteId: string; route: Route }): ReactElement {
               size="sm"
               className="ml-2 h-7"
               onClick={(): void => {
-                navigate('browse');
+                // Back to the full picker (site-first secondary mode),
+                // not the search home — 'Change site' keeps its FMD2
+                // meaning of swapping to another site.
+                navigate('browse', { sites: '1' });
               }}
             >
               <Undo2 aria-hidden="true" />

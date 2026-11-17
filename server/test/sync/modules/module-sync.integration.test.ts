@@ -15,6 +15,7 @@ import {
   type ModuleSyncConfig,
   type ModuleSyncResult,
 } from '../../../src/index.js';
+import { createLuaHostFactory } from '../../../src/engine/lua/host.js';
 import {
   buildFixtureZipball,
   FIXTURE_IDS,
@@ -121,7 +122,10 @@ describe('ModuleSyncService — fixture zipball integration (loopback, offline)'
   });
 
   function syncNow(overrides: Partial<ModuleSyncConfig> = {}): Promise<ModuleSyncResult> {
-    return createModuleSyncService(makeConfig(overrides), { now: () => NOW_ISO }).sync();
+    return createModuleSyncService(makeConfig(overrides), {
+      now: () => NOW_ISO,
+      hostFactory: createLuaHostFactory(),
+    }).sync();
   }
 
   function serveV1(): void {
@@ -453,6 +457,7 @@ describe('ModuleSyncService — fixture zipball integration (loopback, offline)'
         const service = createModuleSyncService(makeConfig({ luaDirOverride: localTree }), {
           fetcher,
           now: () => NOW_ISO,
+          hostFactory: createLuaHostFactory(),
         });
 
         const result = await service.sync();

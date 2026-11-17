@@ -38,25 +38,25 @@ const TOKEN_CLASSES: Record<JobStatus['token'], string> = {
   cancelled: 'bg-state-cancelled text-state-cancelled-foreground',
 };
 
-/** Bar-fill color per status kind (FMD2 colors the embedded bar, pas:4516). */
+/** Bar-fill color per status kind (FMD2 colors the embedded bar, pas:4516) — full literal classes so the Tailwind scanner sees them. */
 const BAR_FILL: Record<JobStatus['kind'], string> = {
-  waiting: 'bg-state-queued',
-  preparing: 'bg-state-running',
-  downloading: 'bg-state-running',
-  compressing: 'bg-state-running',
-  converting: 'bg-state-running',
-  finishing: 'bg-state-done',
-  finished: 'bg-state-done',
-  stopped: 'bg-state-cancelled',
-  problem: 'bg-state-retry',
-  failed: 'bg-state-failed',
+  waiting: '[&>[data-slot=progress-indicator]]:bg-state-queued',
+  preparing: '[&>[data-slot=progress-indicator]]:bg-state-running',
+  downloading: '[&>[data-slot=progress-indicator]]:bg-state-running',
+  compressing: '[&>[data-slot=progress-indicator]]:bg-state-running',
+  converting: '[&>[data-slot=progress-indicator]]:bg-state-running',
+  finishing: '[&>[data-slot=progress-indicator]]:bg-state-done',
+  finished: '[&>[data-slot=progress-indicator]]:bg-state-done',
+  stopped: '[&>[data-slot=progress-indicator]]:bg-state-cancelled',
+  problem: '[&>[data-slot=progress-indicator]]:bg-state-retry',
+  failed: '[&>[data-slot=progress-indicator]]:bg-state-failed',
 };
 
-export function StatusBadge(props: { status: JobStatus }): ReactElement {
+export function StatusBadge(props: { status: JobStatus; readonly className?: string }): ReactElement {
   return (
     <Badge
       variant="secondary"
-      className={cn('badge', `job-${props.status.kind}`, TOKEN_CLASSES[props.status.token])}
+      className={cn('badge max-md:order-2', `job-${props.status.kind}`, TOKEN_CLASSES[props.status.token], props.className)}
       data-status={props.status.kind}
     >
       {props.status.label}
@@ -121,24 +121,29 @@ export function JobRow(props: {
               : undefined;
 
   return (
+    // R3 responsive data row: >=md the flat wrapped line (badge · id ·
+    // title · progress · error · actions — byte-identical to the
+    // pre-mobile layout); <md it collapses to title + secondary-line
+    // meta via order utilities (line 1: title + actions; line 2:
+    // badge + progress + error) with the id chip hidden.
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
       <StatusBadge status={status} />
-      <code className="rounded bg-surface px-1 py-0.5 font-mono text-xs">{job.id.slice(0, 8)}</code>
-      <span className="job-title min-w-0 flex-1 truncate font-medium">
+      <code className="rounded bg-surface px-1 py-0.5 font-mono text-xs max-md:hidden">{job.id.slice(0, 8)}</code>
+      <span className="job-title min-w-0 flex-1 truncate font-medium max-md:order-1">
         {job.payload['mangaTitle'] !== undefined ? String(job.payload['mangaTitle']) : job.moduleId}
         {job.payload['chapterName'] !== undefined ? ` — ${String(job.payload['chapterName'])}` : ''}
       </span>
 
       {progress !== undefined && progress.total > 0 ? (
         <span
-          className="job-progress flex w-40 shrink-0 flex-col gap-1"
+          className="job-progress flex w-40 shrink-0 flex-col gap-1 max-md:order-3 max-md:w-full"
           data-done={progress.done}
           data-total={progress.total}
         >
           <Progress
             value={percent}
             aria-label={`Progress ${String(percent)}%`}
-            className="job-progress-bar h-2 [&>[data-slot=progress-indicator]]:[--tw-bg-opacity:1]"
+            className={cn('job-progress-bar h-2', BAR_FILL[status.kind])}
           />
           <span className="flex items-center justify-between font-mono text-xs text-muted-foreground">
             <span data-testid="job-progress-count">
@@ -152,7 +157,7 @@ export function JobRow(props: {
       ) : null}
 
       {job.error !== undefined ? (
-        <span className="job-error max-w-60 truncate text-xs text-destructive" title={job.error}>
+        <span className="job-error max-w-60 truncate text-xs text-destructive max-md:order-4 max-md:max-w-full" title={job.error}>
           error: {job.error}
         </span>
       ) : null}
@@ -162,7 +167,7 @@ export function JobRow(props: {
           type="button"
           variant="outline"
           size="sm"
-          className="job-primary h-7"
+          className="job-primary h-7 max-md:order-1"
           aria-label={`${primary === 'pause' ? 'Pause' : primary === 'resume' ? 'Resume' : primary === 'retry' ? 'Retry' : 'Redownload'} job ${job.id}`}
           disabled={props.actionPending}
           onClick={(): void => {
@@ -180,7 +185,7 @@ export function JobRow(props: {
             type="button"
             variant="ghost"
             size="icon"
-            className="job-menu h-7 w-7"
+            className="job-menu h-7 w-7 max-md:order-1"
             aria-label={`Actions for job ${job.id}`}
             disabled={props.deletePending}
           >

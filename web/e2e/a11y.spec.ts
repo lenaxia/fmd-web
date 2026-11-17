@@ -46,7 +46,7 @@ async function tabUntil(page: Page, target: 'browse-search' | 'toggle-theme' | '
 
 test('Tab cycles the shell nav (brand → five tabs in order → theme toggle)', async ({ page }: { page: Page }): Promise<void> => {
   await page.goto(`/#/browse?catalog=${CATALOG_ID}`);
-  await expect(page.getByRole('button', { name: /Alpha Quest/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Alpha Quest/ })).toBeVisible();
 
   const seen: (string | null)[] = [];
   const steps = 9; // brand + 5 nav links + theme toggle + first content stops
@@ -77,7 +77,7 @@ test('Tab cycles the shell nav (brand → five tabs in order → theme toggle)',
 
 test('Full Browse interaction without a mouse: search → submit → open entry', async ({ page }: { page: Page }): Promise<void> => {
   await page.goto(`/#/browse?catalog=${CATALOG_ID}`);
-  await expect(page.getByRole('button', { name: /Alpha Quest/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Alpha Quest/ })).toBeVisible();
 
   // Keyboard-only: Tab into the search field, type, submit via Enter.
   const reachedInput = await tabUntil(page, 'browse-search');
@@ -86,7 +86,7 @@ test('Full Browse interaction without a mouse: search → submit → open entry'
   await page.keyboard.press('Enter');
 
   // Search results render (keyboard-submitted form).
-  await expect(page.getByRole('button', { name: /Alpha Quest/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Alpha Quest/ })).toBeVisible();
 
   // Tab to the first catalog entry and activate it with Enter.
   const reachedEntry = await tabUntil(page, 'catalog-entry');

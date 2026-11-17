@@ -97,7 +97,7 @@ decisions recorded here.
 | Genre tri-state include/exclude | LANDED [parity-sweep]: `!`/`-` exclude prefix works end-to-end (parser → state → genresExclude[] NOT LIKE SQL composing with any/all — the audit (b)2 inverted-include defect is fixed with a regression test); excluded chips render struck-through; URL round-trips both lists. The v0.4 note is now ONLY about the per-genre tri-state checkbox UI (3-state toggle per fixed genre) | [parity-sweep] |
 | Regex title filter | SKIP (FTS supersedes; power path) | note |
 | Downloads task actions / bulk / filters / search / progress bar | PARITY (ADAPT: chips not tree; one job = one chapter) | [downloads-parity] |
-| Downloads drag-reorder | SKIP for v0.3 — server-ordered queue; revisit if priority editing lands | [downloads-parity] note |
+| Downloads drag-reorder (DragDrop/Del/Ctrl-arrows, pas) | INTENTIONALLY-DIFFERENT — SKIP for v0.3: queue priority is SERVER-ordered (claim = `priority DESC, id ASC`), a client-side drag would lie about execution order; the jobs list stays stable-ordered (no jumping) via the existing keyset cursor pagination. Revisit if priority editing lands as an API | [downloads-parity] note |
 | Transfer-rate sparkline | ADAPT deferred (WS rate field shipped; chart v0.4) | [downloads-parity] note |
 | Favorites columns / batch check + scopes / new-chapter batch decision / transfer / import / rename / enable / save-to / download-all | PARITY (ADAPT: sheet not modal) | [favorites-parity] |
 | Accounts UI | PARITY (API exists) | [settings-parity] |
@@ -147,3 +147,36 @@ its landed status (IMPLEMENTED / SPLIT / SKIP-with-reason) — zero
 M2 ✓, M3 SKIP, M4 ✓, M5 ✓, M6 split (✓ + SKIP), M7 SKIP, M8 split (✓ + SKIP),
 M9 SKIP, M10 ✓ (+SKIP caps), M11 v0.4 note, M12 ✓ (+SKIPs), M13 ✓, M14 ✓,
 M15 SKIP, M16 consolidated SKIP. Evidence: docs/evidence-parity-sweep.md.
+
+## Part 5 — R5 web-native arrival (tsk-insular-verdict-ambles)
+
+The R5 ruling makes web-native an design authority: the arrival workflow is
+REDESIGNED, not ported. FMD2 is a desktop app that is always-in-front (its
+queue works only while it runs); fmd-web's queue works while you are GONE —
+so the app's job on your return is to TELL you what happened.
+
+| Surface | Disposition |
+|---|---|
+| 'While you were away' summary | IMPLEMENTED [arrival]: landing view renders a dismissible card when the previous visit (localStorage stamp, rewritten each visit) is >= 1 h stale AND there is news — chapters FINISHED since (GET /api/jobs?state=done&since=… grouped per manga, deep-linked to the manga page) + favorites with checks-since-and-new-chapters (additive `newsSince` on GET /api/favorites?since=…, deep-linked to Favorites). 'Nothing new' renders nothing. Dismissal persists per NEWS BATCH (id = newest item timestamp) — the same batch never nags twice. |
+| Downloads nav activity badge | IMPLEMENTED [arrival]: running+queued count on the Downloads destination — desktop top tabs AND the mobile bottom bar (R3). WS-driven (the ONE app-level /ws feed; a resync/reconnect invalidates the count query — backfill-safe, never polled). Completion while the app is open = sonner toast + a dot that clears when Downloads is visited. |
+| PWA installability | IMPLEMENTED [arrival]: web app manifest (name/short_name, standalone display, theme/background from the design tokens' dark palette #09090b, icons 192/512 any + maskable from the brand book-open-text glyph) linked from the SPA shell; iOS meta (apple-touch-icon, apple-mobile-web-app-*) for the share-sheet path; `beforeinstallprompt` captured so 'Install app' surfaces in Settings -> About AND the command palette — only when the browser actually offers it. |
+| Offline service worker | Documented SKIP — fmd-web is a server-dependent app (search/downloads/library ALL talk to the container); an offline shell would be a lie. The manifest is for INSTALLABILITY (home-screen icon, standalone window), not offline. v0.4 candidate only if a real offline story (library cache for read-later) is ruled in. |
+| Web Push / notification permissions | SKIP — v0.4 candidate pending a push-service decision; the away summary covers the return-visit story without permissions friction. |
+
+Install platform quirks (the reason the surfaces are availability-gated):
+
+- Chrome/Edge desktop + Android: `beforeinstallprompt` fires when the UA's
+  installability criteria pass (manifest + HTTPS + engagement) — our Install
+  actions appear. After a prompt (accept OR dismiss) the browser enters its
+  own re-offer cooldown; the captured event is single-use, so the actions
+  hide again until the next event.
+- iOS Safari (all versions to date): NEVER fires `beforeinstallprompt` —
+  install is Share -> Add to Home Screen. That path is served by the
+  apple-touch-icon + apple-mobile-web-app meta; our Install actions stay
+  hidden (rendering a dead button there would be worse than none).
+- Firefox / Safari desktop: no install prompt event — surfaces hidden.
+
+Icons are generated deterministically from the design tokens
+(`node scripts/gen-pwa-icons.mjs` — Playwright rasterizes the lucide
+book-open-text paths; maskable variants keep the glyph inside the 80 % safe
+zone). Evidence: docs/evidence-arrival-experience.md.

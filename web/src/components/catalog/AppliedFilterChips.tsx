@@ -106,7 +106,7 @@ export function AppliedFilterChips(props: {
           <button
             type="button"
             aria-label={`Remove filter: ${chip.label}`}
-            className="flex size-4 items-center justify-center rounded-full transition-colors hover:bg-surface-hover"
+            className="flex size-4 max-md:size-touch-target max-md:rounded-md items-center justify-center rounded-full transition-colors hover:bg-surface-hover"
             onClick={chip.remove}
           >
             <X aria-hidden="true" className="size-3" />

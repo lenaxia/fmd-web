@@ -497,7 +497,7 @@ export interface paths {
         };
         /**
          * Job list with filters + keyset cursor (Downloads parity)
-         * @description Newest-first page (`limit` ≤ 100). `cursor` is the keyset boundary (the last job id of the previous page) — stable under concurrent inserts: newly created jobs never shift pages. Downloads parity filters (FMD2 tsDownload filter tree + search box, web-adapted): `states` (csv multi-select of the §7.1 states), `q` (case-insensitive substring over the job's mangaTitle/chapterName) and `addedFrom`/`addedTo` (inclusive created-at calendar days, UTC — the client maps FMD2's History windows Today/7d/Month/Older and custom From/To into this range). `state` (single) predates the multi-select and stays for back-compat.
+         * @description Newest-first page (`limit` ≤ 100). `cursor` is the keyset boundary (the last job id of the previous page) — stable under concurrent inserts: newly created jobs never shift pages. Downloads parity filters (FMD2 tsDownload filter tree + search box, web-adapted): `states` (csv multi-select of the §7.1 states), `q` (case-insensitive substring over the job's mangaTitle/chapterName) and `addedFrom`/`addedTo` (inclusive created-at calendar days, UTC — the client maps FMD2's History windows Today/7d/Month/Older and custom From/To into this range). `state` (single) predates the multi-select and stays for back-compat. R5 arrival adds `since` (ISO 8601 UTC timestamp): a floor on the row's LAST TRANSITION (`updatedAt`) — combined with `state=done` it selects chapters FINISHED since the timestamp, the 'While you were away' summary's download-news source.
          */
         get: operations["listJobs"];
         put?: never;
@@ -661,7 +661,7 @@ export interface paths {
         };
         /**
          * Favorites listing (§7.2 DoCheck engine)
-         * @description One row per favorite (`id` = LowerCase(ModuleID+Link)): `currentChapter`/`status` from the last successful check (immediate update parity), `newChapterCount` for the UI badge, and the auto-download flag gating pipeline enqueues.
+         * @description One row per favorite (`id` = LowerCase(ModuleID+Link)): `currentChapter`/`status` from the last successful check (immediate update parity), `newChapterCount` for the UI badge, and the auto-download flag gating pipeline enqueues. R5 arrival (additive): `?since=<ISO 8601 UTC>` switches each row's `newsSince` flag on — true when a check ran at/after `since` AND found new chapters (`lastCheck >= since && newChapterCount > 0`) — the favorites half of the 'While you were away' summary. Without the param the flag is omitted (pre-R5 shape).
          */
         get: operations["listFavorites"];
         put?: never;
@@ -1083,6 +1083,7 @@ export interface components {
             saveTo: string | null;
             enabled: boolean;
             dateAdded: components["schemas"]["Timestamp"] | null;
+            newsSince?: boolean;
         };
         /** Format: date-time */
         Timestamp: string;
@@ -2913,6 +2914,7 @@ export interface operations {
                 q?: string;
                 addedFrom?: string;
                 addedTo?: string;
+                since?: string;
                 cursor?: string;
                 limit?: number;
             };
@@ -3466,7 +3468,9 @@ export interface operations {
     };
     listFavorites: {
         parameters: {
-            query?: never;
+            query?: {
+                since?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;

@@ -60,6 +60,9 @@ function runtimeConfig(dataDir: string, mockBase: string, bootstrapDisabled = fa
     dataDir,
     port: 0,
     staticDir: undefined,
+    // R4 auth env surface: unset in tests (auth off).
+    password: undefined,
+    apiTokenEnv: undefined,
     moduleSync: {
       repo: e2e.repo,
       sha: e2e.luaSha,

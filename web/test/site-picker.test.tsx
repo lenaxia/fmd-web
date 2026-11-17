@@ -198,7 +198,7 @@ describe('SitePickerPage (browse default state)', (): void => {
     });
     // URL-synced: ?cats=Manhwa.
     await waitFor((): void => {
-      expect(hashNow()).toBe('#/browse?cats=Manhwa');
+      expect(hashNow()).toBe('#/browse?sites=1&cats=Manhwa');
     });
     expect(chip('All')).toHaveAttribute('aria-pressed', 'false');
     expect(chip('Manhwa')).toHaveAttribute('aria-pressed', 'true');
@@ -211,7 +211,7 @@ describe('SitePickerPage (browse default state)', (): void => {
     await userEvent.click(chip('Manhwa'));
     await userEvent.click(chip('Spanish'));
     await waitFor((): void => {
-      expect(hashNow()).toBe('#/browse?cats=Manhwa,Spanish');
+      expect(hashNow()).toBe('#/browse?sites=1&cats=Manhwa,Spanish');
     });
     expect(screen.getByText('FreshSite')).toBeVisible();
     expect(screen.getByText('SitioEs')).toBeVisible();
@@ -219,10 +219,11 @@ describe('SitePickerPage (browse default state)', (): void => {
       expect(screen.queryByText('InstalledSite')).toBeNull();
     });
 
-    // All clears the selection (back to the full list, cats param gone).
+    // All clears the selection (cats param gone; the picker keeps its
+    // own ?sites=1 address since the search-first home took bare browse).
     await userEvent.click(chip('All'));
     await waitFor((): void => {
-      expect(hashNow()).toBe('#/browse');
+      expect(hashNow()).toBe('#/browse?sites=1');
     });
     expect(screen.getByText('InstalledSite')).toBeVisible();
     expect(screen.getByText('FreshSite')).toBeVisible();
@@ -236,13 +237,13 @@ describe('SitePickerPage (browse default state)', (): void => {
     await userEvent.click(chip('Manhwa'));
     await userEvent.click(chip('Spanish'));
     await waitFor((): void => {
-      expect(hashNow()).toBe('#/browse?cats=Manhwa,Spanish');
+      expect(hashNow()).toBe('#/browse?sites=1&cats=Manhwa,Spanish');
     });
     await userEvent.click(chip('Spanish'));
     expect(screen.getByText('FreshSite')).toBeVisible();
     await waitFor((): void => {
       expect(screen.queryByText('SitioEs')).toBeNull();
-      expect(hashNow()).toBe('#/browse?cats=Manhwa');
+      expect(hashNow()).toBe('#/browse?sites=1&cats=Manhwa');
     });
   });
 
@@ -252,7 +253,7 @@ describe('SitePickerPage (browse default state)', (): void => {
 
     await userEvent.click(chip('Manga'));
     await waitFor((): void => {
-      expect(hashNow()).toBe('#/browse?cats=Manga');
+      expect(hashNow()).toBe('#/browse?sites=1&cats=Manga');
     });
     await userEvent.type(await screen.findByLabelText('Search sites'), 'live');
     expect(screen.getByText('LiveOnlySite')).toBeVisible();
@@ -261,7 +262,7 @@ describe('SitePickerPage (browse default state)', (): void => {
       expect(screen.queryByText('FreshSite')).toBeNull();
     });
     // Search keeps the cats param on the URL untouched.
-    expect(hashNow()).toBe('#/browse?cats=Manga');
+    expect(hashNow()).toBe('#/browse?sites=1&cats=Manga');
   });
 
   it('URL round-trip: ?cats= at mount filters the list and presses the chip', async (): Promise<void> => {

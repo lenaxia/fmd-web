@@ -36,7 +36,7 @@ export function FacetChips(props: {
           type="button"
           variant="outline"
           size="sm"
-          className="facet-chip h-6 rounded-full px-2 text-xs"
+          className="facet-chip h-6 max-md:min-h-touch-target rounded-full px-2 text-xs"
           title={`Search only ${facet.siteName}`}
           onClick={(): void => {
             props.onPickSite(facet.siteId);

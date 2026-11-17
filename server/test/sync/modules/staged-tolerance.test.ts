@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createModuleSyncService, DEFAULT_TARBALL_API_BASE_URL, type ModuleSyncConfig } from '../../../src/index.js';
+import { createLuaHostFactory } from '../../../src/engine/lua/host.js';
 import {
   buildFixtureZipball,
   FIXTURE_SHA,
@@ -107,7 +108,10 @@ describe('staged sync tolerance — the REAL 417-module-file tree (D20 launch fi
   it(
     'first sync on the real tree PROCEEDS: known-broken files tolerated, failures[] recorded',
     async (): Promise<void> => {
-      const result = await createModuleSyncService(config(), { now: () => '2026-11-16T00:00:00.000Z' }).sync();
+      const result = await createModuleSyncService(config(), {
+        now: () => '2026-11-16T00:00:00.000Z',
+        hostFactory: createLuaHostFactory(),
+      }).sync();
 
       expect(result.report.moduleFiles).toBe(417);
       // the D3 published known-broken set, exactly
@@ -145,7 +149,7 @@ describe('staged sync tolerance — the REAL 417-module-file tree (D20 launch fi
   );
 
   it('re-sync of the same real tree re-admits (broken files were never in the inventory)', async (): Promise<void> => {
-    const service = createModuleSyncService(config());
+    const service = createModuleSyncService(config(), { hostFactory: createLuaHostFactory() });
     const first = await service.sync();
     const second = await service.sync();
 
@@ -158,7 +162,7 @@ describe('staged sync tolerance — the REAL 417-module-file tree (D20 launch fi
   }, 240_000);
 
   it('a real-tree sync plus ONE regressed module file refuses as regression', async (): Promise<void> => {
-    const service = createModuleSyncService(config());
+    const service = createModuleSyncService(config(), { hostFactory: createLuaHostFactory() });
     await service.sync();
 
     // Same real tree, but a previously-registered module goes broken:

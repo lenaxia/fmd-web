@@ -2,10 +2,11 @@
  * Favorites-parity route integration tests (§10, offline fastify.inject):
  * the batch check scope matrix + cancel (btFavoritesCheckNewChapter +
  * miFavoritesStopCheckNewChapter parity), the website transfer
- * (frmTransferFavorites: preview valid/invalid mapping + apply remap +
- * the typed invalid-target 409) and the pmFavorites row patch surface
- * (rename / save-to / enable-disable persistence). The settings seam
- * round-trip (interval + startup toggle) rides along — all against the
+ * (frmTransferFavorites: preview valid/invalid mapping — full miss
+ * taxonomy — + apply remap + the typed invalid-target 409), the
+ * pmFavorites row patch surface (rename / save-to / enable-disable
+ * persistence + the empty-patch 400), row delete, and the settings
+ * seam round-trip (interval + startup toggle) — all against the
  * in-memory FavoriteService double with an injected transfer index.
  */
 import { describe, expect, it } from 'vitest';
@@ -14,6 +15,7 @@ import {
   InMemoryFavoriteService,
   type InMemoryFavoriteCheckBehavior,
 } from '../../src/api/services.js';
+import type { FavoriteCheckResponseT } from '../../src/api/schemas.js';
 
 const FAV_URL = 'https://ex.org/manga/fav';
 const FAV_ID = `${MODULE_A_ID}${FAV_URL}`.toLowerCase();
@@ -108,8 +110,8 @@ describe('POST /api/favorites/check — batch scope matrix', (): void => {
     const defaulted = await h.app.inject({ method: 'POST', url: '/api/favorites/check', payload: {} });
     expect(defaulted.statusCode).toBe(200);
     const results = defaulted.json().results as Array<{ newChapters: unknown[]; favorite: { newChapterCount: number } }>;
-    expect(results[0].newChapters.length).toBe(2);
-    expect(results[0].favorite.newChapterCount).toBe(2);
+    expect(results[0]?.newChapters.length).toBe(2);
+    expect(results[0]?.favorite.newChapterCount).toBe(2);
 
     const bad = await h.app.inject({ method: 'POST', url: '/api/favorites/check', payload: { scope: 'nope' } });
     expect(bad.statusCode).toBe(400);
@@ -123,7 +125,7 @@ describe('POST /api/favorites/check — batch scope matrix', (): void => {
       release = resolve;
     });
     const favorites = new (class extends InMemoryFavoriteService {
-      public async checkNow(id: string): Promise<ReturnType<InMemoryFavoriteService['checkNow']>> {
+      public override async checkNow(id: string): Promise<FavoriteCheckResponseT> {
         if (id.endsWith('a')) {
           await gate;
         }
@@ -243,6 +245,53 @@ describe('POST /api/favorites/:id/transfer — website transfer', (): void => {
     expect(res.json()).toMatchObject({ reloadedFromServer: true });
   });
 
+  it('preview surfaces the full miss taxonomy (no-catalog / get-info-failed) and apply stays a typed 409', async (): Promise<void> => {
+    // Targets beyond the fake catalog: reason-bearing misses mirror the
+    // engine taxonomy (real-store coverage: service.test.ts).
+    const NO_CATALOG = 'c'.repeat(32);
+    const GET_INFO_FAILED = 'd'.repeat(32);
+    const h = buildHarness({
+      favorites: new InMemoryFavoriteService(undefined, (moduleId, title) => {
+        if (moduleId === NO_CATALOG) {
+          return { reason: 'no-catalog' };
+        }
+        if (moduleId === GET_INFO_FAILED) {
+          return { reason: 'get-info-failed' };
+        }
+        return transferIndex(moduleId, title);
+      }),
+    });
+    await seedFavorite(h, FAV_URL, 'My Favorite');
+
+    const noCatalog = await h.app.inject({
+      method: 'POST',
+      url: `/api/favorites/${encodeURIComponent(FAV_ID)}/transfer/preview`,
+      payload: { targetModuleId: NO_CATALOG },
+    });
+    expect(noCatalog.statusCode).toBe(200);
+    expect(noCatalog.json()).toMatchObject({ valid: false, targetUrl: null, reason: 'no-catalog' });
+
+    const getInfoFailed = await h.app.inject({
+      method: 'POST',
+      url: `/api/favorites/${encodeURIComponent(FAV_ID)}/transfer/preview`,
+      payload: { targetModuleId: GET_INFO_FAILED },
+    });
+    expect(getInfoFailed.statusCode).toBe(200);
+    expect(getInfoFailed.json()).toMatchObject({ valid: false, targetUrl: null, reason: 'get-info-failed' });
+
+    // An invalid mapping NEVER silently remaps: apply refuses with the
+    // typed 409 and the favorite is untouched.
+    const apply = await h.app.inject({
+      method: 'POST',
+      url: `/api/favorites/${encodeURIComponent(FAV_ID)}/transfer`,
+      payload: { targetModuleId: NO_CATALOG, clearDownloadedList: false },
+    });
+    expect(apply.statusCode).toBe(409);
+    expectEnvelope(apply.body, 'conflict');
+    const still = await h.app.inject({ method: 'GET', url: `/api/favorites/${encodeURIComponent(FAV_ID)}` });
+    expect(still.statusCode).toBe(200);
+  });
+
   it('unknown favorite is a typed 404 on both routes', async (): Promise<void> => {
     const h = harness();
     const preview = await h.app.inject({
@@ -272,7 +321,7 @@ describe('PUT /api/favorites/:id — rename / save-to / enable (pmFavorites pari
     expect(res.statusCode).toBe(200);
     expect(res.json().favorite).toMatchObject({ title: 'New Name' });
     const list = await h.app.inject({ method: 'GET', url: '/api/favorites' });
-    expect((list.json().favorites as Array<{ title: string }>)[0].title).toBe('New Name');
+    expect((list.json().favorites as Array<{ title: string }>)[0]?.title).toBe('New Name');
   });
 
   it('saveTo persists (and an empty string resets it)', async (): Promise<void> => {
@@ -291,7 +340,7 @@ describe('PUT /api/favorites/:id — rename / save-to / enable (pmFavorites pari
     });
     expect(reset.json().favorite).toMatchObject({ saveTo: '' });
     const list = await h.app.inject({ method: 'GET', url: '/api/favorites' });
-    expect((list.json().favorites as Array<{ saveTo: string }>)[0].saveTo).toBe('');
+    expect((list.json().favorites as Array<{ saveTo: string }>)[0]?.saveTo).toBe('');
   });
 
   it('enable/disable persists and feeds the batch scopes', async (): Promise<void> => {
@@ -314,9 +363,46 @@ describe('PUT /api/favorites/:id — rename / save-to / enable (pmFavorites pari
     await seedFavorite(h, FAV_URL, 'A');
     const list = await h.app.inject({ method: 'GET', url: '/api/favorites' });
     const row = (list.json().favorites as Array<Record<string, unknown>>)[0];
-    expect(row['saveTo']).toBeNull();
-    expect(row['enabled']).toBe(true);
-    expect(typeof row['dateAdded']).toBe('string');
+    expect(row?.['saveTo']).toBeNull();
+    expect(row?.['enabled']).toBe(true);
+    expect(typeof row?.['dateAdded']).toBe('string');
+  });
+
+  it('an empty patch is a typed 400 (the guard knows title/autoDownload/saveTo/enabled)', async (): Promise<void> => {
+    const h = buildHarness();
+    await seedFavorite(h, FAV_URL, 'A');
+    const res = await h.app.inject({
+      method: 'PUT',
+      url: `/api/favorites/${encodeURIComponent(FAV_ID)}`,
+      payload: {},
+    });
+    expect(res.statusCode).toBe(400);
+    expectEnvelope(res.body, 'validation_error');
+  });
+});
+
+describe('DELETE /api/favorites/:id — row delete (miFavoritesDelete parity)', (): void => {
+  it('removes the row; the listing drops it; a repeat delete is a typed 404', async (): Promise<void> => {
+    const h = buildHarness();
+    await seedFavorite(h, FAV_URL, 'A');
+    const del = await h.app.inject({ method: 'DELETE', url: `/api/favorites/${encodeURIComponent(FAV_ID)}` });
+    expect(del.statusCode).toBe(200);
+    expect(del.json()).toEqual({ ok: true });
+    const list = await h.app.inject({ method: 'GET', url: '/api/favorites' });
+    expect(list.json().favorites).toHaveLength(0);
+    const again = await h.app.inject({ method: 'DELETE', url: `/api/favorites/${encodeURIComponent(FAV_ID)}` });
+    expect(again.statusCode).toBe(404);
+    expectEnvelope(again.body, 'not_found');
+  });
+
+  it('an unknown id is a typed 404 (nothing else is affected)', async (): Promise<void> => {
+    const h = buildHarness();
+    const kept = await seedFavorite(h, FAV_URL, 'A');
+    const res = await h.app.inject({ method: 'DELETE', url: '/api/favorites/nope' });
+    expect(res.statusCode).toBe(404);
+    expectEnvelope(res.body, 'not_found');
+    const list = await h.app.inject({ method: 'GET', url: '/api/favorites' });
+    expect((list.json().favorites as Array<{ id: string }>).map((f) => f.id)).toEqual([kept]);
   });
 });
 

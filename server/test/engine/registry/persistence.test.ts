@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ModuleSyncService } from '../../../src/engine/registry/module-sync.js';
 import { InMemoryModuleRegistryPersistence } from '../../../src/engine/registry/persistence.js';
 import { StartupRegistryService } from '../../../src/engine/registry/startup.js';
+import { createLuaHostFactory } from '../../../src/engine/lua/host.js';
 import { FMD2_LUA_ROOT } from '../../../src/engine/shims/install.js';
 
 /**
@@ -40,7 +41,7 @@ describe('startup registry — SHA-gated persistence', () => {
   });
 
   function makeSync(): CountingSync {
-    return new CountingSync({ luaRoot: FMD2_LUA_ROOT, modulesDir });
+    return new CountingSync({ luaRoot: FMD2_LUA_ROOT, modulesDir, hostFactory: createLuaHostFactory() });
   }
 
   it('first boot sweeps and persists id/name/root_url/category/options/file/capabilities rows', async () => {

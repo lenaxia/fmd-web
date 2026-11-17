@@ -651,12 +651,19 @@ export interface JobsListFilters {
   /** created-at window (inclusive YYYY-MM-DD; FMD2 History windows map in). */
   readonly addedFrom?: string;
   readonly addedTo?: string;
+  /**
+   * R5 arrival: ISO-timestamp floor on the row's LAST TRANSITION
+   * (`updatedAt`) — with states ['done'] the finished-since set the
+   * away summary renders. Absent on the Downloads page (back-compat).
+   */
+  readonly since?: string;
 }
 
 export const EMPTY_JOBS_FILTERS: JobsListFilters = { states: [], q: '' };
 
 export function useJobsList(
   filters: JobsListFilters,
+  enabled: boolean = true,
 ): UseInfiniteQueryResult<InfiniteData<JobsPageT, { cursor?: string }>, ApiError> {
   const client = useApiClient();
   // Stable, serialized filter key — the WS feed patches every ['jobs', *]
@@ -664,6 +671,7 @@ export function useJobsList(
   const filterKey = JSON.stringify(filters);
   return useInfiniteQuery<JobsPageT, ApiError, InfiniteData<JobsPageT, { cursor?: string }>, QueryKey, { cursor?: string }>({
     queryKey: ['jobs', filterKey],
+    enabled,
     initialPageParam: {},
     queryFn: async ({ pageParam }): Promise<JobsPageT> =>
       unwrap(
@@ -675,6 +683,7 @@ export function useJobsList(
               ...(filters.q !== '' ? { q: filters.q } : {}),
               ...(filters.addedFrom !== undefined ? { addedFrom: filters.addedFrom } : {}),
               ...(filters.addedTo !== undefined ? { addedTo: filters.addedTo } : {}),
+              ...(filters.since !== undefined ? { since: filters.since } : {}),
               ...(pageParam.cursor !== undefined ? { cursor: pageParam.cursor } : {}),
             },
           },
@@ -961,6 +970,30 @@ export function useFavorites(enabled: boolean = true): UseQueryResult<FavoritesL
     queryKey: ['favorites'],
     enabled,
     queryFn: (): Promise<FavoritesListT> => unwrap(client.GET('/api/favorites')),
+  });
+}
+
+/**
+ * R5 arrival: the favorites list WITH the additive `newsSince` flag —
+ * `?since=<last-visit stamp>` asks the server which favorites a check
+ * touched at/after the stamp with new chapters found. Separate cache
+ * entry under the SAME ['favorites'] prefix (check mutations still
+ * invalidate it); disabled until a stamp exists.
+ */
+export function useFavoritesNews(
+  since: string | undefined,
+  enabled: boolean = true,
+): UseQueryResult<FavoritesListT, ApiError> {
+  const client = useApiClient();
+  return useQuery<FavoritesListT, ApiError>({
+    queryKey: ['favorites', 'news', since ?? ''],
+    enabled: enabled && since !== undefined,
+    queryFn: (): Promise<FavoritesListT> => {
+      if (since === undefined) {
+        throw new ApiError('favorites news requires a since stamp', 'internal_error', 500);
+      }
+      return unwrap(client.GET('/api/favorites', { params: { query: { since } } }));
+    },
   });
 }
 

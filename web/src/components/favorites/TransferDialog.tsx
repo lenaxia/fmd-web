@@ -172,7 +172,7 @@ export function TransferDialog(props: {
             </div>
           ) : null}
 
-          <label className="flex items-center gap-2 text-sm" data-testid="transfer-clear-label">
+          <label className="flex items-center gap-2 text-sm max-md:min-h-touch-target" data-testid="transfer-clear-label">
             <Checkbox
               checked={clearDownloadedList}
               onCheckedChange={(value): void => setClearDownloadedList(value === true)}

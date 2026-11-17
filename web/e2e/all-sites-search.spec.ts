@@ -92,7 +92,7 @@ test('all-sites toggle: union over two installed catalogs — merged rows, Websi
 }): Promise<void> => {
   const { searchRequests } = installUnionMock(page);
   await page.goto(`/#/browse?site=${CATALOG_ID}`);
-  await expect(page.getByRole('button', { name: /Alpha Quest/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Alpha Quest/ })).toBeVisible();
 
   // Toggle "All sites" in the search bar → union view (URL carries the
   // mode; FMD2 cbSearchFromAllSites parity). click, not check(): the
@@ -104,9 +104,9 @@ test('all-sites toggle: union over two installed catalogs — merged rows, Websi
   // Type a query — merged results from BOTH installed catalogs, each
   // row badged with its Website.
   await page.getByRole('searchbox', { name: 'Search' }).fill('quest');
-  await expect(page.getByRole('button', { name: /Alpha Quest/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Beta Trails/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Beta Extra/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Alpha Quest/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Beta Trails/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Beta Extra/ })).toBeVisible();
   // Two rows come from BetaSite — both carry its badge (count, not
   // strict single-element visibility).
   await expect(page.getByTitle('Website: FixtureSite')).toBeVisible();
@@ -127,7 +127,7 @@ test('all-sites toggle: union over two installed catalogs — merged rows, Websi
 
   // Routing: a BetaSite row click deep-links into THAT site's context
   // (manga link shape unchanged).
-  await page.getByRole('button', { name: /Beta Trails/ }).click();
+  await page.getByRole('button', { name: /^Beta Trails/ }).click();
   await expect(page).toHaveURL(/#\/manga\?/);
   await expect(page).toHaveURL(new RegExp(`module=${SITE_B_ID}`));
 
