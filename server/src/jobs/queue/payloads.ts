@@ -18,12 +18,19 @@ export const DownloadChapterJobSchema = z.object({
   type: z.literal('download'),
   moduleId: z.string().min(1),
   mangaUrl: z.string().min(1),
-  mangaTitle: z.string().optional(),
+  mangaTitle: z.string().min(1).optional(),
   chapterLink: z.string().min(1),
-  chapterName: z.string().optional(),
+  chapterName: z.string().min(1).optional(),
   /** §7.2 favorites provenance: the per-chapter completion dual-writes
    * the favorite-side ledger when this key is present. */
   mangaKey: z.string().min(1).optional(),
+  /**
+   * FMD2 edSaveTo parity (frmMain.pas:5613): the directory the
+   * finalized artifact lands in — REPLACES `library/<module>/<manga>`.
+   * Relative paths resolve against the library root. (The add-as-stopped
+   * `paused` hold is queue-level — a column, not payload.)
+   */
+  saveTo: z.string().min(1).max(1024).optional(),
 });
 export type DownloadChapterJob = z.infer<typeof DownloadChapterJobSchema>;
 

@@ -44,6 +44,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/modules/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk enable/disable many modules at once
+         * @description FMD2 Websites-tree bulk parity (pas:6400 Select All/Unselect All + per-category checkboxes): one enable/disable write over many module_state rows through the SAME update seam (option/cookie/proxy state untouched). Targets: `ids` (explicit list), OR `category` (exact category match), OR neither (every registered module — the global select-all/none). Unknown ids/categories resolve to an empty target set (`updated: 0`, never a 404 — a sweep is idempotent).
+         */
+        post: operations["bulkUpdateModules"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/accounts": {
         parameters: {
             query?: never;
@@ -116,8 +136,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Global proxy config + browser sidecar profile state
-         * @description The §9/§10 settings projection: the global proxy (SetProxy five-string semantics, httpsendthread.pas:838-874 — type HTTP|SOCKS4|SOCKS5, the empty type is "no proxy") and the §5.11 browser profile state (enabled ⇒ the D2 sidecar is wired and the satisfied §5.10 known-broken flags are dropped from /api/modules).
+         * Global proxy config + output defaults + browser sidecar profile state
+         * @description The §9/§10 settings projection: the global proxy (SetProxy five-string semantics, httpsendthread.pas:838-874 — type HTTP|SOCKS4|SOCKS5, the empty type is "no proxy"), the output defaults (FMD2 Save-to parity subset: default archive format zip/cbz/pdf/epub + chapter filename template, honored on NEW download jobs) and the §5.11 browser profile state (enabled ⇒ the D2 sidecar is wired and the satisfied §5.10 known-broken flags are dropped from /api/modules).
          */
         get: operations["getSettings"];
         put?: never;
@@ -141,6 +161,126 @@ export interface paths {
          * @description Full replacement with SetProxy semantics: a config with a non-empty type requires a host; the all-empty config is the SetNoProxy path. Per-module overrides (PUT /api/modules/{id} proxy) take precedence for their module.
          */
         put: operations["updateProxy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/output": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace the output defaults (format + chapter rename template)
+         * @description FMD2 Save-to options parity (additive, the server-supported subset): `format` picks the §7.3 packer for NEW download jobs (zip/cbz/pdf/epub — FMD2's None loose-images mode is deferred; the §7.1 library model is one packed artifact). `chapterNameTemplate` is the FMD2 custom rename (edOptionMangaCustomRename) with the %WEBSITE%/%MANGA%/%AUTHOR%/%ARTIST%/%CHAPTER%/%NUMBERING%/%FILENAME% placeholders; '' keeps the chapter-name fallback. PDF quality and the digit-padding/unicode rename options are deferred (D16 streaming packer is DCT passthrough — see docs/UX-PARITY.md).
+         */
+        put: operations["updateOutputDefaults"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/performance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace the Performance group (FMD2 Connections subset, additive)
+         * @description [parity-sweep] M10: requestTimeoutSeconds seeds the HTTP pipeline default (module code may still override per request); retryCount is the per-image retry budget; threadsPerChapter is the per-chapter image-worker width (FMD2 MaxThreadPerTaskLimit); parallelChapters is the download-lane slot count and applies at SERVER START (lane slots are fixed at boot). Persisted in app.db (app_settings).
+         */
+        put: operations["updatePerformanceSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/retention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace job-history retention (auto-delete after N days, additive)
+         * @description [parity-sweep] M2: auto-delete finished job history after N days; 0 = keep forever. Drives the periodic prune sweep (hourly; a change applies on the next sweep). Persisted in app.db (app_settings).
+         */
+        put: operations["updateRetentionSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/filename-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace the filename policy (D5 mode, additive)
+         * @description [parity-sweep] M4: true = Linux-normalized filenames; false = the FMD2-desktop parity default. Precedence: the FMD_NORMALIZE_PATHS env / --normalize-paths flag OVERRIDES the setting (env > setting > parity). Persisted in app.db (app_settings).
+         */
+        put: operations["updateFilenamePolicySettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace diagnostics settings (log enable + level, additive)
+         * @description [parity-sweep] M13: structured-log enable + minimum level, applied live to the running logger. The live log VIEWER is v0.4; /metrics + the runbook are linked from the Diagnostics section. Persisted in app.db (app_settings).
+         */
+        put: operations["updateDiagnosticsSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/favorites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace the favorites scheduler settings (interval + startup check)
+         * @description FMD2 Options → Updates parity (additive): `intervalMinutes` is the OptionAutoCheckFavIntervalMinutes analog — 0 disables scheduled checks, other values apply LIVE to the running scheduler (idle favorites re-arm under the new cadence). `checkAtStartup` is OptionCheckFavoritesAtStart — it gates the next boot's initial sweep. Persisted in app.db (app_settings) so it survives restarts.
+         */
+        put: operations["updateFavoritesSettings"];
         post?: never;
         delete?: never;
         options?: never;
@@ -257,7 +397,7 @@ export interface paths {
         };
         /**
          * FTS5 search with cursor pagination (§6.5, §10) + FMD2 filter panel (additive)
-         * @description Sanitized FTS MATCH over the sidecar, ranked; `cursor` continues a previous page (opaque, query-bound — it carries the FULL filter state). Catalogs are read-only after install, so cursors stay stable. FMD2 Filter-panel parity (frmMain.pas:3400, additive): `q` is optional when any filter is set (filter-only pages skip the MATCH and order by jdn DESC); `authors` is a LIKE-contains over the authors column; `genres` (repeated params or one comma-separated value) joins per `genresMode` — `all` (FMD2 rbAll default) ANDs the LIKE clauses, `any` (rbAny) ORs them; `newDays` is the only-new window (jdn > JDN(today) - newDays, FMD2 cbOnlyNew). Prefix-LIKE (`x%`) is a documented non-goal: FMD2 semantics are contains (`%x%`). §6.8 fallback: catalog-less modules search their §6.8-normalized directory-walk snapshot in memory (title/alttitles/summary terms, exact status, substring genre) with the SAME cursor scheme; `source` discriminates the channel.
+         * @description Sanitized FTS MATCH over the sidecar, ranked; `cursor` continues a previous page (opaque, query-bound — it carries the FULL filter state). Catalogs are read-only after install, so cursors stay stable. FMD2 Filter-panel parity (frmMain.pas:3400, additive): `q` is optional when any filter is set (filter-only pages skip the MATCH and order by jdn DESC); `authors` is a LIKE-contains over the authors column; `genres` (repeated params or one comma-separated value) joins per `genresMode` — `all` (FMD2 rbAll default) ANDs the LIKE clauses, `any` (rbAny) ORs them; `genresExclude` (same wire forms, the `!` custom-genre prefix) composes one AND-NOT-LIKE per excluded genre (audit (b)2 fix — excludes AND among themselves regardless of genresMode; a genre in both lists resolves to exclude-only); `newDays` is the only-new window (jdn > JDN(today) - newDays, FMD2 cbOnlyNew). Prefix-LIKE (`x%`) is a documented non-goal: FMD2 semantics are contains (`%x%`). §6.8 fallback: catalog-less modules search their §6.8-normalized directory-walk snapshot in memory (title/alttitles/summary terms, exact status, substring genre) with the SAME cursor scheme; `source` discriminates the channel.
          */
         get: operations["catalogSearch"];
         put?: never;
@@ -298,8 +438,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Normalized live manga info (§5.8 pipeline, cached)
-         * @description Runs the module GetInfo event and applies the §5.8 post-processing pipeline (last-occurrence-wins dedup); responses are cached per (moduleId, url) for the configured TTL.
+         * Normalized live manga info + the downloaded-chapter set (§5.8, cached)
+         * @description Runs the module GetInfo event and applies the §5.8 post-processing pipeline (last-occurrence-wins dedup); responses are cached per (moduleId, url) for the configured TTL. `downloaded` (MangaPage parity — FMD2 downloaded-chapters tint/hide) carries the chapter LINKS already recorded in the `downloaded_chapters` ledger for this manga: it is computed at response time — never cached with the info snapshot — so a just-finished download flips the set on the next call, cache hit or not. [parity-sweep] M14 (FMD2 edURL parity): `moduleId` is OPTIONAL — a url-only body resolves the module by RootURL host match (registry lookup). Unknown host → 400 `no_site_match` ("no site matches this URL"); multiple sites on one host → 400 `ambiguous_site` naming the candidates. The response embeds the serving `moduleId` so the client can navigate to the manga page.
          */
         post: operations["liveInfo"];
         delete?: never;
@@ -319,9 +459,29 @@ export interface paths {
         put?: never;
         /**
          * Create a download job (idempotent, §10)
-         * @description With `idempotencyKey`: an identical-key replay returns the ORIGINAL job with 200 while it is live (queued/running/retry); key reuse with a DIFFERENT payload returns 409. Re-enqueueing a TERMINAL original (done/failed/cancelled) starts a FRESH job chained under the same key (`<key>#<n>`, 201) — the re-download semantic; the fresh attempt resumes from the persisted chapter markers ('D' slots skip their images). Fresh creates return 201.
+         * @description With `idempotencyKey`: an identical-key replay returns the ORIGINAL job with 200 while it is live (queued/running/retry); key reuse with a DIFFERENT payload returns 409. Re-enqueueing a TERMINAL original (done/failed/cancelled) starts a FRESH job chained under the same key (`<key>#<n>`, 201) — the re-download semantic; the fresh attempt resumes from the persisted chapter markers ('D' slots skip their images). Fresh creates return 201. MangaPage parity options (additive): `paused` (FMD2 cbAddAsStopped, frmMain.lfm:1110) creates the job queued-but-held — the download lane will not claim it until POST /api/jobs/{id}/resume; `saveTo` (FMD2 edSaveTo, frmMain.pas:5613) is a custom save directory that REPLACES the `library/<module>/<manga>` prefix at finalize (relative paths resolve against the library root).
          */
         post: operations["createDownloadJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/download/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Batch download-all create (idempotent per manga, §10)
+         * @description The browse row-menu Download-all (FMD2 pmMangaList miMangaListDownloadAll, frmMain.lfm:5798) as ONE request per manga instead of one chatty request per chapter. `chapters: "all"` resolves the live chapter list through the SAME cached §5.8 info path POST /api/info uses; an explicit link array enqueues exactly that selection in the given order (no info fetch). `idempotencyKey` is REQUIRED: every per-chapter create derives `<key>:<index>` (index in the resolved chapter order), so the whole batch replays as one unit — identical replay while any original is live returns the SAME jobs with 200 + `replayed: true` (the double-submit case); a shifted/different chapter sequence under the same key surfaces the per-chapter 409 different-payload conflict; TERMINAL originals chain fresh attempts (`<key>:<index>#<n>`) exactly like the single create — the re-download semantic. `paused`/`saveTo` apply to every chapter job.
+         */
+        post: operations["createDownloadJobsBatch"];
         delete?: never;
         options?: never;
         head?: never;
@@ -336,8 +496,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Job list with state filter + keyset cursor
-         * @description Newest-first page (`limit` ≤ 100). `cursor` is the keyset boundary (the last job id of the previous page) — stable under concurrent inserts: newly created jobs never shift pages.
+         * Job list with filters + keyset cursor (Downloads parity)
+         * @description Newest-first page (`limit` ≤ 100). `cursor` is the keyset boundary (the last job id of the previous page) — stable under concurrent inserts: newly created jobs never shift pages. Downloads parity filters (FMD2 tsDownload filter tree + search box, web-adapted): `states` (csv multi-select of the §7.1 states), `q` (case-insensitive substring over the job's mangaTitle/chapterName) and `addedFrom`/`addedTo` (inclusive created-at calendar days, UTC — the client maps FMD2's History windows Today/7d/Month/Older and custom From/To into this range). `state` (single) predates the multi-select and stays for back-compat.
          */
         get: operations["listJobs"];
         put?: never;
@@ -362,7 +522,11 @@ export interface paths {
         get: operations["getJob"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete a download job row (FMD2 delete task | delete task + data)
+         * @description Removes the job row in ANY state (a running chapter aborts first). `?data=true` (miDownloadDeleteTaskData parity) ALSO removes the finalized artifact the job recorded at done — the library file and its `library_files` row; the default (miDownloadDeleteTask) keeps the download on disk. The response echoes the removed snapshot plus `dataDeleted`.
+         */
+        delete: operations["deleteJob"];
         options?: never;
         head?: never;
         patch?: never;
@@ -382,6 +546,66 @@ export interface paths {
          * @description queued/running/retry → cancelled (200). A running chapter aborts its in-flight images and persists the 'W'/'D' markers, so the next enqueue of the same chapter resumes (only the remaining images are fetched). A terminal row is 409 — nothing to cancel.
          */
         post: operations["cancelJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Lift the add-as-stopped hold on a download job (cbAddAsStopped parity)
+         * @description A job created with `paused: true` sits in `queued` with the hold set — the download lane does not claim it. This endpoint clears the hold (200, `paused` absent thereafter); the lane picks the row up like any other queued job. Terminal rows are 409; resuming a job without the hold is an idempotent no-op returning the current snapshot.
+         */
+        post: operations["resumeJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{id}/action": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply one downloads-tab task action (FMD2 pmDownload parity, web-adapted)
+         * @description ONE typed-union route over the per-job task actions (FMD2 pmDownload menu, frmMain.lfm:5538-5617). `pause` — resume-able stop (miDownloadStop): a queued row gains the hold (`paused: true`, not claimable), a running/retry row user-cancels with markers persisted. `resume` — the inverse (miDownloadResume): a held queued row lifts the hold; a cancelled row re-enqueues a FRESH chained attempt that resumes from the persisted markers. `retry` — failed → fresh chained attempt. `redownload` — done → fresh chained attempt (miDownloadRedownload). `disable` — hold a scheduled-but-not-running row (queued only). `enable` — lift that hold (queued+held only). Holding a held row / lifting an unheld one is an idempotent no-op. Every ILLEGAL application is 409 with the typed envelope carrying `{job: {id, state, paused}, action}` details.
+         */
+        post: operations["jobAction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/bulk-action": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Toolbar bulk op: Resume all / Pause all / Delete completed (FMD2 tsDownload toolbar)
+         * @description `{action: "pause"|"resume", scope: "all"}` — Stop All / Resume All (frmMain.lfm:291-339): pause holds every queued row and cancels every running/retry row; resume lifts every hold and re-enqueues every cancelled row (markers resume). `{action: "delete", scope: "completed"}` — Delete completed (miDownloadDeleteCompleted = RemoveAllFinishedTasks): removes every `done` row, artifacts KEPT (per-row delete+data is the explicit choice). Idempotent: a settled queue returns `affected: 0`. Other scope/action pairings are 400.
+         */
+        post: operations["jobBulkAction"];
         delete?: never;
         options?: never;
         head?: never;
@@ -485,8 +709,8 @@ export interface paths {
          */
         get: operations["getFavorite"];
         /**
-         * Update title / the auto-download toggle
-         * @description The auto-download toggle gates whether new-chapter diff results enqueue through the Phase-3 download pipeline (FMD2 OptionAutoCheckFavDownload, default off).
+         * Rename / auto-download toggle / save-to / enable-disable (pmFavorites parity)
+         * @description The favorite patch: `title` is the Rename action, `autoDownload` gates whether new-chapter diff results enqueue through the Phase-3 download pipeline (FMD2 OptionAutoCheckFavDownload, default off), `saveTo` is the per-favorite custom finalize directory (Change "Save to" — '' resets to the default layout) and `enabled` is Enable/Disable (disabled rows are skipped by the scheduler and the enabled-scope batch checks).
          */
         put: operations["updateFavorite"];
         post?: never;
@@ -520,6 +744,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/favorites/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Batch check with scope (btFavoritesCheckNewChapter parity)
+         * @description FMD2 Check-for-new-chapter over a scope (all|enabled|disabled): every favorite in scope runs one sequential DoCheck cycle (auto-download honored per row); the response carries per-row results — favorites with new chapters feed the NewChaptersSheet decision UI. A second call while a batch is in flight is a 409; POST /api/favorites/check/cancel stops the sweep between rows (the response reports `cancelled`).
+         */
+        post: operations["checkFavoritesBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/favorites/check/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel the in-flight batch check
+         * @description miFavoritesStopCheckNewChapter parity: requests the running batch to stop before its next favorite (already-completed rows keep their results; the batch response reports `cancelled: true`). Idempotent — false when nothing is running.
+         */
+        post: operations["cancelFavoritesCheckBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/favorites/{id}/transfer/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Website-transfer mapping preview (frmTransferFavorites parity)
+         * @description Resolves the favorite's title on the target site: catalog FTS search → exact (case-insensitive) title match → GetInfo dry-run on the hit. The response reports valid + targetUrl/matchedTitle, or invalid with a reason (no-catalog | not-found | get-info-failed) — the transfer dialog's valid/invalid mapping preview.
+         */
+        post: operations["previewFavoriteTransfer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/favorites/{id}/transfer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply the website transfer
+         * @description Remaps the favorite onto the target module+link under a new id (title/status/currentChapter/saveTo carry over); the old row is deleted (its downloaded_chapters ledger row is NOT touched). `clearDownloadedList: true` runs the tag-100 reload — the stored list resets and the live target-site chapter list is re-ingested as downloaded. A mapping is validated first (transfer/preview semantics); invalid targets are a 409.
+         */
+        post: operations["transferFavorite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/login": {
         parameters: {
             query?: never;
@@ -534,6 +838,46 @@ export interface paths {
          * @description Only mounted/meaningful with FMD_WEB_PASSWORD set (otherwise 400 auth_disabled). Sets an HttpOnly, SameSite=Strict session cookie; the 11th attempt within a minute is 429.
          */
         post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/api-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * R4 single app-wide API token state (Settings → API)
+         * @description The ONE deployment-wide token (Sonarr/Radarr model — never lists, never per-user). Returns the stored value (`null` when the FMD_WEB_API_TOKEN env pin owns the secret — read it from the deployment environment instead), the envManaged flag (UI shows 'Managed via environment', hides Regenerate) and the active auth mode (none|password|api-token|password+api-token). Credential-gated in EVERY authed mode — the token secret never rides an open read.
+         */
+        get: operations["getApiToken"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/api-token/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate the single API token in place (audit-logged)
+         * @description Generates a new 32-byte-hex value and replaces the old one IMMEDIATELY — the old key is rejected on the next request, so update your scripts right after rotating (docs/API.md key-rotation runbook). Audit-logged as a settings change (the log never carries the value). 409 when FMD_WEB_API_TOKEN pins the token (rotate the env instead) or when no auth is configured at all (set FMD_WEB_PASSWORD or the env pin first — minting a token into an open deployment would lock the UI out, runbook §API token).
+         */
+        post: operations["regenerateApiToken"];
         delete?: never;
         options?: never;
         head?: never;
@@ -607,7 +951,7 @@ export interface components {
         ApiErrorEnvelope: {
             error: {
                 /** @enum {string} */
-                code: "validation_error" | "unauthorized" | "not_found" | "conflict" | "rate_limited" | "bad_request" | "upstream_error" | "internal_error";
+                code: "validation_error" | "unauthorized" | "not_found" | "conflict" | "rate_limited" | "bad_request" | "upstream_error" | "internal_error" | "no_site_match" | "ambiguous_site";
                 message: string;
                 details?: unknown;
             };
@@ -655,8 +999,47 @@ export interface components {
         ModuleSummary2: string;
         ModuleSummary3: string;
         ModuleSummary4: string;
+        OutputDefaults: {
+            /**
+             * @default zip
+             * @enum {string}
+             */
+            format: "zip" | "cbz" | "pdf" | "epub";
+            /** @default  */
+            chapterNameTemplate: string;
+            /** @default false */
+            unicodeReplacement: boolean;
+            /** @default _ */
+            unicodeReplacementChar: string;
+            /** @default 0 */
+            digitPadding: number;
+            /** @default false */
+            removeMangaName: boolean;
+        };
         SettingsResponse: {
             proxy: components["schemas"]["ProxySettings"];
+            output: components["schemas"]["OutputDefaults"];
+            favorites: {
+                intervalMinutes: number;
+                checkAtStartup: boolean;
+            };
+            performance: {
+                requestTimeoutSeconds: number;
+                retryCount: number;
+                parallelChapters: number;
+                threadsPerChapter: number;
+            };
+            retention: {
+                days: number;
+            };
+            filenamePolicy: {
+                normalizePaths: boolean;
+            };
+            diagnostics: {
+                logEnabled: boolean;
+                /** @enum {string} */
+                logLevel: "debug" | "info" | "warn" | "error";
+            };
             browser: {
                 enabled: boolean;
                 url: string;
@@ -668,6 +1051,12 @@ export interface components {
         SettingsResponse2: string;
         SettingsResponse3: string;
         SettingsResponse4: string;
+        ApiTokenResponse: {
+            token: string | null;
+            envManaged: boolean;
+            /** @enum {string} */
+            mode: "none" | "password" | "api-token" | "password+api-token";
+        };
         CatalogEntry: {
             link: string;
             title: string;
@@ -691,6 +1080,9 @@ export interface components {
             autoDownload: boolean;
             lastCheck: components["schemas"]["Timestamp"] | null;
             lastUpdated: components["schemas"]["Timestamp"] | null;
+            saveTo: string | null;
+            enabled: boolean;
+            dateAdded: components["schemas"]["Timestamp"] | null;
         };
         /** Format: date-time */
         Timestamp: string;
@@ -702,10 +1094,13 @@ export interface components {
             status: "asUnknown" | "asChecking" | "asValid" | "asInvalid";
         };
         InfoRequest: {
-            moduleId: string;
-            url: string;
+            moduleId?: components["schemas"]["InfoRequest0"];
+            url: components["schemas"]["InfoRequest1"];
         };
+        InfoRequest0: string;
+        InfoRequest1: string;
         InfoResponse: {
+            moduleId: string;
             title: string;
             altTitles: string;
             authors: string;
@@ -719,6 +1114,7 @@ export interface components {
             chapterLinks: string[];
             chapterNames: string[];
             numChapter: number;
+            downloaded: string[];
         };
         Job: {
             id: string;
@@ -736,6 +1132,7 @@ export interface components {
             };
             error?: string;
             idempotencyKey?: string;
+            paused?: boolean;
             createdAt: components["schemas"]["Timestamp"];
             updatedAt: components["schemas"]["Timestamp"];
         };
@@ -766,6 +1163,13 @@ export interface components {
         UpdateModuleBody3: string;
         UpdateModuleBody4: string;
         /** @enum {string} */
+        BulkUpdateModules200Response0: "" | "HTTP" | "SOCKS4" | "SOCKS5";
+        BulkUpdateModules200Response1: string;
+        BulkUpdateModules200Response2: string;
+        BulkUpdateModules200Response3: string;
+        BulkUpdateModules200Response4: string;
+        BulkUpdateModulesBody0: string;
+        /** @enum {string} */
         GetSettings200Response0: "" | "HTTP" | "SOCKS4" | "SOCKS5";
         GetSettings200Response1: string;
         GetSettings200Response2: string;
@@ -783,35 +1187,82 @@ export interface components {
         UpdateProxyBody2: string;
         UpdateProxyBody3: string;
         UpdateProxyBody4: string;
+        /** @enum {string} */
+        UpdateOutputDefaults200Response0: "" | "HTTP" | "SOCKS4" | "SOCKS5";
+        UpdateOutputDefaults200Response1: string;
+        UpdateOutputDefaults200Response2: string;
+        UpdateOutputDefaults200Response3: string;
+        UpdateOutputDefaults200Response4: string;
+        /** @enum {string} */
+        UpdatePerformanceSettings200Response0: "" | "HTTP" | "SOCKS4" | "SOCKS5";
+        UpdatePerformanceSettings200Response1: string;
+        UpdatePerformanceSettings200Response2: string;
+        UpdatePerformanceSettings200Response3: string;
+        UpdatePerformanceSettings200Response4: string;
+        /** @enum {string} */
+        UpdateRetentionSettings200Response0: "" | "HTTP" | "SOCKS4" | "SOCKS5";
+        UpdateRetentionSettings200Response1: string;
+        UpdateRetentionSettings200Response2: string;
+        UpdateRetentionSettings200Response3: string;
+        UpdateRetentionSettings200Response4: string;
+        /** @enum {string} */
+        UpdateFilenamePolicySettings200Response0: "" | "HTTP" | "SOCKS4" | "SOCKS5";
+        UpdateFilenamePolicySettings200Response1: string;
+        UpdateFilenamePolicySettings200Response2: string;
+        UpdateFilenamePolicySettings200Response3: string;
+        UpdateFilenamePolicySettings200Response4: string;
+        /** @enum {string} */
+        UpdateDiagnosticsSettings200Response0: "" | "HTTP" | "SOCKS4" | "SOCKS5";
+        UpdateDiagnosticsSettings200Response1: string;
+        UpdateDiagnosticsSettings200Response2: string;
+        UpdateDiagnosticsSettings200Response3: string;
+        UpdateDiagnosticsSettings200Response4: string;
+        /** @enum {string} */
+        UpdateFavoritesSettings200Response0: "" | "HTTP" | "SOCKS4" | "SOCKS5";
+        UpdateFavoritesSettings200Response1: string;
+        UpdateFavoritesSettings200Response2: string;
+        UpdateFavoritesSettings200Response3: string;
+        UpdateFavoritesSettings200Response4: string;
         CatalogSearchQuery0: string;
         CatalogSearchQuery1: string;
         CatalogSearchQuery2: string;
         CatalogSearchQuery3: components["schemas"]["CatalogSearchQuery4"][];
         CatalogSearchQuery4: string;
+        CatalogSearchQuery5: components["schemas"]["CatalogSearchQuery6"][];
+        CatalogSearchQuery6: string;
         /**
          * @default all
          * @enum {string}
          */
-        CatalogSearchQuery5: "all" | "any";
-        CatalogSearchQuery6: string;
-        CatalogSearchQuery7: number;
+        CatalogSearchQuery7: "all" | "any";
         CatalogSearchQuery8: string;
+        CatalogSearchQuery9: string;
+        CatalogSearchQuery10: string;
+        CatalogSearchQuery11: number;
+        CatalogSearchQuery12: string;
         /** @default 20 */
-        CatalogSearchQuery9: number;
+        CatalogSearchQuery13: number;
         AllSitesSearchQuery0: string;
         AllSitesSearchQuery1: string;
         AllSitesSearchQuery2: components["schemas"]["AllSitesSearchQuery3"][];
         AllSitesSearchQuery3: string;
+        AllSitesSearchQuery4: components["schemas"]["AllSitesSearchQuery5"][];
+        AllSitesSearchQuery5: string;
         /**
          * @default all
          * @enum {string}
          */
-        AllSitesSearchQuery4: "all" | "any";
-        AllSitesSearchQuery5: string;
-        AllSitesSearchQuery6: number;
+        AllSitesSearchQuery6: "all" | "any";
         AllSitesSearchQuery7: string;
+        AllSitesSearchQuery8: string;
+        AllSitesSearchQuery9: string;
+        AllSitesSearchQuery10: number;
+        AllSitesSearchQuery11: string;
         /** @default 20 */
-        AllSitesSearchQuery8: number;
+        AllSitesSearchQuery12: number;
+        LiveInfoBody0: string;
+        LiveInfoBody1: string;
+        CreateDownloadJobsBatchBody0: string;
     };
     responses: never;
     parameters: never;
@@ -914,6 +1365,64 @@ export interface operations {
             };
             /** @description Module not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    bulkUpdateModules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    enabled: boolean;
+                    category?: string;
+                    ids?: components["schemas"]["BulkUpdateModulesBody0"][];
+                };
+            };
+        };
+        responses: {
+            /** @description The resolved module set after the write + count */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        modules: components["schemas"]["ModuleSummary"][];
+                        updated: number;
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1224,6 +1733,328 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["ProxySettings"];
+            };
+        };
+        responses: {
+            /** @description Settings snapshot after the update */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    updateOutputDefaults: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OutputDefaults"];
+            };
+        };
+        responses: {
+            /** @description Settings snapshot after the update */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    updatePerformanceSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    requestTimeoutSeconds: number;
+                    retryCount: number;
+                    parallelChapters: number;
+                    threadsPerChapter: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Settings snapshot after the update */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    updateRetentionSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    days: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Settings snapshot after the update */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    updateFilenamePolicySettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    normalizePaths: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Settings snapshot after the update */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    updateDiagnosticsSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    logEnabled: boolean;
+                    /** @enum {string} */
+                    logLevel: "debug" | "info" | "warn" | "error";
+                };
+            };
+        };
+        responses: {
+            /** @description Settings snapshot after the update */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    updateFavoritesSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    intervalMinutes: number;
+                    checkAtStartup: boolean;
+                };
             };
         };
         responses: {
@@ -1660,11 +2491,14 @@ export interface operations {
                 status?: components["schemas"]["CatalogSearchQuery1"];
                 genre?: components["schemas"]["CatalogSearchQuery2"];
                 genres?: components["schemas"]["CatalogSearchQuery3"];
-                genresMode?: components["schemas"]["CatalogSearchQuery5"];
-                authors?: components["schemas"]["CatalogSearchQuery6"];
-                newDays?: components["schemas"]["CatalogSearchQuery7"];
-                cursor?: components["schemas"]["CatalogSearchQuery8"];
-                limit?: components["schemas"]["CatalogSearchQuery9"];
+                genresExclude?: components["schemas"]["CatalogSearchQuery5"];
+                genresMode?: components["schemas"]["CatalogSearchQuery7"];
+                authors?: components["schemas"]["CatalogSearchQuery8"];
+                artists?: components["schemas"]["CatalogSearchQuery9"];
+                summary?: components["schemas"]["CatalogSearchQuery10"];
+                newDays?: components["schemas"]["CatalogSearchQuery11"];
+                cursor?: components["schemas"]["CatalogSearchQuery12"];
+                limit?: components["schemas"]["CatalogSearchQuery13"];
             };
             header?: never;
             path: {
@@ -1743,11 +2577,14 @@ export interface operations {
                 q?: components["schemas"]["AllSitesSearchQuery0"];
                 status?: components["schemas"]["AllSitesSearchQuery1"];
                 genres?: components["schemas"]["AllSitesSearchQuery2"];
-                genresMode?: components["schemas"]["AllSitesSearchQuery4"];
-                authors?: components["schemas"]["AllSitesSearchQuery5"];
-                newDays?: components["schemas"]["AllSitesSearchQuery6"];
-                cursor?: components["schemas"]["AllSitesSearchQuery7"];
-                limit?: components["schemas"]["AllSitesSearchQuery8"];
+                genresExclude?: components["schemas"]["AllSitesSearchQuery4"];
+                genresMode?: components["schemas"]["AllSitesSearchQuery6"];
+                authors?: components["schemas"]["AllSitesSearchQuery7"];
+                artists?: components["schemas"]["AllSitesSearchQuery8"];
+                summary?: components["schemas"]["AllSitesSearchQuery9"];
+                newDays?: components["schemas"]["AllSitesSearchQuery10"];
+                cursor?: components["schemas"]["AllSitesSearchQuery11"];
+                limit?: components["schemas"]["AllSitesSearchQuery12"];
             };
             header?: never;
             path?: never;
@@ -1829,7 +2666,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Normalized MANGAINFO state */
+            /** @description Normalized MANGAINFO state + downloaded chapter links */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1901,6 +2738,8 @@ export interface operations {
                     chapterLink: string;
                     chapterName?: string;
                     idempotencyKey?: string;
+                    paused?: boolean;
+                    saveTo?: string;
                 };
             };
         };
@@ -1965,10 +2804,115 @@ export interface operations {
             };
         };
     };
+    createDownloadJobsBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    moduleId: string;
+                    mangaUrl: string;
+                    mangaTitle?: string;
+                    chapters: "all" | components["schemas"]["CreateDownloadJobsBatchBody0"][];
+                    idempotencyKey: string;
+                    paused?: boolean;
+                    saveTo?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Full replay — every chapter returned an existing live job */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        jobs: components["schemas"]["Job"][];
+                        replayed: boolean;
+                    };
+                };
+            };
+            /** @description Created batch (at least one fresh/chained job) */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        jobs: components["schemas"]["Job"][];
+                        replayed: boolean;
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Module not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Batch key reused with a different chapter sequence */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Module GetInfo failed */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
     listJobs: {
         parameters: {
             query?: {
                 state?: "queued" | "running" | "retry" | "done" | "failed" | "cancelled";
+                states?: string;
+                q?: string;
+                addedFrom?: string;
+                addedTo?: string;
                 cursor?: string;
                 limit?: number;
             };
@@ -2062,6 +3006,70 @@ export interface operations {
             };
         };
     };
+    deleteJob: {
+        parameters: {
+            query?: {
+                data?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description Module/catalog id (32-hex, §5) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The removed job snapshot + artifact outcome */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        job: components["schemas"]["Job"];
+                        dataDeleted: boolean;
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Job not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
     cancelJob: {
         parameters: {
             query?: never;
@@ -2118,6 +3126,223 @@ export interface operations {
             };
             /** @description Job is already terminal */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    resumeJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Module/catalog id (32-hex, §5) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description The resumed job snapshot */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        job: components["schemas"]["Job"];
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Job not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Job is already terminal */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    jobAction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Module/catalog id (32-hex, §5) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    type: "pause" | "resume" | "retry" | "redownload" | "enable" | "disable";
+                };
+            };
+        };
+        responses: {
+            /** @description The resulting job snapshot (fresh row for re-enqueue semantics) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        job: components["schemas"]["Job"];
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Job not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Action illegal in the job current state (state matrix) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    jobBulkAction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    action: "pause" | "resume" | "delete";
+                    /**
+                     * @default all
+                     * @enum {string}
+                     */
+                    scope?: "all" | "completed";
+                };
+            };
+        };
+        responses: {
+            /** @description Bulk outcome: count + touched snapshots */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        action: "pause" | "resume" | "delete";
+                        /** @enum {string} */
+                        scope: "all" | "completed";
+                        affected: number;
+                        jobs: components["schemas"]["Job"][];
+                    };
+                };
+            };
+            /** @description Scope does not apply to this action */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2471,6 +3696,8 @@ export interface operations {
                 "application/json": {
                     title?: string;
                     autoDownload?: boolean;
+                    saveTo?: string;
+                    enabled?: boolean;
                 };
             };
         };
@@ -2635,6 +3862,245 @@ export interface operations {
             };
         };
     };
+    checkFavoritesBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * @default all
+                     * @enum {string}
+                     */
+                    scope?: "all" | "enabled" | "disabled";
+                };
+            };
+        };
+        responses: {
+            /** @description Batch result summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        scope: "all" | "enabled" | "disabled";
+                        cancelled: boolean;
+                        checked: number;
+                        failed: number;
+                        queuedDownloads: number;
+                        results: {
+                            favorite: components["schemas"]["Favorite"];
+                            /** @enum {string} */
+                            status: "checked" | "skipped" | "failed";
+                            newChapters: {
+                                position: number;
+                                link: string;
+                                name: string;
+                            }[];
+                            queuedDownloads: number;
+                            error?: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description A batch is already running */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    cancelFavoritesCheckBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancel accepted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        cancelled: boolean;
+                    };
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    previewFavoriteTransfer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Module/catalog id (32-hex, §5) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    targetModuleId: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Mapping preview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        targetModuleId: string;
+                        valid: boolean;
+                        targetUrl: string | null;
+                        matchedTitle: string | null;
+                        reason?: string;
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Favorite not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    transferFavorite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Module/catalog id (32-hex, §5) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    targetModuleId: string;
+                    /** @default false */
+                    clearDownloadedList?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The transferred favorite */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        favorite: components["schemas"]["Favorite"];
+                        reloadedFromServer: boolean;
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Favorite not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Transfer target invalid */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
     login: {
         parameters: {
             query?: never;
@@ -2680,8 +4146,93 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Login rate limit exceeded */
+            /** @description Login rate limit exceeded (valid Bearer api-token requests bypass it) */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    getApiToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Token state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiTokenResponse"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    regenerateApiToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The new token state (value included, shown once) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiTokenResponse"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Env-pinned (FMD_WEB_API_TOKEN) or no auth configured */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

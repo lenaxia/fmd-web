@@ -52,6 +52,7 @@ export function entryFixture(link: string, title: string, overrides?: Partial<Ca
 
 export function infoFixture(): InfoResponseT {
   return {
+    moduleId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     title: 'Fixture Manga',
     altTitles: 'Fixtue Manhua',
     authors: 'Author A',
@@ -65,6 +66,7 @@ export function infoFixture(): InfoResponseT {
     chapterLinks: ['/manga/fixture/ch-1', '/manga/fixture/ch-2', '/manga/fixture/ch-3'],
     chapterNames: ['Chapter 1', 'Chapter 2', 'Chapter 3'],
     numChapter: 3,
+    downloaded: ['/manga/fixture/ch-1'],
   };
 }
 
@@ -95,6 +97,9 @@ export function favoriteFixture(overrides: Partial<FavoriteT> = {}): FavoriteT {
     autoDownload: false,
     lastCheck: '2026-01-01T00:00:00Z',
     lastUpdated: null,
+    saveTo: null,
+    enabled: true,
+    dateAdded: '2026-01-01T00:00:00Z',
     ...overrides,
   };
 }

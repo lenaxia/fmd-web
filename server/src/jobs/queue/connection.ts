@@ -81,11 +81,20 @@ export function ensureJobSchema(db: Database.Database): void {
       claimed_by      TEXT,
       claimed_at      INTEGER,
       created_at      INTEGER NOT NULL,
-      updated_at      INTEGER NOT NULL
+      updated_at      INTEGER NOT NULL,
+      paused          INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS job_type_state ON job (type, state);
     CREATE INDEX IF NOT EXISTS job_retention  ON job (state, updated_at);
   `);
+  // Additive migration for pre-paused deployments (ALTER cannot be
+  // conditional in SQLite — the pragma read gates it). cbAddAsStopped
+  // parity: paused=1 rows are invisible to the claim transaction until
+  // the resume endpoint lifts the hold.
+  const columns = db.pragma('table_info(job)') as Array<{ name: string }>;
+  if (!columns.some((c): boolean => c.name === 'paused')) {
+    db.exec('ALTER TABLE job ADD COLUMN paused INTEGER NOT NULL DEFAULT 0');
+  }
 }
 
 /** Valid checkpoint modes (`PRAGMA wal_checkpoint(<mode>)`). */

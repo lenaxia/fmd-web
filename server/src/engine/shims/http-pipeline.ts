@@ -26,6 +26,27 @@ import type { HttpTransportPort, RawHttpRequest, RawProxy } from './http-transpo
 export const DEFAULT_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36';
 export const DEFAULT_TIMEOUT_MS = 15000;
+
+/**
+ * [parity-sweep] M10: the settings-driven default request timeout
+ * (PUT /api/settings/performance). Seeds every NEW pipeline's `timeout`
+ * (module code may still override per request via the shim); the
+ * module-level default is the seam the settings sink writes — existing
+ * pipelines keep their value until the next module run.
+ */
+let currentDefaultRequestTimeoutMs: number = DEFAULT_TIMEOUT_MS;
+
+export function setDefaultRequestTimeoutMs(ms: number): void {
+  const clamped: number = Math.max(1, Math.trunc(ms));
+  if (Number.isFinite(clamped)) {
+    currentDefaultRequestTimeoutMs = clamped;
+  }
+}
+
+export function defaultRequestTimeoutMs(): number {
+  return currentDefaultRequestTimeoutMs;
+}
+
 const REDIRECT_CODES = new Set([301, 302, 303, 307]);
 
 /** Stream facade backing (bytes; string views are UTF-8). */
@@ -104,7 +125,7 @@ export class HttpPipeline {
   lastURL = '';
   mimeType = 'text/html';
   userAgent = DEFAULT_USER_AGENT;
-  timeout = DEFAULT_TIMEOUT_MS;
+  timeout = defaultRequestTimeoutMs();
   retryCount = 0;
   maxRedirect = 5;
   enabledCookies = true;

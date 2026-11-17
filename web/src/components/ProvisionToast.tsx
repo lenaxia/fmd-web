@@ -30,13 +30,15 @@ const PHASE_PERCENT: Partial<Record<CatalogSyncPhaseT, number>> = {
 };
 
 const PHASE_TEXT: Record<string, string> = {
-  checking: 'Checking FMD2-DB for the latest catalog…',
-  downloading: 'Downloading the catalog archive…',
-  extracting: 'Extracting the catalog database…',
-  installing: 'Installing the catalog…',
+  checking: 'Looking for the site’s list…',
+  downloading: 'Downloading the site’s list…',
+  extracting: 'Unpacking the site’s list…',
+  installing: 'Finishing up…',
 };
 
-/** Pure message projection (unit-tested): machine → toast (message, determinate %). */
+/** Pure message projection (unit-tested): machine → toast (message, determinate %).
+ * Plumbing-free by charter: no source names, no mode vocabulary — the
+ * user only ever learns that the site is being prepared. */
 export function provisionToastMessage(
   machine: ProvisionMachine,
   siteName: string,
@@ -46,19 +48,19 @@ export function provisionToastMessage(
       return { message: `Preparing ${siteName}…` };
     case 'installing':
       return {
-        message: `${siteName}: ${PHASE_TEXT[machine.phase] ?? 'Provisioning catalog…'}`,
+        message: `${siteName}: ${PHASE_TEXT[machine.phase] ?? 'Preparing…'}`,
         ...(PHASE_PERCENT[machine.phase] !== undefined ? { progress: PHASE_PERCENT[machine.phase] } : {}),
       };
     case 'ready':
-      return { message: `${siteName}: catalog ready.` };
+      return { message: `${siteName} is ready.` };
     case 'no-catalog':
       return {
-        message: `${siteName}: no prebuilt catalog exists (FMD2-DB has no archive for this site).`,
+        message: `${siteName}: no list is available for this site yet.`,
       };
     case 'failed':
-      return { message: `${siteName}: catalog provisioning failed — check your connection and retry.` };
+      return { message: `${siteName}: couldn’t open the site — check your connection and retry.` };
     case 'cancelled':
-      return { message: `${siteName}: provisioning cancelled.` };
+      return { message: `${siteName}: cancelled.` };
     default:
       return { message: `${siteName}…` };
   }

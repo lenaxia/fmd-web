@@ -70,6 +70,17 @@ export interface QueueJob {
   readonly failureKind: JobFailureKind | undefined;
   readonly error: string | undefined;
   readonly attempts: number;
+  /**
+   * cbAddAsStopped parity: a live (queued/retry) row the claim
+   * transaction must SKIP until the resume endpoint lifts the hold.
+   */
+  readonly paused: boolean;
+  /**
+   * The §10 idempotency key this row was enqueued under (the chained
+   * re-enqueue paths — resume/retry/redownload — probe `<key>#<n>`
+   * slots with it; undefined for keyless rows).
+   */
+  readonly idempotencyKey: string | undefined;
   readonly createdAt: number;
   readonly updatedAt: number;
 }
@@ -79,6 +90,8 @@ export interface EnqueueOptions {
   readonly idempotencyKey?: string;
   /** Higher claims first (ORDER BY priority DESC, id ASC). Default 0. */
   readonly priority?: number;
+  /** Add-as-stopped hold: the row is queued but not claimable until resume. */
+  readonly paused?: boolean;
 }
 
 export interface EnqueueResult {
@@ -103,6 +116,24 @@ export interface JobQueue {
   claim(lane: LaneId, opts?: ClaimOptions): QueueJob | undefined;
   transition(jobId: JobId, to: JobState, detail?: JobTransitionDetail): QueueJob;
   cancel(jobId: JobId): QueueJob;
+  /**
+   * Lift the add-as-stopped hold (cbAddAsStopped parity): the paused
+   * row becomes claimable again. Terminal rows and unknown ids throw
+   * (the API service maps both onto the typed envelope).
+   */
+  resume(jobId: JobId): QueueJob;
+  /**
+   * Set the hold (downloads-parity pause/disable): the live row becomes
+   * un-claimable (`paused = 1`). Terminal rows and unknown ids throw;
+   * holding an already-held row returns it unchanged.
+   */
+  hold(jobId: JobId): QueueJob;
+  /**
+   * Delete the row (downloads-parity delete task): any state, returns
+   * the pre-delete snapshot. Unknown ids throw. In-flight progress
+   * buffers drop with the row.
+   */
+  remove(jobId: JobId): QueueJob;
   /** The job row last enqueued under `key`, or undefined (§10 lookup). */
   byIdempotencyKey(key: string): QueueJob | undefined;
   /** Coalesced progress (≤1 durable flush/sec/job, §4). */
@@ -134,6 +165,13 @@ export interface SqliteJobQueueOptions {
   /** Run `recoverOrphans()` at construction (boot-time recovery). */
   readonly recoverOnOpen?: boolean;
   readonly openDbOptions?: OpenQueueDbOptions;
+  /**
+   * [parity-sweep] M2: terminal-job retention window, read LIVE at
+   * every prune (PUT /api/settings/retention applies without restart).
+   * Returning ≤ 0 disables pruning (keep forever); absent = the §9
+   * fixed 30-day default.
+   */
+  readonly retentionMs?: () => number;
 }
 
 interface JobRow {
@@ -146,12 +184,19 @@ interface JobRow {
   readonly failure: string | null;
   readonly error: string | null;
   readonly attempts: number;
+  readonly paused: number;
+  readonly idempotency_key: string | null;
   readonly created_at: number;
   readonly updated_at: number;
 }
 
 /** Replay lookup also carries the fingerprint (§10 conflict check). */
 type JobRowWithFp = JobRow & { readonly idempotency_fp: string | null };
+
+/** The §10 key a row was enqueued under (undefined when keyless). */
+function idempotencyKeyOf(row: JobRow): string | undefined {
+  return row.idempotency_key ?? undefined;
+}
 
 function parseProgress(raw: string | null): JobProgress | undefined {
   if (raw === null) {
@@ -178,6 +223,8 @@ function toQueueJob(row: JobRow): QueueJob {
     failureKind: parseFailureKind(row.failure),
     error: row.error ?? undefined,
     attempts: row.attempts,
+    paused: row.paused !== 0,
+    idempotencyKey: idempotencyKeyOf(row),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -214,18 +261,23 @@ function validatePayloadSemantics(payload: JobPayload): void {
 }
 
 const SELECT_COLUMNS =
-  'id, type, payload, state, priority, progress, failure, error, attempts, created_at, updated_at';
+  'id, type, payload, state, priority, progress, failure, error, attempts, paused, idempotency_key, created_at, updated_at';
 
 export class SqliteJobQueue implements JobQueue {
   private readonly db: Database.Database;
   private readonly clock: SyncClock;
   private readonly coalescer: ProgressCoalescer;
+  /** [parity-sweep] M2: live retention window (≤ 0 = keep forever). */
+  private readonly retentionMs?: () => number;
   private closed = false;
 
   private readonly stmtClaim: Database.Statement;
   private readonly stmtInsert: Database.Statement;
   private readonly stmtByIdempotencyKey: Database.Statement;
   private readonly stmtTransition: Database.Statement;
+  private readonly stmtResume: Database.Statement;
+  private readonly stmtHold: Database.Statement;
+  private readonly stmtRemove: Database.Statement;
   private readonly stmtRecover: Database.Statement;
   private readonly stmtPrune: Database.Statement;
   private readonly stmtGet: Database.Statement;
@@ -242,12 +294,16 @@ export class SqliteJobQueue implements JobQueue {
     readonly moduleId: string | null;
     readonly fingerprint: string;
     readonly priority: number;
+    readonly paused: number;
     readonly now: number;
     readonly idempotencyKey: string | null;
   }) => { readonly row: JobRow; readonly replayed: boolean };
 
   public constructor(opts: SqliteJobQueueOptions) {
     this.clock = opts.clock ?? systemClock;
+    if (opts.retentionMs !== undefined) {
+      this.retentionMs = opts.retentionMs;
+    }
     this.db = openQueueDb(opts.file, opts.openDbOptions ?? {});
     ensureJobSchema(this.db);
     this.coalescer = new ProgressCoalescer({
@@ -271,7 +327,7 @@ export class SqliteJobQueue implements JobQueue {
          updated_at = @now
        WHERE id = (
          SELECT id FROM job
-         WHERE type = @lane AND state IN ('queued', 'retry')
+         WHERE type = @lane AND state IN ('queued', 'retry') AND paused = 0
          ORDER BY priority DESC, id ASC
          LIMIT 1
        )
@@ -279,11 +335,22 @@ export class SqliteJobQueue implements JobQueue {
     );
     this.stmtInsert = this.db.prepare(
       `INSERT INTO job
-         (type, module_id, payload, state, priority, idempotency_key, idempotency_fp, created_at, updated_at)
+         (type, module_id, payload, state, priority, idempotency_key, idempotency_fp, paused, created_at, updated_at)
        VALUES
-         (@type, @moduleId, @payload, 'queued', @priority, @key, @fp, @now, @now)
+         (@type, @moduleId, @payload, 'queued', @priority, @key, @fp, @paused, @now, @now)
        RETURNING ${SELECT_COLUMNS}`,
     );
+    this.stmtResume = this.db.prepare(
+      `UPDATE job SET paused = 0, updated_at = @now
+       WHERE id = @id AND paused = 1
+       RETURNING ${SELECT_COLUMNS}`,
+    );
+    this.stmtHold = this.db.prepare(
+      `UPDATE job SET paused = 1, updated_at = @now
+       WHERE id = @id AND paused = 0
+       RETURNING ${SELECT_COLUMNS}`,
+    );
+    this.stmtRemove = this.db.prepare(`DELETE FROM job WHERE id = @id RETURNING ${SELECT_COLUMNS}`);
     this.stmtByIdempotencyKey = this.db.prepare(
       `SELECT ${SELECT_COLUMNS}, idempotency_fp FROM job WHERE idempotency_key = @key`,
     );
@@ -345,6 +412,7 @@ export class SqliteJobQueue implements JobQueue {
         priority: input.priority,
         key: input.idempotencyKey,
         fp: input.fingerprint,
+        paused: input.paused,
         now: input.now,
       }) as JobRow;
       return { row, replayed: false };
@@ -368,10 +436,76 @@ export class SqliteJobQueue implements JobQueue {
       moduleId: moduleIdOf(payload),
       fingerprint: payloadFingerprint(payload),
       priority,
+      paused: opts?.paused === true ? 1 : 0,
       now: this.clock.now(),
       idempotencyKey: opts?.idempotencyKey ?? null,
     });
     return { job: toQueueJob(row), replayed };
+  }
+
+  /** cbAddAsStopped parity: clear the hold; unknown/terminal rows throw. */
+  public resume(jobId: JobId): QueueJob {
+    this.assertOpen();
+    const current: QueueJob | undefined = this.get(jobId);
+    if (current === undefined) {
+      throw new Error(`resume target not found: job ${jobId}`);
+    }
+    if (current.state === 'done' || current.state === 'failed' || current.state === 'cancelled') {
+      throw new Error(`job ${jobId} is ${current.state} — nothing to resume`);
+    }
+    if (!current.paused) {
+      return current; // idempotent no-op: hold already lifted
+    }
+    const row = this.stmtResume.get({ id: Number(jobId), now: this.clock.now() }) as
+      | JobRow
+      | undefined;
+    if (row === undefined) {
+      // Raced a concurrent resume/cancel — surface the fresh row.
+      const fresh: QueueJob | undefined = this.get(jobId);
+      if (fresh === undefined) {
+        throw new Error(`job ${jobId} vanished after resume (db corruption)`);
+      }
+      return fresh;
+    }
+    return toQueueJob(row);
+  }
+
+  /** Downloads-parity hold: live row → paused=1; unknown/terminal throw. */
+  public hold(jobId: JobId): QueueJob {
+    this.assertOpen();
+    const current: QueueJob | undefined = this.get(jobId);
+    if (current === undefined) {
+      throw new Error(`hold target not found: job ${jobId}`);
+    }
+    if (current.state === 'done' || current.state === 'failed' || current.state === 'cancelled') {
+      throw new Error(`job ${jobId} is ${current.state} — cannot hold a terminal row`);
+    }
+    if (current.paused) {
+      return current; // idempotent no-op: hold already set
+    }
+    const row = this.stmtHold.get({ id: Number(jobId), now: this.clock.now() }) as
+      | JobRow
+      | undefined;
+    if (row === undefined) {
+      // Raced a concurrent hold/resume — surface the fresh row.
+      const fresh: QueueJob | undefined = this.get(jobId);
+      if (fresh === undefined) {
+        throw new Error(`job ${jobId} vanished after hold (db corruption)`);
+      }
+      return fresh;
+    }
+    return toQueueJob(row);
+  }
+
+  /** Downloads-parity delete: any state; returns the pre-delete snapshot. */
+  public remove(jobId: JobId): QueueJob {
+    this.assertOpen();
+    const row = this.stmtRemove.get({ id: Number(jobId) }) as JobRow | undefined;
+    if (row === undefined) {
+      throw new Error(`remove target not found: job ${jobId}`);
+    }
+    this.coalescer.take(jobId); // drop any buffered progress with the row
+    return toQueueJob(row);
   }
 
   public claim(lane: LaneId, opts?: ClaimOptions): QueueJob | undefined {
@@ -505,7 +639,13 @@ export class SqliteJobQueue implements JobQueue {
 
   public pruneRetention(now: number = this.clock.now()): number {
     this.assertOpen();
-    const result = this.stmtPrune.run({ cutoff: now - RETENTION_MS });
+    // [parity-sweep] M2: the live provider wins (PUT /api/settings/retention
+    // applies on the NEXT sweep); ≤ 0 keeps every terminal row forever.
+    const windowMs: number = this.retentionMs !== undefined ? this.retentionMs() : RETENTION_MS;
+    if (!Number.isFinite(windowMs) || windowMs <= 0) {
+      return 0;
+    }
+    const result = this.stmtPrune.run({ cutoff: now - windowMs });
     return result.changes;
   }
 

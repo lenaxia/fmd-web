@@ -12,14 +12,14 @@ import type { CatalogEntry, CatalogSearchQuery } from '@fmd/contract';
 import { jdnToday } from '../../src/sync/db/catalog-store.js';
 import { buildHarness, expectEnvelope, UNKNOWN_CATALOG_ID, inMemoryCatalogs } from './helpers.js';
 
-/** Filter fixtures: overlapping genres/authors/status for ANY/ALL proofs. */
+/** Filter fixtures: overlapping genres/authors/artists/summary for ANY/ALL proofs. */
 function filterFixtures(): CatalogEntry[] {
   return [
-    { link: '/f/1', title: 'Action Comedy', alttitles: '', authors: 'Alice Akagi', artists: '', genres: 'Action, Comedy', status: 'Ongoing', summary: 'filter story', numChapter: 1, jdn: 45000 },
-    { link: '/f/2', title: 'Action Only', alttitles: '', authors: 'Bob Bufo', artists: '', genres: 'Action', status: 'Ongoing', summary: 'filter story', numChapter: 2, jdn: 45001 },
-    { link: '/f/3', title: 'Comedy Drama', alttitles: '', authors: 'Alice Kawabe', artists: '', genres: 'Comedy, Drama', status: 'Completed', summary: 'filter story', numChapter: 3, jdn: 45002 },
+    { link: '/f/1', title: 'Action Comedy', alttitles: '', authors: 'Alice Akagi', artists: 'Rin Sawayama', genres: 'Action, Comedy', status: 'Ongoing', summary: 'filter story one: a tale of two swords', numChapter: 1, jdn: 45000 },
+    { link: '/f/2', title: 'Action Only', alttitles: '', authors: 'Bob Bufo', artists: 'Chihaya Arata', genres: 'Action', status: 'Ongoing', summary: 'filter story two', numChapter: 2, jdn: 45001 },
+    { link: '/f/3', title: 'Comedy Drama', alttitles: '', authors: 'Alice Kawabe', artists: 'Rin Sawayama', genres: 'Comedy, Drama', status: 'Completed', summary: 'filter story three: the swords return', numChapter: 3, jdn: 45002 },
     // 'Malice' contains 'alice' — LIKE-contains is case-insensitive.
-    { link: '/f/4', title: 'Drama Malice', alttitles: '', authors: 'Malice', artists: '', genres: 'Action, Drama', status: 'Hiatus', summary: 'filter story', numChapter: 4, jdn: 45003 },
+    { link: '/f/4', title: 'Drama Malice', alttitles: '', authors: 'Malice', artists: 'Artorias', genres: 'Action, Drama', status: 'Hiatus', summary: 'filter story four', numChapter: 4, jdn: 45003 },
   ];
 }
 
@@ -213,5 +213,164 @@ describe('GET /api/catalog/:id/search — FMD2 filter params (additive)', (): vo
       genres: ['Action', 'Comedy'],
       genresMode: 'any',
     });
+  });
+});
+
+describe('GET /api/catalog/:id/search — genresExclude wire forms (audit (b)2)', (): void => {
+  it('genresExclude excludes end-to-end (repeated params AND csv form)', async (): Promise<void> => {
+    const h = filterHarness();
+    const repeated = await h.app.inject({
+      method: 'GET',
+      url: `/api/catalog/${UNKNOWN_CATALOG_ID}/search?q=filter&genres=Action&genres=Comedy&genresMode=any&genresExclude=Drama`,
+    });
+    expect(repeated.statusCode).toBe(200);
+    expect(titles(repeated.json())).toEqual(['Action Comedy', 'Action Only']);
+    const csv = await h.app.inject({
+      method: 'GET',
+      url: `/api/catalog/${UNKNOWN_CATALOG_ID}/search?q=filter&genresExclude=Comedy,Drama`,
+    });
+    expect(csv.statusCode).toBe(200);
+    expect(titles(csv.json())).toEqual(['Action Only']);
+  });
+
+  it('q is OPTIONAL when ONLY genresExclude is set (exclude-only filter)', async (): Promise<void> => {
+    const h = filterHarness();
+    const res = await h.app.inject({
+      method: 'GET',
+      url: `/api/catalog/${UNKNOWN_CATALOG_ID}/search?genresExclude=Comedy`,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(titles(res.json())).toEqual(['Action Only', 'Drama Malice']);
+  });
+
+  it('cursor binds genresExclude: reuse under a changed exclude set is a 400', async (): Promise<void> => {
+    const h = filterHarness();
+    const first = await h.app.inject({
+      method: 'GET',
+      url: `/api/catalog/${UNKNOWN_CATALOG_ID}/search?q=filter&genres=Action&genresExclude=Comedy&limit=1`,
+    });
+    expect(first.statusCode).toBe(200);
+    const cursor: string = (first.json() as { nextCursor?: string }).nextCursor ?? '';
+    expect(cursor).not.toBe('');
+    const same = await h.app.inject({
+      method: 'GET',
+      url: `/api/catalog/${UNKNOWN_CATALOG_ID}/search?q=filter&genres=Action&genresExclude=Comedy&limit=1&cursor=${encodeURIComponent(cursor)}`,
+    });
+    expect(same.statusCode).toBe(200);
+    const changed = await h.app.inject({
+      method: 'GET',
+      url: `/api/catalog/${UNKNOWN_CATALOG_ID}/search?q=filter&genres=Action&genresExclude=Drama&limit=1&cursor=${encodeURIComponent(cursor)}`,
+    });
+    expect(changed.statusCode).toBe(400);
+    expectEnvelope(changed.body, 'bad_request');
+  });
+
+  it('the route hands the store the parsed genresExclude array', async (): Promise<void> => {
+    const h = filterHarness();
+    const seen: CatalogSearchQuery[] = [];
+    const original = h.catalogs.search.bind(h.catalogs);
+    h.catalogs.search = (id, query): ReturnType<typeof original> => {
+      seen.push(structuredClone(query));
+      return original(id, query);
+    };
+    await h.app.inject({
+      method: 'GET',
+      url: `/api/catalog/${UNKNOWN_CATALOG_ID}/search?q=filter&genresExclude=Ecchi,!Smut`,
+    });
+    // NOTE: the `!` prefix is a WEB grammar (browse-filter-state) — the
+    // API receives the already-split exclude names. Both wire forms are
+    // equivalent here: csv split, trimmed, parsed.
+    expect(seen[0]).toMatchObject({ genresExclude: ['Ecchi', '!Smut'] });
+  });
+});
+
+describe('GET /api/catalog/:id/search — artists + summary filters (FMD2 edFilterArtists/edFilterSummary, settings-parity)', (): void => {
+  it('artists: LIKE-contains, case-insensitive', async (): Promise<void> => {
+    const h = filterHarness();
+    const res = await h.app.inject({
+      method: 'GET',
+      url: `/api/catalog/${UNKNOWN_CATALOG_ID}/search?q=filter&artists=rin`,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(titles(res.json())).toEqual(['Action Comedy', 'Comedy Drama']);
+  });
+
+  it('summary: LIKE-contains over the summary column', async (): Promise<void> => {
+    const h = filterHarness();
+    const res = await h.app.inject({
+      method: 'GET',
+      url: `/api/catalog/${UNKNOWN_CATALOG_ID}/search?q=filter&summary=swords`,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(titles(res.json())).toEqual(['Action Comedy', 'Comedy Drama']);
+  });
+
+  it('artists and summary compose with authors (AND of LIKE clauses)', async (): Promise<void> => {
+    const h = filterHarness();
+    const res = await h.app.inject({
+      method: 'GET',
+      url: `/api/catalog/${UNKNOWN_CATALOG_ID}/search?q=filter&authors=alice&artists=rin&summary=return`,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(titles(res.json())).toEqual(['Comedy Drama']);
+  });
+
+  it('q is OPTIONAL when only artists (or only summary) is set', async (): Promise<void> => {
+    const h = filterHarness();
+    const artistsOnly = await h.app.inject({
+      method: 'GET',
+      url: `/api/catalog/${UNKNOWN_CATALOG_ID}/search?artists=artorias`,
+    });
+    expect(artistsOnly.statusCode).toBe(200);
+    expect(titles(artistsOnly.json())).toEqual(['Drama Malice']);
+    const summaryOnly = await h.app.inject({
+      method: 'GET',
+      url: `/api/catalog/${UNKNOWN_CATALOG_ID}/search?summary=four`,
+    });
+    expect(summaryOnly.statusCode).toBe(200);
+    expect(titles(summaryOnly.json())).toEqual(['Drama Malice']);
+  });
+
+  it('cursor binds artists + summary: reuse under a changed value is a 400', async (): Promise<void> => {
+    const h = filterHarness();
+    const first = await h.app.inject({
+      method: 'GET',
+      url: `/api/catalog/${UNKNOWN_CATALOG_ID}/search?q=filter&artists=rin&limit=1`,
+    });
+    expect(first.statusCode).toBe(200);
+    const cursor: string = (first.json() as { nextCursor?: string }).nextCursor ?? '';
+    expect(cursor).not.toBe('');
+    const same = await h.app.inject({
+      method: 'GET',
+      url: `/api/catalog/${UNKNOWN_CATALOG_ID}/search?q=filter&artists=rin&limit=1&cursor=${encodeURIComponent(cursor)}`,
+    });
+    expect(same.statusCode).toBe(200);
+    const changedArtist = await h.app.inject({
+      method: 'GET',
+      url: `/api/catalog/${UNKNOWN_CATALOG_ID}/search?q=filter&artists=chihaya&limit=1&cursor=${encodeURIComponent(cursor)}`,
+    });
+    expect(changedArtist.statusCode).toBe(400);
+    expectEnvelope(changedArtist.body, 'bad_request');
+    const addedSummary = await h.app.inject({
+      method: 'GET',
+      url: `/api/catalog/${UNKNOWN_CATALOG_ID}/search?q=filter&artists=rin&summary=return&limit=1&cursor=${encodeURIComponent(cursor)}`,
+    });
+    expect(addedSummary.statusCode).toBe(400);
+    expectEnvelope(addedSummary.body, 'bad_request');
+  });
+
+  it('the route hands the store the parsed artists/summary params', async (): Promise<void> => {
+    const h = filterHarness();
+    const seen: CatalogSearchQuery[] = [];
+    const original = h.catalogs.search.bind(h.catalogs);
+    h.catalogs.search = (id, query): ReturnType<typeof original> => {
+      seen.push(structuredClone(query));
+      return original(id, query);
+    };
+    await h.app.inject({
+      method: 'GET',
+      url: `/api/catalog/${UNKNOWN_CATALOG_ID}/search?q=filter&artists=rin&summary=swords`,
+    });
+    expect(seen[0]).toMatchObject({ query: 'filter', artists: 'rin', summary: 'swords' });
   });
 });

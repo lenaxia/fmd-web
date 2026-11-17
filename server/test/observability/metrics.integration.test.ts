@@ -25,6 +25,7 @@ import {
   type JobService,
   type JobsPage,
 } from '../../src/api/services.js';
+import type { JobActionTypeT } from '@fmd/contract';
 import {
   CATALOG_ID,
   FakeInfoService,
@@ -78,6 +79,41 @@ class QueueJobService implements JobService {
   cancel(id: string): JobRecord {
     this.queue.cancel(id);
     return this.toRecord(id);
+  }
+
+  resume(id: string): JobRecord {
+    this.queue.resume(id);
+    return this.toRecord(id);
+  }
+
+  /** Downloads parity: the matrix subset this workload exercises
+   * (hold/lift/cancel); the re-enqueue actions are download-lane
+   * concerns the observability double never hits. */
+  action(id: string, type: JobActionTypeT): JobRecord {
+    const current = this.queue.get(id);
+    if (type === 'pause' || type === 'disable') {
+      if (current !== undefined && (current.state === 'running' || current.state === 'retry') && type === 'pause') {
+        this.queue.cancel(id);
+      } else if (current !== undefined && current.state === 'queued' && !current.paused) {
+        this.queue.hold(id);
+      }
+      return this.toRecord(id);
+    }
+    if (type === 'resume' || type === 'enable') {
+      this.queue.resume(id);
+      return this.toRecord(id);
+    }
+    throw new Error(`unsupported action in the metrics double: ${type}`);
+  }
+
+  remove(id: string): { job: JobRecord; dataDeleted: boolean } {
+    const job = this.toRecord(id);
+    this.queue.remove(id);
+    return { job, dataDeleted: false };
+  }
+
+  bulkAction(): never {
+    throw new Error('bulk actions are not part of the metrics workload');
   }
 
   private toRecord(id: string): JobRecord {

@@ -20,8 +20,15 @@ import { applyFileNamePolicy, type FileNamePolicyMode } from '@fmd/contract';
 export const FILENAME_PLACEHOLDER = '%FILENAME%';
 
 /** `Format('%.3d', [WorkId + 1])` fallback (:538-539). */
-export function indexFileName(workId: number): string {
-  return String(workId + 1).padStart(3, '0');
+/**
+ * WorkId → the zero-padded page number ([parity-sweep] M6/M8: FMD2's
+ * chapter-numbering digits, lfm:4026 — `padding` sets a MINIMUM width,
+ * 0 keeps the server default 3; the width still grows with the page
+ * count so ordering is stable).
+ */
+export function indexFileName(workId: number, padding: number = 0): string {
+  const width: number = padding >= 1 ? Math.trunc(padding) : 3;
+  return String(workId + 1).padStart(width, '0');
 }
 
 export function composeFileName(

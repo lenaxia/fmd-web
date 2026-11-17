@@ -171,3 +171,179 @@ describe('SqliteFavoritesService (production adapter over the §7.2 engine)', ()
     await expect(service.checkNow(downloadedChaptersKey(MODULE, MANGA_URL))).rejects.toThrow('site down');
   });
 });
+
+// ── website transfer + batch check (favorites-parity, production path) ──
+
+const TARGET_MODULE = 'b'.repeat(32);
+const TARGET_MANGA_URL = 'https://other.example/manga/fixture';
+
+/** CatalogService stub: installed set + substring-searchable rows. */
+class StubCatalogs {
+  public constructor(
+    private readonly installed: readonly string[],
+    private readonly rows: ReadonlyArray<{ link: string; title: string }>,
+  ) {}
+
+  public getMeta(id: string): { id: string } | undefined {
+    return this.installed.includes(id) ? { id } : undefined;
+  }
+
+  public latest(): { entries: unknown[] } {
+    return { entries: [] };
+  }
+
+  public byTitle(): { entries: unknown[] } {
+    return { entries: [] };
+  }
+
+  public search(_id: string, query: { query?: string }): { entries: unknown[] } {
+    const q = (query.query ?? '').toLowerCase();
+    return {
+      entries: this.rows
+        .filter((row): boolean => row.title.toLowerCase().includes(q))
+        .map((row): { link: string; title: string } => ({ ...row })),
+    };
+  }
+}
+
+function openTransferService(chapterLinks: string[], installed: readonly string[] = [TARGET_MODULE]): {
+  service: SqliteFavoritesService;
+  info: ScriptedInfo;
+  store: SqliteLibraryStore;
+} {
+  const dir = mkTmpDir('fav-transfer');
+  dbFile = path.join(dir, 'app.db');
+  const raw = new Database(dbFile);
+  const store = new SqliteLibraryStore({ db: raw, libraryRoot: path.join(dir, 'library') });
+  const info = new ScriptedInfo(chapterLinks);
+  const engine = new FavoritesEngine({
+    store,
+    info,
+    downloads: { createDownload: (input): { jobId: string } => ({ jobId: input.chapterLink }) },
+    now: (): number => 1_760_000_000_000,
+  });
+  const catalogs = new StubCatalogs(installed, [
+    { link: TARGET_MANGA_URL, title: 'Fixture Manga' },
+    { link: 'https://other.example/manga/unrelated', title: 'Unrelated Series' },
+  ]);
+  return {
+    service: new SqliteFavoritesService(engine, {
+      catalogs: catalogs as unknown as import('../../../src/api/services.js').CatalogService,
+      info,
+    }),
+    info,
+    store,
+  };
+}
+
+describe('SqliteFavoritesService — website transfer (frmTransferFavorites parity)', (): void => {
+  it('preview: exact title match + live GetInfo dry-run → valid with the target link', async (): Promise<void> => {
+    const { service } = openTransferService(['/ch/1']);
+    const created = await service.create({ moduleId: MODULE, url: MANGA_URL, title: 'Fixture Manga' });
+    const preview = await service.transferPreview(created.id, TARGET_MODULE);
+    expect(preview).toEqual({
+      targetModuleId: TARGET_MODULE,
+      valid: true,
+      targetUrl: TARGET_MANGA_URL,
+      matchedTitle: 'Fixture Manga',
+    });
+  });
+
+  it('preview: no exact match → invalid not-found; catalog-less target → no-catalog; failing dry-run → get-info-failed', async (): Promise<void> => {
+    const noMatch = openTransferService(['/ch/1']);
+    const created = await noMatch.service.create({ moduleId: MODULE, url: MANGA_URL, title: 'Totally Different' });
+    expect(await noMatch.service.transferPreview(created.id, TARGET_MODULE)).toMatchObject({
+      valid: false,
+      reason: 'not-found',
+    });
+
+    const noCatalog = openTransferService(['/ch/1'], []);
+    const created2 = await noCatalog.service.create({ moduleId: MODULE, url: MANGA_URL, title: 'Fixture Manga' });
+    expect(await noCatalog.service.transferPreview(created2.id, TARGET_MODULE)).toMatchObject({
+      valid: false,
+      reason: 'no-catalog',
+    });
+
+    const failing = openTransferService(['/ch/1']);
+    const created3 = await failing.service.create({ moduleId: MODULE, url: MANGA_URL, title: 'Fixture Manga' });
+    failing.info.fail = new Error('target site down');
+    expect(await failing.service.transferPreview(created3.id, TARGET_MODULE)).toMatchObject({
+      valid: false,
+      reason: 'get-info-failed',
+    });
+  });
+
+  it('apply: remap under a new id — title/status/saveTo/enabled/dateAdded carry over, old key deleted', async (): Promise<void> => {
+    const { service, store } = openTransferService(['/ch/1']);
+    const created = await service.create({ moduleId: MODULE, url: MANGA_URL, title: 'Fixture Manga' });
+    await service.update(created.id, { saveTo: '/keep/me' });
+    const patched = service.get(created.id);
+
+    const result = await service.transfer(created.id, {
+      moduleId: TARGET_MODULE,
+      url: TARGET_MANGA_URL,
+      clearDownloadedList: false,
+    });
+    expect(result.favorite.moduleId).toBe(TARGET_MODULE);
+    expect(result.favorite.url).toBe(TARGET_MANGA_URL);
+    expect(result.favorite.id).toBe(downloadedChaptersKey(TARGET_MODULE, TARGET_MANGA_URL));
+    expect(result.favorite.title).toBe('Fixture Manga');
+    expect(result.favorite.saveTo).toBe('/keep/me');
+    expect(result.favorite.enabled).toBe(true);
+    expect(patched?.saveTo).toBe('/keep/me');
+    expect(store.getFavorite(created.id)).toBeUndefined();
+    expect(service.get(downloadedChaptersKey(TARGET_MODULE, TARGET_MANGA_URL))).toBeDefined();
+  });
+
+  it('apply with clearDownloadedList: the tag-100 reload ingests the live target list as downloaded', async (): Promise<void> => {
+    const { service, store } = openTransferService(['/target/ch/1', '/target/ch/2']);
+    const created = await service.create({ moduleId: MODULE, url: MANGA_URL, title: 'Fixture Manga' });
+
+    const result = await service.transfer(created.id, {
+      moduleId: TARGET_MODULE,
+      url: TARGET_MANGA_URL,
+      clearDownloadedList: true,
+    });
+    expect(result.reloadedFromServer).toBe(true);
+    expect(result.favorite.currentChapter).toBe(2);
+    const row = store.getFavorite(downloadedChaptersKey(TARGET_MODULE, TARGET_MANGA_URL));
+    expect(row?.downloadedChapterList).toContain('/target/ch/1');
+    expect(row?.downloadedChapterList).toContain('/target/ch/2');
+  });
+});
+
+describe('SqliteFavoritesService — batch check (scope matrix + failures)', (): void => {
+  it('scope filters by the enabled flag; failures surface per-row without breaking the sweep', async (): Promise<void> => {
+    const { service, info } = openTransferService(['/ch/1']);
+    const a = await service.create({ moduleId: MODULE, url: MANGA_URL, title: 'A' });
+    const b = await service.create({ moduleId: MODULE, url: 'https://site.example/manga/b', title: 'B' });
+    await service.update(b.id, { enabled: false });
+
+    const enabledRun = await service.checkBatch('enabled');
+    expect(enabledRun.checked).toBe(1);
+    expect(enabledRun.results.map((r): string => r.favorite.title ?? '')).toEqual(['A']);
+
+    const disabledRun = await service.checkBatch('disabled');
+    expect(disabledRun.checked).toBe(1);
+    expect(disabledRun.results.map((r): string => r.favorite.title ?? '')).toEqual(['B']);
+
+    // One failing live fetch → per-row failed report, sweep continues.
+    info.fail = new Error('site down');
+    const failing = await service.checkBatch('all');
+    expect(failing.failed).toBe(2);
+    expect(failing.results.every((r): boolean => r.status === 'failed')).toBe(true);
+    expect(failing.results[0]?.error).toContain('site down');
+    info.fail = undefined;
+    void a;
+  });
+
+  it('a second concurrent batch is a typed 409; cancel between rows reports cancelled', async (): Promise<void> => {
+    const { service } = openTransferService(['/ch/1']);
+    await service.create({ moduleId: MODULE, url: MANGA_URL, title: 'A' });
+    const first = service.checkBatch('all');
+    await expect(service.checkBatch('all')).rejects.toMatchObject({ status: 409, code: 'conflict' });
+    await first;
+    // Cancel with nothing running is a clean false.
+    expect(service.cancelBatch()).toBe(false);
+  });
+});

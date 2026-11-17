@@ -21,7 +21,10 @@ describe('GET /api/settings', (): void => {
     const h = buildHarness();
     const res = await h.app.inject({ method: 'GET', url: '/api/settings' });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({
+    // toMatchObject (not toEqual): settings carries more additive groups
+    // (output defaults, favorites scheduler, …) owned by their stories —
+    // THIS test pins the proxy + browser dimensions it names.
+    expect(res.json()).toMatchObject({
       proxy: NO_PROXY,
       browser: { enabled: false, url: '' },
     });
@@ -181,5 +184,253 @@ describe('§5.11 browser profile capability flip (config-driven)', (): void => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().capabilities.known_broken_flags).toEqual([]);
+  });
+});
+
+describe('output defaults (FMD2 Save-to parity subset, settings-parity)', (): void => {
+  it('GET /api/settings defaults: zip + no rename template (+ the merged rename-toggle defaults)', async (): Promise<void> => {
+    const h = buildHarness();
+    const res = await h.app.inject({ method: 'GET', url: '/api/settings' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().output).toEqual({
+      format: 'zip',
+      chapterNameTemplate: '',
+      unicodeReplacement: false,
+      unicodeReplacementChar: '_',
+      digitPadding: 0,
+      removeMangaName: false,
+    });
+  });
+
+  it('PUT /api/settings/output replaces format + template and round-trips', async (): Promise<void> => {
+    const h = buildHarness();
+    const put = await h.app.inject({
+      method: 'PUT',
+      url: '/api/settings/output',
+      payload: { format: 'cbz', chapterNameTemplate: '%MANGA% - %CHAPTER%' },
+    });
+    expect(put.statusCode).toBe(200);
+    // toMatchObject: the [parity-sweep] rename-toggle fields ride along
+    // with their defaults — this test pins THIS story's two fields.
+    expect(put.json().output).toMatchObject({
+      format: 'cbz',
+      chapterNameTemplate: '%MANGA% - %CHAPTER%',
+    });
+    const get = await h.app.inject({ method: 'GET', url: '/api/settings' });
+    expect(get.json().output).toMatchObject({
+      format: 'cbz',
+      chapterNameTemplate: '%MANGA% - %CHAPTER%',
+    });
+    // Back to defaults (zip, template off).
+    const reset = await h.app.inject({
+      method: 'PUT',
+      url: '/api/settings/output',
+      payload: { format: 'zip', chapterNameTemplate: '' },
+    });
+    expect(reset.json().output).toMatchObject({ format: 'zip', chapterNameTemplate: '' });
+  });
+
+  it('each packer format is accepted (zip/cbz/pdf/epub); omitted fields fall back to defaults', async (): Promise<void> => {
+    const h = buildHarness();
+    for (const format of ['zip', 'cbz', 'pdf', 'epub'] as const) {
+      const res = await h.app.inject({
+        method: 'PUT',
+        url: '/api/settings/output',
+        payload: { format },
+      });
+      expect(res.statusCode, format).toBe(200);
+      expect(res.json().output.format).toBe(format);
+      expect(res.json().output.chapterNameTemplate).toBe('');
+    }
+  });
+
+  it('validation: FMD2 "none" (loose images) is DEFERRED — unknown formats are 400 envelopes', async (): Promise<void> => {
+    const h = buildHarness();
+    const none = await h.app.inject({
+      method: 'PUT',
+      url: '/api/settings/output',
+      payload: { format: 'none' },
+    });
+    expect(none.statusCode).toBe(400);
+    expectEnvelope(none.body, 'validation_error');
+    const bogus = await h.app.inject({
+      method: 'PUT',
+      url: '/api/settings/output',
+      payload: { format: 'rar' },
+    });
+    expect(bogus.statusCode).toBe(400);
+    expectEnvelope(bogus.body, 'validation_error');
+  });
+});
+
+describe('[parity-sweep] settings groups — M10/M2/M4/M13 + output itemized subset', (): void => {
+  it('GET defaults mirror the pre-settings server truth', async (): Promise<void> => {
+    const h = buildHarness();
+    const res = await h.app.inject({ method: 'GET', url: '/api/settings' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      performance: { requestTimeoutSeconds: number; retryCount: number; parallelChapters: number; threadsPerChapter: number };
+      retention: { days: number };
+      filenamePolicy: { normalizePaths: boolean };
+      diagnostics: { logEnabled: boolean; logLevel: string };
+      output: { unicodeReplacement: boolean; unicodeReplacementChar: string; digitPadding: number; removeMangaName: boolean };
+    };
+    // 15 s pipeline default, 2 retries, 1 lane slot, 1 thread (the
+    // pre-settings constants); 30 d retention; parity filenames; logs on.
+    expect(body.performance).toEqual({
+      requestTimeoutSeconds: 15,
+      retryCount: 2,
+      parallelChapters: 1,
+      threadsPerChapter: 1,
+    });
+    expect(body.retention).toEqual({ days: 30 });
+    expect(body.filenamePolicy).toEqual({ normalizePaths: false });
+    expect(body.diagnostics).toEqual({ logEnabled: true, logLevel: 'info' });
+    expect(body.output).toMatchObject({
+      unicodeReplacement: false,
+      unicodeReplacementChar: '_',
+      digitPadding: 0,
+      removeMangaName: false,
+    });
+  });
+
+  it('PUT /api/settings/performance round-trips (full document returned + GET)', async (): Promise<void> => {
+    const h = buildHarness();
+    const res = await h.app.inject({
+      method: 'PUT',
+      url: '/api/settings/performance',
+      payload: { requestTimeoutSeconds: 30, retryCount: 4, parallelChapters: 2, threadsPerChapter: 3 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as { performance: unknown }).performance).toEqual({
+      requestTimeoutSeconds: 30,
+      retryCount: 4,
+      parallelChapters: 2,
+      threadsPerChapter: 3,
+    });
+    const get = await h.app.inject({ method: 'GET', url: '/api/settings' });
+    expect((get.json() as { performance: unknown }).performance).toEqual({
+      requestTimeoutSeconds: 30,
+      retryCount: 4,
+      parallelChapters: 2,
+      threadsPerChapter: 3,
+    });
+  });
+
+  it('PUT performance validation: out-of-range values are 400 envelopes', async (): Promise<void> => {
+    const h = buildHarness();
+    const res = await h.app.inject({
+      method: 'PUT',
+      url: '/api/settings/performance',
+      payload: { requestTimeoutSeconds: 0, retryCount: 2, parallelChapters: 1, threadsPerChapter: 1 },
+    });
+    expect(res.statusCode).toBe(400);
+    expectEnvelope(res.body, 'validation_error');
+  });
+
+  it('PUT /api/settings/retention round-trips (0 = keep forever is VALID)', async (): Promise<void> => {
+    const h = buildHarness();
+    const res = await h.app.inject({
+      method: 'PUT',
+      url: '/api/settings/retention',
+      payload: { days: 0 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as { retention: unknown }).retention).toEqual({ days: 0 });
+    const tooOld = await h.app.inject({
+      method: 'PUT',
+      url: '/api/settings/retention',
+      payload: { days: 9999 },
+    });
+    expect(tooOld.statusCode).toBe(400);
+    expectEnvelope(tooOld.body, 'validation_error');
+  });
+
+  it('PUT /api/settings/filename-policy round-trips', async (): Promise<void> => {
+    const h = buildHarness();
+    const res = await h.app.inject({
+      method: 'PUT',
+      url: '/api/settings/filename-policy',
+      payload: { normalizePaths: true },
+    });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as { filenamePolicy: unknown }).filenamePolicy).toEqual({ normalizePaths: true });
+    const bad = await h.app.inject({
+      method: 'PUT',
+      url: '/api/settings/filename-policy',
+      payload: { normalizePaths: 'yes' },
+    });
+    expect(bad.statusCode).toBe(400);
+    expectEnvelope(bad.body, 'validation_error');
+  });
+
+  it('PUT /api/settings/diagnostics round-trips (all four levels valid)', async (): Promise<void> => {
+    const h = buildHarness();
+    for (const level of ['debug', 'info', 'warn', 'error'] as const) {
+      const res = await h.app.inject({
+        method: 'PUT',
+        url: '/api/settings/diagnostics',
+        payload: { logEnabled: true, logLevel: level },
+      });
+      expect(res.statusCode).toBe(200);
+      expect((res.json() as { diagnostics: unknown }).diagnostics).toEqual({ logEnabled: true, logLevel: level });
+    }
+    const off = await h.app.inject({
+      method: 'PUT',
+      url: '/api/settings/diagnostics',
+      payload: { logEnabled: false, logLevel: 'warn' },
+    });
+    expect(off.statusCode).toBe(200);
+    expect((off.json() as { diagnostics: unknown }).diagnostics).toEqual({ logEnabled: false, logLevel: 'warn' });
+    const bad = await h.app.inject({
+      method: 'PUT',
+      url: '/api/settings/diagnostics',
+      payload: { logEnabled: true, logLevel: 'verbose' },
+    });
+    expect(bad.statusCode).toBe(400);
+    expectEnvelope(bad.body, 'validation_error');
+  });
+
+  it('output itemized subset round-trips through PUT /api/settings/output', async (): Promise<void> => {
+    const h = buildHarness();
+    const res = await h.app.inject({
+      method: 'PUT',
+      url: '/api/settings/output',
+      payload: {
+        format: 'cbz',
+        unicodeReplacement: true,
+        unicodeReplacementChar: '-',
+        digitPadding: 4,
+        removeMangaName: true,
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as { output: unknown }).output).toMatchObject({
+      format: 'cbz',
+      unicodeReplacement: true,
+      unicodeReplacementChar: '-',
+      digitPadding: 4,
+      removeMangaName: true,
+    });
+    // Old-shape bodies (pre-subset PUTs) keep working — zod defaults fill
+    // the itemized fields (replace semantics, documented).
+    const legacy = await h.app.inject({
+      method: 'PUT',
+      url: '/api/settings/output',
+      payload: { format: 'zip' },
+    });
+    expect(legacy.statusCode).toBe(200);
+    expect((legacy.json() as { output: unknown }).output).toMatchObject({
+      format: 'zip',
+      unicodeReplacement: false,
+    });
+    // A multi-char replacement char is rejected.
+    const bad = await h.app.inject({
+      method: 'PUT',
+      url: '/api/settings/output',
+      payload: { unicodeReplacementChar: 'ab' },
+    });
+    expect(bad.statusCode).toBe(400);
+    expectEnvelope(bad.body, 'validation_error');
   });
 });

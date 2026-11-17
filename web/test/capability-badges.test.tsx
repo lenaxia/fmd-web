@@ -41,7 +41,7 @@ describe('CapabilityBadges component', (): void => {
     expect(screen.getByTitle(/browser\/antibot sidecar profile/)).toHaveTextContent('needs browser');
     expect(screen.getByTitle(/shells out to a subprocess/)).toHaveTextContent('subprocess');
     expect(screen.getByTitle(/python-gated bypass/)).toHaveTextContent('bypass-gated');
-    expect(screen.getByTitle(/live from its directory walk/)).toHaveTextContent('live-scrape browse');
+    expect(screen.getByTitle(/list its titles straight from the site/)).toHaveTextContent('directory');
     expect(screen.getByTitle(/account login/)).toHaveTextContent('account');
   });
 
@@ -51,7 +51,7 @@ describe('CapabilityBadges component', (): void => {
     expect(screen.queryByText('needs browser')).not.toBeInTheDocument();
     expect(screen.queryByText('subprocess')).not.toBeInTheDocument();
     expect(screen.queryByText('bypass-gated')).not.toBeInTheDocument();
-    expect(screen.queryByText('live-scrape browse')).not.toBeInTheDocument();
+    expect(screen.queryByText('directory')).not.toBeInTheDocument();
     expect(screen.queryByText('account')).not.toBeInTheDocument();
   });
 });

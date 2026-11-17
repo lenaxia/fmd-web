@@ -75,7 +75,7 @@ export const DEFAULT_JITTER_MS = 30_000;
 export class FavoriteScheduler {
   private readonly clock: FavoriteClock;
   private readonly maxConcurrent: number;
-  private readonly defaultIntervalMs: number;
+  private defaultIntervalMsField: number;
   private readonly jitterMs: number;
   private readonly jitter: () => number;
   private readonly onError: (favorite: SchedulerFavorite, error: unknown) => void;
@@ -97,7 +97,7 @@ export class FavoriteScheduler {
   ) {
     this.clock = deps.clock ?? systemFavoriteClock;
     this.maxConcurrent = Math.max(1, deps.maxConcurrent ?? DEFAULT_MAX_CONCURRENT);
-    this.defaultIntervalMs = deps.intervalMs ?? DEFAULT_INTERVAL_MS;
+    this.defaultIntervalMsField = deps.intervalMs ?? DEFAULT_INTERVAL_MS;
     this.jitterMs = Math.max(0, deps.jitterMs ?? DEFAULT_JITTER_MS);
     this.jitter = deps.jitter ?? Math.random;
     this.onError = deps.onError ?? ((): void => {});
@@ -126,6 +126,35 @@ export class FavoriteScheduler {
   /** Stop accepting favorites; in-flight checks settle via {@link drain}. */
   public stop(): void {
     this.stopped = true;
+  }
+
+  /** The live default per-favorite interval (Settings → Updates parity). */
+  public defaultIntervalMs(): number {
+    return this.defaultIntervalMsField;
+  }
+
+  /**
+   * Replace the default interval at runtime (PUT /api/settings/favorites):
+   * every idle next-due stamp is invalidated so the new cadence applies
+   * from now (in-flight checks complete normally and re-arm under the
+   * new default). `<= 0` disables future scheduling entirely.
+   */
+  public setDefaultIntervalMs(ms: number): void {
+    this.defaultIntervalMsField = ms;
+    if (ms <= 0) {
+      this.nextDue.clear();
+      return;
+    }
+    // Re-arm everything without an explicit per-favorite override at
+    // `now` — the dispatch loop claims only what slots allow, so a
+    // shorter interval surfaces immediately without a check storm.
+    const now = this.clock.now();
+    for (const favorite of this.deps.list()) {
+      if (favorite.intervalMs === undefined || favorite.intervalMs <= 0) {
+        this.nextDue.set(favorite.mangaKey, now);
+      }
+    }
+    this.dispatch();
   }
 
   /** Resolve once every in-flight check has settled (no new claims). */
@@ -186,7 +215,7 @@ export class FavoriteScheduler {
 
   /** Interval for one favorite: override > scheduler default (<= 0 = never auto). */
   private intervalFor(favorite: SchedulerFavorite): number {
-    return favorite.intervalMs ?? this.defaultIntervalMs;
+    return favorite.intervalMs ?? this.defaultIntervalMsField;
   }
 
   /** interval + jitter — the next check lands in `[I, I+J)` after this one. */

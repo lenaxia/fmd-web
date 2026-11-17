@@ -71,6 +71,18 @@ describe('readyz readiness probes (§10, fault injection)', (): void => {
           cancel: (): never => {
             throw new Error('unused');
           },
+          resume: (): never => {
+            throw new Error('unused');
+          },
+          action: (): never => {
+            throw new Error('unused');
+          },
+          remove: (): never => {
+            throw new Error('unused');
+          },
+          bulkAction: (): never => {
+            throw new Error('unused');
+          },
         },
         library: new InMemoryLibraryService(),
         favorites: new InMemoryFavoriteService(),

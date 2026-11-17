@@ -1,6 +1,6 @@
 import { join, resolve } from 'node:path';
 import { mkdirSync } from 'node:fs';
-import type { ReadinessStatus } from '@fmd/contract';
+import type { FileNamePolicyMode, ReadinessStatus } from '@fmd/contract';
 import { buildApp, type ApiServices, type AppOptions, DEFAULT_INFO_CACHE_TTL_MS } from '../api/app.js';
 import {
   type CatalogSyncOutcome,
@@ -14,6 +14,7 @@ import {
   WsPublishingSyncService,
 } from '../api/services.js';
 import { ApiError } from '../api/errors.js';
+import { AuthService, resolveApiTokenBootstrap } from '../api/auth.js';
 import { WsHub } from '../api/ws/hub.js';
 import { EngineInfoService } from './engine-info.js';
 import { EngineLoginDriver } from './account-login.js';
@@ -30,6 +31,7 @@ import {
   type CorpusPassRateEntry,
 } from '../observability/index.js';
 import { EgressPolicy } from '../engine/shims/http-egress.js';
+import { setDefaultRequestTimeoutMs } from '../engine/shims/http-pipeline.js';
 import { normalizeProxyConfig, type ProxyConfig } from '../engine/shims/http-proxy.js';
 import { FlareSolverrBypassExecutor } from '../engine/sidecar/bypass-adapter.js';
 import { LoopbackHttpTransport } from '../engine/shims/http-transport.js';
@@ -49,6 +51,13 @@ import { EngineDirectoryWalker } from '../catalog/directory-walk.js';
 import { SyncHostGate } from '../engine/shims/http-hostgate.js';
 import type { CatalogFileStore } from '../sync/db/catalog-store.js';
 import { InMemoryModuleService, InMemorySettingsService } from '../api/services.js';
+import type {
+  DiagnosticsSettingsT,
+  FilenamePolicySettingsT,
+  OutputDefaultsT,
+  PerformanceSettingsT,
+  RetentionSettingsT,
+} from '../api/schemas.js';
 import { openQueueDb, ensureJobSchema } from '../jobs/queue/connection.js';
 import { SqliteJobQueue } from '../jobs/queue/queue.js';
 import { SqliteLibraryStore } from '../jobs/library/store.js';
@@ -123,6 +132,18 @@ export interface RuntimeConfig {
   readonly liveScrapeConcurrency: number;
   /** §6.8 per-host connection gate limit for scrape page fetches (FMD_CATALOG_LIVE_HOST_LIMIT, default 4). */
   readonly liveScrapeHostLimit: number;
+  /**
+   * §10 cookie flow: non-empty FMD_WEB_PASSWORD enables the login
+   * route + the state-changing cookie gate (unset = no cookie flow).
+   */
+  readonly password: string | undefined;
+  /**
+   * R4 single app-wide API token env pin: non-empty FMD_WEB_API_TOKEN
+   * OVERRIDES the stored settings value (precedence env > settings,
+   * runbook §API token) — headless/compose deployments keep the secret
+   * out of the settings store.
+   */
+  readonly apiTokenEnv: string | undefined;
 }
 
 function csvEnv(value: string | undefined): string[] {
@@ -177,6 +198,14 @@ export function loadRuntimeConfig(env: Record<string, string | undefined> = proc
     liveScrapeTtlMs: positiveIntEnv(env['FMD_CATALOG_LIVE_TTL_MS'], DEFAULT_LIVE_SCRAPE_TTL_MS),
     liveScrapeConcurrency: positiveIntEnv(env['FMD_CATALOG_LIVE_CONCURRENCY'], 2),
     liveScrapeHostLimit: positiveIntEnv(env['FMD_CATALOG_LIVE_HOST_LIMIT'], 4),
+    // §10/R4 auth env: empty-string FMD_WEB_PASSWORD = unset (compose
+    // `env_file` blanks); the token pin likewise only when non-empty.
+    password: env['FMD_WEB_PASSWORD'] !== undefined && env['FMD_WEB_PASSWORD'] !== ''
+      ? env['FMD_WEB_PASSWORD']
+      : undefined,
+    apiTokenEnv: env['FMD_WEB_API_TOKEN'] !== undefined && env['FMD_WEB_API_TOKEN'] !== ''
+      ? env['FMD_WEB_API_TOKEN']
+      : undefined,
   };
 }
 
@@ -211,6 +240,12 @@ export interface RuntimeAssembly {
   readonly metrics: FmdMetrics;
   /** §4 structured JSON logger (module-id correlation, dedup bound). */
   readonly logger: StructuredLogger;
+  /**
+   * §10/R4 auth service (cookie sessions + the single API token). The
+   * raw-http entry hands `auth.checkUpgradeRequest` to its own /ws
+   * attach so upgrades share this app's credential truth.
+   */
+  readonly auth: AuthService;
   /** Drain: dispose engines + transport + catalog handles + the WS hub. */
   dispose(): Promise<void>;
 }
@@ -365,6 +400,8 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
   const moduleService = new RefreshableModuleService(
     [],
     browserProfileEnabled,
+    // catalogInstalled join: the InMemoryModuleService constructor wraps
+    // this with the non-32-hex id guard (single source, services.ts).
     (id: string): boolean => catalogSync.store.getMeta(id) !== undefined,
   );
   const bypass = browserProfileEnabled
@@ -464,7 +501,12 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
   mkdirSync(config.dataDir, { recursive: true });
   const db = openQueueDb(join(config.dataDir, 'app.db'));
   ensureJobSchema(db);
-  const sqliteQueue = new SqliteJobQueue({ file: join(config.dataDir, 'app.db'), recoverOnOpen: true });
+  const sqliteQueue = new SqliteJobQueue({
+    file: join(config.dataDir, 'app.db'),
+    recoverOnOpen: true,
+    // [parity-sweep] M2: live retention window (0 days = keep forever).
+    retentionMs: (): number => settings.retentionSettings().days * 86_400_000,
+  });
   const publishingQueue = new PublishingJobQueue(sqliteQueue, (job): void => {
     wsHub.publish(toJobWire(job));
   });
@@ -474,7 +516,126 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
   const queue = new InstrumentedJobQueue(publishingQueue, metrics);
   const libraryStore = new SqliteLibraryStore({ db, libraryRoot: join(config.dataDir, 'library') });
   const libraryService = new SqliteLibraryService(libraryStore);
-  const jobs: JobService = new RuntimeJobService(queue, (jobId): boolean => active.cancel(jobId));
+  // Downloads parity: the delete(+data) seam — RuntimeJobService hands
+  // the recorded artifact path to the store's file+row remover.
+  const jobs: JobService = new RuntimeJobService(
+    queue,
+    (jobId): boolean => active.cancel(jobId),
+    (path): boolean => libraryStore.deleteLibraryFileByPath(path),
+  );
+
+  // ── [parity-sweep] settings seeds + live sinks (app_settings kv) ──
+  // Read BEFORE the lane starts: parallelChapters is fixed at
+  // LaneRunner start (M10 restart-to-apply note); everything else is
+  // read per-job/per-sweep. Precedence (M4): FMD_NORMALIZE_PATHS env >
+  // setting > windows-parity default.
+  const envNormalize: FileNamePolicyMode | undefined =
+    process.env['FMD_NORMALIZE_PATHS'] === '1' ? 'linux-normalized' : undefined;
+  const readParitySweepSeeds = (): {
+    performance: PerformanceSettingsT;
+    retention: RetentionSettingsT;
+    filenamePolicy: FilenamePolicySettingsT;
+    diagnostics: DiagnosticsSettingsT;
+    output: OutputDefaultsT;
+  } => {
+    const defaults = settings;
+    const perf = readJsonSetting(libraryStore, 'performance.lanes');
+    const ret = readJsonSetting(libraryStore, 'retention.jobs');
+    const fp = readJsonSetting(libraryStore, 'filenamePolicy.d5');
+    const diag = readJsonSetting(libraryStore, 'diagnostics.log');
+    const out = readJsonSetting(libraryStore, 'output.defaults');
+    return {
+      performance: { ...defaults.performanceSettings(), ...(isObject(perf) ? coercePerformance(perf) : {}) },
+      retention: { ...defaults.retentionSettings(), ...(isObject(ret) ? coerceRetention(ret) : {}) },
+      filenamePolicy: { ...defaults.filenamePolicySettings(), ...(isObject(fp) ? coerceFilenamePolicy(fp) : {}) },
+      diagnostics: { ...defaults.diagnosticsSettings(), ...(isObject(diag) ? coerceDiagnostics(diag) : {}) },
+      output: { ...defaults.outputDefaults(), ...(isObject(out) ? coerceOutput(out) : {}) },
+    };
+  };
+  const paritySeeds = readParitySweepSeeds();
+  settings.setParitySweepSettingsLive(paritySeeds, {
+    onPerformance: (next): void => {
+      libraryStore.setSetting('performance.lanes', JSON.stringify(next));
+      // M10: the HTTP pipeline default applies to NEW pipelines (per-run
+      // module state) — live enough for new requests.
+      setDefaultRequestTimeoutMs(next.requestTimeoutSeconds * 1000);
+    },
+    onRetention: (next): void => {
+      libraryStore.setSetting('retention.jobs', JSON.stringify(next));
+    },
+    onFilenamePolicy: (next): void => {
+      libraryStore.setSetting('filenamePolicy.d5', JSON.stringify(next));
+    },
+    onDiagnostics: (next): void => {
+      libraryStore.setSetting('diagnostics.log', JSON.stringify(next));
+      logger.applyDiagnostics(next);
+    },
+  });
+  // Boot-time apply (seeds): pipeline default timeout + log filter.
+  setDefaultRequestTimeoutMs(paritySeeds.performance.requestTimeoutSeconds * 1000);
+  logger.applyDiagnostics(paritySeeds.diagnostics);
+
+  // ── R4 single app-wide API token (env pin > settings store) ──────
+  // Precedence: a non-empty FMD_WEB_API_TOKEN pin OVERRIDES the stored
+  // app_settings `api.token` row (headless/compose deployments keep
+  // the secret out of the settings store; the UI shows 'Managed via
+  // environment' and regenerate refuses). First-run generation happens
+  // ONLY for authed deployments (password set, nothing stored, no pin):
+  // a default no-env deployment stays token-less — "both unset → auth
+  // off" — so out-of-box no-auth flows (incl. the e2e harness) are
+  // untouched. The effective provider reads the settings store LIVE, so
+  // UI regeneration applies to the very next request (old key rejected
+  // immediately) and env precedence holds per-request.
+  const storedApiTokenRaw = libraryStore.getSetting('api.token');
+  const storedApiToken: string | null =
+    typeof storedApiTokenRaw === 'string' && /^[0-9a-f]{64}$/.test(storedApiTokenRaw)
+      ? storedApiTokenRaw
+      : null;
+  const apiTokenBootstrap = resolveApiTokenBootstrap({
+    envPin: config.apiTokenEnv,
+    stored: storedApiToken,
+    passwordSet: config.password !== undefined,
+  });
+  settings.bindApiTokenPersistence(apiTokenBootstrap.store, (token: string): void => {
+    libraryStore.setSetting('api.token', token);
+  });
+  if (apiTokenBootstrap.store !== null && storedApiToken === null) {
+    libraryStore.setSetting('api.token', apiTokenBootstrap.store);
+  }
+  const effectiveApiToken = (): string | undefined =>
+    config.apiTokenEnv ?? (settings.getApiToken() ?? undefined);
+  if (apiTokenBootstrap.generated) {
+    log('auth: api token generated on first run — copy it from Settings → API');
+  }
+
+  // ── §10/R4 auth service (cookie flow + the single API token) ─────
+  const authService = new AuthService({
+    password: config.password,
+    apiToken: effectiveApiToken,
+    ...(config.apiTokenEnv !== undefined ? { apiTokenEnvPinned: true } : {}),
+  });
+  log(
+    `auth: ${authService.authMode()} (password ${authService.enabled ? 'on' : 'off'}, ` +
+      `api token ${authService.tokenActive ? 'on' : 'off'}${authService.tokenEnvManaged ? ', env-pinned' : ''})`,
+  );
+
+  // [parity-sweep] M2: the periodic retention sweep (hourly; §9 said
+  // "prunes after 30d" but nothing scheduled it — the sweep IS the
+  // honored-in-behavior half of the retention setting).
+  const retentionSweepInterval = setInterval((): void => {
+    try {
+      queue.pruneRetention();
+    } catch {
+      // queue closing/closed — the drain path owns shutdown
+    }
+  }, 60 * 60 * 1000);
+  retentionSweepInterval.unref?.();
+  try {
+    queue.pruneRetention();
+  } catch {
+    // first sweep best-effort
+  }
+
   const lane = startDownloadLane(queue, {
     wsHub,
     library: libraryStore,
@@ -500,6 +661,16 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
       },
     },
     active,
+    // Output defaults (FMD2 Save-to parity): read per-job so a
+    // PUT /api/settings/output change applies to NEW jobs only.
+    outputDefaults: (): OutputDefaultsT => settings.outputDefaults(),
+    // [parity-sweep] M10: per-job Performance knobs + lane slot count
+    // (slots are fixed at this start — restart to apply changes).
+    performance: (): PerformanceSettingsT => settings.performanceSettings(),
+    parallelChapters: settings.performanceSettings().parallelChapters,
+    // [parity-sweep] M4: env > setting > parity default, resolved here.
+    fileNamePolicy: (): FileNamePolicyMode | undefined =>
+      envNormalize ?? (settings.filenamePolicySettings().normalizePaths ? 'linux-normalized' : 'windows-parity'),
     log,
   });
 
@@ -516,8 +687,16 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
       createDownload: (input): { jobId: string } => ({ jobId: jobs.createDownload(input).job.id }),
     },
   });
+  // Options → Updates parity: the persisted favorites scheduler settings
+  // (app_settings kv) seed the interval + the startup-sweep gate; PUT
+  // /api/settings/favorites applies live through the same sink.
+  const FAVORITES_SETTINGS_KEY = 'favorites.scheduler';
+  const favoritesSettingsSeed = readFavoritesSettings(libraryStore, config.favoriteIntervalMs);
   const favoritesScheduler = new FavoriteScheduler({
-    list: (): readonly { mangaKey: string }[] => favoritesEngine.listFavorites(),
+    // Disabled favorites are never auto-checked (FMD2 Enabled=False rows
+    // stay untouched until re-enabled; manual check-now still works).
+    list: (): readonly { mangaKey: string }[] =>
+      favoritesEngine.listFavorites().filter((row): boolean => row.enabled !== false),
     check: async (favorite): Promise<void> => {
       await favoritesEngine.checkFavorite(favorite.mangaKey);
     },
@@ -525,11 +704,26 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
       log(`favorites: check failed for ${favorite.mangaKey}: ${error instanceof Error ? error.message : String(error)}`);
     },
     maxConcurrent: config.favoriteMaxConcurrent,
-    intervalMs: config.favoriteIntervalMs,
+    intervalMs: favoritesSettingsSeed.intervalMinutes * 60_000,
     jitterMs: config.favoriteJitterMs,
   });
-  const favoritesService = new SqliteFavoritesService(favoritesEngine);
-  favoritesScheduler.start();
+  const favoritesService = new SqliteFavoritesService(favoritesEngine, {
+    catalogs: catalogSync.store,
+    info: infoService,
+  });
+  settings.setFavoritesSettingsLive(
+    {
+      intervalMinutes: favoritesSettingsSeed.intervalMinutes,
+      checkAtStartup: favoritesSettingsSeed.checkAtStartup,
+    },
+    (next): void => {
+      libraryStore.setSetting(FAVORITES_SETTINGS_KEY, JSON.stringify(next));
+      favoritesScheduler.setDefaultIntervalMs(next.intervalMinutes * 60_000);
+    },
+  );
+  if (favoritesSettingsSeed.checkAtStartup) {
+    favoritesScheduler.start();
+  }
 
   const syncService: SyncService = {
     syncModules: async (): Promise<SyncModulesOutcome> => {
@@ -681,6 +875,16 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     version,
     infoCacheTtlMs: DEFAULT_INFO_CACHE_TTL_MS,
     metrics,
+    authService,
+    // R4 audit trail: settings changes (token rotation) become
+    // structured log events — the audit NEVER carries the token value.
+    onAudit: (event): void => {
+      logger.info(`audit: settings ${event.setting} ${event.action}`, {
+        event: 'audit',
+        setting: event.setting,
+        action: event.action,
+      });
+    },
   };
   const app = buildApp(services, appOptions);
   return {
@@ -693,7 +897,8 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     favoritesScheduler,
     active,
     metrics,
-    logger,    dispose: async (): Promise<void> => {
+    logger,
+    auth: authService,    dispose: async (): Promise<void> => {
       favoritesScheduler.stop();
       await favoritesScheduler.drain();
       await lane.stop();
@@ -721,4 +926,113 @@ function toCatalogOutcome(result: {
     ...(result.bytes !== undefined ? { bytes: result.bytes } : {}),
     ...(result.error !== undefined ? { error: result.error } : {}),
   };
+}
+
+/**
+ * Options → Updates parity: the persisted favorites scheduler settings
+ * (app_settings kv `favorites.scheduler`, written by PUT
+ * /api/settings/favorites). Absent/corrupt rows fall back to the env
+ * config (FMD_FAVORITE_INTERVAL_MS) with the startup sweep on — the
+ * pre-settings behavior.
+ */
+function readFavoritesSettings(
+  store: { getSetting(key: string): string | undefined },
+  envIntervalMs: number,
+): { intervalMinutes: number; checkAtStartup: boolean } {
+  const raw = store.getSetting('favorites.scheduler');
+  if (raw !== undefined) {
+    try {
+      const parsed = JSON.parse(raw) as { intervalMinutes?: unknown; checkAtStartup?: unknown };
+      const intervalMinutes =
+        typeof parsed.intervalMinutes === 'number' &&
+        Number.isInteger(parsed.intervalMinutes) &&
+        parsed.intervalMinutes >= 0 &&
+        parsed.intervalMinutes <= 20160
+          ? parsed.intervalMinutes
+          : Math.round(envIntervalMs / 60_000);
+      const checkAtStartup =
+        typeof parsed.checkAtStartup === 'boolean' ? parsed.checkAtStartup : true;
+      return { intervalMinutes, checkAtStartup };
+    } catch {
+      // corrupt row → env defaults
+    }
+  }
+  return { intervalMinutes: Math.round(envIntervalMs / 60_000), checkAtStartup: true };
+}
+
+// ── [parity-sweep] app_settings seed helpers ─────────────────────────
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readJsonSetting(store: { getSetting(key: string): string | undefined }, key: string): unknown {
+  const raw = store.getSetting(key);
+  if (raw === undefined) {
+    return undefined;
+  }
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+function coercePerformance(row: Record<string, unknown>): Partial<PerformanceSettingsT> {
+  const out: Partial<PerformanceSettingsT> = {};
+  if (typeof row.requestTimeoutSeconds === 'number') {
+    out.requestTimeoutSeconds = row.requestTimeoutSeconds;
+  }
+  if (typeof row.retryCount === 'number') {
+    out.retryCount = row.retryCount;
+  }
+  if (typeof row.parallelChapters === 'number') {
+    out.parallelChapters = row.parallelChapters;
+  }
+  if (typeof row.threadsPerChapter === 'number') {
+    out.threadsPerChapter = row.threadsPerChapter;
+  }
+  return out;
+}
+
+function coerceRetention(row: Record<string, unknown>): Partial<RetentionSettingsT> {
+  return typeof row.days === 'number' ? { days: row.days } : {};
+}
+
+function coerceFilenamePolicy(row: Record<string, unknown>): Partial<FilenamePolicySettingsT> {
+  return typeof row.normalizePaths === 'boolean' ? { normalizePaths: row.normalizePaths } : {};
+}
+
+function coerceDiagnostics(row: Record<string, unknown>): Partial<DiagnosticsSettingsT> {
+  const out: Partial<DiagnosticsSettingsT> = {};
+  if (typeof row.logEnabled === 'boolean') {
+    out.logEnabled = row.logEnabled;
+  }
+  if (row.logLevel === 'debug' || row.logLevel === 'info' || row.logLevel === 'warn' || row.logLevel === 'error') {
+    out.logLevel = row.logLevel;
+  }
+  return out;
+}
+
+function coerceOutput(row: Record<string, unknown>): Partial<OutputDefaultsT> {
+  const out: Partial<OutputDefaultsT> = {};
+  if (row.format === 'zip' || row.format === 'cbz' || row.format === 'pdf' || row.format === 'epub') {
+    out.format = row.format;
+  }
+  if (typeof row.chapterNameTemplate === 'string') {
+    out.chapterNameTemplate = row.chapterNameTemplate;
+  }
+  if (typeof row.unicodeReplacement === 'boolean') {
+    out.unicodeReplacement = row.unicodeReplacement;
+  }
+  if (typeof row.unicodeReplacementChar === 'string' && row.unicodeReplacementChar.length === 1) {
+    out.unicodeReplacementChar = row.unicodeReplacementChar;
+  }
+  if (typeof row.digitPadding === 'number') {
+    out.digitPadding = row.digitPadding;
+  }
+  if (typeof row.removeMangaName === 'boolean') {
+    out.removeMangaName = row.removeMangaName;
+  }
+  return out;
 }

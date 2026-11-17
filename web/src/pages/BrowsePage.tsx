@@ -3,14 +3,24 @@
  * state is the SitePicker (sites BY NAME — cbSelectManga parity,
  * frmMain.pas:6186; hex ids ride the URL, never the UI). Selecting a
  * site routes to `browse?site=<id>` (`?catalog=` stays as a legacy
- * alias for old links): an installed catalog opens the entries view
- * instantly (DBDataFileExist → OpenDataDB parity); a missing one
- * AUTO-PROVISIONS (POST /api/sync/catalog/:id + WS-driven progress
- * toast — the web default for FMD2's DBUpdaterThread dialog) and opens
- * on completion. The provision failure taxonomy: FMD2-DB 404 →
- * friendly no-catalog + §6.8 live-scrape offer when the module has
- * the directory events; transient errors → retry; known-broken
- * modules → disabled with reason. Catalog latest / by-title / FTS
+ * alias for old links) and ALWAYS opens its list — one behavior, zero
+ * internal vocabulary (the unified browsing model):
+ *
+ *   catalog present     → serve it (opens instantly)
+ *   catalog absent      → auto-prepare (POST /api/sync/catalog/:id +
+ *                         WS-driven 'Preparing <site>…' toast, the web
+ *                         default for FMD2's DBUpdaterThread dialog)
+ *   no catalog exists   → fall through AUTOMATICALLY to the live
+ *     (FMD2-DB 404)       channel when the module has directory
+ *                         capability — the same progress experience,
+ *                         no user decision point
+ *
+ * The provision failure taxonomy: FMD2-DB 404 on a directory-capable
+ * module auto-falls-through (§6.8, invisible plumbing); 404 on a
+ * non-capable module → friendly no-list panel; transient errors →
+ * retry; known-broken modules → disabled with reason. The channel that
+ * served the open list surfaces ONLY as the muted SourceBadge
+ * ('from site' / 'from catalog'). Catalog latest / by-title / FTS
  * search with cursor pagination ("Load more") is unchanged, and the
  * Manga deep-link flow (catalog→manga) is untouched.
  *
@@ -32,7 +42,6 @@ import { EmptyState } from '@/components/patterns/EmptyState';
 import { ErrorBanner } from '@/components/patterns/ErrorBanner';
 import { FilterBar } from '@/components/patterns/FilterBar';
 import { ListPanel } from '@/components/patterns/ListPanel';
-import { EntryRow } from '@/components/patterns/EntryRow';
 import { PageHeader } from '@/components/patterns/PageHeader';
 import { StatPill } from '@/components/patterns/StatPill';
 import { siteRowDisabledReason } from '@/components/SiteRow';
@@ -41,6 +50,10 @@ import { AppliedFilterChips } from '@/components/catalog/AppliedFilterChips';
 import { CatalogFilterPanel } from '@/components/catalog/CatalogFilterPanel';
 import { SearchBar, type SearchModeLabel } from '@/components/catalog/SearchBar';
 import { AllSitesToggle } from '@/components/catalog/AllSitesToggle';
+import { CatalogEntryRow } from '@/components/catalog/CatalogEntryRow';
+import { HighlightNewToggle } from '@/components/catalog/HighlightNewToggle';
+import { SourceBadge, type ListSource } from '@/components/catalog/SourceBadge';
+import { useHighlightNew } from '../state/highlight-new';
 import { catalogSyncJobId } from '../state/ws-protocol';
 import {
   EMPTY_FILTERS,
@@ -54,37 +67,12 @@ import {
   useSyncCatalogProgress,
   type ProvisionMachine,
 } from '../state/use-sync-catalog-progress';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { navigate, replaceRoute, type Route } from '../router';
 import { useRoute } from '../state/use-route';
 
 const PAGE_LIMIT = 20;
-
-function EntryRowView(props: { entry: CatalogEntryT; siteId: string }): ReactElement {
-  const { entry } = props;
-  const open = (): void => {
-    navigate('manga', {
-      catalog: props.siteId,
-      module: props.siteId,
-      url: entry.link,
-      title: entry.title,
-    });
-  };
-  return (
-    <EntryRow
-      onClick={open}
-      buttonClassName="catalog-entry"
-      title={<span className="entry-title">{entry.title}</span>}
-      meta={
-        <span className="entry-meta">
-          {entry.authors !== '' ? entry.authors : 'unknown author'} · {entry.status} · {entry.numChapter} chapters
-        </span>
-      }
-    />
-  );
-}
 
 export function BrowsePage(props: { route: Route }): ReactElement {
   // The live hash is the truth (App owns routing; this subscription
@@ -100,6 +88,7 @@ export function BrowsePage(props: { route: Route }): ReactElement {
   if (siteId === '') {
     return (
       <SitePickerPage
+        route={route}
         onPick={(module: ModuleSummaryT): void => {
           navigate('browse', { site: module.id });
         }}
@@ -148,7 +137,6 @@ function SiteBrowse(props: { siteId: string; route: Route }): ReactElement {
     (): ModuleSummaryT | undefined => modules.data?.modules.find((m): boolean => m.id === props.siteId),
     [modules.data, props.siteId],
   );
-  const [forceLive, setForceLive] = useState(false);
   const [cancelled, setCancelled] = useState(false);
   const [restView, setRestView] = useState<ProvisionView>({ view: 'idle' });
   const [attempt, setAttempt] = useState(0);
@@ -159,6 +147,9 @@ function SiteBrowse(props: { siteId: string; route: Route }): ReactElement {
 
   const brokenReason = module !== undefined ? siteRowDisabledReason(module) : undefined;
   const needsProvision = module !== undefined && !module.catalogInstalled && brokenReason === undefined;
+  // Directory capability (§5.10): the module can serve its list
+  // straight from the site when no prebuilt catalog exists.
+  const directoryCapable = module?.capabilities.live_scrape_fallback ?? false;
 
   const progress = useSyncCatalogProgress({
     ...(needsProvision ? { jobId: catalogSyncJobId(props.siteId) } : {}),
@@ -166,12 +157,12 @@ function SiteBrowse(props: { siteId: string; route: Route }): ReactElement {
   });
   const machineView = machineToView(progress.machine, cancelled);
 
-  // AUTO-PROVISION (web default; FMD2 asks via dialog): fire the sync
+  // AUTO-PREPARE (web default; FMD2 asks via dialog): fire the sync
   // POST once per (site, attempt) — the fired-key ref keeps React
   // StrictMode's dev double-invoke from double-firing. The
   // AbortController is the cancel LATCH — canceling withdraws the
-  // provisioning view (the sync itself is one idempotent request; a
-  // late completion only flips the chip).
+  // progress view (the sync itself is one idempotent request; a late
+  // completion only flips the chip).
   useEffect((): (() => void) | undefined => {
     if (!needsProvision) return undefined;
     const firedKey = `${props.siteId}#${String(attempt)}`;
@@ -216,6 +207,15 @@ function SiteBrowse(props: { siteId: string; route: Route }): ReactElement {
     }
   }, [provisionView?.view, queryClient]);
 
+  // UNIFIED BROWSING (invisible plumbing): when no prebuilt catalog
+  // exists (FMD2-DB 404) and the module has directory capability, the
+  // SAME progress experience falls through AUTOMATICALLY to the live
+  // channel — the entries fetch is served by the site itself and the
+  // only trace is the muted 'from site' badge. No button, no mode
+  // name, no user decision.
+  const fellThroughToSite =
+    needsProvision && provisionView?.view === 'no-catalog' && directoryCapable;
+
   // Fallback name for a legacy ?catalog= id that is not a registered
   // module: neutral, NEVER the hex id.
   const siteName = module?.name ?? 'Catalog';
@@ -233,17 +233,17 @@ function SiteBrowse(props: { siteId: string; route: Route }): ReactElement {
   };
 
   // Entries open when: the registry resolved (no doomed fetches against
-  // an unresolved site) AND (the catalog is installed | live browse was
-  // chosen | provisioning completed). A legacy ?catalog= for an
-  // UNREGISTERED id keeps the classic entries view (server decides the
-  // catalog/live channel and errors typed).
+  // an unresolved site) AND (the catalog is installed | preparation
+  // completed | the automatic fall-through fired). A legacy ?catalog=
+  // for an UNREGISTERED id keeps the classic entries view (server
+  // decides the channel and errors typed).
   const registryLoaded = modules.data !== undefined;
   const showEntries =
-    registryLoaded && (!needsProvision || forceLive || provisionView?.view === 'ready');
+    registryLoaded && (!needsProvision || provisionView?.view === 'ready' || fellThroughToSite);
 
   return (
     <section aria-label="Browse catalog" data-site-selected={showEntries ? 'entries' : 'provisioning'}>
-      {needsProvision ? (
+      {needsProvision && !fellThroughToSite ? (
         <ProvisionToast machine={progress.machine} siteName={siteName} onCancel={cancel} />
       ) : null}
 
@@ -284,12 +284,8 @@ function SiteBrowse(props: { siteId: string; route: Route }): ReactElement {
         <ProvisionPanel
           siteName={siteName}
           view={provisionView ?? { view: 'idle' }}
-          liveCapable={module?.capabilities.live_scrape_fallback ?? false}
           onCancel={cancel}
           onRetry={retry}
-          onLive={(): void => {
-            setForceLive(true);
-          }}
         />
       ) : null}
 
@@ -308,55 +304,37 @@ function SiteBrowse(props: { siteId: string; route: Route }): ReactElement {
 function ProvisionPanel(props: {
   siteName: string;
   view: ProvisionView;
-  liveCapable: boolean;
   onCancel: () => void;
   onRetry: () => void;
-  onLive: () => void;
 }): ReactElement {
   const v = props.view;
   if (v.view === 'no-catalog') {
+    // Directory-capable modules never reach this branch (the automatic
+    // fall-through opened their list) — this is the no-list dead end
+    // for modules without directory capability.
     return (
-      <EmptyState title="No prebuilt catalog for this site">
+      <EmptyState title="No list available for this site">
         <p>
-          FMD2-DB has no catalog archive for {props.siteName}. The site cannot be browsed from a
-          prebuilt database.
+          There is no ready-made list for {props.siteName}, and its titles cannot be fetched from
+          the site directly.
         </p>
-        {props.liveCapable ? (
-          <p>
-            Its module supports live browsing — you can browse the site’s directory live instead
-            (slower, but always current).
-          </p>
-        ) : (
-          <p>This site’s module does not support live browsing either.</p>
-        )}
-        {props.liveCapable ? (
-          <Button type="button" className="provision-live" onClick={props.onLive}>
-            Browse live instead
-          </Button>
-        ) : null}
+        {v.detail !== undefined ? <p className="text-xs">{v.detail}</p> : null}
       </EmptyState>
     );
   }
   if (v.view === 'failed') {
     return (
       <EmptyState
-        title="Catalog provisioning failed"
+        title="Couldn’t open this site"
         action={
-          <>
-            <Button type="button" onClick={props.onRetry}>
-              Retry
-            </Button>
-            {props.liveCapable ? (
-              <Button type="button" variant="outline" className="ml-2" onClick={props.onLive}>
-                Try live browse
-              </Button>
-            ) : null}
-          </>
+          <Button type="button" onClick={props.onRetry}>
+            Retry
+          </Button>
         }
       >
         <p>
-          A transient error interrupted the catalog download for {props.siteName}. Retry when your
-          connection allows — nothing partial was installed.
+          A transient error interrupted opening {props.siteName}. Retry when your connection
+          allows — nothing partial was installed.
         </p>
         {v.detail !== undefined ? <p className="text-xs">{v.detail}</p> : null}
       </EmptyState>
@@ -365,14 +343,14 @@ function ProvisionPanel(props: {
   if (v.view === 'cancelled') {
     return (
       <EmptyState
-        title="Provisioning cancelled"
+        title="Cancelled"
         action={
           <Button type="button" onClick={props.onRetry}>
-            Restart provisioning
+            Try again
           </Button>
         }
       >
-        <p>The catalog download for {props.siteName} was cancelled. Nothing partial was installed.</p>
+        <p>Opening {props.siteName} was cancelled. Nothing was changed.</p>
       </EmptyState>
     );
   }
@@ -383,8 +361,8 @@ function ProvisionPanel(props: {
       <p className="text-sm font-medium">Preparing {props.siteName}…</p>
       <p className="text-xs text-muted-foreground">
         {v.view === 'installing'
-          ? 'Downloading and installing the site catalog (FMD2-DB).'
-          : 'Starting catalog provisioning…'}
+          ? 'Getting the site ready — this only happens the first time you open it.'
+          : 'Starting…'}
       </p>
       <Button type="button" variant="outline" size="sm" className="mt-2" onClick={props.onCancel}>
         Cancel
@@ -408,6 +386,9 @@ function CatalogEntries(props: {
   const state: BrowseFilterState = parseFilterQuery(props.route.query);
   const view: 'latest' | 'title' = props.route.query['view'] === 'title' ? 'title' : 'latest';
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // FMD2 miHighlightNewManga parity: one persisted global toggle gating
+  // the new-manga accent on every entry row.
+  const [highlightNew] = useHighlightNew();
 
   const { mode, q, pages } = useCatalogQuery(siteId, state, {
     view,
@@ -417,7 +398,9 @@ function CatalogEntries(props: {
 
   const entries = pages.data?.pages.flatMap((page): CatalogEntryT[] => [...page.entries]) ?? [];
   const total = pages.data?.pages.at(-1)?.total;
-  const live = pages.data?.pages.at(-1)?.source === 'live';
+  // Which channel served the open list — transparency only (muted
+  // badge + tooltip), never a label on any control.
+  const source: ListSource | undefined = pages.data?.pages.at(-1)?.source;
 
   // URL writer: replaces while typing, pushes for discrete changes.
   const writeState = (next: BrowseFilterState, replace: boolean): void => {
@@ -495,11 +478,9 @@ function CatalogEntries(props: {
           Filters{filtering ? ' •' : ''}
         </Button>
 
-        {live ? (
-          <Badge variant="secondary" title="§6.8 live-scrape fallback: no FMD2-DB catalog — served live from the module's directory walk">
-            live scrape
-          </Badge>
-        ) : null}
+        <HighlightNewToggle />
+
+        {source !== undefined ? <SourceBadge source={source} /> : null}
       </FilterBar>
 
       {filtersOpen ? (
@@ -526,7 +507,14 @@ function CatalogEntries(props: {
             ariaLabel="Catalog entries"
             items={entries}
             itemKey={(entry): string => `${entry.jdn}-${entry.link}`}
-            renderItem={(entry): ReactElement => <EntryRowView entry={entry} siteId={siteId} />}
+            renderItem={(entry): ReactElement => (
+              <CatalogEntryRow
+                entry={entry}
+                siteId={siteId}
+                highlightNew={highlightNew}
+                {...(state.newDays !== undefined ? { newDays: state.newDays } : {})}
+              />
+            )}
           />
           {pages.hasNextPage ? (
             <Button

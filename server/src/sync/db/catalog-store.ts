@@ -259,7 +259,12 @@ export class CatalogFileStore implements CatalogStore {
     const filters: SearchRowFilters = {
       ...(query.status !== undefined && query.status !== '' ? { status: query.status } : {}),
       ...(query.authors !== undefined && query.authors !== '' ? { authors: query.authors } : {}),
+      ...(query.artists !== undefined && query.artists !== '' ? { artists: query.artists } : {}),
+      ...(query.summary !== undefined && query.summary !== '' ? { summary: query.summary } : {}),
       ...(query.genres !== undefined && query.genres.length > 0 ? { genres: query.genres } : {}),
+      ...(query.genresExclude !== undefined && query.genresExclude.length > 0
+        ? { genresExclude: query.genresExclude }
+        : {}),
       genresMode: query.genresMode ?? 'all',
       ...(query.newDays !== undefined ? { newDays: query.newDays } : {}),
     };
@@ -529,8 +534,19 @@ export interface SearchRowFilters {
   readonly status?: string;
   /** `authors` column LIKE-contains (DBDataProcess:1394). */
   readonly authors?: string;
+  /** `artists` column LIKE-contains (FMD2 edFilterArtists, additive). */
+  readonly artists?: string;
+  /** `summary` column LIKE-contains (FMD2 edFilterSummary, additive). */
+  readonly summary?: string;
   /** Each genre must appear in `genres` (LIKE-contains). */
   readonly genres?: readonly string[];
+  /**
+   * `!`-prefixed custom genres (audit (b)2 fix): each composes as a
+   * `NOT LIKE` exclude — AND-composed among themselves and with the
+   * include block (`genresMode` joins INCLUDES only). A genre listed
+   * in BOTH lists resolves to exclude-only (the exclusion wins).
+   */
+  readonly genresExclude?: readonly string[];
   /** `'all'` (FMD2 rbAll default) ANDs the genre clauses; `'any'` ORs. */
   readonly genresMode: 'all' | 'any';
   /** Only-new window: `jdn > JDN(today) - newDays` (DBDataProcess:1382). */
@@ -566,6 +582,15 @@ export function escapeLikeValue(value: string): string {
  * are read-only attached files where the FTS sidecar already carries
  * the hot path, so contains-parity is kept and the prefix fast-path
  * is deliberately NOT taken (it would change FMD2 semantics).
+ *
+ * Genre EXCLUDES (`!`/`-` custom genres, audit (b)2): composition
+ * matrix — includes join by genresMode (OR for 'any', AND for 'all'),
+ * excludes always AND among themselves, and the exclude block ANDs
+ * onto whatever the include block produced:
+ *   includes=[A,B] any  + excludes=[C]   → (A OR B) AND NOT C
+ *   includes=[A,B] all  + excludes=[C,D] → (A AND B) AND NOT C AND NOT D
+ *   includes=[]         + excludes=[C]   → NOT C (exclude-only filter)
+ *   X in both lists     → exclude wins (X dropped from includes)
  */
 export function composeRowFilters(filters: SearchRowFilters): {
   sql: string;
@@ -581,13 +606,35 @@ export function composeRowFilters(filters: SearchRowFilters): {
     parts.push(` AND e."authors" LIKE ? ESCAPE '\\'`);
     params.push(`%${escapeLikeValue(filters.authors)}%`);
   }
+  if (filters.artists !== undefined) {
+    parts.push(` AND e."artists" LIKE ? ESCAPE '\\'`);
+    params.push(`%${escapeLikeValue(filters.artists)}%`);
+  }
+  if (filters.summary !== undefined) {
+    parts.push(` AND e."summary" LIKE ? ESCAPE '\\'`);
+    params.push(`%${escapeLikeValue(filters.summary)}%`);
+  }
   const genres: readonly string[] = filters.genres ?? [];
-  if (genres.length > 0) {
-    const clauses: string[] = genres.map((): string => `e."genres" LIKE ? ESCAPE '\\'`);
-    const genreParams: string[] = genres.map((g): string => `%${escapeLikeValue(g)}%`);
+  const excludes: readonly string[] = filters.genresExclude ?? [];
+  // Exclusion wins on collision (FMD2 unchecking the box): a genre in
+  // both lists drops out of the includes — the NOT LIKE always applies.
+  const excluded: ReadonlySet<string> = new Set(excludes);
+  const includes: readonly string[] = genres.filter((g): boolean => !excluded.has(g));
+  if (includes.length > 0) {
+    const clauses: string[] = includes.map((): string => `e."genres" LIKE ? ESCAPE '\\'`);
+    const genreParams: string[] = includes.map((g): string => `%${escapeLikeValue(g)}%`);
     const join: string = filters.genresMode === 'any' ? ' OR ' : ' AND ';
     parts.push(` AND (${clauses.join(join)})`);
     params.push(...genreParams);
+  }
+  if (excludes.length > 0) {
+    // Excludes AND among themselves regardless of genresMode — FMD2's
+    // uncheck list composes additively-negatively (AddSQLSimpleFilter
+    // appends each as its own AND NOT LIKE, DBDataProcess.pas:1425).
+    for (const g of excludes) {
+      parts.push(` AND e."genres" NOT LIKE ? ESCAPE '\\'`);
+      params.push(`%${escapeLikeValue(g)}%`);
+    }
   }
   if (filters.newDays !== undefined) {
     parts.push(` AND e."jdn" > ?`);
@@ -649,7 +696,10 @@ interface SearchCursor {
   g?: string;
   st?: string;
   a?: string;
+  ar?: string;
+  sm?: string;
   gs?: string;
+  ge?: string;
   gm?: 'all' | 'any';
   nd?: number;
 }
@@ -682,10 +732,20 @@ function encodeSearchCursor(
   if (filters.authors !== undefined) {
     payload.a = filters.authors;
   }
+  if (filters.artists !== undefined) {
+    payload.ar = filters.artists;
+  }
+  if (filters.summary !== undefined) {
+    payload.sm = filters.summary;
+  }
   const genres: readonly string[] = filters.genres ?? [];
   if (genres.length > 0) {
     payload.gs = cursorGenreKey(genres);
     payload.gm = filters.genresMode;
+  }
+  const excludes: readonly string[] = filters.genresExclude ?? [];
+  if (excludes.length > 0) {
+    payload.ge = cursorGenreKey(excludes);
   }
   if (filters.newDays !== undefined) {
     payload.nd = filters.newDays;
@@ -740,12 +800,26 @@ function searchCursorMatches(
   if ((cursor.a ?? '') !== (filters.authors ?? '')) {
     return false;
   }
+  if ((cursor.ar ?? '') !== (filters.artists ?? '')) {
+    return false;
+  }
+  if ((cursor.sm ?? '') !== (filters.summary ?? '')) {
+    return false;
+  }
   const genres: readonly string[] = filters.genres ?? [];
   if (genres.length > 0) {
     if (cursor.gs !== cursorGenreKey(genres) || (cursor.gm ?? 'all') !== filters.genresMode) {
       return false;
     }
   } else if (cursor.gs !== undefined) {
+    return false;
+  }
+  const excludes: readonly string[] = filters.genresExclude ?? [];
+  if (excludes.length > 0) {
+    if (cursor.ge !== cursorGenreKey(excludes)) {
+      return false;
+    }
+  } else if (cursor.ge !== undefined) {
     return false;
   }
   if ((cursor.nd ?? undefined) !== filters.newDays) {

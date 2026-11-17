@@ -39,9 +39,9 @@ export function CapabilityBadges(props: { module: ModuleSummaryT }): ReactElemen
           <Badge
             variant="secondary"
             className="badge-capability"
-            title="§6.8: no FMD2-DB catalog — Browse serves this module live from its directory walk (§5.8-normalized, TTL-cached)"
+            title="Directory capability: this module can list its titles straight from the site when no prebuilt list exists"
           >
-            live-scrape browse
+            directory
           </Badge>
         </li>
       ) : null}

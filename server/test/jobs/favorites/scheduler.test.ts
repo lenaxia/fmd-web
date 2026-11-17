@@ -316,3 +316,61 @@ describe('FavoriteScheduler — bounded concurrency under a fake clock', (): voi
     scheduler.stop();
   });
 });
+
+describe('FavoriteScheduler.setDefaultIntervalMs — runtime interval (Settings → Updates parity)', (): void => {
+  it('a shorter interval re-arms idle favorites due-now and they are checked immediately', async (): Promise<void> => {
+    const clock = new FakeClock();
+    const checks = new GatedChecks();
+    const scheduler = new FavoriteScheduler({
+      list: (): SchedulerFavorite[] => favorites('a'),
+      check: (favorite): Promise<void> => checks.run(favorite),
+      clock,
+      maxConcurrent: 1,
+      intervalMs: 3_600_000,
+      jitterMs: 0,
+    });
+    scheduler.start();
+    await settle();
+    expect(checks.started).toEqual(['a']);
+    checks.release('a');
+    await settle();
+    // next due = +3_600_000 — nothing fires before that.
+    await clock.advance(60_000);
+    expect(checks.started).toEqual(['a']);
+
+    scheduler.setDefaultIntervalMs(1_000);
+    expect(scheduler.defaultIntervalMs()).toBe(1_000);
+    await settle();
+    // 'a' re-armed due-now under the new cadence → claimed again.
+    expect(checks.started).toEqual(['a', 'a']);
+    checks.release('a');
+    await settle();
+    scheduler.stop();
+  });
+
+  it('interval 0 (scheduled checks off) clears every pending wake — no future check fires', async (): Promise<void> => {
+    const clock = new FakeClock();
+    const checks = new GatedChecks();
+    const scheduler = new FavoriteScheduler({
+      list: (): SchedulerFavorite[] => favorites('a'),
+      check: (favorite): Promise<void> => checks.run(favorite),
+      clock,
+      maxConcurrent: 1,
+      intervalMs: 3_600_000,
+      jitterMs: 0,
+    });
+    scheduler.start();
+    await settle();
+    expect(checks.started).toEqual(['a']);
+    checks.release('a');
+    await settle();
+    // 'a' re-armed at +3_600_000 — flipping the interval off mid-flight
+    // must clear that wake, not just future completions.
+    scheduler.setDefaultIntervalMs(0);
+    expect(scheduler.defaultIntervalMs()).toBe(0);
+    expect(scheduler.stats().nextWakeAt).toBeUndefined();
+    await clock.advance(100_000_000);
+    expect(checks.started).toEqual(['a']);
+    scheduler.stop();
+  });
+});

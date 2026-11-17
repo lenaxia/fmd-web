@@ -67,6 +67,7 @@ export const module: ModuleSummaryT = {
 
 export const info: InfoResponseT = {
   title: 'Alpha Quest',
+  moduleId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   altTitles: 'Alpha Quest (Alt)',
   authors: 'Author A',
   artists: 'Artist B',
@@ -79,6 +80,7 @@ export const info: InfoResponseT = {
   chapterLinks: ['/manga/alpha/ch-1', '/manga/alpha/ch-2'],
   chapterNames: ['Chapter 1: The Beginning', 'Chapter 2: The Middle'],
   numChapter: 2,
+  downloaded: [],
 };
 
 export const job: JobT = {
@@ -123,6 +125,32 @@ export function installMockApi(page: Page): void {
   void page.route(API('modules'), (route): void => {
     void route.fulfill(json({ modules: [module], count: 1 }));
   });
+  // [parity-sweep] Settings groups + About version: the default GETs
+  // every Settings section issues (kept deterministic for fixtures).
+  void page.route(API('settings'), (route): void => {
+    void route.fulfill(
+      json({
+        proxy: { type: '', host: '', port: '', user: '', pass: '' },
+        output: {
+          format: 'zip',
+          chapterNameTemplate: '',
+          unicodeReplacement: false,
+          unicodeReplacementChar: '_',
+          digitPadding: 0,
+          removeMangaName: false,
+        },
+        favorites: { intervalMinutes: 60, checkAtStartup: true },
+        performance: { requestTimeoutSeconds: 15, retryCount: 2, parallelChapters: 1, threadsPerChapter: 1 },
+        retention: { days: 30 },
+        filenamePolicy: { normalizePaths: false },
+        diagnostics: { logEnabled: true, logLevel: 'info' },
+        browser: { enabled: false, url: '' },
+      }),
+    );
+  });
+  void page.route(/\/healthz$/, (route): void => {
+    void route.fulfill(json({ status: 'ok', version: '0.3.0-e2e' }));
+  });
   void page.route(API('catalog/[^/]+/latest'), (route): void => {
     const url = new URL(route.request().url());
     const pageParam = Number(url.searchParams.get('page') ?? '1');
@@ -154,6 +182,19 @@ export function installMockApi(page: Page): void {
   });
   void page.route(API('jobs/download'), (route): void => {
     void route.fulfill(json({ job }, 201));
+  });
+  // Browse row-menu batch download-all: fresh 201, replay 200 (specs
+  // layer stateful variants over this).
+  void page.route(API('jobs/download/batch'), (route): void => {
+    void route.fulfill(json({ jobs: [job, { ...job, id: 'e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b1' }], replayed: false }, 201));
+  });
+  // Entry rows derive favorited-ness from this list on mount.
+  void page.route(API('favorites'), (route): void => {
+    if (route.request().method() === 'GET') {
+      void route.fulfill(json({ favorites: [] }));
+    } else {
+      void route.fulfill(json({ favorite: {} }, 201));
+    }
   });
   void page.route(API('sync/modules'), (route): void => {
     void route.fulfill(

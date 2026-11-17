@@ -23,6 +23,7 @@
  * finalize precedes the ledger write so the ledger never cites a
  * missing artifact).
  */
+import { rmSync, statSync } from 'node:fs';
 import type Database from 'better-sqlite3';
 import { downloadedChaptersKey, linesToText, mergeCaseInsensitive } from './merge.js';
 import type { FinalizeRequest, FinalizeResult } from './finalize.js';
@@ -55,6 +56,12 @@ export interface FavoriteRow {
   readonly newChapterCount?: number;
   /** Case-insensitive merged list (M2) — trailing-LF text or ''. */
   readonly downloadedChapterList?: string;
+  /** Per-favorite download directory override ('' = default layout). */
+  readonly saveTo?: string;
+  /** Disabled favorites are skipped by the scheduler (FMD2 `Enabled`). */
+  readonly enabled?: boolean;
+  /** Creation stamp (FMD2 `DateAdded`, epoch ms). */
+  readonly dateAdded?: number;
 }
 
 export interface ChapterCompletionRequest {
@@ -109,6 +116,16 @@ export interface LibraryStore extends DownloadedChaptersAccess {
   listLibraryFiles(opts?: { limit?: number; beforeId?: number }): LibraryFileRow[];
   /** One listing row (with its absolute path for the download route). */
   getLibraryFile(id: string): (LibraryFileRow & { readonly path: string }) | undefined;
+  /**
+   * Downloads parity (delete task + data): remove the artifact recorded
+   * at `path` — the file on disk (when present) plus its `library_files`
+   * row. Returns whether a recorded row existed and was removed.
+   */
+  deleteLibraryFileByPath(path: string): boolean;
+  /** app_settings kv read (undefined when the key is absent). */
+  getSetting(key: string): string | undefined;
+  /** app_settings kv write (insert-or-replace). */
+  setSetting(key: string, value: string): void;
 }
 
 /** One §7.1 finalized artifact as the listing API projects it. */
@@ -160,7 +177,28 @@ export function ensureLibrarySchema(db: Database.Database): void {
       bytes      INTEGER NOT NULL,
       created_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
+  // Additive favorites-parity columns: CREATE IF NOT EXISTS does not
+  // extend an existing table, so each new column lands via an idempotent
+  // ALTER guarded by PRAGMA table_info (old data keeps its defaults).
+  const favoriteColumns = new Set(
+    (db.prepare('PRAGMA table_info(favorite)').all() as Array<{ name: string }>).map(
+      (column): string => column.name,
+    ),
+  );
+  if (!favoriteColumns.has('save_to')) {
+    db.exec('ALTER TABLE favorite ADD COLUMN save_to TEXT');
+  }
+  if (!favoriteColumns.has('enabled')) {
+    db.exec('ALTER TABLE favorite ADD COLUMN enabled INTEGER NOT NULL DEFAULT 1');
+  }
+  if (!favoriteColumns.has('date_added')) {
+    db.exec('ALTER TABLE favorite ADD COLUMN date_added INTEGER');
+  }
 }
 
 export class SqliteLibraryStore implements LibraryStore {
@@ -230,8 +268,9 @@ export class SqliteLibraryStore implements LibraryStore {
       .prepare(
         `INSERT INTO favorite
             (manga_key, module_id, url, title, status, current_chapter, last_check,
-             last_updated, auto_download, new_chapter_count, downloaded_chapter_list)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             last_updated, auto_download, new_chapter_count, downloaded_chapter_list,
+             save_to, enabled, date_added)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(manga_key) DO UPDATE SET
             module_id = excluded.module_id,
             url = excluded.url,
@@ -242,7 +281,10 @@ export class SqliteLibraryStore implements LibraryStore {
             last_updated = excluded.last_updated,
             auto_download = excluded.auto_download,
             new_chapter_count = excluded.new_chapter_count,
-            downloaded_chapter_list = excluded.downloaded_chapter_list`,
+            downloaded_chapter_list = excluded.downloaded_chapter_list,
+            save_to = excluded.save_to,
+            enabled = excluded.enabled,
+            date_added = excluded.date_added`,
       )
       .run(
         favorite.mangaKey,
@@ -256,6 +298,9 @@ export class SqliteLibraryStore implements LibraryStore {
         favorite.autoDownload === false ? 0 : 1,
         favorite.newChapterCount ?? 0,
         favorite.downloadedChapterList ?? null,
+        favorite.saveTo ?? null,
+        favorite.enabled === false ? 0 : 1,
+        favorite.dateAdded ?? null,
       );
   }
 
@@ -263,7 +308,8 @@ export class SqliteLibraryStore implements LibraryStore {
     const row = this.options.db
       .prepare(
         `SELECT manga_key, module_id, url, title, status, current_chapter, last_check,
-                last_updated, auto_download, new_chapter_count, downloaded_chapter_list
+                last_updated, auto_download, new_chapter_count, downloaded_chapter_list,
+                save_to, enabled, date_added
            FROM favorite WHERE manga_key = ?`,
       )
       .get(mangaKey) as FavoriteDbRow | undefined;
@@ -274,7 +320,8 @@ export class SqliteLibraryStore implements LibraryStore {
     const rows = this.options.db
       .prepare(
         `SELECT manga_key, module_id, url, title, status, current_chapter, last_check,
-                last_updated, auto_download, new_chapter_count, downloaded_chapter_list
+                last_updated, auto_download, new_chapter_count, downloaded_chapter_list,
+                save_to, enabled, date_added
            FROM favorite ORDER BY rowid`,
       )
       .all() as FavoriteDbRow[];
@@ -397,6 +444,43 @@ export class SqliteLibraryStore implements LibraryStore {
     }
     return { ...toLibraryFileRow(row), path: row.path };
   }
+
+  /** Downloads parity (delete task + data): file + row at `path`. */
+  public deleteLibraryFileByPath(path: string): boolean {
+    const row = this.options.db
+      .prepare('SELECT id FROM library_files WHERE path = ?')
+      .get(path) as { readonly id: number } | undefined;
+    if (row === undefined) {
+      return false;
+    }
+    // Remove the artifact when it is still on disk (a re-download may
+    // have replaced it; a wiped dir is not an error). Regular files
+    // only — never follow a path that mutated into something else.
+    try {
+      if (statSync(path).isFile()) {
+        rmSync(path);
+      }
+    } catch {
+      // Missing file (or unreachable) — the row removal still stands.
+    }
+    this.options.db.prepare('DELETE FROM library_files WHERE id = ?').run(row.id);
+    return true;
+  }
+
+  public getSetting(key: string): string | undefined {
+    const row = this.options.db
+      .prepare('SELECT value FROM app_settings WHERE key = ?')
+      .get(key) as { readonly value: string } | undefined;
+    return row?.value;
+  }
+
+  public setSetting(key: string, value: string): void {
+    this.options.db
+      .prepare(
+        'INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+      )
+      .run(key, value);
+  }
 }
 
 interface LibraryFileDbRow {
@@ -420,6 +504,9 @@ interface FavoriteDbRow {
   readonly auto_download: number | null;
   readonly new_chapter_count: number | null;
   readonly downloaded_chapter_list: string | null;
+  readonly save_to: string | null;
+  readonly enabled: number | null;
+  readonly date_added: number | null;
 }
 
 function toFavoriteRow(row: FavoriteDbRow): FavoriteRow {
@@ -437,6 +524,9 @@ function toFavoriteRow(row: FavoriteDbRow): FavoriteRow {
     ...(row.downloaded_chapter_list !== null
       ? { downloadedChapterList: row.downloaded_chapter_list }
       : {}),
+    ...(row.save_to !== null ? { saveTo: row.save_to } : {}),
+    enabled: row.enabled !== 0,
+    ...(row.date_added !== null ? { dateAdded: row.date_added } : {}),
   };
 }
 

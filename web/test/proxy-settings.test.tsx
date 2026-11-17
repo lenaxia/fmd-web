@@ -11,7 +11,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ProxySettingsSection } from '../src/components/ProxySettings';
 import { SettingsPage } from '../src/pages/SettingsPage';
-import { autoCleanup, mockFetch, renderWithProviders, type MockRoute } from './helpers';
+import { autoCleanup, FULL_SETTINGS, mockFetch, renderWithProviders, type MockRoute } from './helpers';
 import { moduleFixture } from './fixtures';
 
 autoCleanup();
@@ -23,7 +23,7 @@ describe('ProxySettingsSection (global proxy + sidecar badge)', (): void => {
         method: 'GET',
         match: (url): boolean => url.pathname === '/api/settings',
         respond: (): { body: object } => ({
-          body: { proxy: { type: '', host: '', port: '', user: '', pass: '' }, browser: { enabled: false, url: '' } },
+          body: { ...FULL_SETTINGS },
         }),
       },
     ];
@@ -43,7 +43,7 @@ describe('ProxySettingsSection (global proxy + sidecar badge)', (): void => {
         match: (url): boolean => url.pathname === '/api/settings',
         respond: (): { body: object } => ({
           body: {
-            proxy: { type: '', host: '', port: '', user: '', pass: '' },
+            ...FULL_SETTINGS,
             browser: { enabled: true, url: 'http://flaresolverr:8191' },
           },
         }),
@@ -61,7 +61,7 @@ describe('ProxySettingsSection (global proxy + sidecar badge)', (): void => {
         method: 'GET',
         match: (url): boolean => url.pathname === '/api/settings',
         respond: (): { body: object } => ({
-          body: { proxy: { type: '', host: '', port: '', user: '', pass: '' }, browser: { enabled: false, url: '' } },
+          body: { ...FULL_SETTINGS },
         }),
       },
       {
@@ -125,7 +125,7 @@ describe('Settings page: proxy section + module capability badges + override', (
         method: 'GET',
         match: (url): boolean => url.pathname === '/api/settings',
         respond: (): { body: object } => ({
-          body: { proxy: { type: '', host: '', port: '', user: '', pass: '' }, browser: { enabled: false, url: '' } },
+          body: { ...FULL_SETTINGS },
         }),
       },
       {
@@ -186,7 +186,7 @@ describe('Settings page: proxy section + module capability badges + override', (
         method: 'GET',
         match: (url): boolean => url.pathname === '/api/settings',
         respond: (): { body: object } => ({
-          body: { proxy: { type: '', host: '', port: '', user: '', pass: '' }, browser: { enabled: false, url: '' } },
+          body: { ...FULL_SETTINGS },
         }),
       },
       {

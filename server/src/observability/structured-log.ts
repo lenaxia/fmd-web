@@ -92,12 +92,31 @@ export class StructuredLogger {
   private readonly now: () => Date;
   /** Run-level expression-failure dedup (§5.6 review bound). */
   readonly expressionDedup = new ExpressionFailureDeduper();
+  /**
+   * [parity-sweep] M13: diagnostics settings (PUT /api/settings/
+   * diagnostics), applied LIVE — records below the minimum level (or
+   * everything, when disabled) are dropped before the sink. Default:
+   * enabled at debug (no filtering — the pre-settings behavior).
+   */
+  private diagnostics: { logEnabled: boolean; logLevel: LogLevel } = {
+    logEnabled: true,
+    logLevel: 'debug',
+  };
 
   constructor(options: StructuredLoggerOptions = {}) {
     this.sink = options.sink ?? ((line: string): void => {
       process.stdout.write(`${line}\n`);
     });
     this.now = options.now ?? ((): Date => new Date());
+  }
+
+  /** [parity-sweep] M13: apply the diagnostics settings (live). */
+  applyDiagnostics(settings: { logEnabled: boolean; logLevel: LogLevel }): void {
+    this.diagnostics = { ...settings };
+  }
+
+  diagnosticsSettings(): { logEnabled: boolean; logLevel: LogLevel } {
+    return { ...this.diagnostics };
   }
 
   debug(msg: string, fields: Record<string, unknown> = {}): void {
@@ -154,6 +173,10 @@ export class StructuredLogger {
   }
 
   private write(level: LogLevel, msg: string, fields: Record<string, unknown> = {}): void {
+    // [parity-sweep] M13: the diagnostics filter (enable + min level).
+    if (!this.diagnostics.logEnabled || LEVEL_RANK[level] < LEVEL_RANK[this.diagnostics.logLevel]) {
+      return;
+    }
     const record: Record<string, unknown> = { ts: this.now().toISOString(), level, msg };
     for (const [key, value] of Object.entries(fields)) {
       if (value !== undefined) {
@@ -163,6 +186,14 @@ export class StructuredLogger {
     this.sink(JSON.stringify(record));
   }
 }
+
+/** [parity-sweep] M13: level ordering for the minimum-level filter. */
+const LEVEL_RANK: Readonly<Record<LogLevel, number>> = {
+  debug: 10,
+  info: 20,
+  warn: 30,
+  error: 40,
+};
 
 /** Module-bound view — every line carries the same `module` id. */
 export class ModuleScopedLogger {

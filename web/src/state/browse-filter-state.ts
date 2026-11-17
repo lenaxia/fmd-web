@@ -74,10 +74,19 @@ export interface BrowseFilterState {
   readonly status: string;
   /** Authors LIKE-contains; '' = any. */
   readonly authors: string;
+  /** Artists LIKE-contains (FMD2 edFilterArtists); '' = any. */
+  readonly artists: string;
+  /** Summary LIKE-contains (FMD2 edFilterSummary); '' = any. */
+  readonly summary: string;
   /** Fixed-genre multi-select (canonical list membership implied). */
   readonly genres: readonly string[];
   /** Custom genres (FMD2 edCustomGenres, comma-separated free text). */
   readonly customGenres: readonly string[];
+  /**
+   * Excluded genres (FMD2 `!`/`-` custom-genre prefix) — carried to the
+   * API as `genresExclude[]` (server-side NOT LIKE). Audit (b)2 fix.
+   */
+  readonly excludedGenres: readonly string[];
   /** Genre clause join: 'all' (FMD2 rbAll default) | 'any' (rbAny). */
   readonly genresMode: GenresMode;
   /** Only-new window days (jdn-based); undefined = off. */
@@ -88,8 +97,11 @@ export const EMPTY_FILTERS: BrowseFilterState = {
   q: '',
   status: '',
   authors: '',
+  artists: '',
+  summary: '',
   genres: [],
   customGenres: [],
+  excludedGenres: [],
   genresMode: 'all',
 };
 
@@ -99,8 +111,11 @@ export function hasActiveFilters(state: BrowseFilterState): boolean {
     state.q !== '' ||
     state.status !== '' ||
     state.authors !== '' ||
+    state.artists !== '' ||
+    state.summary !== '' ||
     state.genres.length > 0 ||
     state.customGenres.length > 0 ||
+    state.excludedGenres.length > 0 ||
     state.newDays !== undefined
   );
 }
@@ -110,16 +125,59 @@ export function apiGenres(state: BrowseFilterState): readonly string[] {
   return [...state.genres, ...state.customGenres];
 }
 
-/** FMD2 custom-genres parsing (:3371-3388): comma-split, trimmed,
- * non-empty; a leading '!' or '-' EXCLUDES (uncheck list) — V1 keeps
- * the plain include form and strips the negation prefix. */
-export function parseCustomGenres(raw: string): readonly string[] {
-  return raw
-    .split(',')
-    .map((part): string => part.trim())
-    .filter((part): boolean => part !== '')
-    .map((part): string => (part.startsWith('!') || part.startsWith('-') ? part.slice(1).trim() : part))
-    .filter((part): boolean => part !== '');
+/** The API's genresExclude[] list (server NOT LIKE per genre). */
+export function apiGenresExclude(state: BrowseFilterState): readonly string[] {
+  return [...state.excludedGenres];
+}
+
+/**
+ * FMD2 custom-genres parsing (:3371-3388): comma-split, trimmed,
+ * non-empty; a leading '!' or '-' EXCLUDES (the uncheck list — FMD2's
+ * AddSQLSimpleFilter emits `NOT LIKE` for these, DBDataProcess.pas:1425).
+ *
+ * Audit (b)2 regression: V1 STRIPPED the prefix and included the genre
+ * (inverted semantics — typing `!Ecchi` INCLUDED Ecchi). The parser now
+ * preserves the prefix as a separate exclude list end-to-end.
+ */
+export interface ParsedGenreEntries {
+  /** Plain entries — genre INCLUDE filters. */
+  readonly includes: readonly string[];
+  /** `!`/`-` prefixed entries — genre EXCLUDE filters. */
+  readonly excludes: readonly string[];
+}
+
+export function parseGenreEntries(raw: string): ParsedGenreEntries {
+  const includes: string[] = [];
+  const excludes: string[] = [];
+  for (const part of raw.split(',')) {
+    const trimmed: string = part.trim();
+    if (trimmed === '') {
+      continue;
+    }
+    if (trimmed.startsWith('!') || trimmed.startsWith('-')) {
+      const genre: string = trimmed.slice(1).trim();
+      if (genre !== '') {
+        excludes.push(genre);
+      }
+    } else {
+      includes.push(trimmed);
+    }
+  }
+  return { includes, excludes };
+}
+
+/**
+ * Parse the raw custom-genres text into the split filter state
+ * (includes + excludes). A genre named in BOTH lists resolves to
+ * exclude-only (the exclusion wins, mirroring FMD2 unchecking the box).
+ */
+export function parseCustomGenresSplit(raw: string): ParsedGenreEntries {
+  const { includes, excludes } = parseGenreEntries(raw);
+  const excluded: ReadonlySet<string> = new Set(excludes);
+  return {
+    includes: includes.filter((genre): boolean => !excluded.has(genre)),
+    excludes,
+  };
 }
 
 // ── URL (query-param) codec ─────────────────────────────────────────
@@ -144,7 +202,7 @@ function parseList(raw: string | undefined): readonly string[] {
   if (raw === undefined) {
     return [];
   }
-  return [...new Set(parseCustomGenres(raw))];
+  return [...new Set(parseGenreEntries(raw).includes)];
 }
 
 function serializeList(values: readonly string[]): string | undefined {
@@ -158,6 +216,10 @@ function serializeList(values: readonly string[]): string | undefined {
  * Parse the browse URL query into filter state. Unknown keys are
  * ignored; malformed values fall back to defaults (a shared URL never
  * 500s the page).
+ *
+ * `cgenres` carries the FMD2 custom-genre grammar INCLUDING the
+ * `!`/`-` exclude prefix — both lists round-trip through it (excludes
+ * are serialized back with the canonical `!` prefix; `-` parses too).
  */
 export function parseFilterQuery(query: Record<string, string>): BrowseFilterState {
   const newRaw: string | undefined = query['new'];
@@ -169,12 +231,16 @@ export function parseFilterQuery(query: Record<string, string>): BrowseFilterSta
     }
   }
   const modeRaw: string | undefined = query['mode'];
+  const custom: ParsedGenreEntries = parseCustomGenresSplit(query['cgenres'] ?? '');
   return {
     q: query['q'] ?? '',
     status: FILTER_STATUSES.includes(query['status'] ?? '') ? (query['status'] as string) : '',
     authors: query['authors'] ?? '',
+    artists: query['artists'] ?? '',
+    summary: query['summary'] ?? '',
     genres: parseList(query['genres']),
-    customGenres: parseList(query['cgenres']),
+    customGenres: [...new Set(custom.includes)],
+    excludedGenres: [...new Set(custom.excludes)],
     genresMode: modeRaw === 'any' ? 'any' : 'all',
     ...(newDays !== undefined ? { newDays } : {}),
   };
@@ -195,11 +261,22 @@ export function serializeFilterQuery(state: BrowseFilterState): Record<string, s
   if (state.authors !== '') {
     out['authors'] = state.authors;
   }
+  if (state.artists !== '') {
+    out['artists'] = state.artists;
+  }
+  if (state.summary !== '') {
+    out['summary'] = state.summary;
+  }
   const genres: string | undefined = serializeList(state.genres);
   if (genres !== undefined) {
     out['genres'] = genres;
   }
-  const custom: string | undefined = serializeList(state.customGenres);
+  // FMD2 grammar round-trip: plain entries include, `!`-prefixed exclude.
+  const customRaw: readonly string[] = [
+    ...state.customGenres,
+    ...state.excludedGenres.map((genre): string => `!${genre}`),
+  ];
+  const custom: string | undefined = serializeList(customRaw);
   if (custom !== undefined) {
     out['cgenres'] = custom;
   }

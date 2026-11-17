@@ -1,13 +1,22 @@
 import { join } from 'node:path';
-import type { JobT, JobState, LaneId } from '@fmd/contract';
+import type {
+  JobActionTypeT,
+  JobBulkActionRequestT,
+  JobBulkActionResponseT,
+  JobState,
+  JobT,
+  LaneId,
+} from '@fmd/contract';
 import { ApiError } from '../api/errors.js';
 import type {
   JobCreateInput,
   JobRecord,
   JobService,
+  JobsListOptions,
   JobsPage,
 } from '../api/services.js';
 import { IdempotencyConflictError, isTerminalJobState, type JobTransitionDetail } from '../jobs/queue/index.js';
+import type { DownloadChapterJob } from '../jobs/queue/payloads.js';
 import {
   LaneRunner,
   type JobQueue,
@@ -21,9 +30,11 @@ import { ConcurrentImageWorkerPool } from '../jobs/download/image-worker-pool.js
 import { PerHostSiteLimiter } from '../jobs/download/site-limiter.js';
 import { indexFileName } from '../jobs/download/filenames.js';
 import { readMarkers, writeMarkers } from '../jobs/download/marker-store.js';
-import { ZipPacker } from '../jobs/packers/zip-packer.js';
+import { createPacker } from '../jobs/packers/index.js';
+import { applyOutputRenameOptions, resolveChapterFileName, sanitizeFileName, truncateKeepTail } from '../jobs/library/filenames.js';
 import { SqliteLibraryStore } from '../jobs/library/store.js';
-import { sanitizeFileName, truncateKeepTail } from '../jobs/library/filenames.js';
+import type { OutputDefaultsT, PerformanceSettingsT } from '../api/schemas.js';
+import type { FileNamePolicyMode } from '@fmd/contract';
 import type { WsHub } from '../api/ws/hub.js';
 import { EngineDownloadHooks, type EngineDownloadOptions } from './download-engine.js';
 
@@ -56,6 +67,7 @@ export function toJobWire(job: QueueJob, idempotencyKey?: string): JobT {
     ...(job.progress !== undefined ? { progress: { ...job.progress } } : {}),
     ...(job.error !== undefined ? { error: job.error } : {}),
     ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
+    ...(job.paused ? { paused: true } : {}),
     createdAt: new Date(job.createdAt).toISOString(),
     updatedAt: new Date(job.updatedAt).toISOString(),
   };
@@ -73,6 +85,7 @@ function toJobRecord(job: QueueJob, idempotencyKey?: string): JobRecord {
     ...(wire.progress !== undefined ? { progress: wire.progress } : {}),
     ...(wire.error !== undefined ? { error: wire.error } : {}),
     ...(wire.idempotencyKey !== undefined ? { idempotencyKey: wire.idempotencyKey } : {}),
+    ...(wire.paused !== undefined ? { paused: wire.paused } : {}),
     createdAt: wire.createdAt,
     updatedAt: wire.updatedAt,
   };
@@ -118,6 +131,28 @@ export class PublishingJobQueue implements JobQueue {
     const job = this.inner.cancel(jobId);
     this.publish(job);
     return job;
+  }
+
+  resume(jobId: string): QueueJob {
+    const job = this.inner.resume(jobId);
+    this.publish(job);
+    return job;
+  }
+
+  hold(jobId: string): QueueJob {
+    const job = this.inner.hold(jobId);
+    this.publish(job);
+    return job;
+  }
+
+  /**
+   * Delete the row. NOT published: the D19 WS protocol carries job
+   * snapshots only (no deletion frame), so re-broadcasting the
+   * pre-delete snapshot would resurrect a ghost in live caches —
+   * deleting clients refetch the list instead.
+   */
+  remove(jobId: string): QueueJob {
+    return this.inner.remove(jobId);
   }
 
   byIdempotencyKey(key: string): QueueJob | undefined {
@@ -183,6 +218,13 @@ export class RuntimeJobService implements JobService {
     private readonly queue: JobQueue,
     /** In-flight cancellation for RUNNING rows (the lane's registry). */
     private readonly cancelRunning: (jobId: string) => boolean,
+    /**
+     * Downloads-parity delete(+data) seam: removes the finalized
+     * artifact (library file + `library_files` row) recorded at
+     * `progress.libraryPath` by a finished job. Returns whether an
+     * artifact existed and was removed.
+     */
+    private readonly deleteArtifact: (path: string) => boolean = (): boolean => false,
   ) {}
 
   createDownload(input: JobCreateInput, idempotencyKey?: string): { job: JobRecord; replayed: boolean } {
@@ -193,9 +235,13 @@ export class RuntimeJobService implements JobService {
       ...(input.mangaTitle !== undefined ? { mangaTitle: input.mangaTitle } : {}),
       chapterLink: input.chapterLink,
       ...(input.chapterName !== undefined ? { chapterName: input.chapterName } : {}),
+      ...(input.saveTo !== undefined ? { saveTo: input.saveTo } : {}),
     } as const;
     try {
-      const result = this.queue.enqueue(payload, idempotencyKey !== undefined ? { idempotencyKey } : undefined);
+      const result = this.queue.enqueue(payload, {
+        ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
+        ...(input.paused === true ? { paused: true } : {}),
+      });
       if (!result.replayed) {
         return { job: toJobRecord(result.job, idempotencyKey), replayed: false };
       }
@@ -219,7 +265,7 @@ export class RuntimeJobService implements JobService {
 
   /** First free `<key>#<n>` slot (probe; bounded) → fresh queued row. */
   private enqueueChained(
-    payload: { type: 'download'; moduleId: string; mangaUrl: string; chapterLink: string; mangaTitle?: string; chapterName?: string },
+    payload: DownloadChapterJob,
     baseKey: string | undefined,
   ): { job: QueueJob; key?: string; replayed: boolean } {
     if (baseKey === undefined) {
@@ -251,7 +297,7 @@ export class RuntimeJobService implements JobService {
     return job === undefined || job.lane !== 'download' ? undefined : toJobRecord(job);
   }
 
-  list(opts: { state?: JobRecord['state']; cursor?: string; limit: number }): JobsPage {
+  list(opts: JobsListOptions): JobsPage {
     let boundaryId = Number.MAX_SAFE_INTEGER;
     if (opts.cursor !== undefined) {
       const raw = Number.parseInt(Buffer.from(opts.cursor, 'base64url').toString('utf8'), 10);
@@ -260,9 +306,36 @@ export class RuntimeJobService implements JobService {
       }
       boundaryId = raw;
     }
+    // Downloads-parity filters (web multi-select / search / date-added
+    // window): applied in-memory over the lane rows — the job table is
+    // retention-bounded, so a JS filter pass is the honest scope.
+    const needle = opts.q !== undefined && opts.q !== '' ? opts.q.toLowerCase() : undefined;
+    const fromMs =
+      opts.addedFrom !== undefined ? Date.parse(`${opts.addedFrom}T00:00:00.000Z`) : undefined;
+    const toMs =
+      opts.addedTo !== undefined ? Date.parse(`${opts.addedTo}T23:59:59.999Z`) : undefined;
     const all = this.queue
       .list({ ...(opts.state !== undefined ? { state: opts.state } : {}), lane: 'download' })
       .filter((job): boolean => Number(job.id) < boundaryId)
+      .filter((job): boolean => opts.states === undefined || opts.states.includes(job.state))
+      .filter((job): boolean => {
+        if (needle === undefined) {
+          return true;
+        }
+        const payload = job.payload as Record<string, unknown>;
+        const title = typeof payload['mangaTitle'] === 'string' ? payload['mangaTitle'] : '';
+        const chapter = typeof payload['chapterName'] === 'string' ? payload['chapterName'] : '';
+        return title.toLowerCase().includes(needle) || chapter.toLowerCase().includes(needle);
+      })
+      .filter((job): boolean => {
+        if (fromMs === undefined && toMs === undefined) {
+          return true;
+        }
+        if (Number.isNaN(job.createdAt)) {
+          return false;
+        }
+        return (fromMs === undefined || job.createdAt >= fromMs) && (toMs === undefined || job.createdAt <= toMs);
+      })
       .sort((a, b): number => Number(b.id) - Number(a.id));
     const page = all.slice(0, opts.limit);
     const last = page.at(-1);
@@ -287,6 +360,176 @@ export class RuntimeJobService implements JobService {
       this.cancelRunning(id);
     }
     return toJobRecord(this.queue.cancel(id));
+  }
+
+  /** cbAddAsStopped parity: lift the hold on a live row (queued+paused → claimable). */
+  resume(id: string): JobRecord {
+    const job = this.queue.get(id);
+    if (job === undefined || job.lane !== 'download') {
+      throw new ApiError(404, 'not_found', `unknown job: ${id}`);
+    }
+    if (isTerminalJobState(job.state)) {
+      throw new ApiError(409, 'conflict', `job ${id} is ${job.state} — nothing to resume`);
+    }
+    return toJobRecord(this.queue.resume(id));
+  }
+
+  // ── downloads-tab task actions (FMD2 pmDownload parity, web-adapted) ──
+  // State matrix (rows = §7.1 state × hold; ★ = the FMD2 origin menu):
+  //
+  //   state      | pause★   | resume★  | retry | redownload★ | disable★ | enable★
+  //   queued     | hold     | lift/-op | 409   | 409         | hold     | lift/-op
+  //   queued+held| -op      | lift     | 409   | 409         | -op      | lift
+  //   running    | cancel   | 409      | 409   | 409         | 409      | 409
+  //   retry      | cancel   | 409      | 409   | 409         | 409      | 409
+  //   done       | 409      | 409      | 409   | re-enqueue  | 409      | 409
+  //   failed     | 409      | 409      | re-enqueue | 409    | 409      | 409
+  //   cancelled  | 409      | re-enqueue | 409 | 409         | 409      | 409
+  //
+  // (`-op` = idempotent no-op returning the row.) pause on a live row is
+  // the FMD2 STOP analog (markers persist — resume re-enqueues and skips
+  // already-downloaded images); disable/enable are the DISABLED analog
+  // for scheduled-but-not-running rows. re-enqueue = fresh chained
+  // attempt under `<key>#<n>` (createDownload's re-download semantic).
+
+  /** The download-lane row for `id`, or undefined (404 mapping input). */
+  private downloadRow(id: string): QueueJob | undefined {
+    const job = this.queue.get(id);
+    return job !== undefined && job.lane === 'download' ? job : undefined;
+  }
+
+  /** Typed 409 envelope for an action the row's state does not admit. */
+  private illegalAction(id: string, action: JobActionTypeT, job: QueueJob): ApiError {
+    return new ApiError(
+      409,
+      'conflict',
+      `cannot ${action} job ${id} in state ${job.state}${job.paused ? ' (held)' : ''}`,
+      { job: { id, state: job.state, paused: job.paused }, action },
+    );
+  }
+
+  /** Fresh chained attempt for a terminal row (resumes from markers). */
+  private reenqueue(job: QueueJob): JobRecord {
+    const chained = this.enqueueChained(
+      job.payload.type === 'download'
+        ? job.payload
+        : { type: 'download', moduleId: '', mangaUrl: '', chapterLink: '' },
+      job.idempotencyKey,
+    );
+    return toJobRecord(chained.job, chained.key ?? job.idempotencyKey);
+  }
+
+  action(id: string, type: JobActionTypeT): JobRecord {
+    const job = this.downloadRow(id);
+    if (job === undefined) {
+      throw new ApiError(404, 'not_found', `unknown job: ${id}`);
+    }
+    switch (type) {
+      case 'pause':
+      case 'disable': {
+        if (job.state === 'queued') {
+          return job.paused ? toJobRecord(job) : toJobRecord(this.queue.hold(id));
+        }
+        if (type === 'pause' && (job.state === 'running' || job.state === 'retry')) {
+          if (job.state === 'running') {
+            this.cancelRunning(id);
+          }
+          return toJobRecord(this.queue.cancel(id));
+        }
+        break;
+      }
+      case 'resume':
+      case 'enable': {
+        if (job.state === 'queued') {
+          return job.paused ? toJobRecord(this.queue.resume(id)) : toJobRecord(job);
+        }
+        if (type === 'resume' && job.state === 'cancelled') {
+          return this.reenqueue(job);
+        }
+        break;
+      }
+      case 'retry': {
+        if (job.state === 'failed') {
+          return this.reenqueue(job);
+        }
+        break;
+      }
+      case 'redownload': {
+        if (job.state === 'done') {
+          return this.reenqueue(job);
+        }
+        break;
+      }
+    }
+    throw this.illegalAction(id, type, job);
+  }
+
+  /** Delete the row (any state); `data: true` also removes the artifact. */
+  remove(id: string, opts: { readonly data?: boolean } = {}): { job: JobRecord; dataDeleted: boolean } {
+    const job = this.downloadRow(id);
+    if (job === undefined) {
+      throw new ApiError(404, 'not_found', `unknown job: ${id}`);
+    }
+    if (job.state === 'running') {
+      this.cancelRunning(id);
+    }
+    let dataDeleted = false;
+    if (opts.data === true) {
+      const live = this.queue.progressOf(id) ?? job.progress;
+      const path =
+        live !== undefined && typeof live['libraryPath'] === 'string' ? (live['libraryPath'] as string) : '';
+      if (path !== '') {
+        dataDeleted = this.deleteArtifact(path);
+      }
+    }
+    return { job: toJobRecord(this.queue.remove(id)), dataDeleted };
+  }
+
+  /**
+   * Toolbar bulk ops (FMD2 tsDownload toolbar, frmMain.lfm:291-339):
+   * pause all (Stop All) / resume all (Resume All) over scope `all`;
+   * delete over scope `completed` (Delete completed — FMD2
+   * RemoveAllFinishedTasks removes STATUS_FINISH rows only). Idempotent:
+   * a settled queue reports `affected: 0`.
+   */
+  bulkAction(request: JobBulkActionRequestT): JobBulkActionResponseT {
+    const { action, scope } = request;
+    if ((action === 'pause' || action === 'resume') && scope !== 'all') {
+      throw new ApiError(400, 'bad_request', `scope "${scope}" does not apply to bulk ${action} — use "all"`);
+    }
+    if (action === 'delete' && scope !== 'completed') {
+      throw new ApiError(400, 'bad_request', `scope "${scope}" does not apply to bulk delete — use "completed"`);
+    }
+    const rows = this.queue.list({ lane: 'download' });
+    const touched: JobRecord[] = [];
+    for (const job of rows) {
+      try {
+        if (action === 'pause') {
+          if (job.state === 'queued' && !job.paused) {
+            touched.push(toJobRecord(this.queue.hold(job.id)));
+          } else if (job.state === 'running' || job.state === 'retry') {
+            if (job.state === 'running') {
+              this.cancelRunning(job.id);
+            }
+            touched.push(toJobRecord(this.queue.cancel(job.id)));
+          }
+        } else if (action === 'resume') {
+          if (job.state === 'queued' && job.paused) {
+            touched.push(toJobRecord(this.queue.resume(job.id)));
+          } else if (job.state === 'cancelled') {
+            touched.push(this.reenqueue(job));
+          }
+        } else if (job.state === 'done') {
+          this.remove(job.id);
+          touched.push(toJobRecord(job));
+        }
+      } catch {
+        // Best-effort bulk: a row that raced away (retention prune,
+        // concurrent delete) is skipped, not fatal — the count stays
+        // truthful for what THIS pass touched.
+      }
+    }
+    return { action, scope, affected: touched.length, jobs: touched };
   }
 }
 
@@ -328,6 +571,28 @@ export interface DownloadLaneDeps {
   readonly log: (message: string) => void;
   /** Per-image retry budget (default 2 — FMD2 RetryCount analog). */
   readonly imageRetryBudget?: number;
+  /**
+   * Output defaults read seam (PUT /api/settings/output): consulted
+   * per-job at pack/finalize time so a settings change applies to NEW
+   * jobs only. Defaults to zip + no rename template.
+   */
+  readonly outputDefaults?: () => OutputDefaultsT;
+  /**
+   * [parity-sweep] M10: Performance knobs read per-job (PUT
+   * /api/settings/performance): retryCount = the per-image budget,
+   * threadsPerChapter = the image-worker width. Absent = the
+   * pre-settings truth (2 / 1).
+   */
+  readonly performance?: () => PerformanceSettingsT;
+  /**
+   * [parity-sweep] M4: filename-policy mode provider — the ASSEMBLY
+   * composes the precedence (env > setting > parity default) and hands
+   * the lane a resolved mode; undefined keeps env resolution inside
+   * the contract's applyFileNamePolicy.
+   */
+  readonly fileNamePolicy?: () => FileNamePolicyMode | undefined;
+  /** [parity-sweep] M10: download-lane slot count (applies at start). */
+  readonly parallelChapters?: number;
 }
 
 /** Deterministic work-dir segment for a URL's tail (path-safe). */
@@ -344,6 +609,46 @@ function urlSegment(url: string, fallback: string): string {
 }
 
 const DOWNLOAD_STAGE = 'download';
+
+/**
+ * Downloads parity: sliding-window transfer-rate meter (FMD2 shows the
+ * HTTP rate while a task is in DOWNLOAD). Cumulative byte ticks over
+ * the last ~5s window → bytes/second; before two samples (or once the
+ * window goes quiet) the rate is undefined and the progress payload
+ * simply omits it.
+ */
+export class TransferRateMeter {
+  private static readonly WINDOW_MS = 5000;
+
+  private readonly samples: { at: number; totalBytes: number }[] = [];
+  private totalBytes = 0;
+
+  add(byteLength: number, now = Date.now()): void {
+    this.totalBytes += byteLength;
+    this.samples.push({ at: now, totalBytes: this.totalBytes });
+    const cutoff = now - TransferRateMeter.WINDOW_MS;
+    while (this.samples.length > 2 && (this.samples[0]?.at ?? now) < cutoff) {
+      this.samples.shift();
+    }
+  }
+
+  /** Windowed bytes/second (undefined until two samples / after quiet). */
+  bytesPerSecond(now = Date.now()): number | undefined {
+    const first = this.samples[0];
+    const last = this.samples[this.samples.length - 1];
+    if (first === undefined || last === undefined || this.samples.length < 2) {
+      return undefined;
+    }
+    if (now - last.at > TransferRateMeter.WINDOW_MS) {
+      return undefined; // window went quiet — no honest current rate
+    }
+    const elapsedSeconds = (last.at - first.at) / 1000;
+    if (elapsedSeconds <= 0) {
+      return undefined;
+    }
+    return Math.round((last.totalBytes - first.totalBytes) / elapsedSeconds);
+  }
+}
 
 /**
  * The `download` lane: one slot runs one chapter end-to-end (claim →
@@ -376,6 +681,9 @@ export function downloadLane(deps: DownloadLaneDeps): LaneRunnerLaneOptions {
       hooks = await EngineDownloadHooks.create(payload.moduleId, deps.engine);
       const limiter = new PerHostSiteLimiter();
       const resumeMarkers = readMarkers(workDir);
+      // Downloads parity: FMD2 shows the HTTP transfer rate while a
+      // task is in DOWNLOAD — the meter feeds the WS progress payload.
+      const rateMeter = new TransferRateMeter();
       runner = new DownloadChapterRunner(
         { module: hooks, pool: new ConcurrentImageWorkerPool(), limiter },
         {
@@ -384,13 +692,24 @@ export function downloadLane(deps: DownloadLaneDeps): LaneRunnerLaneOptions {
           chapterLink: payload.chapterLink,
           ...(payload.chapterName !== undefined ? { chapterName: payload.chapterName } : {}),
           workDir,
-          maxThreadPerTaskLimit: 1,
+          // [parity-sweep] M10: threads-per-chapter (FMD2
+          // MaxThreadPerTaskLimit) + retry count, read per-job.
+          maxThreadPerTaskLimit: deps.performance?.().threadsPerChapter ?? 1,
           ...(resumeMarkers !== undefined ? { resumeMarkers } : {}),
-          imageRetryBudget: deps.imageRetryBudget ?? 2,
+          imageRetryBudget: deps.performance?.().retryCount ?? deps.imageRetryBudget ?? 2,
           persistMarkers: (pageLinks): void => {
             writeMarkers(workDir, pageLinks);
             const done = pageLinks.filter((marker): boolean => marker === 'D').length;
-            ctx.setProgress({ stage: DOWNLOAD_STAGE, done, total: pageLinks.length });
+            const rate = rateMeter.bytesPerSecond();
+            ctx.setProgress({
+              stage: DOWNLOAD_STAGE,
+              done,
+              total: pageLinks.length,
+              ...(rate !== undefined ? { rate } : {}),
+            });
+          },
+          onImageSaved: (_workId, byteLength): void => {
+            rateMeter.add(byteLength);
           },
         },
       );
@@ -421,8 +740,27 @@ export function downloadLane(deps: DownloadLaneDeps): LaneRunnerLaneOptions {
         return { type: 'failed', kind: 'net', error: result.reason ?? 'chapter download failed' };
       }
 
-      // ── pack (§7.3): savedFiles in WorkId order → ZIP in the work dir ──
-      ctx.setProgress({ stage: 'pack', done: result.done, total: result.total });
+      // ── pack (§7.3): savedFiles in WorkId order → archive in the work dir ──
+      // Format comes from the output defaults (FMD2 Save-to parity,
+      // PUT /api/settings/output): the §7.3 packer set zip/cbz/pdf/epub,
+      // read per-job so a settings change applies to NEW jobs only.
+      // Downloads parity: the progress stage carries the FMD2 status
+      // palette names — COMPRESS for the zip/cbz packers, CONVERT for
+      // pdf/epub (uBaseUnit task states).
+      const output: OutputDefaultsT =
+        deps.outputDefaults?.() ?? {
+          format: 'zip',
+          chapterNameTemplate: '',
+          unicodeReplacement: false,
+          unicodeReplacementChar: '_',
+          digitPadding: 0,
+          removeMangaName: false,
+        };
+      const packStage: 'compress' | 'convert' =
+        output.format === 'pdf' || output.format === 'epub' ? 'convert' : 'compress';
+      ctx.setProgress({ stage: packStage, done: result.done, total: result.total });
+      // [parity-sweep] M6/M8: digitPadding (FMD2 lfm:4026) sets the
+      // minimum page-number width inside the archive entry names.
       const pages = result.savedFiles
         .map((filePath, workId): { workId: number; filePath: string; fileName: string } | undefined => {
           if (filePath === '') {
@@ -433,26 +771,49 @@ export function downloadLane(deps: DownloadLaneDeps): LaneRunnerLaneOptions {
           return {
             workId,
             filePath,
-            fileName: `${indexFileName(workId)}.${ext}`,
+            fileName: `${indexFileName(workId, output.digitPadding)}.${ext}`,
           };
         })
         .filter((page): page is { workId: number; filePath: string; fileName: string } => page !== undefined);
-      const packed = await new ZipPacker('zip').pack(pages, { outputDir: workDir });
+      const packed = await createPacker(output.format).pack(pages, { outputDir: workDir });
 
       // ── finalize (§7.1 step 5): atomic move + ledger + listing row ──
-      const chapterBase = sanitizeFileName(payload.chapterName ?? chapterSegment);
-      const fileName = truncateKeepTail(chapterBase === '' ? chapterSegment : chapterBase, 120);
+      // Filename: the FMD2 custom-rename template when the output
+      // defaults carry one (edOptionMangaCustomRename parity; '' keeps
+      // the chapter-name fallback — the previous behavior).
+      const rawFileName: string =
+        output.chapterNameTemplate !== ''
+          ? resolveChapterFileName({
+              template: output.chapterNameTemplate,
+              chapterName: payload.chapterName ?? chapterSegment,
+              website: deps.engine.modules().find((m): boolean => m.id === payload.moduleId)?.name ?? '',
+              manga: payload.mangaTitle ?? mangaSegment,
+              numbering: '',
+              // [parity-sweep] M4: assembly-resolved policy mode
+              // (env > setting > parity default).
+              ...(deps.fileNamePolicy !== undefined && deps.fileNamePolicy() !== undefined
+                ? { mode: deps.fileNamePolicy() }
+                : {}),
+            })
+          : sanitizeFileName(payload.chapterName ?? chapterSegment) === ''
+            ? chapterSegment
+            : sanitizeFileName(payload.chapterName ?? chapterSegment);
+      const fileName = truncateKeepTail(
+        applyOutputRenameOptions(rawFileName, output, payload.mangaTitle ?? mangaSegment),
+        120,
+            );
       const finalized = deps.library.finalize({
         moduleId: moduleSegment,
         manga: mangaSegment,
         fileName,
-        ext: 'zip',
+        ext: output.format,
         sourcePath: packed.filePath,
+        ...(payload.saveTo !== undefined ? { saveTo: payload.saveTo } : {}),
       });
       deps.library.recordLibraryFile({
         moduleId: moduleSegment,
         manga: mangaSegment,
-        fileName: `${fileName}.zip`,
+        fileName: `${fileName}.${output.format}`,
         path: finalized.path,
         bytes: finalized.bytes,
       });
@@ -465,7 +826,15 @@ export function downloadLane(deps: DownloadLaneDeps): LaneRunnerLaneOptions {
         ...(payload.mangaKey !== undefined ? { mangaKey: payload.mangaKey } : {}),
       });
       deps.log(`job ${job.id}: done — ${finalized.path} (${String(finalized.bytes)}B, ${String(pages.length)} pages)`);
-      ctx.setProgress({ stage: 'finalize', done: result.total, total: result.total });
+      // Downloads parity: the finalized artifact path rides the durable
+      // progress snapshot — delete(+data) resolves it to remove the
+      // library file alongside the job row.
+      ctx.setProgress({
+        stage: 'finalize',
+        done: result.total,
+        total: result.total,
+        libraryPath: finalized.path,
+      });
       return { type: 'done' };
     } catch (error: unknown) {
       return {
@@ -481,7 +850,11 @@ export function downloadLane(deps: DownloadLaneDeps): LaneRunnerLaneOptions {
     }
   };
 
-  return { concurrency: 1, handler };
+  // [parity-sweep] M10: parallelChapters (FMD2 simultaneous-chapter
+  // parity) — the lane slot count is fixed at LaneRunner start, so the
+  // value is read once at construction (server start); the UI documents
+  // "applies on restart".
+  return { concurrency: deps.parallelChapters ?? 1, handler };
 }
 
 /** Assemble the queue + lane runner pair (the runtime's download path). */

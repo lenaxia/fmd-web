@@ -233,6 +233,56 @@ export function resolveChapterFileName(parts: ChapterFileNameParts): string {
 /** The §7.3 packer output formats → library file extensions. */
 export type ChapterFileFormat = 'zip' | 'cbz' | 'pdf' | 'epub';
 
+/**
+ * [parity-sweep] M5/M6: the itemized output-rename options (FMD2
+ * lfm:3947/4183/4014), applied to the resolved chapter base name
+ * BEFORE the final truncation:
+ *
+ * - `removeMangaName` (lfm:4014): strip a leading manga-title prefix
+ *   from the chapter name (case-insensitive contains-prefix on the
+ *   sanitized forms; trailing separators/spaces after the strip are
+ *   trimmed). FMD2 strips the site-provided "MangaName ChapterN" prefix
+ *   so chapter files sort by chapter alone.
+ * - `unicodeReplacement` (lfm:3947/4183): every non-ASCII char in the
+ *   name is replaced with `replacementChar` (contiguous runs collapse
+ *   to one — FMD2's string-replace loops collapse per char; runs keep
+ *   archive listings readable). Off = byte-parity (no change).
+ */
+export function applyOutputRenameOptions(
+  name: string,
+  options: {
+    readonly unicodeReplacement: boolean;
+    readonly unicodeReplacementChar: string;
+    readonly removeMangaName: boolean;
+  },
+  mangaTitle: string,
+): string {
+  let out: string = name;
+  if (options.removeMangaName) {
+    const lowered: string = out.toLowerCase();
+    const title: string = sanitizeFileName(mangaTitle).toLowerCase();
+    if (title !== '' && lowered.startsWith(title)) {
+      out = out.slice(title.length).replace(/^[\s\-_:,.]+/, '');
+    }
+  }
+  if (options.unicodeReplacement) {
+    const replacement: string = options.unicodeReplacementChar;
+    let replaced: string = '';
+    let lastWasReplacement = false;
+    for (const ch of out) {
+      if (ch.charCodeAt(0) <= 0x7f) {
+        replaced += ch;
+        lastWasReplacement = false;
+      } else if (!lastWasReplacement) {
+        replaced += replacement;
+        lastWasReplacement = true;
+      }
+    }
+    out = replaced;
+  }
+  return out;
+}
+
 export function normalizeChapterExtension(ext: string): string {
   const normalized = ext.replace(/^\./, '').toLowerCase();
   if (normalized !== 'zip' && normalized !== 'cbz' && normalized !== 'pdf' && normalized !== 'epub') {

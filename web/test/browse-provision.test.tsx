@@ -2,12 +2,16 @@
 
 /**
  * BrowsePage site-first flow (FMD2 DBUpdaterThread parity, offline):
- * ?site= (with ?catalog= as legacy alias) drives auto-provisioning —
- * POST /api/sync/catalog/:id + WS `sync` frames reduce the progress
- * machine; a finished provision flips catalogInstalled (live join) and
- * the entries view opens; the 404 taxonomy offers the §6.8 live-scrape
- * browse; cancel aborts the provisioning UX; known-broken sites stay
- * closed with their reason; hex ids are never rendered.
+ * ?site= (with ?catalog= as legacy alias) drives the unified browsing
+ * model — POST /api/sync/catalog/:id + WS `sync` frames reduce the
+ * progress machine; a finished provision flips catalogInstalled (live
+ * join) and the entries view opens; the FMD2-DB 404 outcome on a
+ * directory-capable site AUTOMATICALLY falls through to the live
+ * channel (one progress experience, no decision point — the muted
+ * 'from site' badge is the only trace) while a non-capable site gets
+ * the friendly no-list panel; cancel aborts the progress UX;
+ * known-broken sites stay closed with their reason; hex ids are never
+ * rendered; NO mode vocabulary ('live browse'/'scrape') anywhere.
  */
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { screen } from '@testing-library/react';
@@ -74,7 +78,7 @@ interface Harness {
 
 function makeRoutes(
   module: ModuleSummaryT,
-  opts?: { readonly hangPost?: boolean; readonly deferPost?: boolean },
+  opts?: { readonly hangPost?: boolean; readonly deferPost?: boolean; readonly latestSource?: 'catalog' | 'live' },
 ): Harness {
   let installed = module.catalogInstalled;
   let syncCalls = 0;
@@ -118,7 +122,7 @@ function makeRoutes(
           body: {
             entries: [entryFixture('/manga/alpha', 'Alpha Quest')],
             total: 1,
-            source: 'live',
+            source: opts?.latestSource ?? 'catalog',
           },
         };
       },
@@ -176,7 +180,7 @@ describe('BrowsePage site-first flow', (): void => {
     // on the modules refetch → the entries view opens.
     socket?.push(wsFrame('3', 'done', 'updated'));
     h.settleSync({ id: SITE_ID, state: 'updated', dbSha: 'ab', bytes: 2 });
-    expect(await screen.findByRole('button', { name: /Alpha Quest/ })).toBeVisible();
+    expect(await screen.findByRole('button', { name: /^Alpha Quest/ })).toBeVisible();
     expect(h.installed()).toBe(true);
     expect(h.entryCalls()).toBe(1);
     // The site NAME is the header identity — never the hex id.
@@ -197,12 +201,12 @@ describe('BrowsePage site-first flow', (): void => {
     FakeWebSocket.instances[0]?.push(wsFrame('1', 'downloading'));
 
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(await screen.findByText('Provisioning cancelled')).toBeVisible();
+    expect(await screen.findByText('Cancelled')).toBeVisible();
     expect(screen.queryByTestId('provision-status')).toBeNull();
     expect(h.entryCalls()).toBe(0);
   });
 
-  it('FMD2-DB 404 → friendly no-catalog panel + §6.8 live-scrape offer, then live entries', async (): Promise<void> => {
+  it('FMD2-DB 404 on a directory-capable site → AUTOMATIC live fallback: entries open, one progress experience', async (): Promise<void> => {
     vi.stubGlobal('WebSocket', FakeWebSocket);
     const liveCapable = moduleFixture({
       id: SITE_ID,
@@ -219,7 +223,38 @@ describe('BrowsePage site-first flow', (): void => {
         live_scrape_fallback: true,
       },
     });
-    const h = makeRoutes(liveCapable, { deferPost: true });
+    const h = makeRoutes(liveCapable, { deferPost: true, latestSource: 'live' });
+    renderWithProviders(<BrowsePage route={route({ site: SITE_ID })} />, {
+      fetch: mockFetch(h.routes).fetch,
+    });
+
+    // ONE progress experience: the preparing status, then the list.
+    expect(await screen.findByTestId('provision-status')).toBeVisible();
+    expect(screen.getByText(/Preparing LiveSite…/)).toBeVisible();
+    h.settleSync({
+      id: SITE_ID,
+      state: 'failed',
+      error: 'no-catalog: FMD2-DB has no catalog archive for this site (HTTP 404)',
+    });
+
+    // No decision point — the entries open automatically via the live
+    // channel, and the muted source badge is the only trace.
+    expect(await screen.findByRole('button', { name: /^Alpha Quest/ })).toBeVisible();
+    expect(h.entryCalls()).toBe(1);
+    expect(screen.getByTitle('List fetched live from the site')).toHaveTextContent('from site');
+
+    // THE MODE-VOCABULARY CONTRACT: no 'live browse'/'scrape' strings
+    // and no mode-named buttons anywhere in the DOM.
+    const text = document.body.textContent ?? '';
+    expect(text).not.toMatch(/live[ -]browse/i);
+    expect(text).not.toMatch(/scrape/i);
+    expect(screen.queryByRole('button', { name: /live/i })).toBeNull();
+  });
+
+  it('FMD2-DB 404 on a site WITHOUT directory capability → friendly no-list panel, nothing opens', async (): Promise<void> => {
+    vi.stubGlobal('WebSocket', FakeWebSocket);
+    const plain = moduleFixture({ id: SITE_ID, name: 'PlainSite', catalogInstalled: false });
+    const h = makeRoutes(plain, { deferPost: true });
     renderWithProviders(<BrowsePage route={route({ site: SITE_ID })} />, {
       fetch: mockFetch(h.routes).fetch,
     });
@@ -231,14 +266,14 @@ describe('BrowsePage site-first flow', (): void => {
       error: 'no-catalog: FMD2-DB has no catalog archive for this site (HTTP 404)',
     });
 
-    expect(await screen.findByText('No prebuilt catalog for this site')).toBeVisible();
-    expect(screen.getByText(/live browsing/i)).toBeVisible();
+    expect(await screen.findByText('No list available for this site')).toBeVisible();
+    expect(screen.getByText(/titles cannot be fetched from the site directly/i)).toBeVisible();
     expect(h.entryCalls()).toBe(0);
-
-    await userEvent.click(screen.getByRole('button', { name: 'Browse live instead' }));
-    expect(await screen.findByRole('button', { name: /Alpha Quest/ })).toBeVisible();
-    // The source badge marks the §6.8 live channel.
-    expect(screen.getByText('live scrape')).toBeVisible();
+    // No mode-named buttons anywhere.
+    expect(screen.queryByRole('button', { name: /live/i })).toBeNull();
+    const text = document.body.textContent ?? '';
+    expect(text).not.toMatch(/live[ -]browse/i);
+    expect(text).not.toMatch(/scrape/i);
   });
 
   it('transient failure → retry affordance re-fires the sync POST', async (): Promise<void> => {
@@ -251,13 +286,13 @@ describe('BrowsePage site-first flow', (): void => {
 
     expect(await screen.findByTestId('provision-status')).toBeVisible();
     h.settleSync({ id: SITE_ID, state: 'failed', error: 'ETIMEDOUT' });
-    expect(await screen.findByText('Catalog provisioning failed')).toBeVisible();
+    expect(await screen.findByText('Couldn’t open this site')).toBeVisible();
     expect(h.syncCalls()).toBe(1);
 
     await userEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(h.syncCalls()).toBe(2);
     h.settleSync({ id: SITE_ID, state: 'failed', error: 'ETIMEDOUT' });
-    expect(await screen.findByText('Catalog provisioning failed')).toBeVisible();
+    expect(await screen.findByText('Couldn’t open this site')).toBeVisible();
   });
 
   it('known-broken site: disabled open with reason, no provisioning', async (): Promise<void> => {
@@ -296,7 +331,7 @@ describe('BrowsePage site-first flow', (): void => {
       fetch: mockFetch(h.routes).fetch,
     });
 
-    expect(await screen.findByRole('button', { name: /Alpha Quest/ })).toBeVisible();
+    expect(await screen.findByRole('button', { name: /^Alpha Quest/ })).toBeVisible();
     expect(screen.getByText('LegacySite')).toBeVisible();
     // Installed: no provisioning fired.
     expect(h.syncCalls()).toBe(0);

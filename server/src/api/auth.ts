@@ -1,18 +1,31 @@
 /**
- * Auth (DESIGN.md §10): optional single password (`FMD_WEB_PASSWORD`)
+ * Auth (DESIGN.md §10 + R4): optional single password (`FMD_WEB_PASSWORD`)
+ * PLUS the single app-wide API token (docs/UX-PARITY.md R4 — the
+ * Sonarr/Radarr model): `Authorization: Bearer <token>` is a valid
+ * credential on EVERY /api route and the /ws upgrade (header preferred;
+ * `?token=` query param for browser WS clients). ONE token value, ever —
+ * no lists, no per-user/per-scope variants (R2 single-operator).
  *
- * - unset  → everything open; POST /api/auth/login is a 400
- *            `auth_disabled` (there is nothing to log into).
- * - set    → POST /api/auth/login {password} sets an HttpOnly,
- *            SameSite=Strict session cookie; login is rate-limited to
- *            10 attempts/min per remote address (429 + Retry-After);
- *            every STATE-CHANGING route (POST/PUT, except the login
- *            route itself and the health probes) requires a valid,
- *            unexpired session cookie → else 401. Read-only (GET)
- *            routes stay open: the SPA must render Browse/Manga/
- *            Downloads before login.
+ * Auth-mode matrix (every cell offline-tested):
+ * - token + password → either credential grants the gated set
+ *   (state-changing routes + the token-settings reads + /ws); plain
+ *   GETs stay open so the pre-login SPA still renders (§10).
+ * - token only        → API-ONLY mode (R4d): no password means no
+ *   cookie path, so EVERY /api route (reads included) and /ws require
+ *   the token. Scripts are the interface; the SPA is not.
+ * - password only     → today's cookie flow, unchanged.
+ * - both unset        → auth off, everything open.
+ *
+ * Token facts: 32-byte hex; auto-generated on first start of an authed
+ * deployment (no env pin, nothing stored — the runtime assembly owns
+ * generation, `resolveApiTokenBootstrap`); FMD_WEB_API_TOKEN pins it
+ * (precedence env > settings store, runbook §API token); comparison is
+ * constant-time (SHA-256 fingerprints + timingSafeEqual); wrong/missing
+ * token when required → 401 typed envelope; token-authenticated
+ * requests bypass the login rate limit.
  */
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import type { IncomingMessage } from 'node:http';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { ApiError } from './errors.js';
 import { SESSION_COOKIE, LoginRequestSchema } from './schemas.js';
@@ -25,16 +38,35 @@ export interface LoginRateLimit {
 }
 
 export interface AuthConfig {
-  /** `FMD_WEB_PASSWORD`. undefined disables auth entirely. */
+  /** `FMD_WEB_PASSWORD`. undefined disables the cookie flow entirely. */
   readonly password: string | undefined;
   /** Session lifetime (default 24 h). */
   readonly sessionTtlMs?: number;
   /** Login window/max overrides (tests); defaults 60_000 ms / 10. */
   readonly loginRateLimit?: LoginRateLimit;
+  /**
+   * R4 single app-wide API token: the EFFECTIVE value (env pin >
+   * settings store — the runtime assembly composes the provider so
+   * regeneration and env precedence apply to the next request with no
+   * restart). A fixed string is accepted for tests/pins.
+   */
+  readonly apiToken?: string | (() => string | undefined) | undefined;
+  /**
+   * True when the effective value comes from the FMD_WEB_API_TOKEN env
+   * pin: the settings UI shows 'Managed via environment' and the
+   * regenerate route refuses (rotate by changing the env instead).
+   */
+  readonly apiTokenEnvPinned?: boolean | undefined;
 }
 
 export const DEFAULT_LOGIN_RATE_LIMIT: LoginRateLimit = { windowMs: 60_000, max: 10 };
 export const DEFAULT_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+
+/** How a request authenticated: the R4 metrics label vocabulary. */
+export type AuthKind = 'none' | 'cookie' | 'token';
+
+/** The active auth surface, for logs + the Settings → API panel. */
+export type AuthMode = 'none' | 'password' | 'api-token' | 'password+api-token';
 
 interface SessionRecord {
   readonly expiresAt: number;
@@ -49,9 +81,24 @@ function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(ab, bb);
 }
 
-/** Parse the request's Cookie header for the session cookie value. */
-export function readSessionCookie(req: FastifyRequest): string | undefined {
-  const header = req.headers.cookie;
+/** Fixed-length SHA-256 fingerprint: constant-time compare for ANY input length. */
+function tokenFingerprint(value: string): Buffer {
+  return createHash('sha256').update(value, 'utf8').digest();
+}
+
+/** `Authorization: Bearer <token>` → the token (case-insensitive scheme). */
+export function readBearerToken(header: string | string[] | undefined): string | undefined {
+  const value = Array.isArray(header) ? header[0] : header;
+  if (value === undefined) {
+    return undefined;
+  }
+  const match = /^bearer\s+(\S+)$/i.exec(value.trim());
+  return match?.[1];
+}
+
+/** Parse a raw Cookie header for the session cookie value. */
+export function readSessionCookieValue(cookieHeader: string | string[] | undefined): string | undefined {
+  const header = Array.isArray(cookieHeader) ? cookieHeader.join('; ') : cookieHeader;
   if (header === undefined) {
     return undefined;
   }
@@ -67,24 +114,180 @@ export function readSessionCookie(req: FastifyRequest): string | undefined {
   return undefined;
 }
 
+/** Parse the request's Cookie header for the session cookie value. */
+export function readSessionCookie(req: FastifyRequest): string | undefined {
+  return readSessionCookieValue(req.headers.cookie);
+}
+
+/** The `?token=` query param (browser WS clients cannot set headers). */
+function tokenFromQuery(url: string | undefined): string | undefined {
+  if (url === undefined) {
+    return undefined;
+  }
+  const qi = url.indexOf('?');
+  if (qi < 0) {
+    return undefined;
+  }
+  for (const pair of url.slice(qi + 1).split('&')) {
+    const eq = pair.indexOf('=');
+    const name = eq < 0 ? pair : pair.slice(0, eq);
+    if (name !== 'token') {
+      continue;
+    }
+    const raw = eq < 0 ? '' : pair.slice(eq + 1);
+    try {
+      return decodeURIComponent(raw.replace(/\+/g, '%20'));
+    } catch {
+      return raw;
+    }
+  }
+  return undefined;
+}
+
 /**
- * Session store + login rate limiter + the Fastify wiring (login route,
- * state-changing gate). Owns all cookie semantics — routes never
- * touch the cookie directly.
+ * First-run token bootstrap (R4): the stored settings value and the env
+ * pin resolve to the effective token + whether this boot generated one.
+ * Generation happens ONLY for authed deployments (password set, no env
+ * pin, nothing stored): a default no-env deployment stays token-less —
+ * "both unset → auth off" — so out-of-box no-auth flows (and the e2e
+ * harness) are untouched; headless deployments pin FMD_WEB_API_TOKEN.
+ */
+export interface ApiTokenBootstrap {
+  /** True when this boot generated the first token (persist it now). */
+  readonly generated: boolean;
+  /** True when the env pin wins (UI: 'Managed via environment'). */
+  readonly envPinned: boolean;
+  /** The stored value to persist NOW (generation writes it via the sink). */
+  readonly store: string | null;
+}
+
+export function resolveApiTokenBootstrap(input: {
+  readonly envPin: string | undefined;
+  readonly stored: string | null;
+  readonly passwordSet: boolean;
+  readonly generate?: () => string;
+}): ApiTokenBootstrap {
+  const generate = input.generate ?? ((): string => randomBytes(32).toString('hex'));
+  const envPinned = input.envPin !== undefined && input.envPin !== '';
+  if (envPinned) {
+    // The pin OVERRIDES the store: no generation, no store write; the
+    // secret lives in the deployment environment (rotate it there).
+    return { generated: false, envPinned: true, store: input.stored };
+  }
+  if (input.stored !== null) {
+    return { generated: false, envPinned: false, store: input.stored };
+  }
+  if (input.passwordSet) {
+    return { generated: true, envPinned: false, store: generate() };
+  }
+  return { generated: false, envPinned: false, store: null };
+}
+
+/**
+ * Session store + login rate limiter + the single API token check +
+ * the Fastify wiring (login route, credential gate). Owns all cookie
+ * and bearer semantics — routes never touch credentials directly.
  */
 export class AuthService {
   private readonly sessions = new Map<string, SessionRecord>();
   private readonly attempts = new Map<string, { count: number; resetAt: number }>();
   private readonly ttlMs: number;
   private readonly rateLimit: LoginRateLimit;
+  private readonly apiToken: (() => string | undefined) | undefined;
+  private readonly tokenEnvPinned: boolean;
 
   constructor(private readonly config: AuthConfig) {
     this.ttlMs = config.sessionTtlMs ?? DEFAULT_SESSION_TTL_MS;
     this.rateLimit = config.loginRateLimit ?? DEFAULT_LOGIN_RATE_LIMIT;
+    // Local const: narrowing must survive the closure (property-access
+    // narrowing resets inside callbacks — const does not).
+    const providedToken = config.apiToken;
+    this.apiToken =
+      typeof providedToken === 'function' ? providedToken : ((): string | undefined => providedToken);
+    this.tokenEnvPinned = config.apiTokenEnvPinned === true;
   }
 
   get enabled(): boolean {
     return this.config.password !== undefined;
+  }
+
+  /** The effective single token value (env pin > settings, live). */
+  effectiveApiToken(): string | undefined {
+    const value = this.apiToken?.();
+    return value === '' ? undefined : value;
+  }
+
+  /** True when the single token credential is available at all. */
+  get tokenActive(): boolean {
+    return this.effectiveApiToken() !== undefined;
+  }
+
+  /** True when the value comes from the FMD_WEB_API_TOKEN env pin. */
+  get tokenEnvManaged(): boolean {
+    return this.tokenEnvPinned;
+  }
+
+  /** True when ANY auth surface is configured (password or token). */
+  get authActive(): boolean {
+    return this.enabled || this.tokenActive;
+  }
+
+  /** API-ONLY mode (R4d): token set, password unset — every /api route gated. */
+  get apiOnlyMode(): boolean {
+    return this.tokenActive && !this.enabled;
+  }
+
+  /** The active auth surface, for the startup log + Settings panel. */
+  authMode(): AuthMode {
+    if (this.enabled && this.tokenActive) {
+      return 'password+api-token';
+    }
+    if (this.tokenActive) {
+      return 'api-token';
+    }
+    if (this.enabled) {
+      return 'password';
+    }
+    return 'none';
+  }
+
+  /** Constant-time single-token verification (never length-leaky). */
+  verifyApiToken(presented: string | undefined): boolean {
+    const expected = this.effectiveApiToken();
+    if (presented === undefined || expected === undefined || presented === '') {
+      return false;
+    }
+    return timingSafeEqual(tokenFingerprint(presented), tokenFingerprint(expected));
+  }
+
+  /** Resolve how a request authenticated (R4 metrics label). */
+  resolveRequestAuth(req: FastifyRequest): AuthKind {
+    if (this.verifyApiToken(readBearerToken(req.headers.authorization))) {
+      return 'token';
+    }
+    if (this.enabled && this.validate(readSessionCookie(req))) {
+      return 'cookie';
+    }
+    return 'none';
+  }
+
+  /**
+   * /ws upgrade gate: open unless the token is active (today's password
+   * flow never gated the hub). Token via Authorization header
+   * (preferred) or `?token=` (browser clients); a session cookie also
+   * grants when the password flow is on.
+   */
+  checkUpgradeRequest(req: IncomingMessage): boolean {
+    if (!this.tokenActive) {
+      return true;
+    }
+    if (this.verifyApiToken(readBearerToken(req.headers.authorization))) {
+      return true;
+    }
+    if (this.verifyApiToken(tokenFromQuery(req.url))) {
+      return true;
+    }
+    return this.enabled && this.validate(readSessionCookieValue(req.headers.cookie));
   }
 
   /** Verify credentials and mint a session (throws 401 on mismatch). */
@@ -160,23 +363,49 @@ export function isStateChanging(method: string): boolean {
 const GATE_EXEMPT = new Set(['/api/auth/login', '/healthz', '/readyz']);
 
 /**
- * Register POST /api/auth/login and the state-changing gate. The gate
- * is a Fastify `onRequest` hook so gated requests 401 before any
- * body work happens.
+ * GET routes that carry the token SECRET and are therefore
+ * credential-gated in EVERY authed mode (plain GETs stay open for the
+ * pre-login SPA everywhere else).
+ */
+const TOKEN_SECRET_ROUTES = new Set(['/api/settings/api-token']);
+
+/**
+ * Register POST /api/auth/login and the credential gate. The gate is a
+ * Fastify `onRequest` hook so gated requests 401 before any body work
+ * happens. Gated set per the R4 matrix:
+ * - state-changing routes when any auth surface is on;
+ * - the token-secret reads when any auth surface is on;
+ * - EVERY /api route in API-only mode (token set, password unset).
  */
 export function registerAuth(app: FastifyInstance, auth: AuthService): void {
   app.addHook('onRequest', (req: FastifyRequest, _reply: FastifyReply, done: (err?: Error) => void): void => {
-    if (!auth.enabled) {
+    if (!auth.authActive) {
       done();
       return;
     }
     const url = req.url.split('?')[0] ?? req.url;
-    if (!isStateChanging(req.method) || GATE_EXEMPT.has(url)) {
+    if (GATE_EXEMPT.has(url)) {
       done();
       return;
     }
-    if (!auth.validate(readSessionCookie(req))) {
-      done(new ApiError(401, 'unauthorized', 'session required (POST /api/auth/login)'));
+    const gated =
+      isStateChanging(req.method) ||
+      TOKEN_SECRET_ROUTES.has(url) ||
+      (auth.apiOnlyMode && url.startsWith('/api/'));
+    if (!gated) {
+      done();
+      return;
+    }
+    if (auth.resolveRequestAuth(req) === 'none') {
+      done(
+        new ApiError(
+          401,
+          'unauthorized',
+          auth.apiOnlyMode
+            ? 'api token required (Authorization: Bearer <token>)'
+            : 'session required (POST /api/auth/login) or Bearer api token',
+        ),
+      );
       return;
     }
     done();
@@ -185,7 +414,11 @@ export function registerAuth(app: FastifyInstance, auth: AuthService): void {
   app.post(
     '/api/auth/login',
     async (req: FastifyRequest, reply: FastifyReply): Promise<{ ok: true }> => {
-      auth.checkRateLimit(req.ip);
+      // R4: valid token requests bypass the login rate limit (scripts
+      // never get 429'd for a browser's exhausted login window).
+      if (!auth.verifyApiToken(readBearerToken(req.headers.authorization))) {
+        auth.checkRateLimit(req.ip);
+      }
       const body = parseOr400(LoginRequestSchema, req.body, 'login body');
       const token = auth.login(body.password);
       void reply.header('set-cookie', auth.cookieHeader(token));

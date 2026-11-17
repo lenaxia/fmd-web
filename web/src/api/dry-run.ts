@@ -15,6 +15,10 @@ export interface DryRunInput {
   readonly mangaTitle?: string;
   readonly chapterLink: string;
   readonly chapterName?: string;
+  /** cbAddAsStopped parity: queued but held until resumed. */
+  readonly paused?: boolean;
+  /** edSaveTo parity: custom finalize directory. */
+  readonly saveTo?: string;
 }
 
 /** FNV-1a 32-bit over a `|`-joined key, hex — stable across reloads. */
@@ -46,6 +50,8 @@ export function buildDownloadJobBody(input: DryRunInput): DownloadJobBody {
     chapterLink: input.chapterLink,
     ...(input.mangaTitle !== undefined ? { mangaTitle: input.mangaTitle } : {}),
     ...(input.chapterName !== undefined ? { chapterName: input.chapterName } : {}),
+    ...(input.paused !== undefined ? { paused: input.paused } : {}),
+    ...(input.saveTo !== undefined && input.saveTo !== '' ? { saveTo: input.saveTo } : {}),
     idempotencyKey,
   };
 }
@@ -59,6 +65,8 @@ export function dryRunJson(input: DryRunInput): string {
     ...(body.mangaTitle !== undefined ? { mangaTitle: body.mangaTitle } : {}),
     chapterLink: body.chapterLink,
     ...(body.chapterName !== undefined ? { chapterName: body.chapterName } : {}),
+    ...(body.paused !== undefined ? { paused: body.paused } : {}),
+    ...(body.saveTo !== undefined ? { saveTo: body.saveTo } : {}),
     idempotencyKey: body.idempotencyKey,
   };
   return JSON.stringify(ordered, null, 2);

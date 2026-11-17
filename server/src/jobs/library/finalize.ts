@@ -54,6 +54,13 @@ export interface FinalizeRequest {
   readonly sourcePath: string;
   /** CurrentMaxFileNameLength for the final name (0 = no limit, D5). */
   readonly maxLength?: number;
+  /**
+   * FMD2 edSaveTo parity (frmMain.pas:5613): custom save directory —
+   * when present it REPLACES the `<libraryRoot>/<module>/<manga>`
+   * prefix entirely. Relative paths resolve against the library root;
+   * the file name keeps §7.1 sanitization either way.
+   */
+  readonly saveTo?: string;
 }
 
 export interface FinalizeResult {
@@ -123,15 +130,22 @@ export class LibraryFinalizer {
 
   /** The final library path for a request (components sanitized). */
   public targetPath(request: FinalizeRequest): { dir: string; file: string; path: string } {
-    const moduleDir = safeComponent(request.moduleId, 'moduleId');
-    const mangaDir = safeComponent(request.manga, 'manga');
     const baseName = sanitizeFileName(request.fileName);
     if (baseName === '') {
       throw new Error('chapter fileName is empty after sanitization');
     }
     const ext = normalizeChapterExtension(request.ext);
     const name = truncateKeepTail(baseName, request.maxLength ?? 0);
-    const dir = path.join(this.options.libraryRoot, moduleDir, mangaDir);
+    // edSaveTo parity: a custom save directory replaces the module/manga
+    // prefix (relative values resolve against the library root).
+    const dir =
+      request.saveTo !== undefined
+        ? path.resolve(this.options.libraryRoot, request.saveTo)
+        : path.join(
+            this.options.libraryRoot,
+            safeComponent(request.moduleId, 'moduleId'),
+            safeComponent(request.manga, 'manga'),
+          );
     const file = `${name}.${ext}`;
     return { dir, file, path: path.join(dir, file) };
   }

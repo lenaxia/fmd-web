@@ -39,10 +39,87 @@ export const JobSchema = z.object({
   progress: z.record(z.string(), z.unknown()).optional(),
   error: z.string().optional(),
   idempotencyKey: z.string().optional(),
+  /**
+   * Add-as-stopped hold (FMD2 cbAddAsStopped parity): `true` while the
+   * queued row must NOT be claimed by the download lane — the state
+   * stays `queued` and the hold only lifts via the resume endpoint.
+   */
+  paused: z.boolean().optional(),
   createdAt: TimestampSchema,
   updatedAt: TimestampSchema,
 });
 export type JobT = z.infer<typeof JobSchema>;
+
+// ── downloads-tab task actions (FMD2 pmDownload parity, web-adapted) ──
+
+/**
+ * Per-job task actions (FMD2 pmDownload menu, frmMain.lfm:5538-5617 —
+ * Stop/Resume/Redownload/Enable/Disable) as ONE typed union on a
+ * single action route. Web adaptation of the FMD2 semantics:
+ *
+ * - `pause`   — resume-able stop (miDownloadStop): `queued` gains the
+ *   hold (`paused: true`, DISABLED-analog — not claimable); `running`
+ *   /`retry` user-cancels (STOP-analog — markers persist, resumable).
+ * - `resume`  — the inverse (miDownloadResume): held `queued` lifts
+ *   the hold; `cancelled` re-enqueues a FRESH chained attempt that
+ *   resumes from the persisted markers.
+ * - `retry`   — failed → fresh chained attempt (markers resume).
+ * - `redownload` — done → fresh chained attempt (miDownloadRedownload).
+ * - `disable` — hold a SCHEDULED-but-not-running row (queued only).
+ * - `enable`  — lift that hold (queued+paused only).
+ *
+ * Every action validates against the state matrix; an illegal
+ * application is 409 `conflict` with `{job, action}` details.
+ */
+export const JobActionTypeSchema = z.enum([
+  'pause',
+  'resume',
+  'retry',
+  'redownload',
+  'enable',
+  'disable',
+]);
+export type JobActionTypeT = z.infer<typeof JobActionTypeSchema>;
+
+export const JobActionRequestSchema = z.object({ type: JobActionTypeSchema });
+export type JobActionRequestT = z.infer<typeof JobActionRequestSchema>;
+
+export const JobActionResponseSchema = z.object({ job: JobSchema });
+export type JobActionResponseT = z.infer<typeof JobActionResponseSchema>;
+
+/** DELETE /api/jobs/:id query — `data: true` also removes the artifact. */
+export const JobDeleteQuerySchema = z.object({
+  data: z.coerce.boolean().optional(),
+});
+export type JobDeleteQueryT = z.infer<typeof JobDeleteQuerySchema>;
+
+/** Toolbar bulk actions (FMD2 tsDownload toolbar, frmMain.lfm:291-339). */
+export const JobBulkActionSchema = z.enum(['pause', 'resume', 'delete']);
+export type JobBulkActionT = z.infer<typeof JobBulkActionSchema>;
+
+/**
+ * `all` — every job the action legally applies to (pause/resume);
+ * `completed` — terminal rows (delete: FMD2 miDownloadDeleteCompleted
+ * = RemoveAllFinishedTasks).
+ */
+export const JobBulkScopeSchema = z.enum(['all', 'completed']);
+export type JobBulkScopeT = z.infer<typeof JobBulkScopeSchema>;
+
+export const JobBulkActionRequestSchema = z.object({
+  action: JobBulkActionSchema,
+  scope: JobBulkScopeSchema.default('all'),
+});
+export type JobBulkActionRequestT = z.infer<typeof JobBulkActionRequestSchema>;
+
+export const JobBulkActionResponseSchema = z.object({
+  action: JobBulkActionSchema,
+  scope: JobBulkScopeSchema,
+  /** Rows this pass touched (0 on an already-settled queue — idempotent). */
+  affected: z.number().int().min(0),
+  /** Snapshots: resulting rows for pause/resume, removed rows for delete. */
+  jobs: z.array(JobSchema),
+});
+export type JobBulkActionResponseT = z.infer<typeof JobBulkActionResponseSchema>;
 
 // ── /ws protocol (§10 reconnect + D19 backfill + D21 gap marker) ─────
 

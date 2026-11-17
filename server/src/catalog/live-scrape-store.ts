@@ -104,6 +104,8 @@ interface SearchCursor {
   s?: string;
   /** FMD2 filter-panel bindings (parity with the catalog store's cursor). */
   a?: string;
+  ar?: string;
+  sm?: string;
   gs?: string;
   gm?: 'all' | 'any';
   nd?: number;
@@ -188,6 +190,8 @@ export class LiveScrapeCatalogStore implements CatalogFallbackStore {
     const status = query.status;
     const genre = query.genre ?? '';
     const authors = query.authors ?? '';
+    const artists = query.artists ?? '';
+    const summary = query.summary ?? '';
     const genres = query.genres ?? [];
     const genresMode = query.genresMode ?? 'all';
     const newDays = query.newDays;
@@ -210,6 +214,12 @@ export class LiveScrapeCatalogStore implements CatalogFallbackStore {
       }
       if (decoded.a !== undefined && decoded.a !== authors) {
         throw new Error('cursor does not match the issued authors filter');
+      }
+      if (decoded.ar !== undefined && decoded.ar !== artists) {
+        throw new Error('cursor does not match the issued artists filter');
+      }
+      if (decoded.sm !== undefined && decoded.sm !== summary) {
+        throw new Error('cursor does not match the issued summary filter');
       }
       if (decoded.gs !== undefined || decoded.gm !== undefined) {
         const wantKey = genres.length > 0 ? genres.join(CURSOR_GENRE_SEP) : '';
@@ -237,6 +247,12 @@ export class LiveScrapeCatalogStore implements CatalogFallbackStore {
         return false;
       }
       if (authors !== '' && !likeContains(entry.authors, authors)) {
+        return false;
+      }
+      if (artists !== '' && !likeContains(entry.artists, artists)) {
+        return false;
+      }
+      if (summary !== '' && !likeContains(entry.summary, summary)) {
         return false;
       }
       // genres ANY → OR of contains, ALL → AND (FMD2 rbAny/rbAll).
@@ -271,6 +287,12 @@ export class LiveScrapeCatalogStore implements CatalogFallbackStore {
       }
       if (authors !== '') {
         cursor.a = authors;
+      }
+      if (artists !== '') {
+        cursor.ar = artists;
+      }
+      if (summary !== '') {
+        cursor.sm = summary;
       }
       if (genres.length > 0) {
         cursor.gs = genres.join(CURSOR_GENRE_SEP);

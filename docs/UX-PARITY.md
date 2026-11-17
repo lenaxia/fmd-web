@@ -66,16 +66,16 @@ Keyboard (Ctrl+Shift+V/C, Space, Del, Ctrl-arrows, combo autocomplete); drag-dro
 
 ---
 
-## Part 2 — fmd-web as shipped (v0.2.0; v0.3.0 WIP already adds manga-page actions/paused/saveTo — verify against the tree, not this snapshot)
+## Part 2 — fmd-web as shipped (v0.3.0-complete snapshot, refreshed by [parity-sweep])
 
 - Shell: hash-routed SPA (browse/manga/downloads/favorites/library/settings), dark/light toggle, bootstrap banner, toasts.
-- Browse: site picker (enabled modules, category headers + counts, search incl. category text, capability badges, catalog chips; **no category facet filter**); auto-provision w/ WS progress; "Browse live instead" offer + live badge (**internal-mode terminology — being removed**); latest/by-title tabs; as-you-type search + mode label; filter panel (authors, status, genres any/all binary, custom genres, only-new w/ editable days); all-sites union (q only, Website badges, per-site chips).
+- Browse: site picker (enabled modules, category facet chips ?cats= URL-synced, search incl. category text, capability badges, catalog chips, open-by-URL paste-and-go incl. Ctrl+Shift+V [parity-sweep M14]); auto-provision w/ WS progress; unified browsing w/ muted source badge; latest/by-title tabs; as-you-type search + mode label; filter panel (authors, artists, summary, status, genres any/all binary, custom genres with the `!`/`-` EXCLUDE grammar — excluded chips render struck-through [parity-sweep, audit (b)2 fixed], only-new w/ editable days); all-sites union (filters + Website badges, per-site chips).
 - Manga: info card (no cover), chapter checkboxes + select-all/clear only, enqueue + dry-run preview. **No read-online, favorite, save-to, paused, chapter toolbar.**
 - Downloads: job list, state dropdown, per-job cancel, raw-JSON progress. **No task actions, bulk ops, filters, search, progress rendering.**
 - Favorites: auto-download checkbox, check-now, remove, new-chapter badge. **No create-from-UI (hooks exist unused), columns, batch check, sheet, transfer, import UI.**
 - Library: packed files, download links.
-- Settings: sync buttons + tolerated-failure report; global proxy + sidecar badge; module registry (enable, options editor incl. combobox index, cookies, per-module proxy). **No accounts UI (API exists), no module search, no bulk category, no output defaults.**
-- API ahead of UI: accounts CRUD+login, favorites import, per-module options — all server-ready.
+- Settings: sync buttons + tolerated-failure report; global proxy + sidecar badge; module registry (enable, options editor incl. combobox index, cookies, per-module proxy) with search + per-category bulk enable/disable + global select-all/none; per-site re-sync catalog row action; accounts cards for AccountSupport sites (save/remove/check-login, §5.2 status badge); output defaults (format + rename template + the itemized rename subset: unicode replacement + char, digit padding, remove-manga-name); Performance (timeout/retry/parallel-chapters/threads-per-chapter); Job-history retention (days + keep-forever); Filename policy (Linux-normalized checkbox, env-overridable); Diagnostics (log enable + level, /metrics + runbook links); About (server version via /healthz, releases/changelog/repo links) — all [parity-sweep].
+- API ahead of UI: none of the M-list remains unwired; favorites import/transfer UI = [favorites-parity] scope.
 
 ---
 
@@ -90,11 +90,11 @@ decisions recorded here.
 | Live-vs-scrape terminology | ADAPT unified browsing, muted source badge | [language-filter-browsing] |
 | Metadata tooltip | ADAPT HoverCard popover (catalog data, no fetch) | [browse-list-polish] |
 | New/completed row coloring | ADAPT badges/accents + highlight-new toggle | [browse-list-polish] |
-| Row context (download-all/favorite/delete) | PARITY row menu; delete-local-list **deferred** (destructive; revisit with a confirm+undo pattern) | [browse-list-polish] |
+| Row context (download-all/favorite/delete) | PARITY row menu; delete-local-list **deferred from v1** (shipped 3-item menu: Open / Download all chapters / Add to favorites — destructive server-side data needs a confirm+undo pattern first; revisit with the favorites-parity delete work) | [browse-list-polish] |
 | Cover / read-online / add-to-favorites / save-to / add-as-stopped | PARITY | [manga-page-parity] |
 | Chapter toolbar (invert/select-new/hide-downloaded/asc-desc/filter) | PARITY (select-all/clear exist) | [manga-page-parity] |
 | Filter artist + summary fields | PARITY (LIKE params) | [settings-parity] |
-| Genre tri-state include/exclude | ADAPT v0.3 (parity-sweep): implement `!`/`-` exclude prefix end-to-end (parser currently STRIPS the prefix and includes the genre — inverted semantics, audit finding (b)2); full tri-state UI v0.4 | [parity-sweep] |
+| Genre tri-state include/exclude | LANDED [parity-sweep]: `!`/`-` exclude prefix works end-to-end (parser → state → genresExclude[] NOT LIKE SQL composing with any/all — the audit (b)2 inverted-include defect is fixed with a regression test); excluded chips render struck-through; URL round-trips both lists. The v0.4 note is now ONLY about the per-genre tri-state checkbox UI (3-state toggle per fixed genre) | [parity-sweep] |
 | Regex title filter | SKIP (FTS supersedes; power path) | note |
 | Downloads task actions / bulk / filters / search / progress bar | PARITY (ADAPT: chips not tree; one job = one chapter) | [downloads-parity] |
 | Downloads drag-reorder | SKIP for v0.3 — server-ordered queue; revisit if priority editing lands | [downloads-parity] note |
@@ -103,7 +103,7 @@ decisions recorded here.
 | Accounts UI | PARITY (API exists) | [settings-parity] |
 | Module search + bulk category enable + select-all | PARITY | [settings-parity] |
 | Per-site re-sync catalog | PARITY button | [settings-parity] |
-| Output defaults (format/PDF quality/templates) | PARITY for server-supported subset; rest documented deferred | [settings-parity] |
+| Output defaults (format/PDF quality/templates) | PARITY for server-supported subset; rest documented deferred — **[settings-parity] wired: format zip/cbz/pdf/epub + %CR% chapter rename template + PDF-quality/'None'-format DEFERRED (D16 packer is DCT passthrough — no re-encode; the §7.1 library model is one packed artifact); digitPadding/removeMangaName/unicodeReplacement toggles wired via [parity-sweep] M5/M6/M8 merge** | [settings-parity] |
 | UI language (12 locales) | SKIP for v0.3 — web i18n is its own epic (framework + extraction); not a parity bolt-on | note |
 | Tray icon / Drop Box / shutdown-counter / hibernate | SKIP — desktop concepts; web equivalents: toasts, drag-onto-page (v0.4 candidate), server keeps running | note |
 | External program opening / open-folder | ADAPT — Library download links (exists); folder semantics differ server-side | note |
@@ -124,21 +124,26 @@ Independent audit verdict: TRUE-WITH-GAPS. Dispositions for every missed row:
 | # | Feature (evidence) | Disposition |
 |---|---|---|
 | M1 | Sort downloads on new tasks (lfm:3028) | SKIP v0.3 — server-ordered queue; revisit with priority editing |
-| M2 | Delete completed tasks on close (lfm:3018) | ADAPT [parity-sweep]: expose job-history retention (server prunes 30d) as a setting |
+| M2 | Delete completed tasks on close (lfm:3018) | IMPLEMENTED [parity-sweep]: Settings→Job history — 'Auto-delete finished job history after N days' + keep-forever (0); PUT /api/settings/retention drives an hourly prune sweep (previously NOTHING scheduled pruneRetention — the sweep is new); fake-clock tested |
 | M3 | Vacuum databases on exit (lfm:3038) | SKIP — server-side maintenance (runbook documents VACUUM cadence) |
-| M4 | Long-path support toggle (lfm:3048) | PARITY [parity-sweep]: surface the existing FMD_NORMALIZE_PATHS flag in Settings |
-| M5 | Unicode replacement rename option (lfm:3947,4183) | ADAPT [parity-sweep]: part of output-defaults itemization (server-supported subset) |
-| M6 | Remove-manga-name / auto manga+chapter folder toggles (lfm:4014,3958,4026) | ADAPT [parity-sweep]: template-field toggles in output defaults |
+| M4 | Long-path support toggle (lfm:3048) | IMPLEMENTED [parity-sweep]: Settings→Filename policy checkbox (Linux-normalized vs FMD2-desktop-parity); precedence env > setting > parity documented + composed in assembly; both modes behavior-tested |
+| M5 | Unicode replacement rename option (lfm:3947,4183) | IMPLEMENTED [parity-sweep]: output-defaults unicodeReplacement toggle + replacement char; applied at chapter-filename resolution (non-ASCII runs collapse to the char); honored-in-finalize tested |
+| M6 | Remove-manga-name / auto manga+chapter folder toggles (lfm:4014,3958,4026) | SPLIT [parity-sweep]: removeMangaName IMPLEMENTED (strips a leading manga-title prefix from the chapter filename); auto manga/chapter FOLDER toggles SKIP — the §7.1 library layout is fixed-depth `library/<module>/<manga>/<chapter>.<ext>` by design (edSaveTo custom directories already cover custom paths) |
 | M7 | ImageMagick group (lfm:4455-4569) | SKIP — native binary dependency; server re-encodes internally where needed |
-| M8 | Image conversion subset (WebP→X, PNG level, JPEG quality, PNG→JPEG; lfm:4332-4438) | ADAPT [parity-sweep]: default WebP→PNG/JPEG + JPEG quality (packers re-encode path); rest SKIP |
+| M8 | Image conversion subset (WebP→X, PNG level, JPEG quality, PNG→JPEG; lfm:4332-4438) | SPLIT [parity-sweep]: digitPadding IMPLEMENTED (lfm:4026 numbering digits — minimum page-name width in archives); WebP target + JPEG quality SKIP — the packers store pages as downloaded (the re-encode recovery exists only as a typed error HINT; no offline WebP decoder ships server-side and the chromium bridge is antibot-scoped, too heavy per page) |
 | M9 | Updates extras: skip-info-on-sync (lfm:4717), dedupe-on-update (lfm:4727), open-favorites-on-startup (lfm:4706) | SKIP all three — catalogs don't fetch info (N/A); dedupe is automatic server-side; no startup-page semantics on web |
-| M10 | Connections knobs (lfm:3394-3866 incl. thread caps 3793/3806/3834) | ADAPT [parity-sweep]: Performance group with timeout / retry / parallel-chapters / threads-per-chapter; lane thread-caps SKIP (tuned defaults, env-overridable) |
+| M10 | Connections knobs (lfm:3394-3866 incl. thread caps 3793/3806/3834) | IMPLEMENTED [parity-sweep]: Settings→Performance — request timeout (seeds the HTTP pipeline default, real-pipeline tested), retry count (per-image budget), threads-per-chapter (image-worker width), parallel chapters (lane slots — documented restart-to-apply, lane-options tested); lane thread-caps remain SKIP (tuned defaults, env-overridable); UA string + proxy already shipped earlier |
 | M11 | Advanced per-module grid beyond SaveTo: MaxTask/Thread/Connection limits, UpdateList threads/pages, per-module UA (WebsiteModulesSettings.pas:60-88) | v0.4 — per-module UA + connection limit are real capability; SKIP v0.3 with this note |
-| M12 | About tab: version check+abort, blog, changelog tab, donate (lfm:5263,5370,5472) | ADAPT [parity-sweep]: Settings→About (version, CHANGELOG/releases link, repo link); donate SKIP |
-| M13 | Log settings + frmLogger (lfm:5034-5111) | ADAPT [parity-sweep]: Settings→Diagnostics (log enable + level, link /metrics + runbook); live viewer v0.4 |
-| M14 | URL-box navigation: edURL + paste-and-go + Ctrl+Shift+V (lfm:860, pas:6609) | ADAPT [parity-sweep]: open-by-URL input on Browse picker (resolves module by host via /api/info → manga page); Ctrl+Shift+V honored |
+| M12 | About tab: version check+abort, blog, changelog tab, donate (lfm:5263,5370,5472) | IMPLEMENTED [parity-sweep]: Settings→About — server version (live /healthz payload), links to CHANGELOG.md, GitHub releases, repo; donate + blog SKIP (no donation channel/blog for this deployment); version-check-and-abort SKIP (container/image updates — runbook) |
+| M13 | Log settings + frmLogger (lfm:5034-5111) | IMPLEMENTED [parity-sweep]: Settings→Diagnostics — structured-log enable + minimum level applied LIVE to the running logger (behavior-tested); links to /metrics + the operations runbook; live log viewer deferred v0.4 (noted in the UI) |
+| M14 | URL-box navigation: edURL + paste-and-go + Ctrl+Shift+V (lfm:860, pas:6609) | IMPLEMENTED [parity-sweep]: 'Paste a manga URL…' input on the Browse picker — POST /api/info url-only resolves the module by RootURL host (case/port-insensitive; unknown host → typed 400 no_site_match 'no site matches this URL', ambiguous → 400 ambiguous_site naming candidates), navigates to the manga page carrying the RESOLVED moduleId; Ctrl+Shift+V paste-and-go honored; Playwright-covered |
 | M15 | Favorites as drag-target (pas:4924) | SKIP — explicit add-to-favorites buttons; page-wide DnD/drop-box parity = v0.4 candidate |
 | M16 | Minor interactions: manga-list multi-select, middle-click site reload, combo auto-dropdown, status-bar row, splitters/persisted-window state, LuaModulesUpdater toggles (warning/auto-restart/module-debug) | Consolidated SKIP — web equivalents exist (click-navigate, URL state, sync UI) or are desktop-only; module-debug flag = env var (runbook) |
 
-Genre tri-state / `!`-exclude and Part-2 refresh are handled by [parity-sweep]
-(see Part 3 row fix above). Evidence-citation corrections applied in place.
+[parity-sweep] post-landing: the `!`-exclude defect is FIXED (Part 3 row),
+Part 2 reflects the v0.3.0-complete tree, and every M1–M16 row above carries
+its landed status (IMPLEMENTED / SPLIT / SKIP-with-reason) — zero
+'undocumented' rows remain. Self-check against the audit's M-list: M1 SKIP,
+M2 ✓, M3 SKIP, M4 ✓, M5 ✓, M6 split (✓ + SKIP), M7 SKIP, M8 split (✓ + SKIP),
+M9 SKIP, M10 ✓ (+SKIP caps), M11 v0.4 note, M12 ✓ (+SKIPs), M13 ✓, M14 ✓,
+M15 SKIP, M16 consolidated SKIP. Evidence: docs/evidence-parity-sweep.md.

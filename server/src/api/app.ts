@@ -12,8 +12,9 @@
  * db story.
  */
 import { createReadStream } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import type {
   CatalogFallbackStore,
   CatalogPage,
@@ -21,9 +22,9 @@ import type {
   HealthStatus,
   ReadinessStatus,
 } from '@fmd/contract';
-import { CatalogFallbackError } from '@fmd/contract';
+import { CatalogFallbackError, JobStateSchema, type JobStateT } from '@fmd/contract';
 import type { FmdMetrics } from '../observability/metrics.js';
-import { ApiError, toErrorBody, notFound } from './errors.js';
+import { ApiError, toErrorBody, notFound, validationError } from './errors.js';
 import {
   AccountListResponseSchema,
   AccountLoginResponseSchema,
@@ -31,6 +32,7 @@ import {
   AccountUpsertRequestSchema,
   AllSitesSearchQuerySchema,
   AllSitesSearchResponseSchema,
+  ApiTokenResponseSchema,
   CatalogBrowseQuerySchema,
   CatalogPageResponseSchema,
   CatalogSearchQuerySchema,
@@ -42,25 +44,48 @@ import {
   InfoResponseSchema,
   JobCreatedResponseSchema,
   JobCreateRequestSchema,
+  JobBatchCreateRequestSchema,
+  JobBatchCreatedResponseSchema,
   JobIdSchema,
   JobsListQuerySchema,
   JobsListResponseSchema,
+  JobActionRequestSchema,
+  JobActionResponseSchema,
+  JobDeleteQuerySchema,
+  JobDeletedResponseSchema,
+  JobBulkActionRequestSchema,
+  JobBulkActionResponseSchema,
   LibraryListQuerySchema,
   LibraryListResponseSchema,
   ModuleIdSchema,
   ModuleListResponseSchema,
   ModuleSummarySchema,
   ModuleUpdateRequestSchema,
+  ModuleBulkUpdateRequestSchema,
+  ModuleBulkUpdateResponseSchema,
+  OutputDefaultsUpdateRequestSchema,
+  PerformanceSettingsUpdateRequestSchema,
+  RetentionSettingsUpdateRequestSchema,
+  FilenamePolicySettingsUpdateRequestSchema,
+  DiagnosticsSettingsUpdateRequestSchema,
   ProxyUpdateRequestSchema,
   ReadyzResponseSchema,
   SettingsResponseSchema,
   SyncModulesResponseSchema,
+  FavoriteCheckBatchCancelResponseSchema,
+  FavoriteCheckBatchRequestSchema,
+  FavoriteCheckBatchResponseSchema,
   FavoriteCheckResponseSchema,
   FavoriteCreateRequestSchema,
   FavoriteIdSchema,
   FavoriteImportRequestSchema,
   FavoriteListResponseSchema,
   FavoriteResponseSchema,
+  FavoriteSchedulerSettingsUpdateRequestSchema,
+  FavoriteTransferPreviewRequestSchema,
+  FavoriteTransferPreviewResponseSchema,
+  FavoriteTransferRequestSchema,
+  FavoriteTransferResponseSchema,
   FavoriteUpdateRequestSchema,
   parseOr400,
   type AccountListResponseT,
@@ -68,15 +93,25 @@ import {
   type AccountResponseT,
   type CatalogPageResponseT,
   type AllSitesSearchResponseT,
+  type ApiTokenResponseT,
+  type FavoriteCheckBatchCancelResponseT,
+  type FavoriteCheckBatchResponseT,
   type FavoriteCheckResponseT,
   type FavoriteResponseT,
+  type FavoriteTransferPreviewResponseT,
+  type FavoriteTransferResponseT,
   type FavoriteT,
   type FavoriteListResponseT,
   type InfoResponseT,
   type JobCreatedResponseT,
+  type JobBatchCreatedResponseT,
+  type JobActionResponseT,
+  type JobBulkActionResponseT,
+  type JobDeletedResponseT,
   type JobT,
   type JobsListResponseT,
   type LibraryListResponseT,
+  type ModuleBulkUpdateResponseT,
   type ModuleListResponseT,
   type SettingsResponseT,
   type ModuleSummaryT,
@@ -89,6 +124,7 @@ import { InMemoryAccountService, type AccountService } from '../accounts/account
 import {
   InfoResponseCache,
   InMemorySettingsService,
+  resolveModuleByHost,
   type CatalogService,
   type FavoriteService,
   type InfoService,
@@ -137,10 +173,31 @@ export interface ApiServices {
   readonly readiness?: () => ReadinessStatus;
 }
 
+/**
+ * R4 settings-audit event (structured log line; NEVER carries the
+ * token value — the audit says WHAT changed, not the secret).
+ */
+export interface SettingsAuditEvent {
+  readonly setting: string;
+  readonly action: string;
+}
+
 export interface AppOptions {
   readonly version: string;
   /** When undefined, auth is disabled and every route is open. */
-  readonly auth?: AuthConfig;
+  readonly auth?: AuthConfig | undefined;
+  /**
+   * R4: pre-built auth service (runtime assembly) so the raw server's
+   * /ws gate shares the SAME session store + token provider as this
+   * app. Absent → built from `auth` above.
+   */
+  readonly authService?: AuthService;
+  /**
+   * R4 audit sink: settings-audit events (e.g. API token regeneration).
+   * The runtime wires the structured logger; the event NEVER carries
+   * the token value.
+   */
+  readonly onAudit?: (event: SettingsAuditEvent) => void;
   /** POST /api/info response cache TTL (default 60 s). */
   readonly infoCacheTtlMs?: number;
   /**
@@ -174,12 +231,14 @@ function toJobWire(job: JobRecord): JobT {
     ...(job.progress !== undefined ? { progress: job.progress } : {}),
     ...(job.error !== undefined ? { error: job.error } : {}),
     ...(job.idempotencyKey !== undefined ? { idempotencyKey: job.idempotencyKey } : {}),
+    ...(job.paused === true ? { paused: true } : {}),
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
   };
 }
 
-function toInfoWire(info: NormalizedInfo): InfoResponseT {
+/** The info wire body minus the addressing `moduleId` (added by the route). */
+function toInfoWire(info: NormalizedInfo, downloaded: readonly string[]): Omit<InfoResponseT, 'moduleId'> {
   return {
     title: info.title,
     altTitles: info.altTitles,
@@ -194,6 +253,7 @@ function toInfoWire(info: NormalizedInfo): InfoResponseT {
     chapterLinks: [...info.chapterLinks],
     chapterNames: [...info.chapterNames],
     numChapter: info.numChapter,
+    downloaded: [...downloaded],
   };
 }
 
@@ -277,15 +337,40 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     void reply.code(404).send({ error: { code: 'not_found', message: 'route not found' } });
   });
 
-  registerAuth(app, new AuthService(options.auth ?? { password: undefined }));
+  // ── auth (§10 cookie flow + the R4 single API token) ─────────────
+  // The runtime assembly may hand in a pre-built service so the raw
+  // server's /ws gate (runtime-entry) shares the SAME session store +
+  // token provider as this app; tests/buildApp-only hosts get a fresh
+  // one from the config.
+  const auth: AuthService = options.authService ?? new AuthService(options.auth ?? { password: undefined });
+  registerAuth(app, auth);
 
   // ── /ws (§10 + D19) — real-socket upgrades only; inject never sees them ──
+  // R4: the upgrade is credential-gated whenever the single API token
+  // is active (header preferred; ?token= for browser clients; the
+  // session cookie also grants when the password flow is on). Without
+  // a token the hub is exactly as open as today.
   let wsAttachment: WsAttachment | undefined;
   if (options.wsHub !== undefined) {
-    wsAttachment = attachWebSocketHub(app.server, options.wsHub);
+    wsAttachment = attachWebSocketHub(app.server, options.wsHub, {
+      authenticate: (req): boolean => auth.checkUpgradeRequest(req),
+    });
     app.addHook('onClose', async (): Promise<void> => {
       wsAttachment?.dispose();
     });
+  }
+
+  // ── R4 observability: HTTP requests by auth mode (§4/§15) ────────
+  if (options.metrics !== undefined) {
+    const metrics = options.metrics;
+    app.addHook(
+      'onResponse',
+      (req: FastifyRequest, reply: FastifyReply, done: () => void): void => {
+        const route = typeof req.routeOptions?.url === 'string' ? req.routeOptions.url : 'unrouted';
+        metrics.observeHttpRequest(auth.resolveRequestAuth(req), req.method.toUpperCase(), route, reply.statusCode);
+        done();
+      },
+    );
   }
 
   // ── health (never gated) ──────────────────────────────────────────
@@ -345,6 +430,28 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     );
   });
 
+  // Bulk enable/disable (FMD2 Websites-tree parity, pas:6400 Select
+  // All/Unselect All + per-category checkboxes): one write over many
+  // module_state rows via the SAME update seam (option/cookie/proxy
+  // state is untouched; unknown ids/categories update nothing — the
+  // response carries the resolved module set + count).
+  app.post('/api/modules/bulk', async (req): Promise<ModuleBulkUpdateResponseT> => {
+    const body = parseOr400(ModuleBulkUpdateRequestSchema, req.body, 'module bulk update body');
+    const targets: ModuleSummaryT[] = services.modules
+      .list()
+      .filter((m): boolean =>
+        body.ids !== undefined
+          ? body.ids.includes(m.id)
+          : body.category !== undefined
+            ? m.category === body.category
+            : true,
+      );
+    const updated: ModuleSummaryT[] = targets.map((m): ModuleSummaryT =>
+      services.modules.update(m.id, { enabled: body.enabled }),
+    );
+    return ModuleBulkUpdateResponseSchema.parse({ modules: updated, updated: updated.length });
+  });
+
   // ── accounts (§8.6/D4 CRUD + login) ───────────────────────────────
   app.get('/api/accounts', async (): Promise<AccountListResponseT> => {
     const rows = accounts.list();
@@ -402,6 +509,95 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
   app.put('/api/settings/proxy', async (req): Promise<SettingsResponseT> => {
     const proxy = parseOr400(ProxyUpdateRequestSchema, req.body, 'proxy update body');
     return SettingsResponseSchema.parse(settings.setProxy(proxy));
+  });
+
+  // Output defaults (FMD2 Save-to options parity, additive): default
+  // archive format + chapter filename template — honored by the
+  // download lane on NEW jobs (packer selection + §7.1 finalize).
+  app.put('/api/settings/output', async (req): Promise<SettingsResponseT> => {
+    const output = parseOr400(OutputDefaultsUpdateRequestSchema, req.body, 'output defaults body');
+    return SettingsResponseSchema.parse(settings.setOutput(output));
+  });
+
+  // [parity-sweep] M10: Performance group (FMD2 Connections subset) —
+  // request timeout (HTTP pipeline default), retry count (per-image
+  // budget), parallel chapters (lane slots, restart to apply),
+  // threads per chapter (image-worker width).
+  app.put('/api/settings/performance', async (req): Promise<SettingsResponseT> => {
+    const performance = parseOr400(PerformanceSettingsUpdateRequestSchema, req.body, 'performance settings body');
+    return SettingsResponseSchema.parse(settings.setPerformance(performance));
+  });
+
+  // [parity-sweep] M2: job-history retention — auto-delete finished
+  // job history after N days (0 = keep forever); drives the prune sweep.
+  app.put('/api/settings/retention', async (req): Promise<SettingsResponseT> => {
+    const retention = parseOr400(RetentionSettingsUpdateRequestSchema, req.body, 'retention settings body');
+    return SettingsResponseSchema.parse(settings.setRetention(retention));
+  });
+
+  // [parity-sweep] M4: filename policy — Linux-normalized vs the
+  // FMD2-desktop-parity default (precedence: env > setting > parity).
+  app.put('/api/settings/filename-policy', async (req): Promise<SettingsResponseT> => {
+    const policy = parseOr400(FilenamePolicySettingsUpdateRequestSchema, req.body, 'filename policy body');
+    return SettingsResponseSchema.parse(settings.setFilenamePolicy(policy));
+  });
+
+  // [parity-sweep] M13: diagnostics — structured-log enable + level.
+  app.put('/api/settings/diagnostics', async (req): Promise<SettingsResponseT> => {
+    const diagnostics = parseOr400(DiagnosticsSettingsUpdateRequestSchema, req.body, 'diagnostics settings body');
+    return SettingsResponseSchema.parse(settings.setDiagnostics(diagnostics));
+  });
+
+  // Favorites scheduler settings (Options → Updates parity, additive):
+  // check interval minutes (0 = off) + check-at-startup — the interval
+  // applies LIVE to the running scheduler (idle re-arm), the startup
+  // toggle gates the next boot's initial sweep.
+  app.put('/api/settings/favorites', async (req): Promise<SettingsResponseT> => {
+    const body = parseOr400(
+      FavoriteSchedulerSettingsUpdateRequestSchema,
+      req.body,
+      'favorites scheduler settings body',
+    );
+    return SettingsResponseSchema.parse(settings.setFavoritesSettings(body));
+  });
+
+  // ── R4 single app-wide API token (Settings → API) ─────────────────
+  // GET is credential-gated in EVERY authed mode (the token secret must
+  // never ride an open read — the auth hook holds TOKEN_SECRET_ROUTES);
+  // the value only travels here and in the regenerate response.
+  app.get('/api/settings/api-token', async (): Promise<ApiTokenResponseT> => {
+    return ApiTokenResponseSchema.parse({
+      token: auth.tokenEnvManaged ? null : (auth.effectiveApiToken() ?? null),
+      envManaged: auth.tokenEnvManaged,
+      mode: auth.authMode(),
+    });
+  });
+
+  // Regenerate rotates the ONE value in place (old key rejected on the
+  // next request — the provider reads the store live). Env-pinned
+  // deployments refuse: the secret lives in the environment, rotate it
+  // there. No-auth deployments refuse: minting a token without any
+  // auth configured would silently flip the deployment into API-only
+  // mode and lock the UI out (runbook §API token).
+  app.post('/api/settings/api-token/regenerate', async (): Promise<ApiTokenResponseT> => {
+    if (auth.tokenEnvManaged) {
+      throw new ApiError(
+        409,
+        'conflict',
+        'API token is pinned via FMD_WEB_API_TOKEN (managed environment) — rotate it in the deployment environment',
+      );
+    }
+    if (!auth.authActive) {
+      throw new ApiError(
+        409,
+        'conflict',
+        'no auth configured — set FMD_WEB_PASSWORD or FMD_WEB_API_TOKEN before generating an API token',
+      );
+    }
+    const token = randomBytes(32).toString('hex');
+    settings.setApiToken(token);
+    options.onAudit?.({ setting: 'api_token', action: 'regenerate' });
+    return ApiTokenResponseSchema.parse({ token, envManaged: false, mode: auth.authMode() });
   });
 
   // ── sync ──────────────────────────────────────────────────────────
@@ -513,6 +709,12 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     } else {
       delete rawQuery['genres'];
     }
+    const genresExclude: unknown = normalizeGenresParam(rawQuery['genresExclude']);
+    if (Array.isArray(genresExclude) && genresExclude.length > 0) {
+      rawQuery['genresExclude'] = genresExclude;
+    } else {
+      delete rawQuery['genresExclude'];
+    }
     const query = parseOr400(CatalogSearchQuerySchema, rawQuery, 'search query');
     const searchInput: CatalogSearchQuery = {
       ...(query.q !== undefined && query.q !== '' ? { query: query.q } : {}),
@@ -521,7 +723,12 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
       ...(query.status !== undefined && query.status !== '' ? { status: query.status } : {}),
       ...(query.genre !== undefined && query.genre !== '' ? { genre: query.genre } : {}),
       ...(query.authors !== undefined && query.authors !== '' ? { authors: query.authors } : {}),
+      ...(query.artists !== undefined && query.artists !== '' ? { artists: query.artists } : {}),
+      ...(query.summary !== undefined && query.summary !== '' ? { summary: query.summary } : {}),
       ...(query.genres !== undefined && query.genres.length > 0 ? { genres: query.genres } : {}),
+      ...(query.genresExclude !== undefined && query.genresExclude.length > 0
+        ? { genresExclude: query.genresExclude }
+        : {}),
       genresMode: query.genresMode,
       ...(query.newDays !== undefined ? { newDays: query.newDays } : {}),
     };
@@ -548,14 +755,25 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     } else {
       delete rawQuery['genres'];
     }
+    const genresExclude: unknown = normalizeGenresParam(rawQuery['genresExclude']);
+    if (Array.isArray(genresExclude) && genresExclude.length > 0) {
+      rawQuery['genresExclude'] = genresExclude;
+    } else {
+      delete rawQuery['genresExclude'];
+    }
     const query = parseOr400(AllSitesSearchQuerySchema, rawQuery, 'all-sites search query');
     return AllSitesSearchResponseSchema.parse(
       await unionSearch.search({
         ...(query.q !== undefined && query.q !== '' ? { q: query.q } : {}),
         ...(query.status !== undefined && query.status !== '' ? { status: query.status } : {}),
         ...(query.genres !== undefined && query.genres.length > 0 ? { genres: query.genres } : {}),
+        ...(query.genresExclude !== undefined && query.genresExclude.length > 0
+          ? { genresExclude: query.genresExclude }
+          : {}),
         genresMode: query.genresMode,
         ...(query.authors !== undefined && query.authors !== '' ? { authors: query.authors } : {}),
+        ...(query.artists !== undefined && query.artists !== '' ? { artists: query.artists } : {}),
+        ...(query.summary !== undefined && query.summary !== '' ? { summary: query.summary } : {}),
         ...(query.newDays !== undefined ? { newDays: query.newDays } : {}),
         ...(query.cursor !== undefined ? { cursor: query.cursor } : {}),
         limit: query.limit,
@@ -587,14 +805,36 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
 
   app.post('/api/info', async (req): Promise<InfoResponseT> => {
     const body = parseOr400(InfoRequestSchema, req.body, 'info body');
-    const key = infoCache.key(body.moduleId, body.url);
+    // [parity-sweep] M14 (FMD2 edURL parity): a url-only body resolves
+    // the module by RootURL host; unknown/ambiguous hosts are TYPED
+    // errors ('no site matches this URL').
+    let moduleId: string = body.moduleId ?? '';
+    if (moduleId === '') {
+      const resolved = resolveModuleByHost(services.modules.list(), body.url);
+      if ('moduleId' in resolved) {
+        moduleId = resolved.moduleId;
+      } else if ('ambiguous' in resolved) {
+        throw new ApiError(
+          400,
+          'ambiguous_site',
+          `multiple sites match this URL's host: ${resolved.candidates.join(', ')}`,
+        );
+      } else {
+        throw new ApiError(400, 'no_site_match', 'no site matches this URL');
+      }
+    }
+    const key = infoCache.key(moduleId, body.url);
+    // The downloaded set is computed at RESPONSE time (never cached with
+    // the info snapshot) so a just-finished download flips the set on
+    // the very next call, cache hit or not.
+    const downloaded = services.library.downloadedChapters(moduleId, body.url);
     const cached = infoCache.get(key, Date.now());
     if (cached !== undefined) {
-      return InfoResponseSchema.parse(toInfoWire(cached));
+      return InfoResponseSchema.parse({ moduleId, ...toInfoWire(cached, downloaded) });
     }
     let info: NormalizedInfo;
     try {
-      info = await instrumentInfo(body.moduleId, () => services.info.getInfo(body.moduleId, body.url));
+      info = await instrumentInfo(moduleId, () => services.info.getInfo(moduleId, body.url));
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         throw err;
@@ -606,7 +846,10 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
       );
     }
     infoCache.set(key, info, Date.now());
-    return InfoResponseSchema.parse(toInfoWire(info));
+    return InfoResponseSchema.parse({
+      moduleId,
+      ...toInfoWire(info, services.library.downloadedChapters(moduleId, body.url)),
+    });
   });
 
   // ── jobs (§7.1, idempotent create) ───────────────────────────────
@@ -619,6 +862,8 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
         ...(body.mangaTitle !== undefined ? { mangaTitle: body.mangaTitle } : {}),
         chapterLink: body.chapterLink,
         ...(body.chapterName !== undefined ? { chapterName: body.chapterName } : {}),
+        ...(body.paused !== undefined ? { paused: body.paused } : {}),
+        ...(body.saveTo !== undefined ? { saveTo: body.saveTo } : {}),
       },
       body.idempotencyKey,
     );
@@ -627,10 +872,99 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     return JobCreatedResponseSchema.parse({ job: wire });
   });
 
+  // ── batch download-all (browse row menu; FMD2 pmMangaList
+  // miMangaListDownloadAll parity — one task per MANGA mental model).
+  //
+  // `chapters: 'all'` resolves the live chapter list through the SAME
+  // cached §5.8 info path POST /api/info uses; an explicit selection
+  // enqueues verbatim (no info fetch). Every per-chapter create reuses
+  // the §10 idempotent createDownload with a derived key
+  // `<batchKey>:<index>` — replay while live returns the SAME jobs, a
+  // changed chapter sequence under the same key surfaces the per-chapter
+  // 409 (different payload), and terminal originals chain re-downloads
+  // exactly like the single-chapter endpoint.
+  app.post('/api/jobs/download/batch', async (req, reply): Promise<JobBatchCreatedResponseT> => {
+    const body = parseOr400(JobBatchCreateRequestSchema, req.body, 'download batch body');
+    let chapterLinks: string[];
+    let chapterNames: ReadonlyMap<string, string>;
+    if (Array.isArray(body.chapters)) {
+      chapterLinks = [...body.chapters];
+      chapterNames = new Map();
+    } else {
+      const key = infoCache.key(body.moduleId, body.mangaUrl);
+      const cached = infoCache.get(key, Date.now());
+      let info: NormalizedInfo | undefined = cached;
+      if (info === undefined) {
+        try {
+          info = await instrumentInfo(body.moduleId, () =>
+            services.info.getInfo(body.moduleId, body.mangaUrl),
+          );
+        } catch (err: unknown) {
+          if (err instanceof ApiError) {
+            throw err;
+          }
+          throw new ApiError(
+            502,
+            'upstream_error',
+            `module GetInfo failed: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+        infoCache.set(key, info, Date.now());
+      }
+      chapterLinks = [...info.chapterLinks];
+      chapterNames = new Map(
+        info.chapterNames
+          .map((name, i): [string, string] | undefined =>
+            info!.chapterLinks[i] !== undefined ? [info!.chapterLinks[i], name] : undefined,
+          )
+          .filter((pair): pair is [string, string] => pair !== undefined),
+      );
+    }
+    const results = chapterLinks.map((chapterLink, index) => {
+      const chapterName = chapterNames.get(chapterLink);
+      return services.jobs.createDownload(
+        {
+          moduleId: body.moduleId,
+          mangaUrl: body.mangaUrl,
+          ...(body.mangaTitle !== undefined ? { mangaTitle: body.mangaTitle } : {}),
+          chapterLink,
+          ...(chapterName !== undefined ? { chapterName } : {}),
+          ...(body.paused !== undefined ? { paused: body.paused } : {}),
+          ...(body.saveTo !== undefined ? { saveTo: body.saveTo } : {}),
+        },
+        `${body.idempotencyKey}:${String(index)}`,
+      );
+    });
+    void reply.code(results.length > 0 && results.every((r): boolean => r.replayed) ? 200 : 201);
+    return JobBatchCreatedResponseSchema.parse({
+      jobs: results.map((r): JobT => toJobWire(r.job)),
+      replayed: results.length > 0 && results.every((r): boolean => r.replayed),
+    });
+  });
+
   app.get('/api/jobs', async (req): Promise<JobsListResponseT> => {
     const query = parseOr400(JobsListQuerySchema, req.query, 'jobs query');
+    // Downloads parity: `states` is a csv multi-select — validate every
+    // member against the §7.1 enum (400 validation_error on a bad one).
+    let states: JobStateT[] | undefined;
+    if (query.states !== undefined) {
+      const parsed = query.states.split(',').map((value): JobStateT => {
+        const result = JobStateSchema.safeParse(value);
+        if (!result.success) {
+          throw validationError(`unknown job state in states filter: ${JSON.stringify(value)}`, result.error.issues);
+        }
+        return result.data;
+      });
+      if (parsed.length > 0) {
+        states = parsed;
+      }
+    }
     const page = services.jobs.list({
       ...(query.state !== undefined ? { state: query.state } : {}),
+      ...(states !== undefined ? { states } : {}),
+      ...(query.q !== undefined ? { q: query.q } : {}),
+      ...(query.addedFrom !== undefined ? { addedFrom: query.addedFrom } : {}),
+      ...(query.addedTo !== undefined ? { addedTo: query.addedTo } : {}),
       ...(query.cursor !== undefined ? { cursor: query.cursor } : {}),
       limit: query.limit,
     });
@@ -656,6 +990,53 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     const id = parseOr400(JobIdSchema, (req.params as Record<string, unknown>)['id'], 'job id');
     const job = services.jobs.cancel(id);
     return JobCreatedResponseSchema.parse({ job: toJobWire(job) });
+  });
+
+  // cbAddAsStopped parity: lift the add-as-stopped hold on a live job —
+  // the row was created queued+paused and becomes claimable; terminal
+  // rows are 409 (nothing to resume), an unpaused row is a no-op replay.
+  app.post('/api/jobs/:id/resume', async (req): Promise<JobCreatedResponseT> => {
+    const id = parseOr400(JobIdSchema, (req.params as Record<string, unknown>)['id'], 'job id');
+    const job = services.jobs.resume(id);
+    return JobCreatedResponseSchema.parse({ job: toJobWire(job) });
+  });
+
+  // ── downloads parity (FMD2 pmDownload, web-adapted) ────────────────
+  // ONE typed-union action route (pause/resume/retry/redownload/enable/
+  // disable); the legality matrix lives in the job services and illegal
+  // applications surface the typed 409 envelope with {job, action}
+  // details. Re-enqueue semantics (resume-of-cancelled, retry,
+  // redownload) chain a FRESH attempt that resumes from markers.
+  app.post('/api/jobs/:id/action', async (req): Promise<JobActionResponseT> => {
+    const id = parseOr400(JobIdSchema, (req.params as Record<string, unknown>)['id'], 'job id');
+    const body = parseOr400(JobActionRequestSchema, req.body, 'job action body');
+    const job = services.jobs.action(id, body.type);
+    return JobActionResponseSchema.parse({ job: toJobWire(job) });
+  });
+
+  // Delete task (FMD2 miDownloadDeleteTask | miDownloadDeleteTaskData):
+  // `?data=true` also removes the finalized artifact recorded by the
+  // job (library file + row) — "job only" keeps the download on disk.
+  app.delete('/api/jobs/:id', async (req): Promise<JobDeletedResponseT> => {
+    const id = parseOr400(JobIdSchema, (req.params as Record<string, unknown>)['id'], 'job id');
+    const query = parseOr400(JobDeleteQuerySchema, req.query, 'job delete query');
+    const { job, dataDeleted } = services.jobs.remove(id, { ...(query.data === true ? { data: true } : {}) });
+    return JobDeletedResponseSchema.parse({ job: toJobWire(job), dataDeleted });
+  });
+
+  // Toolbar bulk ops (FMD2 tsDownload toolbar): Resume all / Pause all
+  // over scope `all`, Delete completed over scope `completed`
+  // (RemoveAllFinishedTasks — done rows only). Idempotent: a settled
+  // queue returns affected: 0.
+  app.post('/api/jobs/bulk-action', async (req): Promise<JobBulkActionResponseT> => {
+    const body = parseOr400(JobBulkActionRequestSchema, req.body, 'job bulk action body');
+    const result = services.jobs.bulkAction(body);
+    return JobBulkActionResponseSchema.parse({
+      action: result.action,
+      scope: result.scope,
+      affected: result.affected,
+      jobs: result.jobs,
+    });
   });
 
   // ── library (§7.1 listing/download) ───────────────────────────────
@@ -724,11 +1105,17 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     return FavoriteResponseSchema.parse({ favorite });
   });
 
-  // Title + the auto-download toggle (§7.2 pipeline eligibility).
+  // Title + the auto-download toggle + save-to + enable/disable
+  // (§7.2 pipeline eligibility, pmFavorites parity).
   app.put('/api/favorites/:id', async (req): Promise<FavoriteResponseT> => {
     const id = parseOr400(FavoriteIdSchema, (req.params as Record<string, unknown>)['id'], 'favorite id');
     const patch = parseOr400(FavoriteUpdateRequestSchema, req.body, 'favorite update body');
-    if (patch.title === undefined && patch.autoDownload === undefined) {
+    if (
+      patch.title === undefined &&
+      patch.autoDownload === undefined &&
+      patch.saveTo === undefined &&
+      patch.enabled === undefined
+    ) {
       throw new ApiError(400, 'validation_error', 'empty favorite update (nothing to change)');
     }
     return FavoriteResponseSchema.parse({ favorite: services.favorites.update(id, patch) });
@@ -755,6 +1142,50 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
       }
       throw new ApiError(502, 'upstream_error', `module GetInfo failed: ${err instanceof Error ? err.message : String(err)}`);
     }
+  });
+
+  // ── favorites batch check (btFavoritesCheckNewChapter + cancel) ──
+  app.post('/api/favorites/check', async (req): Promise<FavoriteCheckBatchResponseT> => {
+    const body = parseOr400(FavoriteCheckBatchRequestSchema, req.body ?? {}, 'favorite check batch body');
+    return FavoriteCheckBatchResponseSchema.parse(await services.favorites.checkBatch(body.scope));
+  });
+
+  app.post('/api/favorites/check/cancel', async (): Promise<FavoriteCheckBatchCancelResponseT> => {
+    return FavoriteCheckBatchCancelResponseSchema.parse({ cancelled: services.favorites.cancelBatch() });
+  });
+
+  // ── favorites website transfer (frmTransferFavorites parity) ─────
+  app.post('/api/favorites/:id/transfer/preview', async (req): Promise<FavoriteTransferPreviewResponseT> => {
+    const id = parseOr400(FavoriteIdSchema, (req.params as Record<string, unknown>)['id'], 'favorite id');
+    const body = parseOr400(
+      FavoriteTransferPreviewRequestSchema,
+      req.body,
+      'favorite transfer preview body',
+    );
+    return FavoriteTransferPreviewResponseSchema.parse(
+      await services.favorites.transferPreview(id, body.targetModuleId),
+    );
+  });
+
+  app.post('/api/favorites/:id/transfer', async (req): Promise<FavoriteTransferResponseT> => {
+    const id = parseOr400(FavoriteIdSchema, (req.params as Record<string, unknown>)['id'], 'favorite id');
+    const body = parseOr400(FavoriteTransferRequestSchema, req.body, 'favorite transfer body');
+    // Resolve the mapping first (the dry-run validation IS the gate —
+    // an invalid target is a typed 409, never a silent remap).
+    const preview = await services.favorites.transferPreview(id, body.targetModuleId);
+    if (!preview.valid || preview.targetUrl === null) {
+      throw new ApiError(
+        409,
+        'conflict',
+        `transfer target invalid (${preview.reason ?? 'not-found'}): ${body.targetModuleId}`,
+      );
+    }
+    const result = await services.favorites.transfer(id, {
+      moduleId: body.targetModuleId,
+      url: preview.targetUrl,
+      clearDownloadedList: body.clearDownloadedList,
+    });
+    return FavoriteTransferResponseSchema.parse(result);
   });
 
   return app;

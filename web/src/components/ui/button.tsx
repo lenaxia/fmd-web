@@ -1,4 +1,5 @@
 import * as React from "react"
+import { forwardRef } from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "cn"
 import { Slot } from "radix-ui"
@@ -37,20 +38,37 @@ const buttonVariants = cva(
   }
 )
 
-function Button({
-  className,
-  variant = "default",
-  size = "default",
-  asChild = false,
-  ...props
-}: React.ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean
-  }) {
+// VENDORED PATCH (browse-list polish): the CLI output ships the
+// React-19 plain-function style — refs as props. This app runs React
+// 18, where a function component CANNOT receive a ref, so every Radix
+// `asChild` trigger wrapping <Button> (DropdownMenuTrigger,
+// DialogTrigger, SheetTrigger, TooltipTrigger…) silently lost the ref:
+// Radix never registered the popper ANCHOR and floating-ui left the
+// content at its `translate(0, -200%)` pre-positioning state — every
+// menu/popover in the app rendered off-screen in a real browser
+// (unit tests pass because jsdom never measures layout). forwardRef
+// restores the ref; no other line is touched.
+const Button = forwardRef<
+  HTMLButtonElement,
+  React.ComponentProps<"button"> &
+    VariantProps<typeof buttonVariants> & {
+      asChild?: boolean
+    }
+>(function Button(
+  {
+    className,
+    variant = "default",
+    size = "default",
+    asChild = false,
+    ...props
+  },
+  forwardedRef
+) {
   const Comp = asChild ? Slot.Root : "button"
 
   return (
     <Comp
+      ref={forwardedRef}
       data-slot="button"
       data-variant={variant}
       data-size={size}
@@ -58,6 +76,6 @@ function Button({
       {...props}
     />
   )
-}
+})
 
 export { Button, buttonVariants }

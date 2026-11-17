@@ -789,10 +789,29 @@ export interface CatalogSearchQuery {
   /** How `genres` clauses join: `'all'` (default, FMD2 rbAll) | `'any'`. */
   readonly genresMode?: 'all' | 'any';
   /**
+   * Filter (FMD2 parity, audit (b)2 fix): `!`/`-` prefixed custom
+   * genres — each composes as a `NOT LIKE` exclude (AND among
+   * excludes; `genresMode` joins `genres` only). A genre in both
+   * lists resolves to exclude-only.
+   */
+  readonly genresExclude?: readonly string[];
+  /**
    * Filter (FMD2 parity): `authors` column LIKE contains. FMD2's
    * `AddSQLSimpleFilter('authors', …)` (DBDataProcess.pas:1394).
    */
   readonly authors?: string;
+  /**
+   * Filter (FMD2 parity): `artists` column LIKE contains — FMD2's
+   * `edFilterArtists` (frmMain.lfm:1569) via the same
+   * `AddSQLSimpleFilter` path as `authors` (additive).
+   */
+  readonly artists?: string;
+  /**
+   * Filter (FMD2 parity): `summary` column LIKE contains — FMD2's
+   * `edFilterSummary` (frmMain.lfm:1606) via the same
+   * `AddSQLSimpleFilter` path (additive).
+   */
+  readonly summary?: string;
   /**
    * Only-new window (FMD2 `cbOnlyNew` parity, jdn-based):
    * `jdn > DateToJDN(today) - newDays` — DBDataProcess.pas:1382-1385.

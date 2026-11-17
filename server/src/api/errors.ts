@@ -14,7 +14,9 @@ export type ApiErrorCode =
   | 'rate_limited'
   | 'bad_request'
   | 'upstream_error'
-  | 'internal_error';
+  | 'internal_error'
+  | 'no_site_match'
+  | 'ambiguous_site';
 
 /** The wire envelope. */
 export interface ApiErrorBody {

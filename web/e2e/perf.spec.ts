@@ -174,7 +174,10 @@ test('Settings site list: 1000 modules render virtualized, scroll without jank',
   });
 
   await page.goto('/#/settings');
-  await expect(page.getByText('PerfSite 0')).toBeVisible({ timeout: 10_000 });
+  // Scoped to the module list: the Settings page also renders account
+  // cards (settings-parity) whose texts carry the same site names.
+  const moduleList = page.getByRole('list', { name: 'Site modules' });
+  await expect(moduleList.getByText('PerfSite 0', { exact: true })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByText(/Modules \(1000\)/)).toBeVisible();
 
   const list = page.locator('.module-list');
@@ -185,9 +188,28 @@ test('Settings site list: 1000 modules render virtualized, scroll without jank',
 
   await revealContainer(page, '[data-virtualized="true"]');
   const stop = await startFrameRecorder(page);
-  await wheelScroll(page, 60);
+  // 100 pages ≈ 120k px: the settings rows carry the row actions
+  // (configure + re-sync catalog, settings-parity) and measure ~2× the
+  // default estimate — the budget must cover the real list height,
+  // not the estimate. (Virtualization + jank is the contract, not
+  // the page count.)
+  await wheelScroll(page, 100);
   const gaps = await stop();
   assertNoJank(gaps);
+
+  // Wheel to the END deterministically (outside the recorded window):
+  // dynamic row measurement grows the list while scrolling, so a fixed
+  // page count can land a few kb short of the tail.
+  for (let i = 0; i < 100; i += 1) {
+    const atBottom: boolean = await page.evaluate((): boolean => {
+      const el = document.querySelector('[data-virtualized="true"]');
+      if (el === null) return false;
+      return el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
+    });
+    if (atBottom) break;
+    await page.mouse.wheel(0, 4_000);
+    await page.waitForTimeout(50);
+  }
 
   const tail = await page.evaluate((): { scrollTop: number; scrollHeight: number; lastIndex: number } => {
     const el = document.querySelector('[data-virtualized="true"]');

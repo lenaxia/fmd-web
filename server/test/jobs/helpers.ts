@@ -27,6 +27,8 @@ export interface HarnessOptions {
   readonly flushIntervalMs?: number;
   readonly walAutocheckpointPages?: number;
   readonly recoverOnOpen?: boolean;
+  /** [parity-sweep] M2: live retention window provider (≤0 = keep forever). */
+  readonly retentionMs?: () => number;
 }
 
 /** Open a queue harness: FakeClock + fresh `app.db` in `dir`. */
@@ -41,6 +43,7 @@ export function openHarness(dir: string, opts?: HarnessOptions): QueueHarness {
       ? { walAutocheckpointPages: opts.walAutocheckpointPages }
       : {}),
     ...(opts?.recoverOnOpen !== undefined ? { recoverOnOpen: opts.recoverOnOpen } : {}),
+    ...(opts?.retentionMs !== undefined ? { retentionMs: opts.retentionMs } : {}),
   });
   return { queue, clock, file, dir };
 }

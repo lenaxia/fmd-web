@@ -1,8 +1,12 @@
 /**
  * Playwright e2e — SITE-FIRST BROWSE (FMD2 cbSelectManga parity):
- * picker by NAME → auto-provision (mock FMD2-DB catalog, WS-driven
- * progress) → entries → manga deep-link; cancel; the FMD2-DB-404
- * taxonomy with the §6.8 live-scrape offer; known-broken rows
+ * picker by NAME with the category facet chips (?cats= URL-synced,
+ * single/multi/All + persistence) → auto-provision (mock FMD2-DB
+ * catalog, WS-driven progress) → entries → manga deep-link; cancel;
+ * the UNIFIED browsing model — a catalog-less directory-capable site
+ * opens via the automatic live fallback with ONE progress experience
+ * and the muted 'from site' badge, with NO mode vocabulary
+ * ('live browse'/'scrape') anywhere in the DOM; known-broken rows
  * disabled with reason; hex module ids NEVER rendered (they ride the
  * URL only). Fully offline: loopback + intercepted routes/sockets.
  */
@@ -13,6 +17,7 @@ const INSTALLED_ID = '1'.repeat(32);
 const FRESH_ID = '2'.repeat(32);
 const BROKEN_ID = '3'.repeat(32);
 const NOCATALOG_ID = '4'.repeat(32);
+const SPANISH_ID = '5'.repeat(32);
 
 const HEX32 = /[0-9a-f]{32}/;
 
@@ -27,7 +32,8 @@ function site(overrides: Partial<ModuleSummaryT> & { id: string; name: string })
 }
 
 /** The picker registry: installed, fresh (provisionable, live-capable),
- * known-broken, and a 404-catalog site (live-capable). */
+ * known-broken, a 404-catalog site (live-capable), and a Spanish site
+ * (the language facet). */
 function pickerModules(freshInstalled: boolean): ModuleSummaryT[] {
   return [
     site({ id: INSTALLED_ID, name: 'MangaRock', category: 'Manga', catalogInstalled: true }),
@@ -52,6 +58,7 @@ function pickerModules(freshInstalled: boolean): ModuleSummaryT[] {
       catalogInstalled: false,
       capabilities: { ...module.capabilities, known_broken_flags: [], requires_browser: false, live_scrape_fallback: true },
     }),
+    site({ id: SPANISH_ID, name: 'SitioLibre', category: 'Spanish', catalogInstalled: true }),
   ];
 }
 
@@ -75,7 +82,7 @@ async function installPickerMockApi(
     void route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ modules: pickerModules(state.freshInstalled), count: 4 }),
+      body: JSON.stringify({ modules: pickerModules(state.freshInstalled), count: 5 }),
     });
   });
 
@@ -86,14 +93,19 @@ async function installPickerMockApi(
     }
     const id = new URL(route.request().url()).pathname.split('/').at(-1) ?? '';
     if (id === NOCATALOG_ID) {
-      void route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          ok: true,
-          result: { id, state: 'failed', error: 'no-catalog: FMD2-DB has no catalog archive for this site (HTTP 404)' },
-        }),
-      });
+      // A small delay keeps the (transient) preparing status
+      // deterministically observable before the 404 outcome lands and
+      // the automatic fallback opens the entries.
+      setTimeout((): void => {
+        void route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ok: true,
+            result: { id, state: 'failed', error: 'no-catalog: FMD2-DB has no catalog archive for this site (HTTP 404)' },
+          }),
+        });
+      }, 300);
       return;
     }
     if (opts?.syncBody !== undefined) {
@@ -108,8 +120,8 @@ async function installPickerMockApi(
     });
   });
 
-  // Catalog entries for the provisionable/404 sites (the §6.8 live
-  // channel serves the 404 site — source discriminator carried).
+  // Catalog entries for the provisionable/404 sites (the live channel
+  // serves the 404 site — source discriminator carried).
   for (const id of [FRESH_ID, NOCATALOG_ID]) {
     await page.route(new RegExp(`^https?://[^/]+/api/catalog/${id}/latest`), (route): void => {
       void route.fulfill({
@@ -162,6 +174,16 @@ function pushSyncFrame(ws: { current?: WebSocketRoute }, frame: unknown): void {
   ws.current?.send(JSON.stringify(frame));
 }
 
+/** The mode-vocabulary contract: 'live browse'/'scrape' never appear in
+ * the rendered UI, and no control is named after a mode. */
+async function expectNoModeVocabulary(page: Page): Promise<void> {
+  const bodyText = await page.locator('body').innerText();
+  expect(bodyText).not.toMatch(/live[ -]browse/i);
+  expect(bodyText).not.toMatch(/scrape/i);
+  const liveButtons = await page.getByRole('button', { name: /live/i }).count();
+  expect(liveButtons).toBe(0);
+}
+
 test.beforeEach(async ({ page }: { page: Page }): Promise<void> => {
   await page.route(/^https?:\/\/[^/]+\/api\/readyz$/, (route): void => {
     void route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ready: true }) });
@@ -169,8 +191,7 @@ test.beforeEach(async ({ page }: { page: Page }): Promise<void> => {
 });
 
 test('picker: sites by NAME, category groups, chips; broken disabled; hex IDs never rendered', async ({ page }: { page: Page }): Promise<void> => {
-  const mock = await installPickerMockApi(page);
-  void mock;
+  await installPickerMockApi(page);
   await page.goto('/#/browse');
 
   await expect(page.getByRole('heading', { name: 'Browse sites' })).toBeVisible();
@@ -181,9 +202,9 @@ test('picker: sites by NAME, category groups, chips; broken disabled; hex IDs ne
   await expect(page.locator('.site-category', { hasText: 'Manga' })).toBeVisible();
   await expect(page.locator('.site-category', { hasText: 'Manhua' })).toBeVisible();
 
-  // Catalog-state chips.
-  await expect(page.getByText('catalog ready').first()).toBeVisible();
-  await expect(page.getByText('live browse').first()).toBeVisible();
+  // Readiness chips (unified browsing: no mode vocabulary on chips).
+  await expect(page.getByText('ready').first()).toBeVisible();
+  await expect(page.getByText('needs setup').first()).toBeVisible();
 
   // Known-broken row disabled with its reason.
   const broken = page.getByRole('button', { name: /BrokenScan/ });
@@ -199,6 +220,63 @@ test('picker: sites by NAME, category groups, chips; broken disabled; hex IDs ne
   await page.getByLabel('Search sites').fill('');
   const bodyText = await page.locator('body').innerText();
   expect(bodyText).not.toMatch(HEX32);
+
+  // THE mode-vocabulary contract holds on the picker too.
+  await expectNoModeVocabulary(page);
+});
+
+test('category facet chips: single / multi / All filter the list and sync ?cats= (persist across reload)', async ({ page }: { page: Page }): Promise<void> => {
+  await installPickerMockApi(page);
+  await page.goto('/#/browse');
+
+  const chips = page.getByRole('group', { name: 'Filter sites by category' });
+  await expect(chips).toBeVisible();
+  // Counts: Manga 3 (installed, broken, no-catalog), Manhua 1, Spanish 1.
+  await expect(chips.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(chips.getByRole('button', { name: /Manga 3/ })).toBeVisible();
+  await expect(chips.getByRole('button', { name: /Manhua 1/ })).toBeVisible();
+  await expect(chips.getByRole('button', { name: /Spanish 1/ })).toBeVisible();
+
+  // SINGLE: Spanish only — the Manga/Manhua rows and headers vanish.
+  await chips.getByRole('button', { name: /Spanish/ }).click();
+  await expect(page.getByRole('button', { name: /SitioLibre/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /MangaRock/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /ManhuaFresh/ })).toHaveCount(0);
+  await expect(page.locator('.site-category', { hasText: 'Spanish' })).toBeVisible();
+  await expect(page.locator('.site-category', { hasText: 'Manga' })).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/browse\?cats=Spanish$/);
+  await expect(chips.getByRole('button', { name: /Spanish/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(chips.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'false');
+
+  // MULTI: adding Manhua unions the two categories.
+  await chips.getByRole('button', { name: /Manhua/ }).click();
+  await expect(page.getByRole('button', { name: /SitioLibre/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /ManhuaFresh/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /MangaRock/ })).toHaveCount(0);
+  const hash = decodeURIComponent(new URL(page.url()).hash);
+  expect(hash).toBe('#/browse?cats=Manhua,Spanish');
+
+  // PERSISTENCE: a reload (shared-URL semantics) restores the facet.
+  await page.reload();
+  await expect(page.getByRole('button', { name: /SitioLibre/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /ManhuaFresh/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /MangaRock/ })).toHaveCount(0);
+  const chipsAfterReload = page.getByRole('group', { name: 'Filter sites by category' });
+  await expect(chipsAfterReload.getByRole('button', { name: /Manhua/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(chipsAfterReload.getByRole('button', { name: /Spanish/ })).toHaveAttribute('aria-pressed', 'true');
+
+  // ALL: clears the facet (full list, cats param gone).
+  await chipsAfterReload.getByRole('button', { name: 'All' }).click();
+  await expect(page.getByRole('button', { name: /MangaRock/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /ManhuaFresh/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /SitioLibre/ })).toBeVisible();
+  await expect(page).toHaveURL(/#\/browse$/);
+
+  // Chips AND-compose with the search box (matrix completion).
+  await chipsAfterReload.getByRole('button', { name: /Manga/ }).click();
+  await page.getByLabel('Search sites').fill('rock');
+  await expect(page.getByRole('button', { name: /MangaRock/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /BrokenScan/ })).toHaveCount(0);
 });
 
 test('picker → auto-provision(mock catalog, WS progress) → entries → manga deep-link', async ({ page }: { page: Page }): Promise<void> => {
@@ -211,7 +289,7 @@ test('picker → auto-provision(mock catalog, WS progress) → entries → manga
 
   // Provisioning is visible (inline status + WS-driven toast phases).
   await expect(page.getByTestId('provision-status')).toBeVisible();
-  await expect(page.getByText(/Downloading the catalog archive/)).toBeVisible();
+  await expect(page.getByText(/Downloading the site’s list/)).toBeVisible();
 
   // Terminal WS frame → entries open on completion.
   pushSyncFrame(mock.ws, {
@@ -223,6 +301,9 @@ test('picker → auto-provision(mock catalog, WS progress) → entries → manga
   expect(mock.freshInstalled()).toBe(true);
   expect(mock.syncCalls()).toBe(1);
   await expect(page.getByTestId('provision-status')).toHaveCount(0);
+
+  // The provisioned catalog carries the muted 'from catalog' badge.
+  await expect(page.getByTitle('Prebuilt list from FMD2-DB')).toHaveText('from catalog');
 
   // Hex still never rendered as text on the entries view.
   expect(await page.locator('body').innerText()).not.toMatch(HEX32);
@@ -239,10 +320,10 @@ test('cancel withdraws the provisioning UX and returns to the picker', async ({ 
 
   await page.getByRole('button', { name: /ManhuaFresh/ }).click();
   await expect(page.getByTestId('provision-status')).toBeVisible();
-  await expect(page.getByText(/Downloading the catalog archive/)).toBeVisible();
+  await expect(page.getByText(/Downloading the site’s list/)).toBeVisible();
 
   await page.getByTestId('provision-status').getByRole('button', { name: 'Cancel' }).click();
-  await expect(page.getByText('Provisioning cancelled')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Cancelled' })).toBeVisible();
   await expect(page.getByTestId('provision-status')).toHaveCount(0);
   expect(mock.syncCalls()).toBe(1);
 
@@ -251,18 +332,32 @@ test('cancel withdraws the provisioning UX and returns to the picker', async ({ 
   await expect(page.getByRole('heading', { name: 'Browse sites' })).toBeVisible();
 });
 
-test('FMD2-DB 404 → friendly no-catalog + §6.8 live-scrape offer (source badge)', async ({ page }: { page: Page }): Promise<void> => {
-  await installPickerMockApi(page);
+test('catalog-less directory-capable site → automatic live fallback: ONE progress experience, muted badge, no mode vocabulary', async ({ page }: { page: Page }): Promise<void> => {
+  const mock = await installPickerMockApi(page);
   await page.goto('/#/browse');
 
   await page.getByRole('button', { name: /NoCatalogSite/ }).click();
   await expect(page).toHaveURL(new RegExp(`#/browse\\?site=${NOCATALOG_ID}`));
 
-  await expect(page.getByText('No prebuilt catalog for this site')).toBeVisible();
-  await expect(page.getByText(/live browsing/i)).toBeVisible();
+  // ONE progress experience: 'Preparing <site>…' — the same one shown
+  // for any other site; no source/mode decision point ever appears.
+  await expect(page.getByTestId('provision-status')).toBeVisible();
+  await expect(page.getByText(/Preparing NoCatalogSite…/)).toBeVisible();
 
-  // Live browse serves the directory walk with the source badge.
-  await page.getByRole('button', { name: 'Browse live instead' }).click();
+  // FMD2-DB 404 → the entries open AUTOMATICALLY via the live channel
+  // (no button press, no mode offer) and the preparation withdraws.
   await expect(page.getByRole('button', { name: /Alpha Quest/ })).toBeVisible();
-  await expect(page.getByTitle(/live-scrape fallback/)).toHaveText('live scrape');
+  await expect(page.getByTestId('provision-status')).toHaveCount(0);
+  expect(mock.syncCalls()).toBe(1);
+
+  // The muted source badge is the ONLY trace — transparency, not a
+  // decision point.
+  await expect(page.getByTitle('List fetched live from the site')).toHaveText('from site');
+
+  // THE MODE-VOCABULARY CONTRACT (DOM grep): no 'live browse'/'scrape'
+  // strings, no mode-named buttons anywhere.
+  await expectNoModeVocabulary(page);
+
+  // Hex still never rendered as text.
+  expect(await page.locator('body').innerText()).not.toMatch(HEX32);
 });

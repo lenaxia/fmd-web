@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SettingsPage } from '../src/pages/SettingsPage';
-import { autoCleanup, mockFetch, renderWithProviders, type MockRoute } from './helpers';
+import { autoCleanup, FULL_SETTINGS, mockFetch, renderWithProviders, type MockRoute } from './helpers';
 import { MODULE_ID, moduleFixture } from './fixtures';
 
 autoCleanup();
@@ -117,7 +117,7 @@ describe('SettingsPage D20 bootstrap empty state', (): void => {
         method: 'GET',
         match: (url): boolean => url.pathname === '/api/settings',
         respond: (): { body: object } => ({
-          body: { proxy: { type: '', host: '', port: '', user: '', pass: '' }, browser: { enabled: false, url: '' } },
+          body: { ...FULL_SETTINGS },
         }),
       },
       {

@@ -85,10 +85,28 @@ export function createDefaultServices(opts: DefaultServicesOptions = {}): ApiSer
 }
 
 export function createApp(services: ApiServices = createDefaultServices()): ReturnType<typeof buildApp> {
+  const password =
+    process.env['FMD_WEB_PASSWORD'] !== undefined && process.env['FMD_WEB_PASSWORD'] !== ''
+      ? process.env['FMD_WEB_PASSWORD']
+      : undefined;
+  const apiTokenEnv =
+    process.env['FMD_WEB_API_TOKEN'] !== undefined && process.env['FMD_WEB_API_TOKEN'] !== ''
+      ? process.env['FMD_WEB_API_TOKEN']
+      : undefined;
   const options: AppOptions = {
     version: SERVER_VERSION,
-    ...(process.env['FMD_WEB_PASSWORD'] !== undefined && process.env['FMD_WEB_PASSWORD'] !== ''
-      ? { auth: { password: process.env['FMD_WEB_PASSWORD'] } }
+    ...(password !== undefined || apiTokenEnv !== undefined
+      ? {
+          auth: {
+            ...(password !== undefined ? { password } : {}),
+            // R4: the env pin OVERRIDES any stored value (headless runs);
+            // the in-memory entry here has no settings store, so the pin
+            // is the only token source.
+            ...(apiTokenEnv !== undefined
+              ? { apiToken: apiTokenEnv, apiTokenEnvPinned: true }
+              : {}),
+          },
+        }
       : {}),
     infoCacheTtlMs: DEFAULT_INFO_CACHE_TTL_MS,
   };

@@ -14,7 +14,7 @@ export function AppliedFilterChips(props: {
   readonly onChange: (next: BrowseFilterState) => void;
 }): ReactElement | null {
   const { state } = props;
-  const chips: Array<{ key: string; label: string; remove: () => void }> = [];
+  const chips: Array<{ key: string; label: string; remove: () => void; excluded?: boolean }> = [];
   if (state.q !== '') {
     chips.push({
       key: 'q',
@@ -42,6 +42,24 @@ export function AppliedFilterChips(props: {
       },
     });
   }
+  if (state.artists !== '') {
+    chips.push({
+      key: 'artists',
+      label: `Artists: ${state.artists}`,
+      remove: (): void => {
+        props.onChange({ ...liveFilterState(state), artists: '' });
+      },
+    });
+  }
+  if (state.summary !== '') {
+    chips.push({
+      key: 'summary',
+      label: `Summary: ${state.summary}`,
+      remove: (): void => {
+        props.onChange({ ...liveFilterState(state), summary: '' });
+      },
+    });
+  }
   if (state.genres.length > 0 || state.customGenres.length > 0) {
     const all: readonly string[] = [...state.genres, ...state.customGenres];
     chips.push({
@@ -49,6 +67,17 @@ export function AppliedFilterChips(props: {
       label: `${state.genresMode === 'any' ? 'Any of' : 'All of'}: ${all.join(', ')}`,
       remove: (): void => {
         props.onChange({ ...liveFilterState(state), genres: [], customGenres: [] });
+      },
+    });
+  }
+  if (state.excludedGenres.length > 0) {
+    const label: string = `None of: ${state.excludedGenres.join(', ')}`;
+    chips.push({
+      key: 'genres-exclude',
+      label,
+      excluded: true,
+      remove: (): void => {
+        props.onChange({ ...liveFilterState(state), excludedGenres: [] });
       },
     });
   }
@@ -67,7 +96,12 @@ export function AppliedFilterChips(props: {
   return (
     <div className="mb-3 flex flex-wrap items-center gap-1.5" aria-label="Applied filters" data-testid="applied-filters">
       {chips.map((chip): ReactElement => (
-        <Badge key={chip.key} variant="secondary" className="gap-1 pr-1">
+        <Badge
+          key={chip.key}
+          variant="secondary"
+          className={`gap-1 pr-1${chip.excluded === true ? ' line-through opacity-60' : ''}`}
+          data-excluded={chip.excluded === true ? 'true' : undefined}
+        >
           <span className="max-w-64 truncate">{chip.label}</span>
           <button
             type="button"

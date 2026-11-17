@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { ApiError } from '../api/errors.js';
 import type { LibraryFileRecord, LibraryPage, LibraryService } from '../api/services.js';
 import type { SqliteLibraryStore } from '../jobs/library/store.js';
+import { splitTextLines } from '../jobs/library/merge.js';
 
 /**
  * The §10 LibraryService port over `library_files` (§9): newest-first
@@ -59,5 +60,11 @@ export class SqliteLibraryService implements LibraryService {
       return undefined;
     }
     return row.path;
+  }
+
+  /** The §9 ledger read behind /api/info's embedded `downloaded` set. */
+  downloadedChapters(moduleId: string, url: string): string[] {
+    const text = this.store.getDownloadedChapters(moduleId, url);
+    return text === '' ? [] : splitTextLines(text);
   }
 }

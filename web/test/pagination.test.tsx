@@ -110,31 +110,35 @@ describe('BrowsePage pagination', (): void => {
     renderWithProviders(<BrowsePage route={parseHash('#/browse')} />, { fetch, hash: '#/browse' });
     expect(await screen.findByText('Browse sites')).toBeInTheDocument();
     expect(screen.getByLabelText('Search sites')).toBeInTheDocument();
-    // The hex-ID form contract is gone: no catalog-id input, no Open.
+    // The hex-ID form contract is gone: no catalog-id input; the only
+    // 'Open' button is open-by-URL ([parity-sweep] M14), never the old
+    // catalog-id form.
     expect(screen.queryByLabelText('Catalog id')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Open' })).toBeNull();
+    const openButtons = screen.getAllByRole('button', { name: 'Open' });
+    expect(openButtons).toHaveLength(1);
+    expect(openButtons[0].closest('[data-testid="open-by-url"]')).not.toBeNull();
     // The picker fetches the module registry (not catalog entries).
     expect(requests.map((r): string => r.path)).toEqual(['/api/modules']);
   });
 
-  it('badges the live-scrape source (§6.8) when the server served the page live', async (): Promise<void> => {
+  it('badges the serving channel: muted source badge when the page came from the site', async (): Promise<void> => {
     const { fetch } = mockFetch([
       modulesRoute,
       latestRoute(1, { body: { entries: [entryFixture('/live', 'LiveEntry')], source: 'live' } }),
     ]);
     renderWithProviders(<BrowsePage route={parseHash(`#/browse?catalog=${CATALOG_ID}`)} />, { fetch, hash: `#/browse?catalog=${CATALOG_ID}` });
     expect(await screen.findByRole('list')).toBeInTheDocument();
-    expect(screen.getByTitle(/live-scrape fallback/)).toHaveTextContent('live scrape');
+    expect(screen.getByTitle('List fetched live from the site')).toHaveTextContent('from site');
   });
 
-  it('does not badge catalog-sourced pages', async (): Promise<void> => {
+  it('badges prebuilt pages with the muted "from catalog" source badge', async (): Promise<void> => {
     const { fetch } = mockFetch([
       modulesRoute,
       latestRoute(1, { body: { entries: [entryFixture('/cat', 'CatEntry')], source: 'catalog' } }),
     ]);
     renderWithProviders(<BrowsePage route={parseHash(`#/browse?catalog=${CATALOG_ID}`)} />, { fetch, hash: `#/browse?catalog=${CATALOG_ID}` });
     expect(await screen.findByRole('list')).toBeInTheDocument();
-    expect(screen.queryByTitle(/live-scrape fallback/)).not.toBeInTheDocument();
+    expect(screen.getByTitle('Prebuilt list from FMD2-DB')).toHaveTextContent('from catalog');
   });
 
   it('entry rows navigate to the manga detail route', async (): Promise<void> => {
@@ -144,7 +148,7 @@ describe('BrowsePage pagination', (): void => {
     ]);
     renderWithProviders(<BrowsePage route={parseHash(`#/browse?catalog=${CATALOG_ID}`)} />, { fetch, hash: `#/browse?catalog=${CATALOG_ID}` });
     const list = await screen.findByRole('list');
-    const row = within(list).getByRole('button', { name: /Alpha/ });
+    const row = within(list).getByRole('button', { name: /^Alpha/ });
     expect(row).toBeInTheDocument();
     await userEvent.click(row);
     expect(globalThis.location.hash).toBe(

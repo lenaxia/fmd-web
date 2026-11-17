@@ -83,6 +83,11 @@ export interface DownloadChapterOptions {
   readonly resumeMarkers?: readonly string[];
   /** Called whenever a marker changes (persist the resume contract). */
   readonly persistMarkers?: (pageLinks: readonly string[]) => void;
+  /**
+   * Downloads parity: called after each NEWLY downloaded image is
+   * saved (workId + byte length) — the lane's transfer-rate source.
+   */
+  readonly onImageSaved?: (workId: number, byteLength: number) => void;
   /** Extra request headers (module-set, e.g. Referer). */
   readonly extraHeaders?: Readonly<Record<string, string>>;
   /** Downloader override (tests); default HttpImageDownloader. */
@@ -363,6 +368,10 @@ export class DownloadChapterRunner {
       pipeline.markDone(workId);
       savedFiles[workId] = savedPath;
       this.options.persistMarkers?.(pipeline.pageLinks);
+      // Downloads parity: per-image byte tick — the lane's transfer-rate
+      // meter feeds on these (NEW downloads only; resumed-from-disk
+      // images transfer nothing).
+      this.options.onImageSaved?.(workId, fetched.bytes.length);
       const after = await this.deps.module.afterImageSaved?.(savedPath);
       if (after === false) {
         fail('afterImageSaved returned false');

@@ -169,6 +169,8 @@ export class FavoritesEngine {
     url: string;
     title?: string;
     autoDownload?: boolean;
+    saveTo?: string;
+    enabled?: boolean;
   }): FavoriteRow {
     const mangaKey = downloadedChaptersKey(input.moduleId, input.url);
     const row: FavoriteRow = {
@@ -179,9 +181,54 @@ export class FavoritesEngine {
       autoDownload: input.autoDownload ?? false,
       newChapterCount: 0,
       downloadedChapterList: '',
+      ...(input.saveTo !== undefined && input.saveTo !== '' ? { saveTo: input.saveTo } : {}),
+      enabled: input.enabled ?? true,
+      dateAdded: this.now(),
     };
     this.deps.store.upsertFavorite(row);
     return row;
+  }
+
+  /**
+   * Website transfer (frmTransferFavorites.btOKClick parity, ADAPT to
+   * one favorite at a time): the row remaps onto the target module+link
+   * under a NEW mangaKey — title/status/currentChapter/saveTo carry
+   * over, the downloaded list carries over unless the caller asked for
+   * the clear-and-reload (then the stored list resets and the tag-100
+   * transfer branch re-ingests the LIVE chapter list from the target
+   * site). The old row is deleted (its downloaded_chapters ledger row
+   * is NOT touched, same as a plain delete).
+   */
+  public async transferFavorite(
+    id: string,
+    target: { moduleId: string; url: string; clearDownloadedList: boolean },
+  ): Promise<FavoriteRow> {
+    const favorite = this.deps.store.getFavorite(id);
+    if (favorite === undefined) {
+      throw new ApiError(404, 'not_found', `unknown favorite: ${id}`);
+    }
+    const seed: FavoriteRow = {
+      ...favorite,
+      mangaKey: downloadedChaptersKey(target.moduleId, target.url),
+      moduleId: target.moduleId,
+      url: target.url,
+      newChapterCount: 0,
+      ...(target.clearDownloadedList ? { downloadedChapterList: '' } : {}),
+    };
+    this.deps.store.deleteFavorite(id);
+    this.deps.store.upsertFavorite(seed);
+    if (target.clearDownloadedList) {
+      // Tag-100 reload: the live target-site chapter list becomes the
+      // stored downloaded list (importFavorite semantics).
+      const reloaded = await this.importFavorite({
+        moduleId: target.moduleId,
+        url: target.url,
+        ...(favorite.title !== undefined ? { title: favorite.title } : {}),
+        ...(favorite.autoDownload !== undefined ? { autoDownload: favorite.autoDownload } : {}),
+      });
+      return reloaded.favorite;
+    }
+    return seed;
   }
 
   /**
@@ -200,6 +247,9 @@ export class FavoritesEngine {
     const mangaKey = downloadedChaptersKey(input.moduleId, input.url);
     const existing = this.deps.store.getFavorite(mangaKey);
     const seed: FavoriteRow = {
+      // Re-ingest keeps the stored row's shape (status/currentChapter/
+      // saveTo/enabled/dateAdded — only the diff-relevant fields reset).
+      ...(existing !== undefined ? existing : {}),
       mangaKey,
       moduleId: input.moduleId,
       url: input.url,

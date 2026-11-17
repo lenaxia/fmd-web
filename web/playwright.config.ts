@@ -11,10 +11,12 @@ export default defineConfig({
   // scripts/e2e.sh (web/playwright.compose.config.ts) — this config is
   // the smoke run only (vite dev server + intercepted mock API): the
   // four page happy-paths (smoke.spec.ts), the keyboard-navigation
-  // smoke (a11y.spec.ts) and the virtualization perf smoke
-  // (perf.spec.ts). Visual regression has its own zero-threshold
-  // config (playwright.visual.config.ts).
-  testMatch: /(smoke|a11y|perf|search)\.spec\.ts/,
+  // smoke (a11y.spec.ts), the virtualization perf smoke
+  // (perf.spec.ts) and the MangaPage parity suite (manga-parity.spec.ts
+  // — favorites round-trip, downloaded tint/hide, asc/desc). Visual
+  // regression has its own zero-threshold config
+  // (playwright.visual.config.ts).
+  testMatch: /(smoke|a11y|perf|search|manga-parity|browse-list-polish|settings-parity|favorites-parity|parity-sweep)\.spec\.ts/,
   timeout: 20_000,
   // CI-load budget: the first test pays vite cold-transform + mock-API
   // hydration under parallel load; 5s (Playwright default) loses that

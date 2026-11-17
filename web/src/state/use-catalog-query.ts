@@ -21,6 +21,7 @@ import type { CatalogMode, CatalogQueryInput } from '../api/hooks';
 import { useCatalogEntries } from '../api/hooks';
 import {
   apiGenres,
+  apiGenresExclude,
   hasActiveFilters,
   type BrowseFilterState,
 } from './browse-filter-state';
@@ -89,6 +90,7 @@ export function useCatalogQuery(
   }, [queryClient, siteId, cancelKey]);
 
   const genres: readonly string[] = apiGenres(state);
+  const genresExclude: readonly string[] = apiGenresExclude(state);
   const active: boolean = mode === 'search';
   const pages = useCatalogEntries({
     catalogId: siteId,
@@ -100,7 +102,10 @@ export function useCatalogQuery(
           q: debouncedQ,
           ...(state.status !== '' ? { status: state.status } : {}),
           ...(state.authors !== '' ? { authors: state.authors } : {}),
+          ...(state.artists !== '' ? { artists: state.artists } : {}),
+          ...(state.summary !== '' ? { summary: state.summary } : {}),
           ...(genres.length > 0 ? { genres } : {}),
+          ...(genresExclude.length > 0 ? { genresExclude } : {}),
           genresMode: state.genresMode,
           ...(state.newDays !== undefined ? { newDays: state.newDays } : {}),
         }

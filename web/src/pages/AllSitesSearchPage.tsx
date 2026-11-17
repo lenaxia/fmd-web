@@ -21,44 +21,27 @@ import { EmptyState } from '@/components/patterns/EmptyState';
 import { ErrorBanner } from '@/components/patterns/ErrorBanner';
 import { FilterBar } from '@/components/patterns/FilterBar';
 import { ListPanel } from '@/components/patterns/ListPanel';
-import { EntryRow } from '@/components/patterns/EntryRow';
 import { PageHeader } from '@/components/patterns/PageHeader';
 import { StatPill } from '@/components/patterns/StatPill';
 import { AllSitesToggle } from '@/components/catalog/AllSitesToggle';
+import { CatalogEntryRow } from '@/components/catalog/CatalogEntryRow';
 import { SearchBar } from '@/components/catalog/SearchBar';
 import { WebsiteBadge } from '@/components/catalog/WebsiteBadge';
+import { useHighlightNew } from '../state/highlight-new';
 import { FacetChips, UnionExcludedChips, UnionWarningChips } from '@/components/catalog/UnionSearchChips';
 import { Button } from '@/components/ui/button';
 
 const PAGE_LIMIT = 20;
 
-function UnionRow(props: { entry: SearchEntryT }): ReactElement {
+function UnionRow(props: { entry: SearchEntryT; highlightNew: boolean }): ReactElement {
   const { entry } = props;
-  const open = (): void => {
-    // Unchanged manga deep-link — the site params carry the union row
-    // into its source site's context.
-    navigate('manga', {
-      catalog: entry.site,
-      module: entry.site,
-      url: entry.link,
-      title: entry.title,
-    });
-  };
   return (
-    <EntryRow
-      onClick={open}
-      buttonClassName="catalog-entry union-entry"
-      title={
-        <span className="flex flex-wrap items-center gap-2">
-          <span className="entry-title">{entry.title}</span>
-          <WebsiteBadge siteName={entry.siteName} siteId={entry.site} />
-        </span>
-      }
-      meta={
-        <span className="entry-meta">
-          {entry.authors !== '' ? entry.authors : 'unknown author'} · {entry.status} · {entry.numChapter} chapters
-        </span>
-      }
+    <CatalogEntryRow
+      entry={entry}
+      siteId={entry.site}
+      highlightNew={props.highlightNew}
+      badges={<WebsiteBadge siteName={entry.siteName} siteId={entry.site} />}
+      website={entry.siteName}
     />
   );
 }
@@ -69,6 +52,9 @@ export function AllSitesSearchPage(props: { route: Route }): ReactElement {
 
   const debouncedQ: string = useDebouncedValue(q, SEARCH_DEBOUNCE_MS);
   const pages = useAllSitesSearch({ q: debouncedQ, limit: PAGE_LIMIT, enabled: true });
+  // The same persisted global toggle gates the union rows' accents
+  // (FMD2's setting is global across the manga list).
+  const [highlightNew] = useHighlightNew();
 
   const entries: SearchEntryT[] =
     pages.data?.pages.flatMap((page): SearchEntryT[] => [...page.entries]) ?? [];
@@ -160,7 +146,7 @@ export function AllSitesSearchPage(props: { route: Route }): ReactElement {
             ariaLabel="All-sites search results"
             items={entries}
             itemKey={(entry): string => `${entry.site}-${entry.link}`}
-            renderItem={(entry): ReactElement => <UnionRow entry={entry} />}
+            renderItem={(entry): ReactElement => <UnionRow entry={entry} highlightNew={highlightNew} />}
           />
           {pages.hasNextPage ? (
             <Button

@@ -14,23 +14,43 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import type { RegistrationRecord } from '../engine/registry/capabilities.js';
 import { isValidCatalogId } from '../sync/db/catalog-store.js';
-import type { CatalogStore, CatalogSyncProgressT, CatalogSyncPhaseT } from '@fmd/contract';
-import { catalogSyncJobId } from '@fmd/contract';
 import type {
+  CatalogStore,
+  CatalogSyncProgressT,
+  CatalogSyncPhaseT,
+  JobActionTypeT,
+  JobBulkActionRequestT,
+  JobBulkActionResponseT,
+  JobStateT,
+} from '@fmd/contract';
+import { catalogSyncJobId } from '@fmd/contract';
+import { OutputDefaultsSchema } from './schemas.js';
+import type {
+  FavoriteCheckBatchItemT,
+  FavoriteCheckBatchResponseT,
   FavoriteCheckResponseT,
+  FavoriteCheckScopeT,
   FavoriteCreateRequestT,
+  FavoriteSchedulerSettingsT,
   FavoriteT,
+  FavoriteTransferPreviewResponseT,
   FavoriteUpdateRequestT,
 } from './schemas.js';
 import type {
   ModuleCapabilitiesT,
   ModuleSummaryT,
   OptionValueT,
+  OutputDefaultsT,
+  PerformanceSettingsT,
+  RetentionSettingsT,
+  FilenamePolicySettingsT,
+  DiagnosticsSettingsT,
   ProxySettingsT,
   SettingsResponseT,
 } from './schemas.js';
 import { ApiError } from './errors.js';
 import { decodeCursor, encodeCursor } from './cursor.js';
+import { downloadedChaptersKey } from '../jobs/library/merge.js';
 
 // ── modules ──────────────────────────────────────────────────────────
 
@@ -272,26 +292,95 @@ export interface SettingsService {
   get(): SettingsResponseT;
   /** Replace the global proxy config (PUT /api/settings/proxy). */
   setProxy(proxy: ProxySettingsT): SettingsResponseT;
+  /** Replace the output defaults (PUT /api/settings/output, additive). */
+  setOutput(output: OutputDefaultsT): SettingsResponseT;
+  /** [parity-sweep] M10: replace the Performance group (PUT /api/settings/performance). */
+  setPerformance(performance: PerformanceSettingsT): SettingsResponseT;
+  /** [parity-sweep] M2: replace job-history retention (PUT /api/settings/retention). */
+  setRetention(retention: RetentionSettingsT): SettingsResponseT;
+  /** [parity-sweep] M4: replace the filename policy (PUT /api/settings/filename-policy). */
+  setFilenamePolicy(policy: FilenamePolicySettingsT): SettingsResponseT;
+  /** [parity-sweep] M13: replace diagnostics settings (PUT /api/settings/diagnostics). */
+  setDiagnostics(diagnostics: DiagnosticsSettingsT): SettingsResponseT;
   /** The effective proxy for one module: override → global → undefined. */
   effectiveProxy(moduleId: string): ProxySettingsT | undefined;
   /** §5.11: the compose `browser` profile is wired (flags flip). */
   browserProfileEnabled(): boolean;
   /** Per-module override read seam (engine effective-proxy resolution). */
   moduleProxyOverride(moduleId: string): ProxySettingsT | null;
+  /** Favorites scheduler settings (Options → Updates parity). */
+  getFavoritesSettings(): FavoriteSchedulerSettingsT;
+  /** Replace the favorites scheduler settings (PUT /api/settings/favorites). */
+  setFavoritesSettings(settings: FavoriteSchedulerSettingsT): SettingsResponseT;
+  /**
+   * R4 single app-wide API token: the STORED settings value (null when
+   * nothing is stored). The env pin (FMD_WEB_API_TOKEN) hides the
+   * stored value entirely — precedence lives in the auth assembly.
+   */
+  getApiToken(): string | null;
+  /**
+   * Rotate/persist the stored token (POST /api/settings/api-token/
+   * regenerate). The value NEVER travels in GET /api/settings — only
+   * the credential-gated token route exposes it.
+   */
+  setApiToken(token: string): void;
 }
 
 export class InMemorySettingsService implements SettingsService {
   private proxy: ProxySettingsT = { type: '', host: '', port: '', user: '', pass: '' };
+  // Every field of OutputDefaultsSchema carries a zod default — parse
+  // the empty object to build the default (single source; new fields
+  // land here automatically).
+  private output: OutputDefaultsT = OutputDefaultsSchema.parse({});
+  private favorites: FavoriteSchedulerSettingsT = { intervalMinutes: 60, checkAtStartup: true };
+  private favoritesSink: ((settings: FavoriteSchedulerSettingsT) => void) | undefined;
+  /** [parity-sweep] groups — defaults mirror the pre-settings server truth. */
+  private performance: PerformanceSettingsT = {
+    requestTimeoutSeconds: 15,
+    retryCount: 2,
+    parallelChapters: 1,
+    threadsPerChapter: 1,
+  };
+  private retention: RetentionSettingsT = { days: 30 };
+  private filenamePolicy: FilenamePolicySettingsT = { normalizePaths: false };
+  private diagnostics: DiagnosticsSettingsT = { logEnabled: true, logLevel: 'info' };
+  /** R4: the stored single API token (env pin hides it; null = none). */
+  private apiToken: string | null = null;
+  private apiTokenSink: ((token: string) => void) | undefined;
+  /** Live-apply sinks (assembly: app_settings persistence + runtime apply). */
+  private performanceSink: ((p: PerformanceSettingsT) => void) | undefined;
+  private retentionSink: ((r: RetentionSettingsT) => void) | undefined;
+  private filenamePolicySink: ((p: FilenamePolicySettingsT) => void) | undefined;
+  private diagnosticsSink: ((d: DiagnosticsSettingsT) => void) | undefined;
 
   constructor(
     private readonly modules?: { getProxyOverride(id: string): ProxySettingsT | null },
     /** §5.11 config input: non-empty FMD_WEB_BROWSER_SIDECAR_URL. */
     private readonly browserUrl: string = '',
-  ) {}
+    /**
+     * Favorites scheduler settings seed (assembly reads the persisted
+     * app_settings row) + the live-apply sink (scheduler interval).
+     */
+    favoritesSeed?: FavoriteSchedulerSettingsT,
+    onFavoritesSettings?: (settings: FavoriteSchedulerSettingsT) => void,
+  ) {
+    if (favoritesSeed !== undefined) {
+      this.favorites = { ...favoritesSeed };
+    }
+    if (onFavoritesSettings !== undefined) {
+      this.favoritesSink = onFavoritesSettings;
+    }
+  }
 
   get(): SettingsResponseT {
     return {
       proxy: { ...this.proxy },
+      output: { ...this.output },
+      favorites: { ...this.favorites },
+      performance: { ...this.performance },
+      retention: { ...this.retention },
+      filenamePolicy: { ...this.filenamePolicy },
+      diagnostics: { ...this.diagnostics },
       browser: {
         enabled: this.browserUrl !== '',
         url: this.browserUrl,
@@ -302,6 +391,153 @@ export class InMemorySettingsService implements SettingsService {
   setProxy(proxy: ProxySettingsT): SettingsResponseT {
     this.proxy = { ...proxy };
     return this.get();
+  }
+
+  setOutput(output: OutputDefaultsT): SettingsResponseT {
+    this.output = { ...output };
+    return this.get();
+  }
+ 
+  setPerformance(performance: PerformanceSettingsT): SettingsResponseT {
+    this.performance = { ...performance };
+    this.performanceSink?.(this.performance);
+    return this.get();
+  }
+
+  setRetention(retention: RetentionSettingsT): SettingsResponseT {
+    this.retention = { ...retention };
+    this.retentionSink?.(this.retention);
+    return this.get();
+  }
+
+  setFilenamePolicy(policy: FilenamePolicySettingsT): SettingsResponseT {
+    this.filenamePolicy = { ...policy };
+    this.filenamePolicySink?.(this.filenamePolicy);
+    return this.get();
+  }
+
+  setDiagnostics(diagnostics: DiagnosticsSettingsT): SettingsResponseT {
+    this.diagnostics = { ...diagnostics };
+    this.diagnosticsSink?.(this.diagnostics);
+    return this.get();
+  }
+
+  /** [parity-sweep] read seams (assembly: lane knobs, retention sweep, logger). */
+  performanceSettings(): PerformanceSettingsT {
+    return { ...this.performance };
+  }
+
+  retentionSettings(): RetentionSettingsT {
+    return { ...this.retention };
+  }
+
+  filenamePolicySettings(): FilenamePolicySettingsT {
+    return { ...this.filenamePolicy };
+  }
+
+  diagnosticsSettings(): DiagnosticsSettingsT {
+    return { ...this.diagnostics };
+  }
+
+  /**
+   * Assembly seam: the persisted app_settings seeds + the live-apply
+   * sinks land here after construction (the store exists later). The
+   * seeds do NOT fire the sinks (they already reflect persisted state).
+   */
+  setParitySweepSettingsLive(
+    seeds: {
+      performance?: PerformanceSettingsT;
+      retention?: RetentionSettingsT;
+      filenamePolicy?: FilenamePolicySettingsT;
+      diagnostics?: DiagnosticsSettingsT;
+      output?: OutputDefaultsT;
+    },
+    sinks?: {
+      onPerformance?: (p: PerformanceSettingsT) => void;
+      onRetention?: (r: RetentionSettingsT) => void;
+      onFilenamePolicy?: (p: FilenamePolicySettingsT) => void;
+      onDiagnostics?: (d: DiagnosticsSettingsT) => void;
+      onOutput?: (o: OutputDefaultsT) => void;
+    },
+  ): void {
+    if (seeds.performance !== undefined) {
+      this.performance = { ...seeds.performance };
+    }
+    if (seeds.retention !== undefined) {
+      this.retention = { ...seeds.retention };
+    }
+    if (seeds.filenamePolicy !== undefined) {
+      this.filenamePolicy = { ...seeds.filenamePolicy };
+    }
+    if (seeds.diagnostics !== undefined) {
+      this.diagnostics = { ...seeds.diagnostics };
+    }
+    if (seeds.output !== undefined) {
+      this.output = { ...seeds.output };
+    }
+    if (sinks?.onPerformance !== undefined) {
+      this.performanceSink = sinks.onPerformance;
+    }
+    if (sinks?.onRetention !== undefined) {
+      this.retentionSink = sinks.onRetention;
+    }
+    if (sinks?.onFilenamePolicy !== undefined) {
+      this.filenamePolicySink = sinks.onFilenamePolicy;
+    }
+    if (sinks?.onDiagnostics !== undefined) {
+      this.diagnosticsSink = sinks.onDiagnostics;
+    }
+  }
+
+  getFavoritesSettings(): FavoriteSchedulerSettingsT {
+    return { ...this.favorites };
+  }
+
+  setFavoritesSettings(settings: FavoriteSchedulerSettingsT): SettingsResponseT {
+    this.favorites = { ...settings };
+    this.favoritesSink?.(settings);
+    return this.get();
+  }
+
+  /**
+   * Assembly seam: the settings instance is constructed BEFORE the
+   * favorites scheduler exists, so the persisted seed + the live-apply
+   * sink (app_settings write + scheduler interval) land here after the
+   * fact. The seed does NOT fire the sink (it already reflects state).
+   */
+  setFavoritesSettingsLive(
+    seed: FavoriteSchedulerSettingsT,
+    sink?: (settings: FavoriteSchedulerSettingsT) => void,
+  ): void {
+    this.favorites = { ...seed };
+    this.favoritesSink = sink;
+  }
+
+  // ── R4 single app-wide API token (storage; env pin hides it) ──────
+
+  getApiToken(): string | null {
+    return this.apiToken;
+  }
+
+  setApiToken(token: string): void {
+    this.apiToken = token;
+    this.apiTokenSink?.(token);
+  }
+
+  /**
+   * Assembly seam (like the favorites one): the persisted seed (the
+   * app_settings `api.token` row) + the write-back sink land after the
+   * settings instance exists. Seeding does NOT fire the sink (the row
+   * already reflects it); every later rotation does.
+   */
+  bindApiTokenPersistence(seed: string | null, sink?: (token: string) => void): void {
+    this.apiToken = seed;
+    this.apiTokenSink = sink;
+  }
+
+  /** Output defaults read seam (download lane pack/filename resolution). */
+  outputDefaults(): OutputDefaultsT {
+    return { ...this.output };
   }
 
   effectiveProxy(moduleId: string): ProxySettingsT | undefined {
@@ -331,6 +567,44 @@ export class InMemorySettingsService implements SettingsService {
 export type CatalogService = CatalogStore;
 
 // ── live info ────────────────────────────────────────────────────────
+
+/**
+ * [parity-sweep] M14 (FMD2 edURL parity): resolve a module by the
+ * URL's host against the registry's RootURL hosts (case-insensitive;
+ * port ignored — FMD2 matches origins the same loose way).
+ *
+ * Returns the module id, or a typed ambiguity/miss report the route
+ * maps onto ApiError('no_site_match'|'ambiguous_site').
+ */
+export function resolveModuleByHost(
+  modules: ReadonlyArray<{ id: string; name?: string; rootURL: string }>,
+  url: string,
+): { moduleId: string } | { noMatch: true } | { ambiguous: true; candidates: readonly string[] } {
+  let host = '';
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return { noMatch: true };
+  }
+  if (host === '') {
+    return { noMatch: true };
+  }
+  const matches = modules.filter((module): boolean => {
+    try {
+      return new URL(module.rootURL).hostname.toLowerCase() === host;
+    } catch {
+      return false;
+    }
+  });
+  const single = matches.length === 1 ? matches[0] : undefined;
+  if (single !== undefined) {
+    return { moduleId: single.id };
+  }
+  if (matches.length > 1) {
+    return { ambiguous: true, candidates: matches.map((m): string => m.name ?? m.id) };
+  }
+  return { noMatch: true };
+}
 
 export interface NormalizedInfo {
   title: string;
@@ -397,6 +671,8 @@ export interface JobRecord {
   progress?: Record<string, unknown>;
   error?: string;
   idempotencyKey?: string;
+  /** Add-as-stopped hold (cbAddAsStopped parity): queued but not claimable. */
+  paused?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -409,6 +685,10 @@ export interface JobCreateInput {
   chapterName?: string;
   /** §7.2 favorites provenance (per-chapter completion dual-writes the favorite side). */
   mangaKey?: string;
+  /** Add-as-stopped hold: the lane skips the row until resumed. */
+  paused?: boolean;
+  /** Save-to directory override honored at library finalize. */
+  saveTo?: string;
 }
 
 export interface JobsPage {
@@ -416,14 +696,49 @@ export interface JobsPage {
   nextCursor?: string;
 }
 
+/**
+ * Jobs-list filter set (Downloads parity): the pre-existing single
+ * `state`, plus the web multi-select (`states`), the title/chapter
+ * substring (`q`) and the created-at window (`addedFrom`/`addedTo`,
+ * inclusive calendar days parsed as UTC).
+ */
+export interface JobsListOptions {
+  readonly state?: JobRecord['state'];
+  readonly states?: readonly JobStateT[];
+  readonly q?: string;
+  readonly addedFrom?: string;
+  readonly addedTo?: string;
+  readonly cursor?: string;
+  readonly limit: number;
+}
+
 export interface JobService {
   /** Create a download job; `idempotencyKey` replays per §10. */
   createDownload(input: JobCreateInput, idempotencyKey?: string): { job: JobRecord; replayed: boolean };
   get(id: string): JobRecord | undefined;
   /** Newest-first page with a keyset cursor (stable under inserts). */
-  list(opts: { state?: JobRecord['state']; cursor?: string; limit: number }): JobsPage;
+  list(opts: JobsListOptions): JobsPage;
   /** §7.1 user cancellation (queued/running/retry → cancelled; terminal → 409). */
   cancel(id: string): JobRecord;
+  /** Lift the add-as-stopped hold (cbAddAsStopped parity): queued+paused → claimable. */
+  resume(id: string): JobRecord;
+  /**
+   * Downloads parity (FMD2 pmDownload, web-adapted): apply one task
+   * action under the state matrix — illegal applications 409 with
+   * `{job, action}` details.
+   */
+  action(id: string, type: JobActionTypeT): JobRecord;
+  /**
+   * Delete one job row (any state); `data: true` also removes the
+   * finalized artifact when the job recorded one.
+   */
+  remove(id: string, opts?: { readonly data?: boolean }): { job: JobRecord; dataDeleted: boolean };
+  /**
+   * Toolbar bulk op (FMD2 tsDownload): pause/resume over scope `all`,
+   * delete over scope `completed` (STATUS_FINISH rows only). Idempotent
+   * — a settled queue affects 0 rows.
+   */
+  bulkAction(request: JobBulkActionRequestT): JobBulkActionResponseT;
 }
 
 /** Canonical JSON (sorted keys, recursive) — the idempotency fingerprint input. */
@@ -455,6 +770,11 @@ export class InMemoryJobService implements JobService {
   /** In-flight cancel hooks (the real executor registers one per running job). */
   private readonly cancelHooks = new Map<string, () => void>();
   private nextId = 1;
+
+  constructor(
+    /** Delete(+data) seam — the harness wires a fake artifact remover. */
+    private readonly artifactDeleter: (path: string) => boolean = (): boolean => false,
+  ) {}
 
   /** Register the in-flight cancel hook for one running job id. */
   addCancelHook(id: string, cancel: () => void): void {
@@ -511,10 +831,12 @@ export class InMemoryJobService implements JobService {
         ...(input.mangaTitle !== undefined ? { mangaTitle: input.mangaTitle } : {}),
         chapterLink: input.chapterLink,
         ...(input.chapterName !== undefined ? { chapterName: input.chapterName } : {}),
+        ...(input.saveTo !== undefined ? { saveTo: input.saveTo } : {}),
       },
       state: 'queued',
       priority: 0,
       ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
+      ...(input.paused === true ? { paused: true } : {}),
       createdAt: now,
       updatedAt: now,
     };
@@ -525,11 +847,30 @@ export class InMemoryJobService implements JobService {
     return { job, replayed: false };
   }
 
+  /** cbAddAsStopped parity: clear the hold on a live row; terminal 409. */
+  resume(id: string): JobRecord {
+    const job = this.jobs.get(id);
+    if (job === undefined) {
+      throw new ApiError(404, 'not_found', `unknown job: ${id}`);
+    }
+    if (job.state === 'done' || job.state === 'failed' || job.state === 'cancelled') {
+      throw new ApiError(409, 'conflict', `job ${id} is ${job.state} — nothing to resume`);
+    }
+    if (job.paused !== true) {
+      return job; // idempotent no-op: the hold is already lifted
+    }
+    const { paused: _lifted, ...rest } = job;
+    void _lifted;
+    const resumed: JobRecord = { ...rest, updatedAt: new Date().toISOString() };
+    this.jobs.set(id, resumed);
+    return resumed;
+  }
+
   get(id: string): JobRecord | undefined {
     return this.jobs.get(id);
   }
 
-  list(opts: { state?: JobRecord['state']; cursor?: string; limit: number }): JobsPage {
+  list(opts: JobsListOptions): JobsPage {
     // Keyset cursor on the monotonic id (newest first): the boundary is
     // "ids strictly below the last row of the previous page", so pages
     // never shift under concurrent inserts — new jobs have higher ids
@@ -543,9 +884,35 @@ export class InMemoryJobService implements JobService {
       }
       boundaryId = raw;
     }
+    // Downloads-parity filters — same semantics as the runtime service
+    // (states multi-select, title/chapter substring, created-at window).
+    const needle = opts.q !== undefined && opts.q !== '' ? opts.q.toLowerCase() : undefined;
+    const fromMs =
+      opts.addedFrom !== undefined ? Date.parse(`${opts.addedFrom}T00:00:00.000Z`) : undefined;
+    const toMs =
+      opts.addedTo !== undefined ? Date.parse(`${opts.addedTo}T23:59:59.999Z`) : undefined;
     const all = [...this.jobs.values()]
       .filter((j) => Number(j.id) < boundaryId)
       .filter((j) => opts.state === undefined || j.state === opts.state)
+      .filter((j) => opts.states === undefined || opts.states.includes(j.state))
+      .filter((j): boolean => {
+        if (needle === undefined) {
+          return true;
+        }
+        const title = typeof j.payload['mangaTitle'] === 'string' ? j.payload['mangaTitle'] : '';
+        const chapter = typeof j.payload['chapterName'] === 'string' ? j.payload['chapterName'] : '';
+        return title.toLowerCase().includes(needle) || chapter.toLowerCase().includes(needle);
+      })
+      .filter((j): boolean => {
+        if (fromMs === undefined && toMs === undefined) {
+          return true;
+        }
+        const created = Date.parse(j.createdAt);
+        if (Number.isNaN(created)) {
+          return false;
+        }
+        return (fromMs === undefined || created >= fromMs) && (toMs === undefined || created <= toMs);
+      })
       .sort((a, b): number => Number(b.id) - Number(a.id));
     const page = all.slice(0, opts.limit);
     const last = page.at(-1);
@@ -553,6 +920,131 @@ export class InMemoryJobService implements JobService {
       return { jobs: page, nextCursor: encodeCursor({ id: Number(last.id) }) };
     }
     return { jobs: page };
+  }
+
+  /** Downloads parity: the FMD2 pmDownload action matrix (see the
+   * runtime service for the table — this in-memory twin keeps the API
+   * harness on the SAME legality surface). */
+  action(id: string, type: JobActionTypeT): JobRecord {
+    const job = this.jobs.get(id);
+    if (job === undefined) {
+      throw new ApiError(404, 'not_found', `unknown job: ${id}`);
+    }
+    const illegal = (): ApiError =>
+      new ApiError(
+        409,
+        'conflict',
+        `cannot ${type} job ${id} in state ${job.state}${job.paused === true ? ' (held)' : ''}`,
+        { job: { id, state: job.state, paused: job.paused === true }, action: type },
+      );
+    switch (type) {
+      case 'pause':
+      case 'disable': {
+        if (job.state === 'queued') {
+          if (job.paused === true) {
+            return job;
+          }
+          const held: JobRecord = { ...job, paused: true, updatedAt: new Date().toISOString() };
+          this.jobs.set(id, held);
+          return held;
+        }
+        if (type === 'pause' && (job.state === 'running' || job.state === 'retry')) {
+          return this.cancel(id);
+        }
+        throw illegal();
+      }
+      case 'resume':
+      case 'enable': {
+        if (job.state === 'queued') {
+          return this.resume(id);
+        }
+        if (type === 'resume' && job.state === 'cancelled') {
+          return this.reenqueue(job);
+        }
+        throw illegal();
+      }
+      case 'retry': {
+        if (job.state === 'failed') {
+          return this.reenqueue(job);
+        }
+        throw illegal();
+      }
+      case 'redownload': {
+        if (job.state === 'done') {
+          return this.reenqueue(job);
+        }
+        throw illegal();
+      }
+    }
+  }
+
+  /** Fresh queued copy of a terminal row (the chained re-enqueue analog). */
+  private reenqueue(job: JobRecord): JobRecord {
+    const now = new Date().toISOString();
+    const { error: _error, progress: _progress, paused: _paused, ...rest } = job;
+    void _error;
+    void _progress;
+    void _paused;
+    const fresh: JobRecord = {
+      ...rest,
+      id: String(this.nextId),
+      state: 'queued',
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.nextId += 1;
+    this.jobs.set(fresh.id, fresh);
+    return fresh;
+  }
+
+  remove(id: string, opts: { readonly data?: boolean } = {}): { job: JobRecord; dataDeleted: boolean } {
+    const job = this.jobs.get(id);
+    if (job === undefined) {
+      throw new ApiError(404, 'not_found', `unknown job: ${id}`);
+    }
+    let dataDeleted = false;
+    if (opts.data === true) {
+      const path =
+        job.progress !== undefined && typeof job.progress['libraryPath'] === 'string'
+          ? (job.progress['libraryPath'] as string)
+          : '';
+      if (path !== '') {
+        dataDeleted = this.artifactDeleter(path);
+      }
+    }
+    this.jobs.delete(id);
+    return { job, dataDeleted };
+  }
+
+  bulkAction(request: JobBulkActionRequestT): JobBulkActionResponseT {
+    const { action, scope } = request;
+    if ((action === 'pause' || action === 'resume') && scope !== 'all') {
+      throw new ApiError(400, 'bad_request', `scope "${scope}" does not apply to bulk ${action} — use "all"`);
+    }
+    if (action === 'delete' && scope !== 'completed') {
+      throw new ApiError(400, 'bad_request', `scope "${scope}" does not apply to bulk delete — use "completed"`);
+    }
+    const rows = [...this.jobs.values()].sort((a, b): number => Number(b.id) - Number(a.id));
+    const touched: JobRecord[] = [];
+    for (const job of rows) {
+      if (action === 'pause') {
+        if (job.state === 'queued' && job.paused !== true) {
+          touched.push(this.action(job.id, 'disable'));
+        } else if (job.state === 'running' || job.state === 'retry') {
+          touched.push(this.action(job.id, 'pause'));
+        }
+      } else if (action === 'resume') {
+        if (job.state === 'queued' && job.paused === true) {
+          touched.push(this.action(job.id, 'enable'));
+        } else if (job.state === 'cancelled') {
+          touched.push(this.action(job.id, 'resume'));
+        }
+      } else if (job.state === 'done') {
+        this.remove(job.id);
+        touched.push(job);
+      }
+    }
+    return { action, scope, affected: touched.length, jobs: touched };
   }
 
   get size(): number {
@@ -585,12 +1077,29 @@ export interface LibraryService {
   get(id: string): LibraryFileRecord | undefined;
   /** Absolute path of the artifact (the route streams it); undefined = gone. */
   resolveFile(id: string): string | undefined;
+  /**
+   * The downloaded-chapter LINK set for one manga (the §9
+   * `downloaded_chapters` ledger read behind POST /api/info's embedded
+   * `downloaded` array — MangaPage tinting/hide-downloaded parity).
+   */
+  downloadedChapters(moduleId: string, url: string): string[];
 }
 
 /** In-memory library store (dev/test stand-in for `library_files`). */
 export class InMemoryLibraryService implements LibraryService {
   private readonly rows = new Map<string, LibraryFileRecord & { path: string }>();
   private nextId = 1;
+  /** Test/dev seam: the downloaded_chapters ledger double (per manga key). */
+  private readonly downloaded = new Map<string, string[]>();
+
+  /** Seed the ledger double (test harness hook for /api/info embedding). */
+  setDownloadedChapters(moduleId: string, url: string, links: readonly string[]): void {
+    this.downloaded.set(downloadedChaptersKey(moduleId, url), [...links]);
+  }
+
+  downloadedChapters(moduleId: string, url: string): string[] {
+    return [...(this.downloaded.get(downloadedChaptersKey(moduleId, url)) ?? [])];
+  }
 
   /** Insert-or-replace by absolute path (a re-download swaps the entry). */
   put(entry: { moduleId: string; manga: string; fileName: string; bytes: number; path: string; createdAt?: string }): LibraryFileRecord {
@@ -836,12 +1345,36 @@ export interface FavoriteService {
   get(id: string): FavoriteT | undefined;
   /** Create a favorite (default `autoDownload: false` — FMD2 default). */
   create(input: FavoriteCreateRequestT): Promise<FavoriteT>;
-  /** Patch title / the auto-download toggle. */
+  /** Patch title / auto-download / save-to / enable. */
   update(id: string, patch: FavoriteUpdateRequestT): FavoriteT;
   /** Delete a favorite (its downloaded_chapters row is NOT touched). */
   remove(id: string): void;
   /** Manual check-now: the immediate DoCheck cycle for one favorite. */
   checkNow(id: string): Promise<FavoriteCheckResponseT>;
+  /**
+   * Batch check (btFavoritesCheckNewChapter parity): every favorite in
+   * scope gets one DoCheck cycle, sequentially; a {@link cancelBatch}
+   * between rows stops the sweep (the response reports `cancelled`).
+   * A run already in flight is a typed 409.
+   */
+  checkBatch(scope: FavoriteCheckScopeT): Promise<FavoriteCheckBatchResponseT>;
+  /** Cancel the in-flight batch check (false when none is running). */
+  cancelBatch(): boolean;
+  /**
+   * Transfer mapping preview (frmTransferFavorites parity): resolve the
+   * favorite's title on the target site (catalog search) and dry-run
+   * GetInfo on the hit — the dialog's valid/invalid report.
+   */
+  transferPreview(id: string, targetModuleId: string): Promise<FavoriteTransferPreviewResponseT>;
+  /**
+   * Apply the website transfer: remap the favorite onto the target
+   * module+link (new id), optionally clearing the downloaded list and
+   * re-ingesting it from the live target-site chapter list.
+   */
+  transfer(
+    id: string,
+    target: { moduleId: string; url: string; clearDownloadedList: boolean },
+  ): Promise<{ favorite: FavoriteT; reloadedFromServer: boolean }>;
   /** D4 import path: the tag-100 transfer-favorite bulk-ingest. */
   import(input: FavoriteCreateRequestT): Promise<FavoriteT>;
 }
@@ -866,9 +1399,18 @@ export class InMemoryFavoriteService implements FavoriteService {
   private readonly rows = new Map<string, FavoriteT>();
   private order: string[] = [];
   private counter = 0;
+  private batchCancelRequested = false;
+  private batchRunning = false;
 
   public constructor(
     private readonly checkBehavior: (id: string) => InMemoryFavoriteCheckBehavior = (): InMemoryFavoriteCheckBehavior => ({}),
+    /**
+     * Transfer-mapping stand-in (the production adapter searches the
+     * target catalog + dry-runs GetInfo): resolves a target-site title
+     * match or undefined. Default: nothing resolves (invalid preview).
+     */
+    private readonly transferIndex: (moduleId: string, title: string) => { url: string; title: string } | undefined =
+      (): undefined => undefined,
   ) {}
 
   list(): FavoriteT[] {
@@ -896,6 +1438,9 @@ export class InMemoryFavoriteService implements FavoriteService {
       autoDownload: input.autoDownload ?? false,
       lastCheck: '2026-01-01T00:00:00Z',
       lastUpdated: null,
+      saveTo: null,
+      enabled: true,
+      dateAdded: '2026-01-01T00:00:00Z',
     };
     this.rows.set(id, favorite);
     this.order.push(id);
@@ -911,6 +1456,8 @@ export class InMemoryFavoriteService implements FavoriteService {
       ...favorite,
       ...(patch.title !== undefined ? { title: patch.title } : {}),
       ...(patch.autoDownload !== undefined ? { autoDownload: patch.autoDownload } : {}),
+      ...(patch.saveTo !== undefined ? { saveTo: patch.saveTo } : {}),
+      ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
     };
     this.rows.set(id, updated);
     return updated;
@@ -947,5 +1494,93 @@ export class InMemoryFavoriteService implements FavoriteService {
     this.counter += 1;
     void this.counter;
     return this.create(input);
+  }
+
+  async checkBatch(scope: FavoriteCheckScopeT): Promise<FavoriteCheckBatchResponseT> {
+    if (this.batchRunning) {
+      throw new ApiError(409, 'conflict', 'a favorites check batch is already running');
+    }
+    this.batchRunning = true;
+    this.batchCancelRequested = false;
+    try {
+      const results: FavoriteCheckBatchItemT[] = [];
+      let checked = 0;
+      let failed = 0;
+      let queuedDownloads = 0;
+      let cancelled = false;
+      for (const id of [...this.order]) {
+        if (this.batchCancelRequested) {
+          cancelled = true;
+          break;
+        }
+        const favorite = this.rows.get(id);
+        if (favorite === undefined) {
+          continue;
+        }
+        if (scope === 'enabled' && favorite.enabled !== true) {
+          continue;
+        }
+        if (scope === 'disabled' && favorite.enabled === true) {
+          continue;
+        }
+        // The in-memory double reuses checkNow (behavior-injectable).
+        const result = await this.checkNow(id);
+        checked += 1;
+        queuedDownloads += result.queuedDownloads;
+        results.push({
+          favorite: result.favorite,
+          status: 'checked',
+          newChapters: result.newChapters,
+          queuedDownloads: result.queuedDownloads,
+        });
+      }
+      return { scope, cancelled, checked, failed, queuedDownloads, results };
+    } finally {
+      this.batchRunning = false;
+      this.batchCancelRequested = false;
+    }
+  }
+
+  cancelBatch(): boolean {
+    if (!this.batchRunning) {
+      return false;
+    }
+    this.batchCancelRequested = true;
+    return true;
+  }
+
+  async transferPreview(id: string, targetModuleId: string): Promise<FavoriteTransferPreviewResponseT> {
+    const favorite = this.rows.get(id);
+    if (favorite === undefined) {
+      throw new ApiError(404, 'not_found', `unknown favorite: ${id}`);
+    }
+    const title = favorite.title ?? '';
+    const hit = title === '' ? undefined : this.transferIndex(targetModuleId, title);
+    if (hit === undefined) {
+      return { targetModuleId, valid: false, targetUrl: null, matchedTitle: null, reason: 'not-found' };
+    }
+    return { targetModuleId, valid: true, targetUrl: hit.url, matchedTitle: hit.title };
+  }
+
+  async transfer(
+    id: string,
+    target: { moduleId: string; url: string; clearDownloadedList: boolean },
+  ): Promise<{ favorite: FavoriteT; reloadedFromServer: boolean }> {
+    const favorite = this.rows.get(id);
+    if (favorite === undefined) {
+      throw new ApiError(404, 'not_found', `unknown favorite: ${id}`);
+    }
+    const nextId = `${target.moduleId}${target.url}`.toLowerCase();
+    const moved: FavoriteT = {
+      ...favorite,
+      id: nextId,
+      moduleId: target.moduleId,
+      url: target.url,
+      newChapterCount: 0,
+    };
+    this.rows.delete(id);
+    this.order = this.order.map((key): string => (key === id ? nextId : key));
+    this.rows.set(nextId, moved);
+    return { favorite: moved, reloadedFromServer: target.clearDownloadedList };
   }
 }

@@ -4,24 +4,43 @@
  * semantics) + cookies editor, sync buttons (modules / all catalogs),
  * and the D20 first-run bootstrap empty state with surfaced progress.
  *
+ * v0.3.0 settings-parity additions: module-list search + bulk
+ * enable/disable (global Select all/None + per-category headers — FMD2
+ * Websites-tree parity pas:6400), per-site 'Re-sync catalog' row
+ * action (update-list parity) with a progress toast, the Accounts
+ * section (frmAccountManager adaptation) and Output defaults (FMD2
+ * Save-to subset).
+ *
  * Design-system retrofit: PageHeader + toolbar Buttons (with sonner
  * progress toasts — additive, distinct from the pinned inline status
  * texts) + Proxy Card + the virtualized module list. The registry is
  * 454 sites in production — ListPanel virtualizes it above the
  * threshold while fixture-sized lists stay plain DOM.
  */
-import { useRef, useState, type FormEvent, type ReactElement } from 'react';
-import { RefreshCw, X } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';
+import { RefreshCw, RotateCw, X } from 'lucide-react';
 import {
   useModules,
+  useProvisionCatalog,
   useSyncAllCatalogs,
   useSyncModules,
   useUpdateModule,
   type ModuleSummaryT,
   type ProxySettingsT,
 } from '../api/hooks';
+import { AccountsSection } from '../components/AccountsSection';
 import { CapabilityBadges } from '../components/CapabilityBadges';
+import { ModuleListSearch, GlobalBulkControls, CategoryBulkControls } from '../components/ModuleListControls';
+import { OutputDefaultsForm } from '../components/OutputDefaultsForm';
+import { FavoritesSettingsForm } from '../components/FavoritesSettingsForm';
 import { ProxySettingsSection } from '../components/ProxySettings';
+import {
+  AboutSection,
+  DiagnosticsSection,
+  FilenamePolicySection,
+  PerformanceSection,
+  RetentionSection,
+} from '../components/settings/ParitySweepSections';
 import { EmptyState } from '@/components/patterns/EmptyState';
 import { ErrorBanner } from '@/components/patterns/ErrorBanner';
 import { ListPanel } from '@/components/patterns/ListPanel';
@@ -160,11 +179,76 @@ function ModuleEditor(props: { module: ModuleSummaryT; onDone: () => void }): Re
   );
 }
 
-function ModuleRow(props: { module: ModuleSummaryT }): ReactElement {
+/**
+ * Per-site 'Re-sync catalog' (FMD2 update-list parity): the existing
+ * POST /api/sync/catalog/:id behind a progress toast; only offered for
+ * sites with an INSTALLED catalog (installing a missing one is the
+ * Browse picker's auto-provision flow).
+ */
+function ResyncCatalogButton(props: { module: ModuleSummaryT }): ReactElement | null {
+  const provision = useProvisionCatalog();
+  const toast = useRef<ProgressToastHandle | null>(null);
+  if (!props.module.catalogInstalled) {
+    return null;
+  }
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      className="h-7"
+      disabled={provision.isPending}
+      aria-label={`Re-sync catalog for ${props.module.name}`}
+      data-testid={`resync-catalog-${props.module.id}`}
+      onClick={(): void => {
+        toast.current = progressToast.start(`Re-syncing ${props.module.name} catalog…`);
+        provision.mutate({ moduleId: props.module.id }, {
+          onSuccess: (data): void => {
+            if (toast.current !== null) {
+              const state: string = data.result.state;
+              progressToast.done(
+                toast.current,
+                `${props.module.name} catalog ${state === 'failed' ? 'sync FAILED' : `sync ${state}`}`,
+              );
+            }
+          },
+          onError: (): void => {
+            if (toast.current !== null) {
+              progressToast.fail(toast.current, `${props.module.name} catalog sync failed`);
+            }
+          },
+        });
+      }}
+    >
+      <RotateCw aria-hidden="true" />
+      {provision.isPending ? 'Syncing…' : 'Re-sync catalog'}
+    </Button>
+  );
+}
+
+function ModuleRow(props: {
+  readonly module: ModuleSummaryT;
+  /** Accounts-section cookies link-out: open + scroll to the editor. */
+  readonly forceOpen: boolean;
+  readonly onForceOpenHandled: () => void;
+}): ReactElement {
   const update = useUpdateModule();
   const [open, setOpen] = useState(false);
+
+  // The accounts card's "Cookies…" link-out opens the editor and
+  // scrolls the row into view (the editor keeps its own state).
+  const rowRef = useRef<HTMLDivElement>(null);
+  useEffect((): void => {
+    if (props.forceOpen) {
+      setOpen(true);
+      rowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      props.onForceOpenHandled();
+    }
+  }, [props]);
+  const editorOpen: boolean = open || props.forceOpen;
+
   return (
-    <div className="module-row w-full">
+    <div className="module-row w-full" id={`module-row-${props.module.id}`} ref={rowRef}>
       <div className="module-head flex flex-wrap items-center gap-x-3 gap-y-1.5 py-2.5">
         <label htmlFor={`enabled-${props.module.id}`} className="flex items-center gap-2 text-sm font-medium">
           <input
@@ -182,21 +266,22 @@ function ModuleRow(props: { module: ModuleSummaryT }): ReactElement {
           {props.module.category} · {props.module.rootURL}
         </span>
         <CapabilityBadges module={props.module} />
+        <ResyncCatalogButton module={props.module} />
         <Button
           type="button"
           variant="outline"
           size="sm"
           className="ml-auto h-7"
-          aria-expanded={open}
+          aria-expanded={editorOpen}
           onClick={(): void => {
             setOpen((prev) => !prev);
           }}
         >
-          {open ? 'Hide options' : 'Configure'}
+          {editorOpen ? 'Hide options' : 'Configure'}
         </Button>
       </div>
       {update.isError ? <ErrorBanner error={update.error} /> : null}
-      {open ? <ModuleEditor module={props.module} onDone={(): void => setOpen(false)} /> : null}
+      {editorOpen ? <ModuleEditor module={props.module} onDone={(): void => setOpen(false)} /> : null}
     </div>
   );
 }
@@ -208,6 +293,9 @@ export function SettingsPage(): ReactElement {
 
   const moduleToast = useRef<ProgressToastHandle | null>(null);
   const catalogToast = useRef<ProgressToastHandle | null>(null);
+
+  const [search, setSearch] = useState('');
+  const [openEditorFor, setOpenEditorFor] = useState<string | null>(null);
 
   const list = modules.data?.modules ?? [];
   const bootstrapRunning = syncModules.isPending || syncCatalogs.isPending;
@@ -247,7 +335,7 @@ export function SettingsPage(): ReactElement {
   if (modules.isPending) {
     return (
       <section aria-label="Settings">
-        <PageHeader title="Settings" description="Module registry, options, proxy and sync." />
+        <PageHeader title="Settings" description="Module registry, accounts, output defaults and sync." />
         <p role="status" className="text-sm text-muted-foreground">Loading modules…</p>
       </section>
     );
@@ -255,7 +343,7 @@ export function SettingsPage(): ReactElement {
   if (modules.isError) {
     return (
       <section aria-label="Settings">
-        <PageHeader title="Settings" description="Module registry, options, proxy and sync." />
+        <PageHeader title="Settings" description="Module registry, accounts, output defaults and sync." />
         <ErrorBanner error={modules.error} />
       </section>
     );
@@ -264,7 +352,7 @@ export function SettingsPage(): ReactElement {
   if (list.length === 0) {
     return (
       <section aria-label="Settings">
-        <PageHeader title="Settings" description="Module registry, options, proxy and sync." />
+        <PageHeader title="Settings" description="Module registry, accounts, output defaults and sync." />
         <EmptyState
           title="No modules registered yet"
           action={
@@ -307,11 +395,37 @@ export function SettingsPage(): ReactElement {
     );
   }
 
+  // ── module-list search + category grouping (FMD2 Websites tree) ──
+  // ONE ListPanel stays virtualized for production-sized registries
+  // (perf contract: 1000 modules); the category headers ride along as
+  // interleaved list rows carrying the bulk controls (FMD2 tree nodes).
+  const needle: string = search.trim().toLowerCase();
+  const filtered: readonly ModuleSummaryT[] =
+    needle === ''
+      ? list
+      : list.filter(
+          (m): boolean =>
+            m.name.toLowerCase().includes(needle) || m.category.toLowerCase().includes(needle),
+        );
+  type ModuleListRow =
+    | { readonly kind: 'header'; readonly category: string; count: number }
+    | { readonly kind: 'module'; readonly module: ModuleSummaryT };
+  const rows: ModuleListRow[] = [];
+  let currentHeader: { readonly kind: 'header'; readonly category: string; count: number } | undefined;
+  for (const module of filtered) {
+    if (currentHeader === undefined || currentHeader.category !== module.category) {
+      currentHeader = { kind: 'header', category: module.category, count: 0 };
+      rows.push(currentHeader);
+    }
+    currentHeader.count += 1;
+    rows.push({ kind: 'module', module });
+  }
+
   return (
     <section aria-label="Settings">
       <PageHeader
         title="Settings"
-        description="Module registry, options, proxy and sync."
+        description="Module registry, accounts, output defaults and sync."
         actions={
           <>
             <Button
@@ -377,15 +491,54 @@ export function SettingsPage(): ReactElement {
 
       <ProxySettingsSection />
 
-      <h2 className="mb-2 text-lg font-semibold">Modules ({list.length})</h2>
-      <ListPanel
-        className="module-list"
-        ariaLabel="Site modules"
-        items={list}
-        itemKey={(module): string => module.id}
-        rowClassName="module-row"
-        renderItem={(module): ReactElement => <ModuleRow module={module} />}
+      {/* [parity-sweep] audit M2/M4/M10/M12/M13 groups */}
+      <PerformanceSection />
+      <RetentionSection />
+      <FilenamePolicySection />
+      <DiagnosticsSection />
+      <AboutSection />
+
+      <OutputDefaultsForm />
+
+      <FavoritesSettingsForm />
+
+      <AccountsSection
+        modules={list}
+        onOpenCookies={(moduleId): void => {
+          setSearch('');
+          setOpenEditorFor(moduleId);
+        }}
       />
+
+      <h2 className="mb-2 mt-6 text-lg font-semibold">Modules ({list.length})</h2>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <ModuleListSearch value={search} onChange={setSearch} resultCount={filtered.length} totalCount={list.length} />
+        <GlobalBulkControls busy={bootstrapRunning} />
+      </div>
+      {filtered.length === 0 ? (
+        <EmptyState title="No modules match the search">
+          <p>No module name or category contains “{search}”.</p>
+        </EmptyState>
+      ) : (
+        <ListPanel
+          className="module-list"
+          ariaLabel="Site modules"
+          items={rows}
+          itemKey={(row): string => (row.kind === 'header' ? `category:${row.category}` : row.module.id)}
+          rowClassName="module-row"
+          renderItem={(row): ReactElement =>
+            row.kind === 'header' ? (
+              <CategoryBulkControls category={row.category} count={row.count} busy={bootstrapRunning} />
+            ) : (
+              <ModuleRow
+                module={row.module}
+                forceOpen={openEditorFor === row.module.id}
+                onForceOpenHandled={(): void => setOpenEditorFor(null)}
+              />
+            )
+          }
+        />
+      )}
     </section>
   );
 }

@@ -167,12 +167,15 @@ export class InMemoryCatalogStore implements CatalogStore {
     const genre = query.genre?.toLowerCase() ?? '';
     const status = query.status ?? '';
     const authors = query.authors?.toLowerCase() ?? '';
+    const artists = query.artists?.toLowerCase() ?? '';
+    const summary = query.summary?.toLowerCase() ?? '';
     const genres = query.genres ?? [];
+    const genresExclude = query.genresExclude ?? [];
     const genresMode = query.genresMode ?? 'all';
     const newDays = query.newDays;
     let offset = 0;
     if (query.cursor !== undefined) {
-      let decoded: { q?: string; g?: string; o?: number; st?: string; a?: string; gs?: string; gm?: string; nd?: number };
+      let decoded: { q?: string; g?: string; o?: number; st?: string; a?: string; ar?: string; sm?: string; gs?: string; ge?: string; gm?: string; nd?: number };
       try {
         decoded = JSON.parse(Buffer.from(query.cursor, 'base64url').toString('utf8')) as typeof decoded;
       } catch {
@@ -191,8 +194,17 @@ export class InMemoryCatalogStore implements CatalogStore {
       if ((decoded.a ?? '') !== authors) {
         throw new Error('cursor does not match the issued authors filter');
       }
+      if ((decoded.ar ?? '') !== artists) {
+        throw new Error('cursor does not match the issued artists filter');
+      }
+      if ((decoded.sm ?? '') !== summary) {
+        throw new Error('cursor does not match the issued summary filter');
+      }
       const genresKey = genres.length > 0 ? genres.join('\x1f') : '';
       if ((decoded.gs ?? '') !== genresKey || (decoded.gm ?? 'all') !== genresMode) {
+        throw new Error('cursor does not match the issued genre filters');
+      }
+      if ((decoded.ge ?? '') !== (genresExclude.length > 0 ? genresExclude.join('\x1f') : '')) {
         throw new Error('cursor does not match the issued genre filters');
       }
       if ((decoded.nd ?? undefined) !== newDays) {
@@ -227,6 +239,12 @@ export class InMemoryCatalogStore implements CatalogStore {
       if (authors !== '' && !entry.authors.toLowerCase().includes(authors)) {
         return false;
       }
+      if (artists !== '' && !entry.artists.toLowerCase().includes(artists)) {
+        return false;
+      }
+      if (summary !== '' && !entry.summary.toLowerCase().includes(summary)) {
+        return false;
+      }
       // genres ANY → OR of contains, ALL → AND (FMD2 rbAny/rbAll).
       if (genres.length > 0) {
         const lowered = entry.genres.toLowerCase();
@@ -235,6 +253,11 @@ export class InMemoryCatalogStore implements CatalogStore {
         if (!hit) {
           return false;
         }
+      }
+      // `!` excludes: AND of NOT-contains (audit (b)2 — SQL NOT LIKE parity).
+      const loweredAll = entry.genres.toLowerCase();
+      if (genresExclude.some((g): boolean => loweredAll.includes(g.toLowerCase()))) {
+        return false;
       }
       if (newThreshold !== undefined && entry.jdn <= newThreshold) {
         return false;
@@ -259,7 +282,10 @@ export class InMemoryCatalogStore implements CatalogStore {
         ...(genre !== '' ? { g: genre } : {}),
         ...(status !== '' ? { st: status } : {}),
         ...(authors !== '' ? { a: authors } : {}),
+        ...(artists !== '' ? { ar: artists } : {}),
+        ...(summary !== '' ? { sm: summary } : {}),
         ...(genres.length > 0 ? { gs: genres.join('\x1f'), gm: genresMode } : {}),
+        ...(genresExclude.length > 0 ? { ge: genresExclude.join('\x1f') } : {}),
         ...(newDays !== undefined ? { nd: newDays } : {}),
         o: offset + limit,
       }),

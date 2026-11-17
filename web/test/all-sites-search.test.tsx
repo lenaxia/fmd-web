@@ -83,7 +83,7 @@ describe('All-sites union search UI', () => {
     });
     const user = userEvent.setup();
     await waitFor((): void => {
-      expect(screen.getByRole('button', { name: /SiteA Local Row/ })).toBeVisible();
+      expect(screen.getByRole('button', { name: /^SiteA Local Row/ })).toBeVisible();
     });
 
     await user.click(screen.getByRole('checkbox', { name: /All sites/ }));
@@ -94,8 +94,8 @@ describe('All-sites union search UI', () => {
     // The union fired: merged rows from BOTH sites, each badged with
     // its Website (FMD2 hint :5170 parity).
     await waitFor((): void => {
-      expect(screen.getByRole('button', { name: /Union Alpha/ })).toBeVisible();
-      expect(screen.getByRole('button', { name: /Union Beta/ })).toBeVisible();
+      expect(screen.getByRole('button', { name: /^Union Alpha/ })).toBeVisible();
+      expect(screen.getByRole('button', { name: /^Union Beta/ })).toBeVisible();
     });
     expect(screen.getByTitle('Website: SiteA Manga')).toBeVisible();
     expect(screen.getByTitle('Website: SiteB Manga')).toBeVisible();
@@ -110,11 +110,11 @@ describe('All-sites union search UI', () => {
     });
 
     await waitFor((): void => {
-      expect(screen.getByRole('button', { name: /Union Alpha/ })).toBeVisible();
+      expect(screen.getByRole('button', { name: /^Union Alpha/ })).toBeVisible();
     });
     // Facet chips: per-site counts (site NAME — never the hex id).
-    expect(screen.getByRole('button', { name: /SiteA Manga\s*1/ })).toBeVisible();
-    expect(screen.getByRole('button', { name: /SiteB Manga\s*2/ })).toBeVisible();
+    expect(screen.getByRole('button', { name: /^SiteA Manga\s*1/ })).toBeVisible();
+    expect(screen.getByRole('button', { name: /^SiteB Manga\s*2/ })).toBeVisible();
     // Typed partial failure: the broken site is NAMED, never silent.
     expect(screen.getByText('SiteD Manga didn’t answer')).toBeVisible();
     // Installed-only semantics explained in the UI.
@@ -129,9 +129,9 @@ describe('All-sites union search UI', () => {
     });
     const user = userEvent.setup();
     await waitFor((): void => {
-      expect(screen.getByRole('button', { name: /Union Beta/ })).toBeVisible();
+      expect(screen.getByRole('button', { name: /^Union Beta/ })).toBeVisible();
     });
-    await user.click(screen.getByRole('button', { name: /Union Beta/ }));
+    await user.click(screen.getByRole('button', { name: /^Union Beta/ }));
     const hash = globalThis.location.hash;
     expect(hash).toContain('#/manga?');
     expect(hash).toContain(`module=${SITE_B}`);
@@ -147,9 +147,9 @@ describe('All-sites union search UI', () => {
     });
     const user = userEvent.setup();
     await waitFor((): void => {
-      expect(screen.getByRole('button', { name: /SiteB Manga\s*2/ })).toBeVisible();
+      expect(screen.getByRole('button', { name: /^SiteB Manga\s*2/ })).toBeVisible();
     });
-    await user.click(screen.getByRole('button', { name: /SiteB Manga\s*2/ }));
+    await user.click(screen.getByRole('button', { name: /^SiteB Manga\s*2/ }));
     await waitFor((): void => {
       expect(globalThis.location.hash).toBe(`#/browse?site=${SITE_B}&q=union`);
     });

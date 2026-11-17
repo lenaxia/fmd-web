@@ -67,8 +67,12 @@ export interface UnionSearchInput {
   readonly q?: string;
   readonly status?: string;
   readonly genres?: readonly string[];
+  /** `!`-prefixed custom genres — NOT LIKE excludes (audit (b)2 fix). */
+  readonly genresExclude?: readonly string[];
   readonly genresMode?: 'all' | 'any';
   readonly authors?: string;
+  readonly artists?: string;
+  readonly summary?: string;
   readonly newDays?: number;
   readonly cursor?: string;
   readonly limit: number;
@@ -131,7 +135,10 @@ export function unionCursorKey(input: Omit<UnionSearchInput, 'cursor' | 'limit'>
     input.q ?? '',
     input.status ?? '',
     input.authors ?? '',
+    input.artists ?? '',
+    input.summary ?? '',
     (input.genres ?? []).join(CURSOR_GENRE_SEP),
+    (input.genresExclude ?? []).join(CURSOR_GENRE_SEP),
     input.genresMode ?? 'all',
     input.newDays ?? null,
   ]);
@@ -244,7 +251,12 @@ export class UnionSearchService {
       ...(input.q !== undefined && input.q !== '' ? { query: input.q } : {}),
       ...(input.status !== undefined && input.status !== '' ? { status: input.status } : {}),
       ...(input.authors !== undefined && input.authors !== '' ? { authors: input.authors } : {}),
+      ...(input.artists !== undefined && input.artists !== '' ? { artists: input.artists } : {}),
+      ...(input.summary !== undefined && input.summary !== '' ? { summary: input.summary } : {}),
       ...(input.genres !== undefined && input.genres.length > 0 ? { genres: [...input.genres] } : {}),
+      ...(input.genresExclude !== undefined && input.genresExclude.length > 0
+        ? { genresExclude: [...input.genresExclude] }
+        : {}),
       genresMode: input.genresMode ?? 'all',
       ...(input.newDays !== undefined ? { newDays: input.newDays } : {}),
     };

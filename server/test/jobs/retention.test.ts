@@ -112,3 +112,63 @@ describe('§9 retention — prune >30d jobs (fake clock)', () => {
     expect(queue.get(retrying.id)?.state).toBe('retry');
   });
 });
+
+describe('[parity-sweep] M2 — settings-driven retention (PUT /api/settings/retention)', () => {
+  let dir: string;
+
+  afterEach(() => {
+    rmDir(dir);
+  });
+
+  const terminalRowAtT0 = (h: QueueHarness): string => {
+    const { job } = h.queue.enqueue(downloadPayload('/settings-prune'));
+    h.queue.claim('download');
+    h.queue.transition(job.id, 'done');
+    return job.id;
+  };
+
+  it('a LIVE provider window is honored: 7 days prunes at the 7-day boundary', async () => {
+    dir = mkTmpDir('queue-prune-settings');
+    const harness = openHarness(dir, { retentionMs: (): number => 7 * 86_400_000 });
+    const id = terminalRowAtT0(harness);
+    await harness.clock.advance(6 * 86_400_000);
+    expect(harness.queue.pruneRetention()).toBe(0);
+    expect(harness.queue.get(id)).toBeDefined();
+    await harness.clock.advance(2 * 86_400_000);
+    expect(harness.queue.pruneRetention()).toBe(1);
+    expect(harness.queue.get(id)).toBeUndefined();
+    harness.queue.close();
+  });
+
+  it('the window is re-read at EVERY prune: a settings change applies on the next sweep', async () => {
+    dir = mkTmpDir('queue-prune-live');
+    let days = 30;
+    const harness = openHarness(dir, { retentionMs: (): number => days * 86_400_000 });
+    const id = terminalRowAtT0(harness);
+    await harness.clock.advance(10 * 86_400_000);
+    days = 7; // PUT /api/settings/retention { days: 7 }
+    expect(harness.queue.pruneRetention()).toBe(1);
+    expect(harness.queue.get(id)).toBeUndefined();
+    harness.queue.close();
+  });
+
+  it('days = 0 KEEPS FOREVER (ancient terminal rows survive)', async () => {
+    dir = mkTmpDir('queue-prune-forever');
+    const harness = openHarness(dir, { retentionMs: (): number => 0 });
+    const id = terminalRowAtT0(harness);
+    await harness.clock.advance(3650 * 86_400_000);
+    expect(harness.queue.pruneRetention()).toBe(0);
+    expect(harness.queue.get(id)).toBeDefined();
+    harness.queue.close();
+  });
+
+  it('a negative provider result is treated as keep-forever (defensive)', async () => {
+    dir = mkTmpDir('queue-prune-negative');
+    const harness = openHarness(dir, { retentionMs: (): number => -1 });
+    const id = terminalRowAtT0(harness);
+    await harness.clock.advance(400 * 86_400_000);
+    expect(harness.queue.pruneRetention()).toBe(0);
+    expect(harness.queue.get(id)).toBeDefined();
+    harness.queue.close();
+  });
+});

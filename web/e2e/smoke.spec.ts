@@ -97,10 +97,14 @@ test('Downloads: job list, cursor load-more, WS progress updates live', async ({
 test('Settings: module list with capability/known-broken badges + options editor', async ({ page }: { page: Page }): Promise<void> => {
   await page.goto('/#/settings');
 
-  await expect(page.getByText('FixtureSite')).toBeVisible();
-  await expect(page.getByText('known broken: cloudflare-loop')).toBeVisible();
-  await expect(page.getByText('needs browser')).toBeVisible();
-  await expect(page.getByText('account')).toBeVisible();
+  // Scoped to the module list: the Settings page also renders the
+  // Accounts section (settings-parity) whose card texts contain the
+  // same module name.
+  const moduleList = page.getByRole('list', { name: 'Site modules' });
+  await expect(moduleList.getByText('FixtureSite', { exact: true })).toBeVisible();
+  await expect(moduleList.getByText('known broken: cloudflare-loop')).toBeVisible();
+  await expect(moduleList.getByText('needs browser')).toBeVisible();
+  await expect(moduleList.getByText('account', { exact: true })).toBeVisible();
 
   // options editor opens honoring the module descriptors
   await page.getByRole('button', { name: 'Configure' }).click();

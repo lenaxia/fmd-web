@@ -1,6 +1,8 @@
 /**
  * CatalogFilterPanel + GenreSelect (FMD2 Filter panel parity,
- * frmMain.pas:3400): authors input, status select, the canonical
+ * frmMain.pas:3400): authors/artists/summary inputs (edFilterArtists
+ * frmMain.lfm:1569, edFilterSummary :1606), status select, the
+ * canonical
  * 38-genre checkbox grid with an ANY/ALL toggle (rbAny/rbAll), custom
  * genres free text (edCustomGenres), the only-new jdn window chip
  * (cbOnlyNew + OptionNewMangaTime), and reset (btFilterResetClick).
@@ -19,6 +21,7 @@ import {
   FILTER_STATUSES,
   FMD2_GENRES,
   liveFilterState,
+  parseGenreEntries,
   type BrowseFilterState,
   type GenresMode,
 } from '@/state/browse-filter-state';
@@ -113,6 +116,36 @@ export function CatalogFilterPanel(props: FilterPanelProps): ReactElement {
       </div>
 
       <div className="flex flex-col gap-1.5">
+        <label htmlFor="filter-artists" className="text-sm font-medium">
+          Artists
+        </label>
+        <Input
+          id="filter-artists"
+          className="w-56"
+          placeholder="contains…"
+          value={state.artists}
+          onChange={(e): void => {
+            patch({ artists: e.target.value });
+          }}
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="filter-summary" className="text-sm font-medium">
+          Summary
+        </label>
+        <Input
+          id="filter-summary"
+          className="w-56"
+          placeholder="contains…"
+          value={state.summary}
+          onChange={(e): void => {
+            patch({ summary: e.target.value });
+          }}
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
         <label htmlFor="filter-status" className="text-sm font-medium">
           Status
         </label>
@@ -149,21 +182,23 @@ export function CatalogFilterPanel(props: FilterPanelProps): ReactElement {
         <Input
           id="filter-custom-genres"
           className="w-56"
-          placeholder="Adventure, Comedy, …"
-          value={state.customGenres.join(', ')}
+          placeholder="Adventure, !Ecchi, …"
+          value={[...state.customGenres, ...state.excludedGenres.map((g): string => `!${g}`)].join(', ')}
           onChange={(e): void => {
             const raw: string = e.target.value;
             // Preserve the user's in-progress tail (trailing separator
-            // or space) — parseCustomGenres drops it on submit.
-            const parsed: readonly string[] = raw
-              .split(',')
-              .map((p): string => p.trim())
-              .filter((p): boolean => p !== '');
+            // or space) — parsing drops it on submit.
+            const { includes, excludes } = parseGenreEntries(raw);
             const trailing: boolean = /[,\s]$/.test(raw);
-            patch({ customGenres: trailing ? [...parsed, ''] : parsed });
+            patch({
+              customGenres: trailing ? [...includes, ''] : includes,
+              excludedGenres: excludes,
+            });
           }}
         />
-        <p className="text-xs text-muted-foreground">Separate multiple genres with ","</p>
+        <p className="text-xs text-muted-foreground">
+          Separate multiple genres with ","; prefix with ! or - to exclude
+        </p>
       </div>
 
       <div className="flex items-center gap-2">

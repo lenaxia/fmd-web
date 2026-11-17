@@ -83,6 +83,21 @@ export class InstrumentedJobQueue implements JobQueue {
     return job;
   }
 
+  /** cbAddAsStopped parity: hold lift passthrough (non-terminal — no counter). */
+  resume(jobId: string): QueueJob {
+    return this.inner.resume(jobId);
+  }
+
+  /** Downloads-parity hold set (non-terminal — no counter). */
+  hold(jobId: string): QueueJob {
+    return this.inner.hold(jobId);
+  }
+
+  /** Downloads-parity row delete (out of band — no terminal counter). */
+  remove(jobId: string): QueueJob {
+    return this.inner.remove(jobId);
+  }
+
   byIdempotencyKey(key: string): QueueJob | undefined {
     return this.inner.byIdempotencyKey(key);
   }

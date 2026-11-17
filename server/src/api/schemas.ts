@@ -53,6 +53,9 @@ export const ApiErrorEnvelopeSchema = z.object({
       'bad_request',
       'upstream_error',
       'internal_error',
+      // [parity-sweep] M14 open-by-URL host resolution failures.
+      'no_site_match',
+      'ambiguous_site',
     ]),
     message: z.string(),
     details: z.unknown().optional(),
@@ -108,9 +111,133 @@ export const ProxySettingsSchema = z
   });
 export type ProxySettingsT = z.infer<typeof ProxySettingsSchema>;
 
-/** GET /api/settings — global proxy + the §5.11 browser profile state. */
+/**
+ * Output defaults (FMD2 Save-to options parity, additive — the
+ * server-supported subset). `format` maps onto the §7.3 packers
+ * (zip/cbz/pdf/epub; FMD2's `None` loose-images mode is DEFERRED — the
+ * §7.1 library model is one packed artifact per chapter).
+ * `chapterNameTemplate` is FMD2's custom rename (edOptionMangaCustomRename,
+ * frmMain.lfm:3983; %WEBSITE%/%MANGA%/%AUTHOR%/%ARTIST%/%CHAPTER%/
+ * %NUMBERING%/%FILENAME% via resolveChapterFileName) — '' disables it
+ * (chapter-name fallback, the previous behavior). The itemized rename
+ * subset ([parity-sweep] M5/M6/M8): `unicodeReplacement` +
+ * `unicodeReplacementChar` (FMD2 lfm:3947/4183 — non-ASCII filename
+ * chars replaced; off = byte-parity default), `digitPadding`
+ * (lfm:4026 chapter-numbering digits — minimum page-name width inside
+ * the archive, 0 = server default 3), `removeMangaName` (lfm:4014 —
+ * strip a leading manga-title prefix from the chapter filename).
+ * PDF quality stays DEFERRED (D16 streaming packer is DCT passthrough
+ * — no re-encode knob; see docs/UX-PARITY.md).
+ */
+export const OutputDefaultsSchema = z.object({
+  format: z.enum(['zip', 'cbz', 'pdf', 'epub']).default('zip'),
+  chapterNameTemplate: z.string().max(500).default(''),
+  /** FMD2 lfm:3947/4183: replace non-ASCII filename chars (off = parity). */
+  unicodeReplacement: z.boolean().default(false),
+  /** The replacement char (exactly one; '_' FMD2-style default). */
+  unicodeReplacementChar: z.string().min(1).max(1).default('_'),
+  /** FMD2 lfm:4026: minimum page-numbering width in archive entry names. */
+  digitPadding: z.number().int().min(0).max(6).default(0),
+  /** FMD2 lfm:4014: strip a leading manga-title prefix from chapter names. */
+  removeMangaName: z.boolean().default(false),
+});
+export type OutputDefaultsT = z.infer<typeof OutputDefaultsSchema>;
+
+// ── favorites scheduler settings (Options → Updates parity) ─────────
+
+/** `OptionAutoCheckFavIntervalMinutes` + `OptionCheckFavoritesAtStart`. */
+export const FavoriteSchedulerSettingsSchema = z.object({
+  /** Minutes between scheduled checks; 0 = scheduled checks off. */
+  intervalMinutes: z.number().int().min(0).max(20160),
+  /** Run a check sweep at startup. */
+  checkAtStartup: z.boolean(),
+});
+export type FavoriteSchedulerSettingsT = z.infer<typeof FavoriteSchedulerSettingsSchema>;
+
+// ── [parity-sweep] settings groups (M10/M2/M4/M13) ───────────────────
+
+/**
+ * Performance (FMD2 Options → Connections, lfm:3394-3866 — the
+ * server-exposeable subset): `requestTimeoutSeconds` seeds the HTTP
+ * pipeline default (module code may still override per request),
+ * `retryCount` is the per-image retry budget (FMD2 RetryCount),
+ * `threadsPerChapter` the per-chapter image-worker width
+ * (MaxThreadPerTaskLimit), `parallelChapters` the download-lane slot
+ * count (applies at server start — lane slots are fixed at boot).
+ * Lane thread-caps beyond these are SKIP (tuned defaults,
+ * env-overridable; see docs/UX-PARITY.md Part 4 M10).
+ */
+export const PerformanceSettingsSchema = z.object({
+  requestTimeoutSeconds: z.number().int().min(1).max(300),
+  retryCount: z.number().int().min(0).max(10),
+  parallelChapters: z.number().int().min(1).max(8),
+  threadsPerChapter: z.number().int().min(1).max(8),
+});
+export type PerformanceSettingsT = z.infer<typeof PerformanceSettingsSchema>;
+
+/**
+ * Job-history retention (FMD2 M2 delete-completed-tasks parity): the
+ * terminal-job history prunes after N days; 0 = keep forever.
+ */
+export const RetentionSettingsSchema = z.object({
+  days: z.number().int().min(0).max(3650),
+});
+export type RetentionSettingsT = z.infer<typeof RetentionSettingsSchema>;
+
+/**
+ * Filename policy (D5, FMD2 M4 long-path parity): `true` = the
+ * Linux-normalized mode. Precedence: the `FMD_NORMALIZE_PATHS` env /
+ * `--normalize-paths` flag OVERRIDES this setting (env > setting >
+ * windows-parity default) — the checkbox is disabled in the UI when
+ * the env is set.
+ */
+export const FilenamePolicySettingsSchema = z.object({
+  normalizePaths: z.boolean(),
+});
+export type FilenamePolicySettingsT = z.infer<typeof FilenamePolicySettingsSchema>;
+
+/**
+ * Diagnostics (FMD2 M13 log settings parity): structured-log enable +
+ * minimum level. The live log VIEWER is v0.4; /metrics + the runbook
+ * are linked from the UI.
+ */
+export const DiagnosticsSettingsSchema = z.object({
+  logEnabled: z.boolean(),
+  logLevel: z.enum(['debug', 'info', 'warn', 'error']),
+});
+export type DiagnosticsSettingsT = z.infer<typeof DiagnosticsSettingsSchema>;
+
+/**
+ * R4 single app-wide API token state (GET /api/settings/api-token +
+ * POST /api/settings/api-token/regenerate). ONE token value ever
+ * (Sonarr/Radarr model); `token` is null when nothing is stored or the
+ * env pin owns the secret (read it from the deployment environment).
+ */
+export const ApiTokenModeSchema = z.enum(['none', 'password', 'api-token', 'password+api-token']);
+export type ApiTokenModeT = z.infer<typeof ApiTokenModeSchema>;
+export const ApiTokenResponseSchema = z.object({
+  /** The stored token value; null when none stored or env-managed. */
+  token: z.string().nullable(),
+  /** True when FMD_WEB_API_TOKEN pins the value (env > settings). */
+  envManaged: z.boolean(),
+  /** The active auth surface (startup-log vocabulary, never the value). */
+  mode: ApiTokenModeSchema,
+});
+export type ApiTokenResponseT = z.infer<typeof ApiTokenResponseSchema>;
+
+/** GET /api/settings — global proxy + output defaults + §5.11 browser profile state. */
 export const SettingsResponseSchema = z.object({
   proxy: ProxySettingsSchema,
+  output: OutputDefaultsSchema,
+  favorites: FavoriteSchedulerSettingsSchema,
+  /** [parity-sweep] M10: Performance group (Connections parity subset). */
+  performance: PerformanceSettingsSchema,
+  /** [parity-sweep] M2: job-history retention (0 = keep forever). */
+  retention: RetentionSettingsSchema,
+  /** [parity-sweep] M4: filename policy (env > setting > parity default). */
+  filenamePolicy: FilenamePolicySettingsSchema,
+  /** [parity-sweep] M13: diagnostics log enable + level. */
+  diagnostics: DiagnosticsSettingsSchema,
   browser: z.object({
     /** The compose `browser` profile is active (§5.11 sidecar wired). */
     enabled: z.boolean(),
@@ -125,6 +252,46 @@ export const ProxyUpdateRequestSchema = ProxySettingsSchema;
 export type ProxyUpdateRequestT = z.infer<typeof ProxyUpdateRequestSchema>;
 export const ProxyUpdateResponseSchema = SettingsResponseSchema;
 export type ProxyUpdateResponseT = z.infer<typeof ProxyUpdateResponseSchema>;
+
+/** PUT /api/settings/favorites — favorites scheduler settings (additive). */
+export const FavoriteSchedulerSettingsUpdateRequestSchema = FavoriteSchedulerSettingsSchema;
+export type FavoriteSchedulerSettingsUpdateRequestT = z.infer<
+  typeof FavoriteSchedulerSettingsUpdateRequestSchema
+>;
+export const FavoriteSchedulerSettingsUpdateResponseSchema = SettingsResponseSchema;
+export type FavoriteSchedulerSettingsUpdateResponseT = z.infer<
+  typeof FavoriteSchedulerSettingsUpdateResponseSchema
+>;
+
+/** PUT /api/settings/output — replaces the output defaults (additive). */
+export const OutputDefaultsUpdateRequestSchema = OutputDefaultsSchema;
+export type OutputDefaultsUpdateRequestT = z.infer<typeof OutputDefaultsUpdateRequestSchema>;
+export const OutputDefaultsUpdateResponseSchema = SettingsResponseSchema;
+
+/** PUT /api/settings/performance — replaces the Performance group ([parity-sweep] M10). */
+export const PerformanceSettingsUpdateRequestSchema = PerformanceSettingsSchema;
+export type PerformanceSettingsUpdateRequestT = z.infer<typeof PerformanceSettingsUpdateRequestSchema>;
+export const PerformanceSettingsUpdateResponseSchema = SettingsResponseSchema;
+export type PerformanceSettingsUpdateResponseT = z.infer<typeof PerformanceSettingsUpdateResponseSchema>;
+
+/** PUT /api/settings/retention — replaces job-history retention ([parity-sweep] M2). */
+export const RetentionSettingsUpdateRequestSchema = RetentionSettingsSchema;
+export type RetentionSettingsUpdateRequestT = z.infer<typeof RetentionSettingsUpdateRequestSchema>;
+export const RetentionSettingsUpdateResponseSchema = SettingsResponseSchema;
+export type RetentionSettingsUpdateResponseT = z.infer<typeof RetentionSettingsUpdateResponseSchema>;
+
+/** PUT /api/settings/filename-policy — replaces the filename policy ([parity-sweep] M4). */
+export const FilenamePolicySettingsUpdateRequestSchema = FilenamePolicySettingsSchema;
+export type FilenamePolicySettingsUpdateRequestT = z.infer<typeof FilenamePolicySettingsUpdateRequestSchema>;
+export const FilenamePolicySettingsUpdateResponseSchema = SettingsResponseSchema;
+export type FilenamePolicySettingsUpdateResponseT = z.infer<typeof FilenamePolicySettingsUpdateResponseSchema>;
+
+/** PUT /api/settings/diagnostics — replaces diagnostics settings ([parity-sweep] M13). */
+export const DiagnosticsSettingsUpdateRequestSchema = DiagnosticsSettingsSchema;
+export type DiagnosticsSettingsUpdateRequestT = z.infer<typeof DiagnosticsSettingsUpdateRequestSchema>;
+export const DiagnosticsSettingsUpdateResponseSchema = SettingsResponseSchema;
+export type DiagnosticsSettingsUpdateResponseT = z.infer<typeof DiagnosticsSettingsUpdateResponseSchema>;
+export type OutputDefaultsUpdateResponseT = z.infer<typeof OutputDefaultsUpdateResponseSchema>;
 
 // ── modules (§5.1 options API — combobox stores the INDEX) ───────────
 
@@ -214,6 +381,28 @@ export type ModuleUpdateRequestT = z.infer<typeof ModuleUpdateRequestSchema>;
 
 export const ModuleUpdateResponseSchema = ModuleSummarySchema;
 export type ModuleUpdateResponseT = z.infer<typeof ModuleUpdateResponseSchema>;
+
+/**
+ * POST /api/modules/bulk — FMD2 Websites-tree bulk parity (pas:6400
+ * Select All/Unselect All + the per-category tree checkboxes): one
+ * enable/disable write over MANY modules. Target resolution: `ids`
+ * (explicit list) OR `category` (exact category column match) OR
+ * neither (every registered module — the global Select-all/None).
+ */
+export const ModuleBulkUpdateRequestSchema = z.object({
+  enabled: z.boolean(),
+  /** Exact category match (the Settings category-header bulk buttons). */
+  category: z.string().min(1).max(200).optional(),
+  /** Explicit module ids (max one batch sweep). */
+  ids: z.array(ModuleIdSchema).max(1000).optional(),
+});
+export type ModuleBulkUpdateRequestT = z.infer<typeof ModuleBulkUpdateRequestSchema>;
+
+export const ModuleBulkUpdateResponseSchema = z.object({
+  modules: z.array(ModuleSummarySchema),
+  updated: z.number().int().nonnegative(),
+});
+export type ModuleBulkUpdateResponseT = z.infer<typeof ModuleBulkUpdateResponseSchema>;
 
 // ── sync ─────────────────────────────────────────────────────────────
 
@@ -313,10 +502,21 @@ export const CatalogSearchQuerySchema = z
      * normalizes both to this array).
      */
     genres: z.array(z.string().min(1).max(100)).max(64).optional(),
-    /** `'all'` (FMD2 rbAll default) ANDs genre clauses; `'any'` ORs them. */
+    /**
+     * FMD2 parity (additive, audit (b)2 fix): `!`/`-` prefixed custom
+     * genres — each composes as a `NOT LIKE` exclude (AND among
+     * excludes; the genresMode join applies to `genres` only). Same
+     * wire forms as `genres` (repeated params or one csv param).
+     */
+    genresExclude: z.array(z.string().min(1).max(100)).max(64).optional(),
+    /** `'all'` (FMD2 rbAll default) ANDs genre clauses; `'any'` ORs. */
     genresMode: z.enum(['all', 'any']).default('all'),
     /** FMD2 parity (additive): authors column LIKE contains. */
     authors: z.string().max(200).optional(),
+    /** FMD2 parity (additive): artists column LIKE contains (edFilterArtists). */
+    artists: z.string().max(200).optional(),
+    /** FMD2 parity (additive): summary column LIKE contains (edFilterSummary). */
+    summary: z.string().max(500).optional(),
     /** FMD2 cbOnlyNew parity (jdn-based): jdn > JDN(today) - newDays. */
     newDays: z.coerce.number().int().min(1).max(365).optional(),
     cursor: z.string().max(4096).optional(),
@@ -328,7 +528,10 @@ export const CatalogSearchQuerySchema = z
       (q.status !== undefined && q.status !== '') ||
       (q.genre !== undefined && q.genre !== '') ||
       (q.genres !== undefined && q.genres.length > 0) ||
+      (q.genresExclude !== undefined && q.genresExclude.length > 0) ||
       (q.authors !== undefined && q.authors !== '') ||
+      (q.artists !== undefined && q.artists !== '') ||
+      (q.summary !== undefined && q.summary !== '') ||
       q.newDays !== undefined,
     { message: 'search requires q or at least one filter' },
   );
@@ -411,8 +614,12 @@ export const AllSitesSearchQuerySchema = z
     q: z.string().max(500).optional(),
     status: z.string().max(100).optional(),
     genres: z.array(z.string().min(1).max(100)).max(64).optional(),
+    /** `!`-prefixed custom genres — NOT LIKE excludes (same as per-site). */
+    genresExclude: z.array(z.string().min(1).max(100)).max(64).optional(),
     genresMode: z.enum(['all', 'any']).default('all'),
     authors: z.string().max(200).optional(),
+    artists: z.string().max(200).optional(),
+    summary: z.string().max(500).optional(),
     newDays: z.coerce.number().int().min(1).max(365).optional(),
     cursor: z.string().max(4096).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -422,7 +629,10 @@ export const AllSitesSearchQuerySchema = z
       (q.q !== undefined && q.q !== '') ||
       (q.status !== undefined && q.status !== '') ||
       (q.genres !== undefined && q.genres.length > 0) ||
+      (q.genresExclude !== undefined && q.genresExclude.length > 0) ||
       (q.authors !== undefined && q.authors !== '') ||
+      (q.artists !== undefined && q.artists !== '') ||
+      (q.summary !== undefined && q.summary !== '') ||
       q.newDays !== undefined,
     { message: 'search requires q or at least one filter' },
   );
@@ -443,14 +653,41 @@ export type AllSitesSearchResponseT = z.infer<typeof AllSitesSearchResponseSchem
 
 // ── live info (§5.8 pipeline, cached) ────────────────────────────────
 
-export const InfoRequestSchema = z.object({
-  moduleId: ModuleIdSchema,
-  url: z.string().min(1),
-});
+/**
+ * [parity-sweep] M14 (FMD2 edURL parity): `moduleId` is OPTIONAL —
+ * a url-only request resolves the module by RootURL host match
+ * (unknown/ambiguous hosts are typed errors). Exactly one of the two
+ * addressing modes applies: explicit moduleId, or host resolution.
+ */
+export const InfoRequestSchema = z
+  .object({
+    moduleId: ModuleIdSchema.optional(),
+    url: z.string().min(1),
+  })
+  .refine(
+    (body): boolean => {
+      try {
+        const parsed = new URL(body.url);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+      } catch {
+        return false;
+      }
+    },
+    { message: 'url must be an absolute http(s) URL' },
+  );
 export type InfoRequestT = z.infer<typeof InfoRequestSchema>;
 
-/** The normalized MANGAINFO state in the oracle's emit order (§5.8). */
+/**
+ * The normalized MANGAINFO state in the oracle's emit order (§5.8) —
+ * plus the manga's downloaded-chapter ledger projection: `downloaded`
+ * carries the chapter LINKS already recorded in `downloaded_chapters`
+ * for this (moduleId, url) (merged text split into lines). It is
+ * computed at response time — NEVER cached with the info snapshot — so
+ * a just-finished download flips the set on the next call.
+ */
 export const InfoResponseSchema = z.object({
+  /** The module that served this info (explicit or host-resolved). */
+  moduleId: ModuleIdSchema,
   title: z.string(),
   altTitles: z.string(),
   authors: z.string(),
@@ -464,6 +701,7 @@ export const InfoResponseSchema = z.object({
   chapterLinks: z.array(z.string()),
   chapterNames: z.array(z.string()),
   numChapter: z.number().int().nonnegative(),
+  downloaded: z.array(z.string()),
 });
 export type InfoResponseT = z.infer<typeof InfoResponseSchema>;
 
@@ -483,14 +721,82 @@ export const JobCreateRequestSchema = z.object({
    * 200; key reuse with a DIFFERENT payload → 409.
    */
   idempotencyKey: z.string().min(1).max(200).optional(),
+  /**
+   * Add-as-stopped parity (FMD2 cbAddAsStopped, frmMain.lfm:1110): the
+   * job is created `queued` but HELD — the download lane does not claim
+   * it until POST /api/jobs/:id/resume lifts the hold.
+   */
+  paused: z.boolean().optional(),
+  /**
+   * Save-to override (FMD2 edSaveTo parity, frmMain.pas:5613): the
+   * directory the finalized artifact lands in — REPLACES the default
+   * `library/<module>/<manga>` path. Relative paths resolve against
+   * the library root; the file name keeps §7.1 sanitization.
+   */
+  saveTo: z.string().min(1).max(1024).optional(),
 });
 export type JobCreateRequestT = z.infer<typeof JobCreateRequestSchema>;
 
 export const JobCreatedResponseSchema = z.object({ job: JobSchema });
 export type JobCreatedResponseT = z.infer<typeof JobCreatedResponseSchema>;
 
+/**
+ * Batch download-all create (browse row menu, FMD2 pmMangaList
+ * miMangaListDownloadAll parity): ONE request per MANGA instead of one
+ * chatty request per chapter. `chapters: 'all'` resolves the live
+ * chapter list through the §5.8 info path (cached like POST /api/info);
+ * an explicit link array enqueues exactly that selection in the given
+ * order (no info fetch). The idempotency key is REQUIRED and shared by
+ * every derived per-chapter key (`<key>:<index>`) — the whole batch
+ * replays as one unit per §10 while its jobs are live.
+ */
+export const JobBatchCreateRequestSchema = z.object({
+  moduleId: ModuleIdSchema,
+  /** Manga page URL (§7.1 Job = chapter). */
+  mangaUrl: z.string().min(1),
+  mangaTitle: z.string().min(1).optional(),
+  /** 'all' (live chapter list) or an explicit chapter-link selection. */
+  chapters: z.union([z.literal('all'), z.array(z.string().min(1)).min(1)]),
+  /**
+   * Batch idempotency key (§10): REQUIRED — every per-chapter create
+   * derives `<key>:<index>` (index in the resolved chapter order, so the
+   * key binds to the chapter SEQUENCE: a shifted/different list under
+   * the same key is a 409 different-payload conflict).
+   */
+  idempotencyKey: z.string().min(1).max(200),
+  /** Add-as-stopped parity — applied to every chapter job. */
+  paused: z.boolean().optional(),
+  /** Save-to override parity — applied to every chapter job. */
+  saveTo: z.string().min(1).max(1024).optional(),
+});
+export type JobBatchCreateRequestT = z.infer<typeof JobBatchCreateRequestSchema>;
+
+/**
+ * `replayed` is true only when EVERY chapter job replayed an existing
+ * LIVE row (the double-submit case); any fresh or chained create is a
+ * 201.
+ */
+export const JobBatchCreatedResponseSchema = z.object({
+  jobs: z.array(JobSchema),
+  replayed: z.boolean(),
+});
+export type JobBatchCreatedResponseT = z.infer<typeof JobBatchCreatedResponseSchema>;
+
+/**
+ * Jobs-list query (Downloads parity): `state` keeps the single-state
+ * filter (back-compat) while `states` carries the web multi-select
+ * (comma-separated JobState values); `q` is a title/chapter substring
+ * (case-insensitive, matches mangaTitle or chapterName payload fields);
+ * `addedFrom`/`addedTo` bound the created-at window (calendar dates,
+ * `addedTo` inclusive of its day — the client computes the FMD2 History
+ * windows Today/7d/Month/Older and custom From/To into this range).
+ */
 export const JobsListQuerySchema = z.object({
   state: JobStateSchema.optional(),
+  states: z.string().regex(/^([a-z]+)(,[a-z]+)*$/, 'expected comma-separated job states').optional(),
+  q: z.string().min(1).max(200).optional(),
+  addedFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD').optional(),
+  addedTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'expected YYYY-MM-DD').optional(),
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
@@ -505,6 +811,34 @@ export type JobsListResponseT = z.infer<typeof JobsListResponseSchema>;
 /** Queue row id (monotonic integer, decimal string). */
 export const JobIdSchema = z.string().regex(/^\d+$/, 'expected a numeric job id');
 export type JobIdT = z.infer<typeof JobIdSchema>;
+
+// ── downloads-tab task actions (FMD2 pmDownload parity, web-adapted) ──
+
+export {
+  JobActionTypeSchema,
+  type JobActionTypeT,
+  JobActionRequestSchema,
+  type JobActionRequestT,
+  JobActionResponseSchema,
+  type JobActionResponseT,
+  JobDeleteQuerySchema,
+  type JobDeleteQueryT,
+  JobBulkActionSchema,
+  type JobBulkActionT,
+  JobBulkScopeSchema,
+  type JobBulkScopeT,
+  JobBulkActionRequestSchema,
+  type JobBulkActionRequestT,
+  JobBulkActionResponseSchema,
+  type JobBulkActionResponseT,
+} from '@fmd/contract';
+
+/** DELETE /api/jobs/:id response — the removed row + artifact outcome. */
+export const JobDeletedResponseSchema = z.object({
+  job: JobSchema,
+  dataDeleted: z.boolean(),
+});
+export type JobDeletedResponseT = z.infer<typeof JobDeletedResponseSchema>;
 
 // ── library (§7.1 listing/download) ──────────────────────────────────
 
@@ -552,6 +886,12 @@ export const FavoriteSchema = z.object({
   autoDownload: z.boolean(),
   lastCheck: TimestampSchema.nullable(),
   lastUpdated: TimestampSchema.nullable(),
+  /** Per-favorite download directory override ('' = default layout). */
+  saveTo: z.string().nullable(),
+  /** Disabled favorites are skipped by the scheduler + the enabled-scope batch checks. */
+  enabled: z.boolean(),
+  /** Creation stamp (FMD2 DateAdded). */
+  dateAdded: TimestampSchema.nullable(),
 });
 export type FavoriteT = z.infer<typeof FavoriteSchema>;
 
@@ -569,10 +909,14 @@ export const FavoriteCreateRequestSchema = z.object({
 });
 export type FavoriteCreateRequestT = z.infer<typeof FavoriteCreateRequestSchema>;
 
-/** Favorite patch — the auto-download toggle lives here. */
+/** Favorite patch — the auto-download toggle, rename, save-to and
+ * enable/disable all live here (pmFavorites parity). */
 export const FavoriteUpdateRequestSchema = z.object({
   title: z.string().min(1).optional(),
   autoDownload: z.boolean().optional(),
+  /** Custom save-to directory ('' resets to the default layout). */
+  saveTo: z.string().max(1024).optional(),
+  enabled: z.boolean().optional(),
 });
 export type FavoriteUpdateRequestT = z.infer<typeof FavoriteUpdateRequestSchema>;
 
@@ -594,6 +938,81 @@ export const FavoriteCheckResponseSchema = z.object({
   newChapters: z.array(FavoriteNewChapterSchema),
 });
 export type FavoriteCheckResponseT = z.infer<typeof FavoriteCheckResponseSchema>;
+
+// ── favorites batch check (btFavoritesCheckNewChapter parity) ───────
+
+/** Which rows a batch check touches (FMD2 Check-for-new-chapter scopes). */
+export const FavoriteCheckScopeSchema = z.enum(['all', 'enabled', 'disabled']);
+export type FavoriteCheckScopeT = z.infer<typeof FavoriteCheckScopeSchema>;
+
+export const FavoriteCheckBatchRequestSchema = z.object({
+  scope: FavoriteCheckScopeSchema.default('all'),
+});
+export type FavoriteCheckBatchRequestT = z.infer<typeof FavoriteCheckBatchRequestSchema>;
+
+/** One row of the batch result (per-favorite DoCheck outcome). */
+export const FavoriteCheckBatchItemSchema = z.object({
+  favorite: FavoriteSchema,
+  /** 'checked' | 'skipped' (link-less row) | 'failed' (live info error). */
+  status: z.enum(['checked', 'skipped', 'failed']),
+  newChapters: z.array(FavoriteNewChapterSchema),
+  queuedDownloads: z.number().int().nonnegative(),
+  /** Failure detail (status='failed' only). */
+  error: z.string().optional(),
+});
+export type FavoriteCheckBatchItemT = z.infer<typeof FavoriteCheckBatchItemSchema>;
+
+export const FavoriteCheckBatchResponseSchema = z.object({
+  scope: FavoriteCheckScopeSchema,
+  /** true when a cancel landed mid-run (remaining rows untouched). */
+  cancelled: z.boolean(),
+  checked: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+  queuedDownloads: z.number().int().nonnegative(),
+  results: z.array(FavoriteCheckBatchItemSchema),
+});
+export type FavoriteCheckBatchResponseT = z.infer<typeof FavoriteCheckBatchResponseSchema>;
+
+export const FavoriteCheckBatchCancelResponseSchema = z.object({
+  /** false when no batch run was in flight (idempotent cancel). */
+  cancelled: z.boolean(),
+});
+export type FavoriteCheckBatchCancelResponseT = z.infer<typeof FavoriteCheckBatchCancelResponseSchema>;
+
+// ── favorites website transfer (frmTransferFavorites parity) ────────
+
+export const FavoriteTransferPreviewRequestSchema = z.object({
+  targetModuleId: ModuleIdSchema,
+});
+export type FavoriteTransferPreviewRequestT = z.infer<typeof FavoriteTransferPreviewRequestSchema>;
+
+/** Target-site mapping preview: catalog title-match + GetInfo dry-run. */
+export const FavoriteTransferPreviewResponseSchema = z.object({
+  targetModuleId: z.string().min(1),
+  /** true when the title resolves to a live target-site manga. */
+  valid: z.boolean(),
+  /** The resolved target link (valid only). */
+  targetUrl: z.string().nullable(),
+  /** The target-site title found (valid only). */
+  matchedTitle: z.string().nullable(),
+  /** Why the mapping is invalid ('no-catalog' | 'not-found' | 'get-info-failed' | 'unknown-module'). */
+  reason: z.string().optional(),
+});
+export type FavoriteTransferPreviewResponseT = z.infer<typeof FavoriteTransferPreviewResponseSchema>;
+
+export const FavoriteTransferRequestSchema = z.object({
+  targetModuleId: ModuleIdSchema,
+  /** Clear the downloaded list and re-ingest the live target-site list. */
+  clearDownloadedList: z.boolean().default(false),
+});
+export type FavoriteTransferRequestT = z.infer<typeof FavoriteTransferRequestSchema>;
+
+export const FavoriteTransferResponseSchema = z.object({
+  favorite: FavoriteSchema,
+  /** true when the clear-and-reload tag-100 branch ran. */
+  reloadedFromServer: z.boolean(),
+});
+export type FavoriteTransferResponseT = z.infer<typeof FavoriteTransferResponseSchema>;
 
 // ── accounts (§8.6/D4 module-scoped account CRUD + login) ────────────
 

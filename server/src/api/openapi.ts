@@ -13,21 +13,37 @@ import {
   ApiErrorEnvelopeSchema,
   AllSitesSearchQuerySchema,
   AllSitesSearchResponseSchema,
+  ApiTokenResponseSchema,
   CatalogEntrySchema,
   HealthzResponseSchema,
   InfoRequestSchema,
   InfoResponseSchema,
   FavoriteCheckResponseSchema,
+  FavoriteCheckBatchCancelResponseSchema,
+  FavoriteCheckBatchRequestSchema,
+  FavoriteCheckBatchResponseSchema,
   FavoriteCreateRequestSchema,
   FavoriteListResponseSchema,
   FavoriteResponseSchema,
   FavoriteSchema,
+  FavoriteSchedulerSettingsUpdateRequestSchema,
+  FavoriteTransferPreviewRequestSchema,
+  FavoriteTransferPreviewResponseSchema,
+  FavoriteTransferRequestSchema,
+  FavoriteTransferResponseSchema,
   FavoriteUpdateRequestSchema,
   JobCreateRequestSchema,
   JobCreatedResponseSchema,
+  JobBatchCreateRequestSchema,
+  JobBatchCreatedResponseSchema,
   JobSchema,
   JobsListQuerySchema,
   JobsListResponseSchema,
+  JobActionRequestSchema,
+  JobActionResponseSchema,
+  JobDeleteQuerySchema,
+  JobBulkActionRequestSchema,
+  JobBulkActionResponseSchema,
   LibraryFileSchema,
   LibraryListQuerySchema,
   LoginRequestSchema,
@@ -38,6 +54,14 @@ import {
   ModuleOptionDescriptorSchema,
   ModuleSummarySchema,
   ModuleUpdateRequestSchema,
+  ModuleBulkUpdateRequestSchema,
+  ModuleBulkUpdateResponseSchema,
+  OutputDefaultsSchema,
+  OutputDefaultsUpdateRequestSchema,
+  PerformanceSettingsUpdateRequestSchema,
+  RetentionSettingsUpdateRequestSchema,
+  FilenamePolicySettingsUpdateRequestSchema,
+  DiagnosticsSettingsUpdateRequestSchema,
   ProxySettingsSchema,
   ProxyUpdateRequestSchema,
   ReadyzResponseSchema,
@@ -66,7 +90,9 @@ const REGISTRY: readonly [z.ZodType, string][] = [
   [ModuleCapabilitiesSchema, 'ModuleCapabilities'],
   [ModuleSummarySchema, 'ModuleSummary'],
   [ProxySettingsSchema, 'ProxySettings'],
+  [OutputDefaultsSchema, 'OutputDefaults'],
   [SettingsResponseSchema, 'SettingsResponse'],
+  [ApiTokenResponseSchema, 'ApiTokenResponse'],
   [CatalogEntrySchema, 'CatalogEntry'],
   [FavoriteSchema, 'Favorite'],
   [AccountViewSchema, 'AccountView'],
@@ -163,6 +189,25 @@ const OPERATIONS: readonly RouteOperation[] = [
     },
   },
   {
+    method: 'post',
+    path: '/api/modules/bulk',
+    operationId: 'bulkUpdateModules',
+    summary: 'Bulk enable/disable many modules at once',
+    description:
+      'FMD2 Websites-tree bulk parity (pas:6400 Select All/Unselect All + per-category ' +
+      'checkboxes): one enable/disable write over many module_state rows through the SAME ' +
+      'update seam (option/cookie/proxy state untouched). Targets: `ids` (explicit list), ' +
+      'OR `category` (exact category match), OR neither (every registered module — the ' +
+      'global select-all/none). Unknown ids/categories resolve to an empty target set ' +
+      '(`updated: 0`, never a 404 — a sweep is idempotent).',
+    tags: ['modules'],
+    body: ModuleBulkUpdateRequestSchema,
+    responses: {
+      200: { description: 'The resolved module set after the write + count', schema: ModuleBulkUpdateResponseSchema },
+      ...errors(validation(), unauthorized(), internal()),
+    },
+  },
+  {
     method: 'get',
     path: '/api/accounts',
     operationId: 'listAccounts',
@@ -232,10 +277,12 @@ const OPERATIONS: readonly RouteOperation[] = [
     method: 'get',
     path: '/api/settings',
     operationId: 'getSettings',
-    summary: 'Global proxy config + browser sidecar profile state',
+    summary: 'Global proxy config + output defaults + browser sidecar profile state',
     description:
       'The §9/§10 settings projection: the global proxy (SetProxy five-string semantics, ' +
-      'httpsendthread.pas:838-874 — type HTTP|SOCKS4|SOCKS5, the empty type is "no proxy") and the ' +
+      'httpsendthread.pas:838-874 — type HTTP|SOCKS4|SOCKS5, the empty type is "no proxy"), ' +
+      'the output defaults (FMD2 Save-to parity subset: default archive format zip/cbz/pdf/epub ' +
+      '+ chapter filename template, honored on NEW download jobs) and the ' +
       '§5.11 browser profile state (enabled ⇒ the D2 sidecar is wired and the satisfied §5.10 ' +
       'known-broken flags are dropped from /api/modules).',
     tags: ['settings'],
@@ -255,6 +302,111 @@ const OPERATIONS: readonly RouteOperation[] = [
       'take precedence for their module.',
     tags: ['settings'],
     body: ProxyUpdateRequestSchema,
+    responses: {
+      200: { description: 'Settings snapshot after the update', schema: SettingsResponseSchema },
+      ...errors(validation(), unauthorized(), internal()),
+    },
+  },
+  {
+    method: 'put',
+    path: '/api/settings/output',
+    operationId: 'updateOutputDefaults',
+    summary: 'Replace the output defaults (format + chapter rename template)',
+    description:
+      'FMD2 Save-to options parity (additive, the server-supported subset): `format` picks ' +
+      'the §7.3 packer for NEW download jobs (zip/cbz/pdf/epub — FMD2\'s None loose-images mode ' +
+      'is deferred; the §7.1 library model is one packed artifact). `chapterNameTemplate` is the ' +
+      'FMD2 custom rename (edOptionMangaCustomRename) with the %WEBSITE%/%MANGA%/%AUTHOR%/' +
+      '%ARTIST%/%CHAPTER%/%NUMBERING%/%FILENAME% placeholders; \'\' keeps the chapter-name ' +
+      'fallback. PDF quality and the digit-padding/unicode rename options are deferred (D16 ' +
+      'streaming packer is DCT passthrough — see docs/UX-PARITY.md).',
+    tags: ['settings'],
+    body: OutputDefaultsUpdateRequestSchema,
+    responses: {
+      200: { description: 'Settings snapshot after the update', schema: SettingsResponseSchema },
+      ...errors(validation(), unauthorized(), internal()),
+    },
+  },
+  {
+    method: 'put',
+    path: '/api/settings/performance',
+    operationId: 'updatePerformanceSettings',
+    summary: 'Replace the Performance group (FMD2 Connections subset, additive)',
+    description:
+      '[parity-sweep] M10: requestTimeoutSeconds seeds the HTTP pipeline default (module ' +
+      'code may still override per request); retryCount is the per-image retry budget; ' +
+      'threadsPerChapter is the per-chapter image-worker width (FMD2 ' +
+      'MaxThreadPerTaskLimit); parallelChapters is the download-lane slot count and ' +
+      'applies at SERVER START (lane slots are fixed at boot). Persisted in app.db ' +
+      '(app_settings).',
+    tags: ['settings'],
+    body: PerformanceSettingsUpdateRequestSchema,
+    responses: {
+      200: { description: 'Settings snapshot after the update', schema: SettingsResponseSchema },
+      ...errors(validation(), unauthorized(), internal()),
+    },
+  },
+  {
+    method: 'put',
+    path: '/api/settings/retention',
+    operationId: 'updateRetentionSettings',
+    summary: 'Replace job-history retention (auto-delete after N days, additive)',
+    description:
+      '[parity-sweep] M2: auto-delete finished job history after N days; 0 = keep ' +
+      'forever. Drives the periodic prune sweep (hourly; a change applies on the next ' +
+      'sweep). Persisted in app.db (app_settings).',
+    tags: ['settings'],
+    body: RetentionSettingsUpdateRequestSchema,
+    responses: {
+      200: { description: 'Settings snapshot after the update', schema: SettingsResponseSchema },
+      ...errors(validation(), unauthorized(), internal()),
+    },
+  },
+  {
+    method: 'put',
+    path: '/api/settings/filename-policy',
+    operationId: 'updateFilenamePolicySettings',
+    summary: 'Replace the filename policy (D5 mode, additive)',
+    description:
+      '[parity-sweep] M4: true = Linux-normalized filenames; false = the FMD2-desktop ' +
+      'parity default. Precedence: the FMD_NORMALIZE_PATHS env / --normalize-paths flag ' +
+      'OVERRIDES the setting (env > setting > parity). Persisted in app.db (app_settings).',
+    tags: ['settings'],
+    body: FilenamePolicySettingsUpdateRequestSchema,
+    responses: {
+      200: { description: 'Settings snapshot after the update', schema: SettingsResponseSchema },
+      ...errors(validation(), unauthorized(), internal()),
+    },
+  },
+  {
+    method: 'put',
+    path: '/api/settings/diagnostics',
+    operationId: 'updateDiagnosticsSettings',
+    summary: 'Replace diagnostics settings (log enable + level, additive)',
+    description:
+      '[parity-sweep] M13: structured-log enable + minimum level, applied live to the ' +
+      'running logger. The live log VIEWER is v0.4; /metrics + the runbook are linked ' +
+      'from the Diagnostics section. Persisted in app.db (app_settings).',
+    tags: ['settings'],
+    body: DiagnosticsSettingsUpdateRequestSchema,
+    responses: {
+      200: { description: 'Settings snapshot after the update', schema: SettingsResponseSchema },
+      ...errors(validation(), unauthorized(), internal()),
+    },
+  },
+  {
+    method: 'put',
+    path: '/api/settings/favorites',
+    operationId: 'updateFavoritesSettings',
+    summary: 'Replace the favorites scheduler settings (interval + startup check)',
+    description:
+      'FMD2 Options → Updates parity (additive): `intervalMinutes` is the ' +
+      'OptionAutoCheckFavIntervalMinutes analog — 0 disables scheduled checks, other values ' +
+      'apply LIVE to the running scheduler (idle favorites re-arm under the new cadence). ' +
+      '`checkAtStartup` is OptionCheckFavoritesAtStart — it gates the next boot\'s initial ' +
+      'sweep. Persisted in app.db (app_settings) so it survives restarts.',
+    tags: ['settings'],
+    body: FavoriteSchedulerSettingsUpdateRequestSchema,
     responses: {
       200: { description: 'Settings snapshot after the update', schema: SettingsResponseSchema },
       ...errors(validation(), unauthorized(), internal()),
@@ -348,7 +500,10 @@ const OPERATIONS: readonly RouteOperation[] = [
       '`q` is optional when any filter is set (filter-only pages skip the MATCH and order by ' +
       'jdn DESC); `authors` is a LIKE-contains over the authors column; `genres` (repeated ' +
       'params or one comma-separated value) joins per `genresMode` — `all` (FMD2 rbAll default) ' +
-      'ANDs the LIKE clauses, `any` (rbAny) ORs them; `newDays` is the only-new window ' +
+      'ANDs the LIKE clauses, `any` (rbAny) ORs them; `genresExclude` (same wire forms, the `!` ' +
+      'custom-genre prefix) composes one AND-NOT-LIKE per excluded genre (audit (b)2 fix — ' +
+      'excludes AND among themselves regardless of genresMode; a genre in both lists resolves ' +
+      'to exclude-only); `newDays` is the only-new window ' +
       '(jdn > JDN(today) - newDays, FMD2 cbOnlyNew). Prefix-LIKE (`x%`) is a documented ' +
       'non-goal: FMD2 semantics are contains (`%x%`). ' +
       '§6.8 fallback: catalog-less modules search their §6.8-normalized directory-walk snapshot ' +
@@ -390,14 +545,23 @@ const OPERATIONS: readonly RouteOperation[] = [
     method: 'post',
     path: '/api/info',
     operationId: 'liveInfo',
-    summary: 'Normalized live manga info (§5.8 pipeline, cached)',
+    summary: 'Normalized live manga info + the downloaded-chapter set (§5.8, cached)',
     description:
       'Runs the module GetInfo event and applies the §5.8 post-processing pipeline ' +
-      '(last-occurrence-wins dedup); responses are cached per (moduleId, url) for the configured TTL.',
+      '(last-occurrence-wins dedup); responses are cached per (moduleId, url) for the configured TTL. ' +
+      '`downloaded` (MangaPage parity — FMD2 downloaded-chapters tint/hide) carries the chapter LINKS ' +
+      'already recorded in the `downloaded_chapters` ledger for this manga: it is computed at response ' +
+      'time — never cached with the info snapshot — so a just-finished download flips the set on the ' +
+      'next call, cache hit or not. ' +
+      '[parity-sweep] M14 (FMD2 edURL parity): `moduleId` is OPTIONAL — a url-only ' +
+      'body resolves the module by RootURL host match (registry lookup). Unknown host ' +
+      '→ 400 `no_site_match` ("no site matches this URL"); multiple sites on one host → ' +
+      '400 `ambiguous_site` naming the candidates. The response embeds the serving ' +
+      '`moduleId` so the client can navigate to the manga page.',
     tags: ['info'],
     body: InfoRequestSchema,
     responses: {
-      200: { description: 'Normalized MANGAINFO state', schema: InfoResponseSchema },
+      200: { description: 'Normalized MANGAINFO state + downloaded chapter links', schema: InfoResponseSchema },
       ...errors(validation(), unauthorized(), notFound('Module'), upstream('Module GetInfo failed'), internal()),
     },
   },
@@ -411,7 +575,11 @@ const OPERATIONS: readonly RouteOperation[] = [
       'live (queued/running/retry); key reuse with a DIFFERENT payload returns 409. Re-enqueueing a ' +
       'TERMINAL original (done/failed/cancelled) starts a FRESH job chained under the same key ' +
       '(`<key>#<n>`, 201) — the re-download semantic; the fresh attempt resumes from the persisted ' +
-      "chapter markers ('D' slots skip their images). Fresh creates return 201.",
+      "chapter markers ('D' slots skip their images). Fresh creates return 201. " +
+      'MangaPage parity options (additive): `paused` (FMD2 cbAddAsStopped, frmMain.lfm:1110) creates ' +
+      'the job queued-but-held — the download lane will not claim it until POST /api/jobs/{id}/resume; ' +
+      '`saveTo` (FMD2 edSaveTo, frmMain.pas:5613) is a custom save directory that REPLACES the ' +
+      '`library/<module>/<manga>` prefix at finalize (relative paths resolve against the library root).',
     tags: ['jobs'],
     body: JobCreateRequestSchema,
     responses: {
@@ -421,13 +589,42 @@ const OPERATIONS: readonly RouteOperation[] = [
     },
   },
   {
+    method: 'post',
+    path: '/api/jobs/download/batch',
+    operationId: 'createDownloadJobsBatch',
+    summary: 'Batch download-all create (idempotent per manga, §10)',
+    description:
+      'The browse row-menu Download-all (FMD2 pmMangaList miMangaListDownloadAll, frmMain.lfm:5798) as ONE ' +
+      'request per manga instead of one chatty request per chapter. `chapters: "all"` resolves the live ' +
+      'chapter list through the SAME cached §5.8 info path POST /api/info uses; an explicit link array ' +
+      'enqueues exactly that selection in the given order (no info fetch). `idempotencyKey` is REQUIRED: ' +
+      'every per-chapter create derives `<key>:<index>` (index in the resolved chapter order), so the whole ' +
+      'batch replays as one unit — identical replay while any original is live returns the SAME jobs with ' +
+      '200 + `replayed: true` (the double-submit case); a shifted/different chapter sequence under the same ' +
+      'key surfaces the per-chapter 409 different-payload conflict; TERMINAL originals chain fresh attempts ' +
+      "(`<key>:<index>#<n>`) exactly like the single create — the re-download semantic. `paused`/`saveTo` " +
+      'apply to every chapter job.',
+    tags: ['jobs'],
+    body: JobBatchCreateRequestSchema,
+    responses: {
+      201: { description: 'Created batch (at least one fresh/chained job)', schema: JobBatchCreatedResponseSchema },
+      200: { description: 'Full replay — every chapter returned an existing live job', schema: JobBatchCreatedResponseSchema },
+      ...errors(validation(), unauthorized(), errorResponse(409, 'Batch key reused with a different chapter sequence'), upstream('Module GetInfo failed'), notFound('Module'), internal()),
+    },
+  },
+  {
     method: 'get',
     path: '/api/jobs',
     operationId: 'listJobs',
-    summary: 'Job list with state filter + keyset cursor',
+    summary: 'Job list with filters + keyset cursor (Downloads parity)',
     description:
       'Newest-first page (`limit` ≤ 100). `cursor` is the keyset boundary (the last job id of the ' +
-      'previous page) — stable under concurrent inserts: newly created jobs never shift pages.',
+      'previous page) — stable under concurrent inserts: newly created jobs never shift pages. ' +
+      'Downloads parity filters (FMD2 tsDownload filter tree + search box, web-adapted): `states` ' +
+      '(csv multi-select of the §7.1 states), `q` (case-insensitive substring over the job\'s ' +
+      'mangaTitle/chapterName) and `addedFrom`/`addedTo` (inclusive created-at calendar days, UTC ' +
+      '— the client maps FMD2\'s History windows Today/7d/Month/Older and custom From/To into this ' +
+      'range). `state` (single) predates the multi-select and stays for back-compat.',
     tags: ['jobs'],
     query: JobsListQuerySchema,
     responses: {
@@ -462,6 +659,89 @@ const OPERATIONS: readonly RouteOperation[] = [
     responses: {
       200: { description: 'The cancelled job snapshot', schema: JobCreatedResponseSchema },
       ...errors(validation(), unauthorized(), notFound('Job'), errorResponse(409, 'Job is already terminal'), internal()),
+    },
+  },
+  {
+    method: 'post',
+    path: '/api/jobs/{id}/resume',
+    operationId: 'resumeJob',
+    summary: 'Lift the add-as-stopped hold on a download job (cbAddAsStopped parity)',
+    description:
+      'A job created with `paused: true` sits in `queued` with the hold set — the download lane ' +
+      'does not claim it. This endpoint clears the hold (200, `paused` absent thereafter); the ' +
+      'lane picks the row up like any other queued job. Terminal rows are 409; resuming a job ' +
+      'without the hold is an idempotent no-op returning the current snapshot.',
+    tags: ['jobs'],
+    body: z.object({}),
+    bodyRequired: false,
+    responses: {
+      200: { description: 'The resumed job snapshot', schema: JobCreatedResponseSchema },
+      ...errors(validation(), unauthorized(), notFound('Job'), errorResponse(409, 'Job is already terminal'), internal()),
+    },
+  },
+  {
+    method: 'post',
+    path: '/api/jobs/{id}/action',
+    operationId: 'jobAction',
+    summary: 'Apply one downloads-tab task action (FMD2 pmDownload parity, web-adapted)',
+    description:
+      'ONE typed-union route over the per-job task actions (FMD2 pmDownload menu, ' +
+      'frmMain.lfm:5538-5617). `pause` — resume-able stop (miDownloadStop): a queued row gains ' +
+      'the hold (`paused: true`, not claimable), a running/retry row user-cancels with markers ' +
+      'persisted. `resume` — the inverse (miDownloadResume): a held queued row lifts the hold; a ' +
+      'cancelled row re-enqueues a FRESH chained attempt that resumes from the persisted ' +
+      'markers. `retry` — failed → fresh chained attempt. `redownload` — done → fresh chained ' +
+      'attempt (miDownloadRedownload). `disable` — hold a scheduled-but-not-running row ' +
+      '(queued only). `enable` — lift that hold (queued+held only). Holding a held row / ' +
+      'lifting an unheld one is an idempotent no-op. Every ILLEGAL application is 409 with the ' +
+      'typed envelope carrying `{job: {id, state, paused}, action}` details.',
+    tags: ['jobs'],
+    body: JobActionRequestSchema,
+    responses: {
+      200: { description: 'The resulting job snapshot (fresh row for re-enqueue semantics)', schema: JobActionResponseSchema },
+      ...errors(
+        validation(),
+        unauthorized(),
+        notFound('Job'),
+        errorResponse(409, 'Action illegal in the job current state (state matrix)'),
+        internal(),
+      ),
+    },
+  },
+  {
+    method: 'delete',
+    path: '/api/jobs/{id}',
+    operationId: 'deleteJob',
+    summary: 'Delete a download job row (FMD2 delete task | delete task + data)',
+    description:
+      'Removes the job row in ANY state (a running chapter aborts first). `?data=true` ' +
+      '(miDownloadDeleteTaskData parity) ALSO removes the finalized artifact the job recorded ' +
+      'at done — the library file and its `library_files` row; the default (miDownloadDeleteTask) ' +
+      'keeps the download on disk. The response echoes the removed snapshot plus `dataDeleted`.',
+    tags: ['jobs'],
+    query: JobDeleteQuerySchema,
+    responses: {
+      200: { description: 'The removed job snapshot + artifact outcome', schema: z.object({ job: JobSchema, dataDeleted: z.boolean() }) },
+      ...errors(validation(), unauthorized(), notFound('Job'), internal()),
+    },
+  },
+  {
+    method: 'post',
+    path: '/api/jobs/bulk-action',
+    operationId: 'jobBulkAction',
+    summary: 'Toolbar bulk op: Resume all / Pause all / Delete completed (FMD2 tsDownload toolbar)',
+    description:
+      '`{action: "pause"|"resume", scope: "all"}` — Stop All / Resume All (frmMain.lfm:291-339): ' +
+      'pause holds every queued row and cancels every running/retry row; resume lifts every hold ' +
+      'and re-enqueues every cancelled row (markers resume). `{action: "delete", scope: "completed"}` ' +
+      '— Delete completed (miDownloadDeleteCompleted = RemoveAllFinishedTasks): removes every `done` ' +
+      'row, artifacts KEPT (per-row delete+data is the explicit choice). Idempotent: a settled ' +
+      'queue returns `affected: 0`. Other scope/action pairings are 400.',
+    tags: ['jobs'],
+    body: JobBulkActionRequestSchema,
+    responses: {
+      200: { description: 'Bulk outcome: count + touched snapshots', schema: JobBulkActionResponseSchema },
+      ...errors(validation(), unauthorized(), errorResponse(400, 'Scope does not apply to this action'), internal()),
     },
   },
   {
@@ -556,10 +836,14 @@ const OPERATIONS: readonly RouteOperation[] = [
     method: 'put',
     path: '/api/favorites/{id}',
     operationId: 'updateFavorite',
-    summary: 'Update title / the auto-download toggle',
+    summary: 'Rename / auto-download toggle / save-to / enable-disable (pmFavorites parity)',
     description:
-      'The auto-download toggle gates whether new-chapter diff results enqueue through the ' +
-      'Phase-3 download pipeline (FMD2 OptionAutoCheckFavDownload, default off).',
+      'The favorite patch: `title` is the Rename action, `autoDownload` gates whether ' +
+      'new-chapter diff results enqueue through the Phase-3 download pipeline ' +
+      '(FMD2 OptionAutoCheckFavDownload, default off), `saveTo` is the per-favorite custom ' +
+      'finalize directory (Change "Save to" — \'\' resets to the default layout) and `enabled` ' +
+      'is Enable/Disable (disabled rows are skipped by the scheduler and the enabled-scope ' +
+      'batch checks).',
     tags: ['favorites'],
     body: FavoriteUpdateRequestSchema,
     responses: {
@@ -596,6 +880,74 @@ const OPERATIONS: readonly RouteOperation[] = [
   },
   {
     method: 'post',
+    path: '/api/favorites/check',
+    operationId: 'checkFavoritesBatch',
+    summary: 'Batch check with scope (btFavoritesCheckNewChapter parity)',
+    description:
+      'FMD2 Check-for-new-chapter over a scope (all|enabled|disabled): every favorite in scope ' +
+      'runs one sequential DoCheck cycle (auto-download honored per row); the response carries ' +
+      'per-row results — favorites with new chapters feed the NewChaptersSheet decision UI. ' +
+      'A second call while a batch is in flight is a 409; POST /api/favorites/check/cancel ' +
+      'stops the sweep between rows (the response reports `cancelled`).',
+    tags: ['favorites'],
+    body: FavoriteCheckBatchRequestSchema,
+    responses: {
+      200: { description: 'Batch result summary', schema: FavoriteCheckBatchResponseSchema },
+      ...errors(validation(), errorResponse(409, 'A batch is already running'), internal()),
+    },
+  },
+  {
+    method: 'post',
+    path: '/api/favorites/check/cancel',
+    operationId: 'cancelFavoritesCheckBatch',
+    summary: 'Cancel the in-flight batch check',
+    description:
+      'miFavoritesStopCheckNewChapter parity: requests the running batch to stop before its ' +
+      'next favorite (already-completed rows keep their results; the batch response reports ' +
+      '`cancelled: true`). Idempotent — false when nothing is running.',
+    tags: ['favorites'],
+    responses: {
+      200: { description: 'Cancel accepted', schema: FavoriteCheckBatchCancelResponseSchema },
+      ...errors(internal()),
+    },
+  },
+  {
+    method: 'post',
+    path: '/api/favorites/{id}/transfer/preview',
+    operationId: 'previewFavoriteTransfer',
+    summary: 'Website-transfer mapping preview (frmTransferFavorites parity)',
+    description:
+      'Resolves the favorite\'s title on the target site: catalog FTS search → exact ' +
+      '(case-insensitive) title match → GetInfo dry-run on the hit. The response reports ' +
+      'valid + targetUrl/matchedTitle, or invalid with a reason (no-catalog | not-found | ' +
+      'get-info-failed) — the transfer dialog\'s valid/invalid mapping preview.',
+    tags: ['favorites'],
+    body: FavoriteTransferPreviewRequestSchema,
+    responses: {
+      200: { description: 'Mapping preview', schema: FavoriteTransferPreviewResponseSchema },
+      ...errors(validation(), notFound('Favorite'), internal()),
+    },
+  },
+  {
+    method: 'post',
+    path: '/api/favorites/{id}/transfer',
+    operationId: 'transferFavorite',
+    summary: 'Apply the website transfer',
+    description:
+      'Remaps the favorite onto the target module+link under a new id (title/status/' +
+      'currentChapter/saveTo carry over); the old row is deleted (its downloaded_chapters ' +
+      'ledger row is NOT touched). `clearDownloadedList: true` runs the tag-100 reload — the ' +
+      'stored list resets and the live target-site chapter list is re-ingested as downloaded. ' +
+      'A mapping is validated first (transfer/preview semantics); invalid targets are a 409.',
+    tags: ['favorites'],
+    body: FavoriteTransferRequestSchema,
+    responses: {
+      200: { description: 'The transferred favorite', schema: FavoriteTransferResponseSchema },
+      ...errors(validation(), notFound('Favorite'), errorResponse(409, 'Transfer target invalid'), internal()),
+    },
+  },
+  {
+    method: 'post',
     path: '/api/auth/login',
     operationId: 'login',
     summary: 'Password login → session cookie (rate-limited 10/min)',
@@ -610,7 +962,52 @@ const OPERATIONS: readonly RouteOperation[] = [
         validation(),
         errorResponse(400, 'Auth disabled (no FMD_WEB_PASSWORD)'),
         errorResponse(401, 'Invalid credentials'),
-        errorResponse(429, 'Login rate limit exceeded'),
+        errorResponse(429, 'Login rate limit exceeded (valid Bearer api-token requests bypass it)'),
+        internal(),
+      ),
+    },
+  },
+  {
+    method: 'get',
+    path: '/api/settings/api-token',
+    operationId: 'getApiToken',
+    summary: 'R4 single app-wide API token state (Settings → API)',
+    description:
+      'The ONE deployment-wide token (Sonarr/Radarr model — never lists, never per-user). ' +
+      'Returns the stored value (`null` when the FMD_WEB_API_TOKEN env pin owns the secret — ' +
+      'read it from the deployment environment instead), the envManaged flag (UI shows ' +
+      "'Managed via environment', hides Regenerate) and the active auth mode " +
+      '(none|password|api-token|password+api-token). Credential-gated in EVERY authed mode ' +
+      '— the token secret never rides an open read.',
+    tags: ['auth'],
+    responses: {
+      200: { description: 'Token state', schema: ApiTokenResponseSchema },
+      ...errors(
+        unauthorized(),
+        internal(),
+      ),
+    },
+  },
+  {
+    method: 'post',
+    path: '/api/settings/api-token/regenerate',
+    operationId: 'regenerateApiToken',
+    summary: 'Rotate the single API token in place (audit-logged)',
+    description:
+      'Generates a new 32-byte-hex value and replaces the old one IMMEDIATELY — the old ' +
+      'key is rejected on the next request, so update your scripts right after rotating ' +
+      '(docs/API.md key-rotation runbook). Audit-logged as a settings change (the log never ' +
+      'carries the value). 409 when FMD_WEB_API_TOKEN pins the token (rotate the env ' +
+      'instead) or when no auth is configured at all (set FMD_WEB_PASSWORD or the env pin ' +
+      'first — minting a token into an open deployment would lock the UI out, runbook ' +
+      '§API token).',
+    tags: ['auth'],
+    bodyRequired: false,
+    responses: {
+      200: { description: 'The new token state (value included, shown once)', schema: ApiTokenResponseSchema },
+      ...errors(
+        unauthorized(),
+        errorResponse(409, 'Env-pinned (FMD_WEB_API_TOKEN) or no auth configured'),
         internal(),
       ),
     },
@@ -919,7 +1316,13 @@ export function generateOpenApiDocument(version: string): OpenApiDocument {
       };
     }
     if (op.method !== 'get' && op.path !== '/api/auth/login') {
-      operation['security'] = [{ sessionCookie: [] }];
+      // R4: gated routes accept EITHER credential (token or session).
+      operation['security'] = [{ bearerToken: [] }, { sessionCookie: [] }];
+    }
+    if (op.path === '/api/settings/api-token') {
+      // The token secret rides this GET: credential-gated in EVERY
+      // authed mode (unlike the open pre-login reads).
+      operation['security'] = [{ bearerToken: [] }, { sessionCookie: [] }];
     }
     const pathEntry = paths[op.path] ?? {};
     paths[op.path] = pathEntry;
@@ -951,6 +1354,16 @@ export function generateOpenApiDocument(version: string): OpenApiDocument {
     components: {
       schemas: components,
       securitySchemes: {
+        bearerToken: {
+          type: 'http',
+          scheme: 'bearer',
+          description:
+            'R4 SINGLE app-wide API token (Sonarr/Radarr model): `Authorization: Bearer <token>`. ' +
+            'One value per deployment — auto-generated on first start, rotated in Settings → API ' +
+            '(regenerate) or pinned via FMD_WEB_API_TOKEN (env > settings). Valid on EVERY /api ' +
+            'route and the /ws upgrade; with no password set the API runs token-only (API-only ' +
+            'mode: reads included). Constant-time verified; never multiple/per-user tokens.',
+        },
         sessionCookie: {
           type: 'apiKey',
           in: 'cookie',

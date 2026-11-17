@@ -12,6 +12,18 @@ import { createApiClient } from '../src/api/client';
 import type { ReactElement } from 'react';
 import { afterEach } from 'vitest';
 
+// jsdom ships no ResizeObserver; Radix size-tracking components (e.g.
+// Tabs via @radix-ui/react-use-size) need one when the page under test
+// renders them. Minimal no-op stub (observe/unobserve/disconnect).
+if (typeof globalThis.ResizeObserver !== 'function') {
+  class ResizeObserverStub implements ResizeObserver {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+  globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
+}
+
 export interface RecordedRequest {
   readonly method: string;
   readonly path: string;
