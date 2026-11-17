@@ -1,3 +1,4 @@
+import type { LuaCookieJarPort } from '../contract.js';
 import { NameValueMap } from './http-headers.js';
 
 /**
@@ -12,16 +13,11 @@ import { NameValueMap } from './http-headers.js';
  * Structural port implemented by the state service's `SharedCookieJar`
  * (engine/state/module-state.ts: get/set/remove/clear/addServerCookie/
  * size/snapshotSync) — the shim depends on this narrow interface, never
- * on the concrete service.
+ * on the concrete service. Owned by the contract (LuaCookieJarPort) so
+ * the LuaHost/LuaDispatcherShims boundary carries it; this alias keeps
+ * the historical name working.
  */
-export interface CookieJarPort {
-  get(name: string): string;
-  set(name: string, value: string): void;
-  remove(name: string): void;
-  clear(): void;
-  addServerCookie(setCookie: string): void;
-  readonly size: number;
-}
+export type CookieJarPort = LuaCookieJarPort;
 
 /** Cookie name/value pairs of a jar snapshot (jar order). */
 function jarPairs(jar: CookieJarPort): Array<[string, string]> {

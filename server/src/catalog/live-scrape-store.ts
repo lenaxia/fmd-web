@@ -8,10 +8,10 @@ import {
   type ModuleId,
   type UpdateLaneGate,
 } from '@fmd/contract';
-import { pascalLowerCase } from '../engine/normalize/fmdstrings.js';
-import type { RegistrationRecord } from '../engine/registry/capabilities.js';
+import { fmdLowerCase } from '../engine/facade.js';
+import type { RegistrationRecord } from '../engine/facade.js';
 import { CATALOG_PAGE_DEFAULT, CATALOG_PAGE_MAX, jdnToday } from '../sync/db/catalog-store.js';
-import type { DirectoryWalkPort } from './directory-walk.js';
+import type { DirectoryWalkPort } from '../engine/facade.js';
 
 /**
  * §6.8 live-scrape fallback read side — the SAME page shapes as the
@@ -72,8 +72,8 @@ function pageLimit(limit: number | undefined): number {
 
 /** SQLite COLLATE NOCASE parity: ASCII A-Z fold + link tiebreak. */
 function byTitleOrder(a: CatalogEntry, b: CatalogEntry): number {
-  const ta = pascalLowerCase(a.title);
-  const tb = pascalLowerCase(b.title);
+  const ta = fmdLowerCase(a.title);
+  const tb = fmdLowerCase(b.title);
   if (ta !== tb) {
     return ta < tb ? -1 : 1;
   }
@@ -88,7 +88,7 @@ function likeContains(haystack: string, needle: string): boolean {
   if (needle === '') {
     return true;
   }
-  return pascalLowerCase(haystack).includes(pascalLowerCase(needle));
+  return fmdLowerCase(haystack).includes(fmdLowerCase(needle));
 }
 
 // ── cursor encoding (the catalog endpoints' scheme: opaque base64url JSON) ──

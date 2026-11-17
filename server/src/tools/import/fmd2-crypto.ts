@@ -1,4 +1,4 @@
-import { decryptString, encryptString } from '../../engine/shims/crypto-core.js';
+import { decryptString, encryptString } from '../../engine/facade.js';
 
 /**
  * FMD2 EncryptString/DecryptString — the MIGRATION-ONLY key holder (D4,
@@ -21,6 +21,7 @@ import { decryptString, encryptString } from '../../engine/shims/crypto-core.js'
  * the constant (COMPAT.md "DCP cipher semantics").
  */
 
+/** FMD2 `EncryptKey` (uBaseUnit.pas:1556) — migration-only, see module doc. */
 /** FMD2 `EncryptKey` (uBaseUnit.pas:1556) — migration-only, see module doc. */
 export const FMD2_ENCRYPT_KEY = 'B74945FB50E84FD58BF9FEAB8E4BEA6B';
 

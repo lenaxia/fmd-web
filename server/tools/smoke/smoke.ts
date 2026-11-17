@@ -16,7 +16,7 @@ import { createMemoryLogger } from '../../src/engine/lua/logger.js';
 import { createLuaHost } from '../../src/engine/lua/host.js';
 import { DeadlineAbortHandle, createDeadlineCells } from '../../src/engine/lua/abort.js';
 import { createContractDispatcher } from '../../src/engine/events/dispatcher.js';
-import type { FacadeBridge, FacadeSpec } from '../../src/engine/lua/facade.js';
+import type { LuaFacadeSpec } from '../../src/engine/contract.js';
 import {
   installShims,
   initShimsHook,
@@ -327,7 +327,7 @@ async function runModuleGetInfoInner(
       throw new Error('no module descriptor');
     }
     const engine = await host.createEngine();
-    let makeHTTP: ((bridge: FacadeBridge) => FacadeSpec) | undefined;
+    let makeHTTP: (() => LuaFacadeSpec) | undefined;
     await engine.loadModule(moduleFile, (inner, bridge) => {
       const installed = installShims(inner, bridge, {
         resolver: ctx.resolver,

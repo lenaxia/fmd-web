@@ -1,4 +1,5 @@
-import type { HostLogger, LuaChunkCache, LuaEngine } from '@fmd/contract';
+import type { HostLogger } from '@fmd/contract';
+import type { LuaChunkSetup, LuaChunkCache, LuaEngine } from '../contract.js';
 import { LuaFactory, type LuaEngine as WasmoonEngine } from 'wasmoon';
 import { createIdleEnvironment, installBaseEnvironment, type EngineEnvironment } from './base-globals.js';
 import { loadChunkInto } from './chunk-loader.js';
@@ -42,7 +43,7 @@ export class WasmoonLuaEngine implements LuaEngine {
 
   async loadModule(
     fileName: string,
-    preChunkSetup?: (engine: WasmoonEngine, bridge: FacadeBridge) => void,
+    preChunkSetup?: LuaChunkSetup,
   ): Promise<void> {
     const chunk = this.chunkCache.peek(fileName);
     if (chunk === undefined) {
@@ -88,6 +89,15 @@ export class WasmoonLuaEngine implements LuaEngine {
       throw new Error('no module loaded (call loadModule first)');
     }
     return this.inner;
+  }
+
+  /**
+   * Contract LuaEngine member: evaluate a Lua snippet in the live module
+   * state (host-side read-backs). Same behavior as reaching through
+   * `innerEngine` — including the throw when no module is loaded.
+   */
+  doStringSync(code: string): unknown {
+    return this.innerEngine.doStringSync(code);
   }
 
   async dispose(): Promise<void> {

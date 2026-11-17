@@ -1,18 +1,23 @@
-import { ApiError } from '../api/errors.js';
-import { DeadlineAbortHandle, createDeadlineCells } from '../engine/lua/abort.js';
-import { createLuaHost, type WasmoonLuaHost } from '../engine/lua/host.js';
-import { createMemoryLogger, TeeMemoryLogger, type MemoryLogger } from '../engine/lua/logger.js';
-import { createContractDispatcher, type ContractEventDispatcher } from '../engine/events/dispatcher.js';
-import { initShimsHook, installShims, loadRealModuleFile } from '../engine/shims/install.js';
-import type { ProxyConfig } from '../engine/shims/http-proxy.js';
-import type { BypassExecutorPort } from '../engine/sidecar/bypass-adapter.js';
-import { RecordedResponseResolver } from '../engine/shims/http-shim.js';
-import type { EgressPolicy, HttpTransportPort } from '../engine/shims/http-shim.js';
-import type { SwallowSharedDeduper } from '../engine/shims/txquery-shim.js';
-import type { HostLogRecord, LuaModuleDescriptor } from '@fmd/contract';
-import type { RegistrationRecord } from '../engine/registry/capabilities.js';
-import type { ModuleSharedState } from '../engine/state/module-state.js';
-import type { ChapterModuleHooks, TaskWriter } from '../jobs/download/types.js';
+/**
+ * Engine-backed download hooks (§7.1) — MOVED inside the engine by the
+ * engine-boundary story: host-driving MECHANISM. The jobs layer sees only
+ * the ChapterModuleHooks port + the facade factory; failures throw the
+ * contract's typed ApiError envelope.
+ */
+import { ApiError } from '@fmd/contract';
+import { DeadlineAbortHandle, createDeadlineCells } from '../lua/abort.js';
+import { createMemoryLogger, TeeMemoryLogger, type MemoryLogger } from '../lua/logger.js';
+import { initShimsHook, installShims, loadRealModuleFile } from '../shims/install.js';
+import type { ProxyConfig } from '../shims/http-proxy.js';
+import type { BypassExecutorPort } from '../sidecar/bypass-adapter.js';
+import { RecordedResponseResolver } from '../shims/http-shim.js';
+import type { EgressPolicy, HttpTransportPort } from '../shims/http-shim.js';
+import type { SwallowSharedDeduper } from '../shims/txquery-shim.js';
+import type { HostLogRecord } from '@fmd/contract';
+import type { EventDispatchResult, EventDispatcher, LuaEngine, LuaHost, LuaHostFactory, LuaModuleDescriptor } from '../contract.js';
+import type { RegistrationRecord } from '../registry/capabilities.js';
+import type { ModuleSharedState } from '../state/module-state.js';
+import type { ChapterModuleHooks, TaskWriter } from './download-ports.js';
 
 /**
  * Engine-backed download hooks (§7.1): one wasmoon engine per chapter
@@ -60,11 +65,23 @@ export interface EngineDownloadOptions {
    * via module_state at hook creation.
    */
   readonly moduleState?: (moduleId: string) => Promise<ModuleSharedState>;
+  /**
+   * Lua host factory (injected by the composition root): constructs the
+   * per-run host behind the contract LuaHost interface — substitute
+   * hosts (test doubles) wire in here without touching these hooks.
+   */
+  readonly hostFactory: LuaHostFactory;
 }
 
-type DispatchResult = ReturnType<ContractEventDispatcher['dispatch']>;
+type DispatchResult = EventDispatchResult;
 
-export class EngineDownloadHooks implements ChapterModuleHooks {
+/** The download-hooks SERVICE shape (facade-exported; stubs implement this). */
+export type ModuleDownloadHooks = ChapterModuleHooks & {
+  /** Engine + host teardown (end of the chapter run). */
+  dispose(): Promise<void>;
+};
+
+export class EngineDownloadHooks implements ModuleDownloadHooks {
   private readonly taskStartHandler: string | undefined;
   private readonly getPageNumberHandler: string | undefined;
   private readonly getImageURLHandler: string | undefined;
@@ -72,10 +89,10 @@ export class EngineDownloadHooks implements ChapterModuleHooks {
   private readonly pageLinksMirror: string[] = [];
 
   private constructor(
-    private readonly dispatcher: ContractEventDispatcher,
+    private readonly dispatcher: EventDispatcher,
     private readonly descriptor: LuaModuleDescriptor,
-    private readonly host: WasmoonLuaHost,
-    private readonly engine: Awaited<ReturnType<WasmoonLuaHost['createEngine']>>,
+    private readonly host: LuaHost,
+    private readonly engine: LuaEngine,
     private readonly logger: MemoryLogger,
     private readonly sharedState?: ModuleSharedState,
   ) {
@@ -97,7 +114,7 @@ export class EngineDownloadHooks implements ChapterModuleHooks {
     const logger: MemoryLogger = sink === undefined
       ? createMemoryLogger()
       : new TeeMemoryLogger(sink);
-    const host = createLuaHost(logger);
+    const host = options.hostFactory.createHost(logger);
     const abort = new DeadlineAbortHandle(createDeadlineCells());
     const resolver = new RecordedResponseResolver([]);
     const luaRoot = options.luaRoot;
@@ -147,7 +164,7 @@ export class EngineDownloadHooks implements ChapterModuleHooks {
       if (installed === undefined) {
         throw new ApiError(502, 'upstream_error', 'shim install did not run');
       }
-      const dispatcher = createContractDispatcher(engine, abort, logger, undefined, undefined, undefined, {
+      const dispatcher = host.createDispatcher(engine, abort, undefined, {
         makeHTTP: installed.makeHTTP,
         ...(sharedCookies !== undefined ? { moduleCookies: () => sharedCookies } : {}),
       });

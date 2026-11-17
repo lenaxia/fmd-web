@@ -1,8 +1,7 @@
-import type { HostLogger, HttpAbortHandle, LuaModuleDescriptor, ModuleId } from '@fmd/contract';
-import type { FacadeBridge, FacadeSpec } from '../lua/facade.js';
-import type { WasmoonLuaHost } from '../lua/host.js';
+import type { HostLogger, ModuleId } from '@fmd/contract';
+import type { HttpAbortHandle } from '../contract.js';
+import type { LuaChunkSetup, LuaFacadeBridge, LuaFacadeSpec, LuaHost, LuaModuleDescriptor, LuaStateSurface } from '../contract.js';
 import { readFileSync } from 'node:fs';
-import type { LuaEngine as WasmoonEngine } from 'wasmoon';
 import { parseQueryDocument, type DuckDocument, type SwallowSharedDeduper } from './txquery-shim.js';
 import { TxQueryShim } from './txquery-facade.js';
 import {
@@ -88,16 +87,16 @@ export interface InstallShimsOptions {
 export interface InstalledShims {
   readonly txquery: TxQueryShim;
   /** Bind a fresh request-scoped HTTP object (dispatcher HTTP factory). */
-  readonly makeHTTP: () => FacadeSpec;
+  readonly makeHTTP: () => LuaFacadeSpec;
   /** HTTP Document facade id → backing stream (ParseHTML resolution). */
   readonly documents: Map<number, HttpDocument>;
 }
 
-/** The engine surface the installer needs (wasmoon LuaEngine). */
-interface EngineLike {
-  global: { set(name: string, value: unknown): void };
-  doStringSync(code: string): unknown;
-}
+/**
+ * The engine surface the installer needs — the contract's structural
+ * LuaStateSurface (wasmoon's engine and test doubles both satisfy it).
+ */
+type EngineLike = LuaStateSurface;
 
 /**
  * Install the v0 shims on an engine with base globals present (the
@@ -105,7 +104,7 @@ interface EngineLike {
  */
 export function installShims(
   engine: EngineLike,
-  bridge: FacadeBridge,
+  bridge: LuaFacadeBridge,
   options: InstallShimsOptions,
 ): InstalledShims {
   const luaRoot = options.luaRoot ?? FMD2_LUA_ROOT;
@@ -147,7 +146,7 @@ export function installShims(
     ...(options.bypass !== undefined ? { bypass: options.bypass } : {}),
   });
 
-  const makeHTTP = (): FacadeSpec =>
+  const makeHTTP = (): LuaFacadeSpec =>
     makeHttpShim(bridge, {
       resolver: options.resolver,
       abort: options.abort,
@@ -196,7 +195,7 @@ export function installShims(
  */
 export function initShimsHook(
   options: InstallShimsOptions,
-): (engine: WasmoonEngine, bridge: FacadeBridge) => void {
+): LuaChunkSetup {
   return (engine, bridge) => {
     installShims(engine, bridge, options);
   };
@@ -204,10 +203,10 @@ export function initShimsHook(
 
 /** Read + compile a real module file, running its Init() pass. */
 export async function loadRealModuleFile(
-  host: WasmoonLuaHost,
+  host: LuaHost,
   luaRoot: string,
   relativeFile: string,
-  extraSetup?: (engine: WasmoonEngine, bridge: FacadeBridge) => void,
+  extraSetup?: LuaChunkSetup,
 ): Promise<readonly LuaModuleDescriptor[]> {
   const source = readFileSync(`${luaRoot}/${relativeFile}`, 'utf8');
   await host.chunkCache.get(relativeFile, source);

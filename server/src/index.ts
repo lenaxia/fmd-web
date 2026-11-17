@@ -6,14 +6,13 @@ export * from './api/auth.js';
 export * from './api/services.js';
 export * from './api/openapi.js';
 export * from './api/app.js';
-export * from './engine/lua/worker-pool.js';
-export * from './engine/shims/index.js';
-export * from './engine/state/module-state.js';
-export * from './engine/events/bindings.js';
-export * from './engine/events/supervisor.js';
-export * from './engine/pipeline/markers.js';
-export * from './engine/pipeline/chapter-pipeline.js';
-export * from './engine/pipeline/image-worker.js';
+// ENGINE-BOUNDARY (tsk-linear-varnish-restricts): the package surface
+// reaches the engine ONLY through its two doors — the wasmoon-free
+// facade (domain surface) and the production door (facade + the
+// wasmoon-backed default substrate + engine extras: worker pool, shim
+// table, event bindings, supervisor, pipeline incl. the image worker).
+export * from './engine/facade.js';
+export * from './engine/index.js';
 export * from './jobs/lanes.js';
 export * from './jobs/queue/index.js';
 export * from './sync/pin.js';
@@ -24,7 +23,6 @@ export * from './sync/modules/tarball.js';
 export * from './sync/modules/service.js';
 export * from './sync/modules/state.js';
 export * from './sync/modules/swap.js';
-export * from './sync/modules/validate.js';
 export * from './sync/modules/zipball.js';
 export * from './sync/db/index.js';
 export * from './db/schema.js';

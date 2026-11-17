@@ -16,8 +16,6 @@ import {
 import { ApiError } from '../api/errors.js';
 import { AuthService, resolveApiTokenBootstrap } from '../api/auth.js';
 import { WsHub } from '../api/ws/hub.js';
-import { EngineInfoService } from './engine-info.js';
-import { EngineLoginDriver } from './account-login.js';
 import { SqliteAccountService } from '../accounts/account-service.js';
 import { SqliteAccountStore } from '../accounts/account-store.js';
 import { BootstrapRunner } from './bootstrap.js';
@@ -30,16 +28,29 @@ import {
   composeReadiness,
   type CorpusPassRateEntry,
 } from '../observability/index.js';
-import { EgressPolicy } from '../engine/shims/http-egress.js';
-import { setDefaultRequestTimeoutMs } from '../engine/shims/http-pipeline.js';
-import { normalizeProxyConfig, type ProxyConfig } from '../engine/shims/http-proxy.js';
-import { FlareSolverrBypassExecutor } from '../engine/sidecar/bypass-adapter.js';
-import { LoopbackHttpTransport } from '../engine/shims/http-transport.js';
-import { ModuleStateService, type ModuleSharedState } from '../engine/state/module-state.js';
-import { StartupRegistryService } from '../engine/registry/startup.js';
-import { ModuleSyncService as RegistrySweep } from '../engine/registry/module-sync.js';
-import { InMemoryModuleRegistryPersistence } from '../engine/registry/persistence.js';
-import type { RegistrationRecord } from '../engine/registry/capabilities.js';
+// ENGINE-BOUNDARY (tsk-linear-varnish-restricts): this assembly is the
+// composition root and reaches the engine ONLY through the facade — the
+// domain-shaped, wasmoon-free door. The substrate (host factory + the
+// module services) is injected through the ModuleRuntime interface; the
+// wasmoon-backed default is loaded LAZILY via the production door so a
+// substituted runtime (the stub-substrate boot test) keeps wasmoon off
+// its path entirely.
+import {
+  EgressPolicy,
+  FlareSolverrBypassExecutor,
+  InMemoryModuleRegistryPersistence,
+  LoopbackHttpTransport,
+  ModuleStateService,
+  SyncHostGate,
+  normalizeProxyConfig,
+  setDefaultRequestTimeoutMs,
+  type ModuleRuntime,
+  type ModuleSharedState,
+  type ProxyConfig,
+  type RegistrationRecord,
+  type ModuleTreeSweepPort as RegistrySweep,
+  type BootResult,
+} from '../engine/facade.js';
 import type { ModuleSummaryT, OptionValueT } from '../api/schemas.js';
 import { createModuleSyncService } from '../sync/modules/service.js';
 import { loadModuleSyncConfig, type ModuleSyncConfig } from '../sync/modules/config.js';
@@ -47,8 +58,6 @@ import { CatalogSync } from '../sync/db/sync-service.js';
 import { DEFAULT_BOOTSTRAP_CATALOGS } from './catalog-defaults.js';
 import { DEFAULT_LIVE_SCRAPE_TTL_MS, LiveScrapeCatalogStore } from '../catalog/live-scrape-store.js';
 import { UpdateLaneScrapeGate } from '../catalog/update-lane-gate.js';
-import { EngineDirectoryWalker } from '../catalog/directory-walk.js';
-import { SyncHostGate } from '../engine/shims/http-hostgate.js';
 import type { CatalogFileStore } from '../sync/db/catalog-store.js';
 import { InMemoryModuleService, InMemorySettingsService } from '../api/services.js';
 import type {
@@ -255,6 +264,14 @@ export interface BuildRuntimeOptions {
   readonly log: (message: string) => void;
   readonly version: string;
   /**
+   * ENGINE SUBSTRATE OVERRIDE (engine-boundary story): the module runtime
+   * construction surface. Production boots the wasmoon-backed default
+   * (lazily, via the engine production door); tests substitute a stub
+   * (the stub-substrate swap proof — canned registry rows, scripted
+   * results, no wasmoon anywhere on the path).
+   */
+  readonly substrate?: ModuleRuntime;
+  /**
    * §15 corpus pass-rate provider (the nightly corpus run publishes
    * per-module rates; the runtime exports them at scrape). Optional —
    * without it the `fmd_corpus_pass_rate` family stays empty until a
@@ -310,9 +327,20 @@ interface SweepOutcomeShape {
   readonly modules: readonly RegistrationRecord[];
 }
 
+/** Structural slice of StartupRegistryService the assembly uses (lazy). */
+interface StartupRegistryServiceLike {
+  boot(): Promise<BootResult>;
+  knownBroken(): Readonly<Record<string, readonly string[]>>;
+}
+
 export async function buildRuntime(options: BuildRuntimeOptions): Promise<RuntimeAssembly> {
   const { config, log, version } = options;
   const luaRoot = join(config.dataDir, 'lua');
+  // The substrate seam: injected (stub/tests) or the wasmoon default,
+  // loaded lazily so the substituted path never evaluates wasmoon.
+  const substrate: ModuleRuntime =
+    options.substrate ?? (await import('../engine/index.js')).createModuleRuntime();
+  const luaHostFactory = substrate.createHostFactory();
 
   // ── observability (§4/§15) ─────────────────────────────────────────
   // Structured JSON logs (module-id correlation, expression-failure
@@ -353,13 +381,16 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     moduleStateService.forModule(moduleId);
 
   // ── sync services ──────────────────────────────────────────────────
-  const moduleSync = createModuleSyncService(config.moduleSync);
-  const sweep = new RegistrySweep({ luaRoot });
+  const moduleSync = createModuleSyncService(config.moduleSync, { hostFactory: luaHostFactory });
+  const sweep: RegistrySweep = substrate.createSweep({ luaRoot, hostFactory: luaHostFactory });
   // A fresh startup service per boot: in-memory persistence means every
   // boot sweeps (§9 SHA-gated caching resumes with the SQLite
   // module_state story) — and a manual re-sync after a tree swap gets a
   // fresh sweep instead of the memoized registry.
-  let registry = new StartupRegistryService(sweep, new InMemoryModuleRegistryPersistence());
+  // The registry boot service is behind the production door (its module
+  // transitively imports the shim installer): constructed lazily inside
+  // bootRegistry() so a substituted substrate never evaluates it.
+  let registry: StartupRegistryServiceLike | undefined;
   const catalogSync = new CatalogSync({
     dataDir: config.dataDir,
     ...(config.dbUrl !== undefined ? { dbUrl: config.dbUrl } : {}),
@@ -368,9 +399,12 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
   });
 
   // ── registry state (empty until bootstrap's sweep lands) ───────────
-  let moduleRows: readonly RegistrationRecord[] = [];
-  let booted = false;
+  // A substrate that vouches for its own registry rows (the stub proof;
+  // a future native-registry substrate) boots pre-seeded — no sweep.
+  let moduleRows: readonly RegistrationRecord[] = [...(substrate.initialModules ?? [])];
+  let booted = substrate.initialModules !== undefined;
   const bootRegistry = async (): Promise<{ source: string; modules: number; summary?: SweepOutcomeShape }> => {
+    const { StartupRegistryService } = await import('../engine/index.js');
     registry = new StartupRegistryService(sweep, new InMemoryModuleRegistryPersistence());
     const result = await registry.boot();
     moduleRows = result.modules;
@@ -398,7 +432,7 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
   // from the CatalogStore receipts — a finished provision flips the
   // chip on the next modules read, no cache invalidation needed.
   const moduleService = new RefreshableModuleService(
-    [],
+    [...moduleRows],
     browserProfileEnabled,
     // catalogInstalled join: the InMemoryModuleService constructor wraps
     // this with the non-32-hex id guard (single source, services.ts).
@@ -415,8 +449,9 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
       : normalizeProxyConfig(effective.type, effective.host, effective.port, effective.user, effective.pass);
   };
 
-  const info = new EngineInfoService({
+  const info = substrate.createInfoService({
     luaRoot,
+    hostFactory: luaHostFactory,
     modules: (): readonly RegistrationRecord[] => moduleRows,
     transport,
     egress,
@@ -460,8 +495,9 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
   // connection gate. Catalog arrival invalidates the cache and the
   // API's catalog-first lookup order flips the module back.
   const liveScrapeGate = new UpdateLaneScrapeGate(config.liveScrapeConcurrency);
-  const liveScrapeWalker = new EngineDirectoryWalker({
+  const liveScrapeWalker = substrate.createDirectoryWalker({
     luaRoot,
+    hostFactory: luaHostFactory,
     modules: (): readonly RegistrationRecord[] => moduleRows,
     transport,
     egress,
@@ -640,8 +676,13 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     wsHub,
     library: libraryStore,
     dataDir: config.dataDir,
+    // The substrate's download-hooks factory (stub proof substitutes
+    // scripted hooks; default = the wasmoon-backed EngineDownloadHooks).
+    createHooks: (moduleId, engineOptions): Promise<import('../engine/facade.js').ModuleDownloadHooks> =>
+      substrate.createDownloadHooks(moduleId, engineOptions),
     engine: {
       luaRoot,
+      hostFactory: luaHostFactory,
       modules: (): readonly RegistrationRecord[] => moduleRows,
       transport,
       egress,
@@ -742,7 +783,7 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
             file: failure.file,
             error: failure.firstError,
           })),
-          knownBroken: registry.knownBroken(),
+          knownBroken: registry?.knownBroken() ?? {},
           eventCoverage: {},
         },
       };
@@ -830,8 +871,9 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
   const accounts = new SqliteAccountService({
     store: new SqliteAccountStore(db),
     secret: (): string => process.env['FMD_WEB_SECRET'] ?? '',
-    loginDriver: new EngineLoginDriver({
+    loginDriver: substrate.createLoginSession({
       luaRoot,
+      hostFactory: luaHostFactory,
       modules: (): readonly RegistrationRecord[] => moduleRows,
       transport,
       egress,

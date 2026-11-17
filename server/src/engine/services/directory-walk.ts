@@ -1,19 +1,24 @@
-import { CatalogFallbackError, type CatalogEntry, type LuaModuleDescriptor } from '@fmd/contract';
-import type { RegistrationRecord } from '../engine/registry/capabilities.js';
-import { DeadlineAbortHandle, createDeadlineCells } from '../engine/lua/abort.js';
-import { createLuaHost, type WasmoonLuaHost } from '../engine/lua/host.js';
-import { createMemoryLogger, TeeMemoryLogger, type MemoryLogger } from '../engine/lua/logger.js';
-import { createContractDispatcher, type ContractEventDispatcher } from '../engine/events/dispatcher.js';
-import { initShimsHook, installShims, loadRealModuleFile } from '../engine/shims/install.js';
-import { RecordedResponseResolver } from '../engine/shims/http-shim.js';
-import type { EgressPolicy, HttpTransportPort } from '../engine/shims/http-shim.js';
-import type { HostGatePort } from '../engine/shims/http-hostgate.js';
-import type { ProxyConfig } from '../engine/shims/http-proxy.js';
-import type { BypassExecutorPort } from '../engine/sidecar/bypass-adapter.js';
-import type { SwallowSharedDeduper } from '../engine/shims/txquery-shim.js';
+/**
+ * §6.8 live-scrape directory walker — MOVED inside the engine by the
+ * engine-boundary story: the walker drives the module's §5.2 directory
+ * events (host MECHANISM); the catalog layer sees only the
+ * DirectoryWalkPort through the facade.
+ */
+import { CatalogFallbackError, type CatalogEntry } from '@fmd/contract';
+import type { EventDispatcher, LuaHostFactory, LuaModuleDescriptor } from '../contract.js';
+import type { RegistrationRecord } from '../registry/capabilities.js';
+import { DeadlineAbortHandle, createDeadlineCells } from '../lua/abort.js';
+import { createMemoryLogger, TeeMemoryLogger, type MemoryLogger } from '../lua/logger.js';
+import { initShimsHook, installShims, loadRealModuleFile } from '../shims/install.js';
+import { RecordedResponseResolver } from '../shims/http-shim.js';
+import type { EgressPolicy, HttpTransportPort } from '../shims/http-shim.js';
+import type { HostGatePort } from '../shims/http-hostgate.js';
+import type { ProxyConfig } from '../shims/http-proxy.js';
+import type { BypassExecutorPort } from '../sidecar/bypass-adapter.js';
+import type { SwallowSharedDeduper } from '../shims/txquery-shim.js';
 import type { HostLogRecord } from '@fmd/contract';
-import { normalizeMangaInfo } from '../engine/normalize/udata.js';
-import type { ModuleSharedState } from '../engine/state/module-state.js';
+import { normalizeMangaInfo } from '../normalize/udata.js';
+import type { ModuleSharedState } from '../state/module-state.js';
 
 /**
  * §6.8 live-scrape directory walk: ONE pass of the FMD2 update-thread
@@ -84,6 +89,12 @@ export interface EngineDirectoryWalkerOptions {
    * via module_state at the end of the walk.
    */
   readonly moduleState?: (moduleId: string) => Promise<ModuleSharedState>;
+  /**
+   * Lua host factory (injected by the composition root): constructs the
+   * per-walk host behind the contract LuaHost interface — substitute
+   * hosts (test doubles) wire in here without touching the walker.
+   */
+  readonly hostFactory: LuaHostFactory;
 }
 
 /** no_error / net_problem (§5.2 dispatch result codes). */
@@ -110,7 +121,7 @@ export class EngineDirectoryWalker implements DirectoryWalkPort {
     const logger: MemoryLogger = sink === undefined
       ? createMemoryLogger()
       : new TeeMemoryLogger(sink);
-    const host: WasmoonLuaHost = createLuaHost(logger);
+    const host = this.options.hostFactory.createHost(logger);
     try {
       const abort = new DeadlineAbortHandle(createDeadlineCells());
       const resolver = new RecordedResponseResolver([]);
@@ -163,11 +174,11 @@ export class EngineDirectoryWalker implements DirectoryWalkPort {
         if (shimKit === undefined) {
           throw new CatalogFallbackError('walk_failed', 'shim install did not run');
         }
-        const dispatcher = createContractDispatcher(engine, abort, logger, undefined, undefined, undefined, {
+        const dispatcher = host.createDispatcher(engine, abort, undefined, {
           makeHTTP: shimKit.makeHTTP,
           ...(sharedCookies !== undefined ? { moduleCookies: () => sharedCookies } : {}),
         });
-        const runLua = (code: string): unknown => engine.innerEngine.doStringSync(code);
+        const runLua = (code: string): unknown => engine.doStringSync(code);
         const raw = walkDirectory(dispatcher, descriptor, runLua);
         if (sharedState !== undefined) {
           await sharedState.persist();
@@ -185,7 +196,7 @@ export class EngineDirectoryWalker implements DirectoryWalkPort {
 /** The uUpdateThread directory loop: page count → per-page pair
  * harvest; ANY failure throws `walk_failed` (never partial). */
 function walkDirectory(
-  dispatcher: ContractEventDispatcher,
+  dispatcher: EventDispatcher,
   descriptor: LuaModuleDescriptor,
   runLua: (code: string) => unknown,
 ): readonly RawDirectoryEntry[] {
@@ -209,7 +220,7 @@ function walkDirectory(
 
 /** GetDirectoryPageNumber with the §5.2 PAGENUMBER read-back. */
 function readDirectoryPageCount(
-  dispatcher: ContractEventDispatcher,
+  dispatcher: EventDispatcher,
   descriptor: LuaModuleDescriptor,
 ): number {
   if (descriptor.eventHandlers['GetDirectoryPageNumber'] === undefined) {

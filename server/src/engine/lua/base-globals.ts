@@ -1,4 +1,5 @@
-import type { HostLogger, HttpAbortHandle, ModuleId } from '@fmd/contract';
+import type { HostLogger, ModuleId } from '@fmd/contract';
+import type { HttpAbortHandle } from '../contract.js';
 import { DeadlineAbortHandle, blockingSleep, createDeadlineCells } from './abort.js';
 import type { FacadeBridge } from './facade.js';
 import {

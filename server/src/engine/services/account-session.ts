@@ -1,24 +1,22 @@
-import type { HostLogRecord } from '@fmd/contract';
-import { ApiError } from '../api/errors.js';
-import {
-  accountStatusOrdinal,
-  type AccountLoginDriver,
-  type LoginCredentials,
-  type LoginOutcome,
-} from '../accounts/account-service.js';
-import { DeadlineAbortHandle, createDeadlineCells } from '../engine/lua/abort.js';
-import { createLuaHost, type WasmoonLuaHost } from '../engine/lua/host.js';
-import { createMemoryLogger, TeeMemoryLogger, type MemoryLogger } from '../engine/lua/logger.js';
-import { createContractDispatcher } from '../engine/events/dispatcher.js';
-import { initShimsHook, installShims, loadRealModuleFile } from '../engine/shims/install.js';
-import { RecordedResponseResolver } from '../engine/shims/http-shim.js';
-import type { EgressPolicy, HttpTransportPort } from '../engine/shims/http-shim.js';
-import type { SwallowSharedDeduper } from '../engine/shims/txquery-shim.js';
-import type { RegistrationRecord } from '../engine/registry/capabilities.js';
-import type { ModuleSharedState } from '../engine/state/module-state.js';
+import { ApiError, type HostLogRecord } from '@fmd/contract';
+import type { LuaHost, LuaHostFactory } from '../contract.js';
+import { DeadlineAbortHandle, createDeadlineCells } from '../lua/abort.js';
+import { createMemoryLogger, TeeMemoryLogger, type MemoryLogger } from '../lua/logger.js';
+import { initShimsHook, installShims, loadRealModuleFile } from '../shims/install.js';
+import { RecordedResponseResolver } from '../shims/http-shim.js';
+import type { EgressPolicy, HttpTransportPort } from '../shims/http-shim.js';
+import type { SwallowSharedDeduper } from '../shims/txquery-shim.js';
+import type { RegistrationRecord } from '../registry/capabilities.js';
+import type { ModuleSharedState } from '../state/module-state.js';
 
 /**
- * Engine-backed account OnLogin driver (§8.6/D4 login flow): loads the
+ * Engine-backed account OnLogin session (§8.6/D4 login flow) — MOVED
+ * inside the engine by the engine-boundary story: host-driving MECHANISM;
+ * the accounts layer satisfies its AccountLoginDriver port with this
+ * session structurally (identical login/dispose shape), failures throw
+ * the contract's typed ApiError envelope.
+ *
+ * Loads the
  * module through the real Init pass + shims, seeds MODULE.Account with
  * the DECRYPTED credentials, dispatches the §5.2 `Login` row (the
  * account-status constants `asUnknown/asChecking/asValid/asInvalid` are
@@ -52,11 +50,55 @@ export interface EngineLoginDriverOptions {
    * via module_state at the end of the login.
    */
   readonly moduleState?: (moduleId: string) => Promise<ModuleSharedState>;
+  /**
+   * Lua host factory (injected by the composition root): constructs the
+   * per-call host behind the contract LuaHost interface — substitute
+   * hosts (test doubles) wire in here without touching this driver.
+   */
+  readonly hostFactory: LuaHostFactory;
 }
 
-export class EngineLoginDriver implements AccountLoginDriver {
+/**
+ * §5.2 account-status ordinals (asUnknown=0, asChecking=1, asValid=2,
+ * asInvalid=3). The read-back clamp keeps ONLY 1|2|3 — everything else
+ * parks at asUnknown (mirroring FMD2's LoadFromFile tolerance; live
+ * logins may legitimately park in asChecking). Same mapping the accounts
+ * layer's `accountStatusOrdinal` applies — engine-side single source for
+ * the module-event read-back.
+ */
+export type ModuleAccountStatusOrdinal = 0 | 1 | 2 | 3;
+
+export function moduleAccountStatusOrdinal(status: number): ModuleAccountStatusOrdinal {
+  return (status === 1 || status === 2 || status === 3 ? status : 0) as ModuleAccountStatusOrdinal;
+}
+
+/** §5.2 MODULE.Account seed the login dispatch runs with. */
+export interface ModuleLoginCredentials {
+  readonly enabled: boolean;
+  readonly username: string;
+  readonly password: string;
+}
+
+/** What a module OnLogin run produced (handler-set Account fields). */
+export interface ModuleLoginOutcome {
+  readonly status: ModuleAccountStatusOrdinal;
+  readonly cookies: string;
+}
+
+/**
+ * The account-login SERVICE port (facade-exported; stub substrates
+ * implement this). Structurally compatible with the accounts layer's
+ * AccountLoginDriver — the assembly passes the engine session to the
+ * account service directly.
+ */
+export interface ModuleLoginPort {
+  login(moduleId: string, credentials: ModuleLoginCredentials): Promise<ModuleLoginOutcome>;
+  dispose(): Promise<void>;
+}
+
+export class EngineLoginSession implements ModuleLoginPort {
   private tail: Promise<unknown> = Promise.resolve();
-  private readonly hosts: Set<WasmoonLuaHost> = new Set();
+  private readonly hosts: Set<LuaHost> = new Set();
 
   public constructor(private readonly options: EngineLoginDriverOptions) {}
 
@@ -67,14 +109,14 @@ export class EngineLoginDriver implements AccountLoginDriver {
     this.hosts.clear();
   }
 
-  public login(moduleId: string, credentials: LoginCredentials): Promise<LoginOutcome> {
+  public login(moduleId: string, credentials: ModuleLoginCredentials): Promise<ModuleLoginOutcome> {
     // Serialize engine creation/disposal — one wasmoon engine at a time.
-    const run = this.tail.then((): Promise<LoginOutcome> => this.runLogin(moduleId, credentials));
+    const run = this.tail.then((): Promise<ModuleLoginOutcome> => this.runLogin(moduleId, credentials));
     this.tail = run.catch((): void => undefined);
     return run;
   }
 
-  private async runLogin(moduleId: string, credentials: LoginCredentials): Promise<LoginOutcome> {
+  private async runLogin(moduleId: string, credentials: ModuleLoginCredentials): Promise<ModuleLoginOutcome> {
     const registration = this.options.modules().find((m) => m.id === moduleId);
     if (registration === undefined) {
       throw new ApiError(404, 'not_found', `unknown module: ${moduleId}`);
@@ -83,7 +125,7 @@ export class EngineLoginDriver implements AccountLoginDriver {
     const logger: MemoryLogger = sink === undefined
       ? createMemoryLogger()
       : new TeeMemoryLogger(sink);
-    const host = createLuaHost(logger);
+    const host = this.options.hostFactory.createHost(logger);
     this.hosts.add(host);
     try {
       const abort = new DeadlineAbortHandle(createDeadlineCells());
@@ -138,7 +180,7 @@ export class EngineLoginDriver implements AccountLoginDriver {
         if (shimKit === undefined) {
           throw new ApiError(502, 'upstream_error', 'shim install did not run');
         }
-        const dispatcher = createContractDispatcher(engine, abort, logger, undefined, undefined, undefined, {
+        const dispatcher = host.createDispatcher(engine, abort, undefined, {
           makeHTTP: shimKit.makeHTTP,
           ...(sharedCookies !== undefined ? { moduleCookies: () => sharedCookies } : {}),
           account: {
@@ -161,11 +203,11 @@ export class EngineLoginDriver implements AccountLoginDriver {
         // FMD2 DoLogin: Result := lua_toboolean(L, -1) — the boolean is the
         // handler's "did I complete" signal; the STATUS lives on
         // MODULE.Account (read back, LuaWebsiteModules.pas:412-431).
-        const runLua = (code: string): unknown => engine.innerEngine.doStringSync(code);
+        const runLua = (code: string): unknown => engine.doStringSync(code);
         const statusRaw = Number(runLua('return MODULE.Account.Status') ?? 0);
         const cookiesRaw = runLua('return MODULE.Account.Cookies');
         return {
-          status: accountStatusOrdinal(statusRaw),
+          status: moduleAccountStatusOrdinal(statusRaw),
           cookies: typeof cookiesRaw === 'string' ? cookiesRaw : '',
         };
       } finally {

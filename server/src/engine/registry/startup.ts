@@ -1,9 +1,10 @@
 import type { RegistrationRecord } from './capabilities.js';
-import { ModuleSyncService, sortRegistrations, type SweepSummary } from './module-sync.js';
+import { sortRegistrations, type ModuleTreeSweepPort, type SweepSummary } from './module-sync.js';
 import type { ModuleRegistryPersistence } from './persistence.js';
 
 /**
- * Startup service (DESIGN.md §9/§10): wires the ModuleSyncService + LuaHost
+ * Startup service (DESIGN.md §9/§10): wires the tree sweep (the
+ * ModuleTreeSweepPort — the class or a stub substrate's sweep) + persistence
  * Init pass into ONE registry boot. SHA-gated — the §9 re-Init contract:
  *
  * - first boot (or empty store): full sweep → module_state rows persisted
@@ -29,7 +30,7 @@ export class StartupRegistryService {
   private booted: BootResult | null = null;
 
   constructor(
-    private readonly sync: ModuleSyncService,
+    private readonly sync: ModuleTreeSweepPort,
     private readonly persistence: ModuleRegistryPersistence,
   ) {}
 

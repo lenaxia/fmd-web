@@ -1,5 +1,5 @@
 import type { ModuleId } from '@fmd/contract';
-import type { ModuleStatePersistence } from '../../engine/state/persistence.js';
+import type { ModuleStatePersistence } from '../../engine/facade.js';
 
 /**
  * fmd2-modules — the FMD2 `modules.json` → module_state import (D4,

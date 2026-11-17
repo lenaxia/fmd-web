@@ -1,5 +1,5 @@
 import type { ImageWorkerPool, PoolItemFailure } from './types.js';
-import type { PipelineWorkId } from '../../engine/pipeline/chapter-pipeline.js';
+import type { PipelineWorkId } from '../../engine/facade.js';
 
 /**
  * ImageWorkerPool — the download-phase thread pool (DESIGN §7.1; FMD2

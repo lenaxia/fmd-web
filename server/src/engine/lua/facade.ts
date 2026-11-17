@@ -1,3 +1,4 @@
+import type { LuaFacadeBridge, LuaFacadeGetResult, LuaFacadeKey, LuaFacadeSpec, LuaFacadeValue } from '../contract.js';
 import type { LuaEngine as WasmoonEngine } from 'wasmoon';
 
 /**
@@ -13,21 +14,18 @@ import type { LuaEngine as WasmoonEngine } from 'wasmoon';
  * themselves facades: the parent's `sub()` returns the child facade id
  * (a plain number across the boundary) and the Lua glue hands out the
  * matching `__fmd_facades[id]` table.
+ *
+ * The facade TYPE surface is owned by the contract (LuaFacade*); these
+ * aliases keep the host-internal historical names working.
  */
 
-export type FacadeKey = string | number;
-export type FacadeValue = string | number | boolean | null | undefined;
+export type FacadeKey = LuaFacadeKey;
+export type FacadeValue = LuaFacadeValue;
 /** get() returns plain values OR methods (JS functions become Lua functions). */
-export type FacadeGetResult = FacadeValue | ((...args: never[]) => unknown);
+export type FacadeGetResult = LuaFacadeGetResult;
 
 /** Per-id get/set/len behavior supplied by the facade owner. */
-export interface FacadeSpec {
-  get(key: FacadeKey): FacadeGetResult;
-  set(key: FacadeKey, value: FacadeValue): void;
-  len?(): number;
-  /** Child facade id for a sub-object property, if this key is one. */
-  sub?(key: FacadeKey): number | undefined;
-}
+export type FacadeSpec = LuaFacadeSpec;
 
 const FACADE_GLUE = `
 __fmd_facades = {}
@@ -48,7 +46,7 @@ function __fmd_facade_new(id, target)
 end
 `;
 
-export class FacadeBridge {
+export class FacadeBridge implements LuaFacadeBridge {
   private readonly specs = new Map<number, FacadeSpec>();
   private nextId = 1;
 

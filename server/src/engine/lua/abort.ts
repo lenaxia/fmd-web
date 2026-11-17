@@ -1,4 +1,4 @@
-import type { HttpAbortHandle } from '@fmd/contract';
+import type { HttpAbortHandle } from '../contract.js';
 
 /**
  * Deadline/abort machinery shared by `sleep()` and the watchdog (§4, §5.12).

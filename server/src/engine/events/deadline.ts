@@ -1,5 +1,6 @@
 import { Worker } from 'node:worker_threads';
-import type { EventDeadlineController, HttpAbortHandle } from '@fmd/contract';
+import type { HttpAbortHandle } from '../contract.js';
+import type { EventDeadlineController } from '../contract.js';
 import { CELL_CANCEL_REQUEST, CELL_EXPIRED_TOKEN } from '../lua/abort.js';
 
 /**

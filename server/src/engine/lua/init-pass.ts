@@ -1,4 +1,5 @@
-import type { HostLogger, LuaModuleDescriptor, ModuleRegistry } from '@fmd/contract';
+import type { HostLogger } from '@fmd/contract';
+import type { LuaChunkSetup, LuaModuleDescriptor, ModuleRegistry } from '../contract.js';
 import { LuaFactory, type LuaEngine as WasmoonEngine } from 'wasmoon';
 import { createIdleEnvironment, installBaseEnvironment } from './base-globals.js';
 import { loadChunkBuffer } from './chunk-loader.js';
@@ -35,7 +36,7 @@ export class WasmoonModuleRegistry implements ModuleRegistry {
   async loadFile(
     fileName: string,
     source: string,
-    extraSetup?: (engine: WasmoonEngine, bridge: FacadeBridge) => void,
+    extraSetup?: LuaChunkSetup,
   ): Promise<readonly LuaModuleDescriptor[]> {
     const chunk = await this.chunkCache.get(fileName, source);
     const engine = await this.factory.createEngine();

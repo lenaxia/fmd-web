@@ -137,4 +137,46 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // LUA HOST BOUNDARY (DESIGN.md §5.12, tsk-able-steeple-tints; tightened
+    // by the engine-boundary story tsk-linear-varnish-restricts): the
+    // concrete WasmoonLuaHost/WasmoonLuaEngine and the wasmoon dependency
+    // itself live ONLY in the host implementation (engine/lua, the
+    // engine/events dispatcher, the engine/shims installers, the
+    // engine/sidecar stub) plus the substrate factory
+    // (engine/services/module-runtime.ts, which constructs
+    // WasmoonLuaHostFactory for the lazily-loaded production door — the
+    // composition root runtime/assembly.ts reaches it ONLY through
+    // engine/index.js). Everything else depends on domain-shaped facade
+    // types (server/src/engine/facade.ts) or @fmd/contract — a violation
+    // means the dependency direction regressed (substitute substrates
+    // become impossible).
+    files: ['server/src/**/*.ts'],
+    ignores: [
+      'server/src/engine/lua/**',
+      'server/src/engine/events/**',
+      'server/src/engine/shims/**',
+      'server/src/engine/sidecar/**',
+      'server/src/engine/services/module-runtime.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['wasmoon'],
+              message:
+                'Lua host boundary: wasmoon is importable only inside the host implementation (engine/lua, engine/events, engine/shims, engine/sidecar, engine/services/module-runtime.ts). App layers import the engine facade and receive the ModuleHostFactory via injection instead.',
+            },
+            {
+              group: ['**/lua/host.js', '**/lua/host', '**/lua/engine.js', '**/lua/engine'],
+              message:
+                'Lua host boundary: WasmoonLuaHost/WasmoonLuaEngine are constructed only in the host implementation and the substrate factory (engine/services/module-runtime.ts, behind the engine production door). Depend on the domain facade (engine/facade.ts) or the engine-internal contract (engine/contract.ts) instead.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 );

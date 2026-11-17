@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import type { HostLogRecord } from '@fmd/contract';
+import type { LuaHost, LuaHostFactory } from '../contract.js';
 import { maxToleratedSyncFailures } from '@fmd/contract';
-import { createLuaHost, type WasmoonLuaHost } from '../lua/host.js';
 import { createMemoryLogger, type MemoryLogger } from '../lua/logger.js';
 import { DeadlineAbortHandle, createDeadlineCells } from '../lua/abort.js';
 import { RecordedResponseResolver } from '../shims/http-shim.js';
@@ -28,6 +28,12 @@ export interface ModuleSyncOptions {
   readonly luaRoot?: string;
   /** Modules directory (default: `<luaRoot>/modules`). */
   readonly modulesDir?: string;
+  /**
+   * Lua host factory (injected by the composition root): constructs the
+   * sweep's host behind the contract LuaHost interface — substitute
+   * hosts wire in here without touching the sweep.
+   */
+  readonly hostFactory: LuaHostFactory;
 }
 
 export interface FileSweepResult {
@@ -85,13 +91,29 @@ export function sortRegistrations(modules: readonly RegistrationRecord[]): Regis
   );
 }
 
-export class ModuleSyncService {
+/**
+ * The sweep surface consumers use (engine-boundary story): the structural
+ * PORT behind ModuleRuntime.createSweep — stub substrates implement this
+ * without the class's private state, StartupRegistryService accepts it.
+ */
+export interface ModuleTreeSweepPort {
+  /** The `*.lua` module files of the tree, sorted (the sweep order). */
+  discoverFiles(): string[];
+  /** Content SHA of the tree (or an explicit file list). */
+  treeSha(files?: readonly string[]): string;
+  /** Full-tree registration sweep (per-file error isolation). */
+  sweep(): Promise<SweepResult>;
+}
+
+export class ModuleSyncService implements ModuleTreeSweepPort {
   private readonly luaRoot: string;
   private readonly modulesDir: string;
+  private readonly hostFactory: LuaHostFactory;
 
-  constructor(options: ModuleSyncOptions = {}) {
+  constructor(options: ModuleSyncOptions) {
     this.luaRoot = resolve(options.luaRoot ?? FMD2_LUA_ROOT);
     this.modulesDir = resolve(options.modulesDir ?? join(this.luaRoot, 'modules'));
+    this.hostFactory = options.hostFactory;
   }
 
   /** The `*.lua` module files of the tree, sorted (the sweep order). */
@@ -130,7 +152,7 @@ export class ModuleSyncService {
     const files = this.discoverFiles();
     const treeSha = this.treeSha(files);
     const logger = createMemoryLogger();
-    const host = createLuaHost(logger);
+    const host = this.hostFactory.createHost(logger);
     const out: FileSweepResult[] = [];
     try {
       for (const file of files) {
@@ -149,7 +171,7 @@ export class ModuleSyncService {
 
   /** One file's Init pass — the isolation boundary. */
   private async sweepFile(
-    host: WasmoonLuaHost,
+    host: LuaHost,
     logger: MemoryLogger,
     file: string,
   ): Promise<FileSweepResult> {

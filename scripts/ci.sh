@@ -43,6 +43,12 @@ npm run lint
 echo "==> typecheck"
 npm run typecheck
 
+echo "==> engine boundary gate (facade-only door; no Lua outside engine; engine-inward deps; domain-shaped facade)"
+bash scripts/engine-boundary-gate.sh
+
+echo "==> engine boundary mutation tests (each rule must fire on a planted violation)"
+bash scripts/engine-boundary-mutate.sh
+
 echo "==> test (unit + integration — the one offline suite, DESIGN.md §13)"
 npm test
 

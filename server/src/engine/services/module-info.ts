@@ -1,19 +1,23 @@
+/**
+ * Engine-backed live info (§5.8) — MOVED inside the engine by the
+ * engine-boundary story: host-driving MECHANISM. The api layer sees only
+ * the ModuleInfoPort + the contract's NormalizedInfo domain shape (via the
+ * facade); failures throw the contract's typed ApiError envelope.
+ */
 import type { HostLogRecord } from '@fmd/contract';
-import { ApiError } from '../api/errors.js';
-import type { InfoService, NormalizedInfo } from '../api/services.js';
-import { DeadlineAbortHandle, createDeadlineCells } from '../engine/lua/abort.js';
-import { createLuaHost, type WasmoonLuaHost } from '../engine/lua/host.js';
-import { createMemoryLogger, TeeMemoryLogger, type MemoryLogger } from '../engine/lua/logger.js';
-import { createContractDispatcher } from '../engine/events/dispatcher.js';
-import { initShimsHook, installShims, loadRealModuleFile } from '../engine/shims/install.js';
-import { RecordedResponseResolver } from '../engine/shims/http-shim.js';
-import type { EgressPolicy, HttpTransportPort } from '../engine/shims/http-shim.js';
-import type { ProxyConfig } from '../engine/shims/http-proxy.js';
-import type { BypassExecutorPort } from '../engine/sidecar/bypass-adapter.js';
-import type { SwallowSharedDeduper } from '../engine/shims/txquery-shim.js';
-import { normalizeMangaInfo } from '../engine/normalize/udata.js';
-import type { RegistrationRecord } from '../engine/registry/capabilities.js';
-import type { ModuleSharedState } from '../engine/state/module-state.js';
+import type { LuaHost, LuaHostFactory } from '../contract.js';
+import { ApiError, type NormalizedInfo } from '@fmd/contract';
+import { DeadlineAbortHandle, createDeadlineCells } from '../lua/abort.js';
+import { createMemoryLogger, TeeMemoryLogger, type MemoryLogger } from '../lua/logger.js';
+import { initShimsHook, installShims, loadRealModuleFile } from '../shims/install.js';
+import { RecordedResponseResolver } from '../shims/http-shim.js';
+import type { EgressPolicy, HttpTransportPort } from '../shims/http-shim.js';
+import type { ProxyConfig } from '../shims/http-proxy.js';
+import type { BypassExecutorPort } from '../sidecar/bypass-adapter.js';
+import type { SwallowSharedDeduper } from '../shims/txquery-shim.js';
+import { normalizeMangaInfo } from '../normalize/udata.js';
+import type { RegistrationRecord } from '../registry/capabilities.js';
+import type { ModuleSharedState } from '../state/module-state.js';
 
 /**
  * Engine-backed live info (§5.8): POST /api/info runs the module's real
@@ -63,14 +67,27 @@ export interface EngineInfoOptions {
    * via module_state at the end of the call.
    */
   readonly moduleState?: (moduleId: string) => Promise<ModuleSharedState>;
+  /**
+   * Lua host factory (injected by the composition root): constructs the
+   * per-call host behind the contract LuaHost interface — substitute
+   * hosts (test doubles) wire in here without touching this service.
+   */
+  readonly hostFactory: LuaHostFactory;
 }
 
 /** no_error / net_problem (§5.2 dispatch result codes). */
 const NO_ERROR = 0;
 
-export class EngineInfoService implements InfoService {
+/** The module-info SERVICE port (facade-exported; stub substrates implement this). */
+export interface ModuleInfoPort {
+  getInfo(moduleId: string, url: string): Promise<NormalizedInfo>;
+  /** Dispose any engine still alive (SIGTERM drain). */
+  dispose(): Promise<void>;
+}
+
+export class EngineInfoService implements ModuleInfoPort {
   private tail: Promise<unknown> = Promise.resolve();
-  private readonly hosts: Set<WasmoonLuaHost> = new Set();
+  private readonly hosts: Set<LuaHost> = new Set();
 
   constructor(private readonly options: EngineInfoOptions) {}
 
@@ -99,7 +116,7 @@ export class EngineInfoService implements InfoService {
     const logger: MemoryLogger = sink === undefined
       ? createMemoryLogger()
       : new TeeMemoryLogger(sink);
-    const host: WasmoonLuaHost = createLuaHost(logger);
+    const host: LuaHost = this.options.hostFactory.createHost(logger);
     this.hosts.add(host);
     try {
       const abort = new DeadlineAbortHandle(createDeadlineCells());
@@ -155,7 +172,7 @@ export class EngineInfoService implements InfoService {
         if (shimKit === undefined) {
           throw new ApiError(502, 'upstream_error', 'shim install did not run');
         }
-        const dispatcher = createContractDispatcher(engine, abort, logger, undefined, undefined, undefined, {
+        const dispatcher = host.createDispatcher(engine, abort, undefined, {
           makeHTTP: shimKit.makeHTTP,
           ...(sharedCookies !== undefined ? { moduleCookies: () => sharedCookies } : {}),
         });
@@ -173,7 +190,7 @@ export class EngineInfoService implements InfoService {
         if (result.kind !== 'code' || result.value !== NO_ERROR) {
           throw new ApiError(502, 'upstream_error', `GetInfo returned net_problem for ${url}`);
         }
-        return this.readNormalizedInfo(engine.innerEngine.doStringSync.bind(engine.innerEngine));
+        return this.readNormalizedInfo(engine.doStringSync.bind(engine));
       } finally {
         await engine.dispose();
       }

@@ -1,5 +1,5 @@
 import { LuaReturn, type LuaEngine as WasmoonEngine, type LuaWasm } from 'wasmoon';
-import type { LuaChunk } from '@fmd/contract';
+import type { LuaChunk } from '../contract.js';
 
 /**
  * Chunk loading (§5.12): load cached bytecode into a Lua state and run its

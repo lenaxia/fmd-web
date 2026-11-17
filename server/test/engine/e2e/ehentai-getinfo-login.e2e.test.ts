@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { openSession } from './harness.js';
 import { compareOrUpdateGolden } from './golden.js';
-import type { LuaModuleDescriptor } from '@fmd/contract';
+import type { LuaModuleDescriptor } from '../../../src/engine/contract.js';
 
 /**
  * E2E seed flow 5 — EHentai GetInfo + ExHentai Login + GetDirectoryPageNumber:

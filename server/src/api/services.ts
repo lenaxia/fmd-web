@@ -12,7 +12,7 @@
  */
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import type { RegistrationRecord } from '../engine/registry/capabilities.js';
+import type { RegistrationRecord } from '../engine/facade.js';
 import { isValidCatalogId } from '../sync/db/catalog-store.js';
 import type {
   CatalogStore,
@@ -22,6 +22,7 @@ import type {
   JobBulkActionRequestT,
   JobBulkActionResponseT,
   JobStateT,
+  NormalizedInfo,
 } from '@fmd/contract';
 import { catalogSyncJobId } from '@fmd/contract';
 import { OutputDefaultsSchema } from './schemas.js';
@@ -606,21 +607,13 @@ export function resolveModuleByHost(
   return { noMatch: true };
 }
 
-export interface NormalizedInfo {
-  title: string;
-  altTitles: string;
-  authors: string;
-  artists: string;
-  genres: string;
-  status: string;
-  summary: string;
-  coverLink: string;
-  url: string;
-  link: string;
-  chapterLinks: string[];
-  chapterNames: string[];
-  numChapter: number;
-}
+/**
+ * The §5.8 GetInfo result now LIVES in @fmd/contract (engine-boundary
+ * story: the engine-side module-info service produces it, the API
+ * serializes it — a genuine cross-boundary domain shape). Re-exported
+ * here so existing api-layer imports stay untouched.
+ */
+export type { NormalizedInfo } from '@fmd/contract';
 
 /** GetInfo + §5.8 normalization boundary (engine-backed in production). */
 export interface InfoService {
@@ -700,7 +693,9 @@ export interface JobsPage {
  * Jobs-list filter set (Downloads parity): the pre-existing single
  * `state`, plus the web multi-select (`states`), the title/chapter
  * substring (`q`) and the created-at window (`addedFrom`/`addedTo`,
- * inclusive calendar days parsed as UTC).
+ * inclusive calendar days parsed as UTC). R5 arrival adds `since` —
+ * an ISO-timestamp floor on the row's last transition (`updatedAt`),
+ * the finished-since source for the away summary.
  */
 export interface JobsListOptions {
   readonly state?: JobRecord['state'];
@@ -708,6 +703,7 @@ export interface JobsListOptions {
   readonly q?: string;
   readonly addedFrom?: string;
   readonly addedTo?: string;
+  readonly since?: string;
   readonly cursor?: string;
   readonly limit: number;
 }
@@ -779,6 +775,33 @@ export class InMemoryJobService implements JobService {
   /** Register the in-flight cancel hook for one running job id. */
   addCancelHook(id: string, cancel: () => void): void {
     this.cancelHooks.set(id, cancel);
+  }
+
+  /**
+   * Test seam (harness): force a row's state (+progress, +createdAt —
+   * the date-window filter tests backdate rows) — the in-memory analog
+   * of the SQLite lane's transitions. Production code never calls
+   * this; states arrive via create/cancel/action.
+   */
+  forceState(
+    id: string,
+    state: JobRecord['state'],
+    progress?: Record<string, unknown>,
+    createdAt?: string,
+  ): JobRecord {
+    const job = this.jobs.get(id);
+    if (job === undefined) {
+      throw new ApiError(404, 'not_found', `unknown job: ${id}`);
+    }
+    const next: JobRecord = {
+      ...job,
+      state,
+      ...(progress !== undefined ? { progress } : {}),
+      ...(createdAt !== undefined ? { createdAt } : {}),
+      updatedAt: new Date().toISOString(),
+    };
+    this.jobs.set(id, next);
+    return next;
   }
 
   removeCancelHook(id: string): void {
@@ -891,6 +914,9 @@ export class InMemoryJobService implements JobService {
       opts.addedFrom !== undefined ? Date.parse(`${opts.addedFrom}T00:00:00.000Z`) : undefined;
     const toMs =
       opts.addedTo !== undefined ? Date.parse(`${opts.addedTo}T23:59:59.999Z`) : undefined;
+    // R5 arrival: last-transition floor (with state=done this is the
+    // "finished since" set — updatedAt IS the done timestamp).
+    const sinceMs = opts.since !== undefined ? Date.parse(opts.since) : undefined;
     const all = [...this.jobs.values()]
       .filter((j) => Number(j.id) < boundaryId)
       .filter((j) => opts.state === undefined || j.state === opts.state)
@@ -912,6 +938,16 @@ export class InMemoryJobService implements JobService {
           return false;
         }
         return (fromMs === undefined || created >= fromMs) && (toMs === undefined || created <= toMs);
+      })
+      .filter((j): boolean => {
+        if (sinceMs === undefined) {
+          return true;
+        }
+        const updated = Date.parse(j.updatedAt);
+        if (Number.isNaN(updated)) {
+          return false;
+        }
+        return updated >= sinceMs;
       })
       .sort((a, b): number => Number(b.id) - Number(a.id));
     const page = all.slice(0, opts.limit);
@@ -959,27 +995,40 @@ export class InMemoryJobService implements JobService {
           return this.resume(id);
         }
         if (type === 'resume' && job.state === 'cancelled') {
-          return this.reenqueue(job);
+          return this.reenqueue(job).job;
         }
         throw illegal();
       }
       case 'retry': {
         if (job.state === 'failed') {
-          return this.reenqueue(job);
+          return this.reenqueue(job).job;
         }
         throw illegal();
       }
       case 'redownload': {
         if (job.state === 'done') {
-          return this.reenqueue(job);
+          return this.reenqueue(job).job;
         }
         throw illegal();
       }
     }
   }
 
-  /** Fresh queued copy of a terminal row (the chained re-enqueue analog). */
-  private reenqueue(job: JobRecord): JobRecord {
+  /**
+   * Fresh queued copy of a terminal row (the chained re-enqueue
+   * analog). Chain-aware like the runtime `<key>#<n>` probe: a
+   * terminal row that was ALREADY re-enqueued replays its fresh row
+   * (`replayed: true`) — bulk resume-all counts only fresh ones, so a
+   * settled queue reports affected: 0.
+   */
+  private reenqueue(job: JobRecord): { job: JobRecord; replayed: boolean } {
+    const existingId = this.resumeChain.get(job.id);
+    if (existingId !== undefined) {
+      const existing = this.jobs.get(existingId);
+      if (existing !== undefined && existing.state !== 'done' && existing.state !== 'failed' && existing.state !== 'cancelled') {
+        return { job: existing, replayed: true }; // the live re-enqueue
+      }
+    }
     const now = new Date().toISOString();
     const { error: _error, progress: _progress, paused: _paused, ...rest } = job;
     void _error;
@@ -994,8 +1043,12 @@ export class InMemoryJobService implements JobService {
     };
     this.nextId += 1;
     this.jobs.set(fresh.id, fresh);
-    return fresh;
+    this.resumeChain.set(job.id, fresh.id);
+    return { job: fresh, replayed: false };
   }
+
+  /** original id → live re-enqueued row (the chain probe double). */
+  private readonly resumeChain = new Map<string, string>();
 
   remove(id: string, opts: { readonly data?: boolean } = {}): { job: JobRecord; dataDeleted: boolean } {
     const job = this.jobs.get(id);
@@ -1037,7 +1090,18 @@ export class InMemoryJobService implements JobService {
         if (job.state === 'queued' && job.paused === true) {
           touched.push(this.action(job.id, 'enable'));
         } else if (job.state === 'cancelled') {
-          touched.push(this.action(job.id, 'resume'));
+          // Chain-aware like the runtime bulk: only FRESH re-enqueues
+          // count — a replayed live successor is a no-op (idempotence).
+          const successorId = this.resumeChain.get(job.id);
+          const successor = successorId !== undefined ? this.jobs.get(successorId) : undefined;
+          const replayed =
+            successor !== undefined &&
+            successor.state !== 'done' &&
+            successor.state !== 'failed' &&
+            successor.state !== 'cancelled';
+          if (!replayed) {
+            touched.push(this.action(job.id, 'resume'));
+          }
         }
       } else if (job.state === 'done') {
         this.remove(job.id);
@@ -1407,9 +1471,14 @@ export class InMemoryFavoriteService implements FavoriteService {
     /**
      * Transfer-mapping stand-in (the production adapter searches the
      * target catalog + dry-runs GetInfo): resolves a target-site title
-     * match or undefined. Default: nothing resolves (invalid preview).
+     * match, a reason-bearing miss (`no-catalog` / `get-info-failed`,
+     * mirroring the engine taxonomy), or undefined (`not-found`).
+     * Default: nothing resolves (invalid preview).
      */
-    private readonly transferIndex: (moduleId: string, title: string) => { url: string; title: string } | undefined =
+    private readonly transferIndex: (
+      moduleId: string,
+      title: string,
+    ) => { url: string; title: string } | { reason: 'no-catalog' | 'get-info-failed' } | undefined =
       (): undefined => undefined,
   ) {}
 
@@ -1505,7 +1574,7 @@ export class InMemoryFavoriteService implements FavoriteService {
     try {
       const results: FavoriteCheckBatchItemT[] = [];
       let checked = 0;
-      let failed = 0;
+      const failed = 0;
       let queuedDownloads = 0;
       let cancelled = false;
       for (const id of [...this.order]) {
@@ -1558,6 +1627,9 @@ export class InMemoryFavoriteService implements FavoriteService {
     const hit = title === '' ? undefined : this.transferIndex(targetModuleId, title);
     if (hit === undefined) {
       return { targetModuleId, valid: false, targetUrl: null, matchedTitle: null, reason: 'not-found' };
+    }
+    if (!('url' in hit)) {
+      return { targetModuleId, valid: false, targetUrl: null, matchedTitle: null, reason: hit.reason };
     }
     return { targetModuleId, valid: true, targetUrl: hit.url, matchedTitle: hit.title };
   }

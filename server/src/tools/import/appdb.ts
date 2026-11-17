@@ -5,7 +5,7 @@ import type { ModuleId } from '@fmd/contract';
 import type {
   ModuleStatePersistence,
   PersistedModuleState,
-} from '../../engine/state/persistence.js';
+} from '../../engine/facade.js';
 
 /**
  * The one-shot import commands' SQLite targets (§9 app.db). The import is

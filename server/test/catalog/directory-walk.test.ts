@@ -8,7 +8,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { CatalogFallbackError } from '@fmd/contract';
-import { EngineDirectoryWalker, MAX_DIRECTORY_PAGES } from '../../src/catalog/directory-walk.js';
+import { EngineDirectoryWalker, MAX_DIRECTORY_PAGES } from '../../src/engine/services/directory-walk.js';
+import { createLuaHostFactory } from '../../src/engine/lua/host.js';
 import { RecordedHttpTransport } from '../../src/engine/shims/http-transport.js';
 import { RecordedResponseResolver, type ResolvedRecordedResponse } from '../../src/engine/shims/http-shim.js';
 import { EgressPolicy } from '../../src/engine/shims/http-egress.js';
@@ -113,6 +114,7 @@ function walkerFor(
 ): EngineDirectoryWalker {
   return new EngineDirectoryWalker({
     luaRoot: '/workspace/FMD2/lua',
+    hostFactory: createLuaHostFactory(),
     modules: (): readonly RegistrationRecord[] => registrations,
     transport,
     egress: new EgressPolicy({ allow: ['hentai2read.com'] }),

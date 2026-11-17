@@ -26,7 +26,7 @@
  * accepts CRLF either way).
  */
 
-import { compareText } from '../../engine/lua/tstrings.js';
+import { compareLegacyText } from '../../engine/facade.js';
 
 /** FPC GetNextLine / DoSetTextStr line split (stringl.inc:834-947). */
 export function splitTextLines(value: string): string[] {
@@ -81,7 +81,7 @@ export function mergeCaseInsensitive(...inputs: string[]): string {
       while (lo < hi) {
         const mid = lo + ((hi - lo) >> 1);
         const existing = merged[mid] ?? '';
-        const cmp = compareText(line, existing);
+        const cmp = compareLegacyText(line, existing);
         if (cmp === 0) {
           hit = true;
           break;
@@ -109,7 +109,7 @@ export function mergeCaseInsensitive(...inputs: string[]): string {
  */
 export function hasChapter(text: string, line: string): boolean {
   for (const existing of splitTextLines(text)) {
-    if (compareText(line, existing) === 0) {
+    if (compareLegacyText(line, existing) === 0) {
       return true;
     }
   }

@@ -3,7 +3,11 @@ import { basename, dirname, join, resolve, sep } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import type { SyncPin } from '../pin.js';
 import type { HostLogger } from '@fmd/contract';
-import { createMemoryLogger } from '../../engine/lua/logger.js';
+import {
+  createHostLogBuffer,
+  type ModuleHostFactory,
+  type StagedTreeValidation,
+} from '../../engine/facade.js';
 import type { ModuleSyncConfig } from './config.js';
 import { ModuleSyncConfigError } from './config.js';
 import { codeloadZipballUrl } from './config.js';
@@ -13,8 +17,6 @@ import type { SyncStateEntry, SyncStateStore, ModuleSyncReport } from './state.j
 import { FileSyncStateStore } from './state.js';
 import type { ModuleInventoryEntry } from './diff.js';
 import { diffModuleInventories } from './diff.js';
-import type { StagedTreeValidation } from './validate.js';
-import { StagedInitError, validateStagedLuaTree } from './validate.js';
 import { installStagedTree } from './swap.js';
 import { readTarGz } from './tarball.js';
 import { readZipball, type ZipballEntry } from './zipball.js';
@@ -64,6 +66,11 @@ export interface ModuleSyncDeps {
   readonly logger?: HostLogger;
   /** Injectable clock for deterministic `fetched_at` (tests). */
   readonly now?: () => string;
+  /**
+   * Lua host factory (injected by the composition root): feeds the
+   * staged-tree Init-pass validation behind the contract interface.
+   */
+  readonly hostFactory: ModuleHostFactory;
 }
 
 export interface ModuleSyncService {
@@ -84,7 +91,7 @@ export function expectedZipballRoot(repo: string, sha: string): string {
 
 export function createModuleSyncService(
   config: ModuleSyncConfig,
-  deps: ModuleSyncDeps = {},
+  deps: ModuleSyncDeps,
 ): ModuleSyncService {
   if (config.autoBump) {
     throw new ModuleSyncConfigError(
@@ -94,7 +101,7 @@ export function createModuleSyncService(
   }
   const fetcher = deps.fetcher ?? new CodeloadArchiveFetcher();
   const stateStore = deps.stateStore ?? new FileSyncStateStore(join(config.dataDir, 'sync-state.json'));
-  const logger = deps.logger ?? createMemoryLogger();
+  const logger = deps.logger ?? createHostLogBuffer();
   const now = deps.now ?? ((): string => new Date().toISOString());
 
   return {
@@ -115,9 +122,17 @@ export function createModuleSyncService(
           await stageArchiveSubtree(config, fetcher, stagedDir);
         }
 
+        // The staged Init-pass validator is behind the engine production
+        // door (its module transitively imports the shim installer →
+        // wasmoon): loaded lazily HERE so the app's static graph — and a
+        // substituted substrate's boot path — stays wasmoon-free.
+        const { validateStagedLuaTree, StagedInitError } = await import('../../engine/index.js');
         let validation: StagedTreeValidation;
         try {
-          validation = await validateStagedLuaTree(stagedDir, logger, { previousInventory });
+          validation = await validateStagedLuaTree(stagedDir, logger, {
+            previousInventory,
+            hostFactory: deps.hostFactory,
+          });
         } catch (error) {
           if (error instanceof StagedInitError) {
             throw new ModuleSyncError(

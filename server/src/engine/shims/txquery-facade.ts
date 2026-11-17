@@ -1,8 +1,9 @@
 import fontoxpath from 'fontoxpath';
 const { evaluateXPath } = fontoxpath;
 import type { HostLogger, ModuleId } from '@fmd/contract';
+import type { LuaFacadeBridge } from '../contract.js';
 import { toStr } from '../lua/base-globals.js';
-import type { FacadeBridge, FacadeGetResult, FacadeSpec } from '../lua/facade.js';
+import type { FacadeGetResult, FacadeSpec } from '../lua/facade.js';
 import {
   ensureLinkedomLowercase,
   fmdNamespaceResolver,
@@ -104,7 +105,7 @@ export interface TxQueryEngineLike {
 }
 
 export interface TxQueryShimOptions {
-  readonly bridge: FacadeBridge;
+  readonly bridge: LuaFacadeBridge;
   readonly engine: TxQueryEngineLike;
   readonly logger: HostLogger | null;
   readonly moduleId: ModuleId;

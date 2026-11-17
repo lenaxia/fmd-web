@@ -10,7 +10,7 @@ import type { CatalogEntry } from '@fmd/contract';
 import { buildApp } from '../../src/api/app.js';
 import { LiveScrapeCatalogStore } from '../../src/catalog/live-scrape-store.js';
 import { UpdateLaneScrapeGate } from '../../src/catalog/update-lane-gate.js';
-import type { DirectoryWalkPort } from '../../src/catalog/directory-walk.js';
+import type { DirectoryWalkPort } from '../../src/engine/services/directory-walk.js';
 import type { RegistrationRecord } from '../../src/engine/registry/capabilities.js';
 import {
   InMemoryCatalogStore,

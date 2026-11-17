@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { LuaFactory } from 'wasmoon';
-import type { LuaChunk, LuaChunkCache } from '@fmd/contract';
+import type { LuaChunk, LuaChunkCache } from '../contract.js';
 
 /**
  * Chunk cache (DESIGN.md §5.12): chunks compiled once, cached by file SHA

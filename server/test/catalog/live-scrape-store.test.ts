@@ -11,10 +11,10 @@ import {
   type CatalogPage,
 } from '@fmd/contract';
 import { LiveScrapeCatalogStore, DEFAULT_LIVE_SCRAPE_TTL_MS } from '../../src/catalog/live-scrape-store.js';
-import { normalizeDirectoryEntries } from '../../src/catalog/directory-walk.js';
+import { normalizeDirectoryEntries } from '../../src/engine/services/directory-walk.js';
 import { UpdateLaneScrapeGate } from '../../src/catalog/update-lane-gate.js';
 import { makeRegistration } from '../api/helpers.js';
-import type { DirectoryWalkPort } from '../../src/catalog/directory-walk.js';
+import type { DirectoryWalkPort } from '../../src/engine/services/directory-walk.js';
 
 const MODULE_ID = 'b'.repeat(32);
 const OTHER_ID = 'd'.repeat(32);

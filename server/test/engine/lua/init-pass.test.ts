@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import type { LuaModuleDescriptor } from '@fmd/contract';
+import type { LuaModuleDescriptor } from '../../../src/engine/contract.js';
 import { createLuaHost } from '../../../src/engine/lua/host.js';
 import { createMemoryLogger } from '../../../src/engine/lua/logger.js';
 

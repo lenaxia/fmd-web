@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { EventDispatchResult, HttpAbortHandle, LuaModuleDescriptor } from '@fmd/contract';
+import type { HttpAbortHandle } from '../../../src/engine/contract.js';
+import type { EventDispatchResult, LuaModuleDescriptor } from '../../../src/engine/contract.js';
 import { DeadlineAbortHandle, createDeadlineCells } from '../../../src/engine/lua/abort.js';
 import { createLuaHost } from '../../../src/engine/lua/host.js';
 import { createMemoryLogger } from '../../../src/engine/lua/logger.js';

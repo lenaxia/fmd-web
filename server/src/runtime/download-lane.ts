@@ -36,7 +36,10 @@ import { SqliteLibraryStore } from '../jobs/library/store.js';
 import type { OutputDefaultsT, PerformanceSettingsT } from '../api/schemas.js';
 import type { FileNamePolicyMode } from '@fmd/contract';
 import type { WsHub } from '../api/ws/hub.js';
-import { EngineDownloadHooks, type EngineDownloadOptions } from './download-engine.js';
+import type {
+  EngineDownloadOptions,
+  ModuleDownloadHooks,
+} from '../engine/facade.js';
 
 /**
  * The production download path (DESIGN §4/§7.1): the §10 JobService port
@@ -314,6 +317,9 @@ export class RuntimeJobService implements JobService {
       opts.addedFrom !== undefined ? Date.parse(`${opts.addedFrom}T00:00:00.000Z`) : undefined;
     const toMs =
       opts.addedTo !== undefined ? Date.parse(`${opts.addedTo}T23:59:59.999Z`) : undefined;
+    // R5 arrival: last-transition (updatedAt ms) floor — with
+    // state=done the "finished since" set for the away summary.
+    const sinceMs = opts.since !== undefined ? Date.parse(opts.since) : undefined;
     const all = this.queue
       .list({ ...(opts.state !== undefined ? { state: opts.state } : {}), lane: 'download' })
       .filter((job): boolean => Number(job.id) < boundaryId)
@@ -336,6 +342,7 @@ export class RuntimeJobService implements JobService {
         }
         return (fromMs === undefined || job.createdAt >= fromMs) && (toMs === undefined || job.createdAt <= toMs);
       })
+      .filter((job): boolean => sinceMs === undefined || job.updatedAt >= sinceMs)
       .sort((a, b): number => Number(b.id) - Number(a.id));
     const page = all.slice(0, opts.limit);
     const last = page.at(-1);
@@ -408,15 +415,19 @@ export class RuntimeJobService implements JobService {
     );
   }
 
-  /** Fresh chained attempt for a terminal row (resumes from markers). */
-  private reenqueue(job: QueueJob): JobRecord {
+  /** Fresh chained attempt for a terminal row (resumes from markers).
+   * A LIVE chained row replays (no duplicate) — `replayed: true`. */
+  private reenqueue(job: QueueJob): { job: JobRecord; replayed: boolean } {
     const chained = this.enqueueChained(
       job.payload.type === 'download'
         ? job.payload
         : { type: 'download', moduleId: '', mangaUrl: '', chapterLink: '' },
       job.idempotencyKey,
     );
-    return toJobRecord(chained.job, chained.key ?? job.idempotencyKey);
+    return {
+      job: toJobRecord(chained.job, chained.key ?? job.idempotencyKey),
+      replayed: chained.replayed,
+    };
   }
 
   action(id: string, type: JobActionTypeT): JobRecord {
@@ -444,19 +455,19 @@ export class RuntimeJobService implements JobService {
           return job.paused ? toJobRecord(this.queue.resume(id)) : toJobRecord(job);
         }
         if (type === 'resume' && job.state === 'cancelled') {
-          return this.reenqueue(job);
+          return this.reenqueue(job).job;
         }
         break;
       }
       case 'retry': {
         if (job.state === 'failed') {
-          return this.reenqueue(job);
+          return this.reenqueue(job).job;
         }
         break;
       }
       case 'redownload': {
         if (job.state === 'done') {
-          return this.reenqueue(job);
+          return this.reenqueue(job).job;
         }
         break;
       }
@@ -517,7 +528,12 @@ export class RuntimeJobService implements JobService {
           if (job.state === 'queued' && job.paused) {
             touched.push(toJobRecord(this.queue.resume(job.id)));
           } else if (job.state === 'cancelled') {
-            touched.push(this.reenqueue(job));
+            // Chain-aware: a LIVE chained row replays — only FRESH
+            // re-enqueues count (a settled queue reports affected: 0).
+            const resumed = this.reenqueue(job);
+            if (!resumed.replayed) {
+              touched.push(resumed.job);
+            }
           }
         } else if (job.state === 'done') {
           this.remove(job.id);
@@ -567,6 +583,16 @@ export interface DownloadLaneDeps {
   /** `<dataDir>` — downloads work dirs + the library root live under it. */
   readonly dataDir: string;
   readonly engine: EngineDownloadOptions;
+  /**
+   * ENGINE SUBSTRATE SEAM (engine-boundary story): the §7.1 download-event
+   * hooks factory. Defaults to the wasmoon-backed EngineDownloadHooks; the
+   * assembly injects the ModuleRuntime substrate's factory (the
+   * stub-substrate boot proof substitutes scripted hooks here).
+   */
+  readonly createHooks?: (
+    moduleId: string,
+    options: EngineDownloadOptions,
+  ) => Promise<ModuleDownloadHooks>;
   readonly active: ActiveDownloadRegistry;
   readonly log: (message: string) => void;
   /** Per-image retry budget (default 2 — FMD2 RetryCount analog). */
@@ -669,7 +695,7 @@ export function downloadLane(deps: DownloadLaneDeps): LaneRunnerLaneOptions {
 
     ctx.setProgress({ stage: 'prepare', done: 0, total: 0 });
 
-    let hooks: EngineDownloadHooks | undefined;
+    let hooks: ModuleDownloadHooks | undefined;
     let runner: DownloadChapterRunner | undefined;
     try {
       // Terminal-before-start race (cancel landed between claim and here).
@@ -678,7 +704,14 @@ export function downloadLane(deps: DownloadLaneDeps): LaneRunnerLaneOptions {
         return { type: 'failed', kind: 'net', error: 'cancelled before start' };
       }
 
-      hooks = await EngineDownloadHooks.create(payload.moduleId, deps.engine);
+      // Default = the wasmoon-backed hooks, loaded lazily through the
+      // production door (keeps the lane's static graph wasmoon-free for
+      // substituted substrates; the assembly always injects createHooks).
+      const createHooks =
+        deps.createHooks ??
+        (async (moduleId: string, options: EngineDownloadOptions): Promise<ModuleDownloadHooks> =>
+          (await import('../engine/index.js')).EngineDownloadHooks.create(moduleId, options));
+      hooks = await createHooks(payload.moduleId, deps.engine);
       const limiter = new PerHostSiteLimiter();
       const resumeMarkers = readMarkers(workDir);
       // Downloads parity: FMD2 shows the HTTP transfer rate while a

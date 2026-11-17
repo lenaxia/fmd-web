@@ -1,4 +1,5 @@
-import type { EventDispatchResult, JobFailureKind } from '@fmd/contract';
+import type { JobFailureKind } from '@fmd/contract';
+import type { EventDispatchResult } from '../contract.js';
 import { DEFAULT_RSS_BUDGET_BYTES, WORKER_STALL_TOLERANCE } from '../lua/worker-pool.js';
 
 /**

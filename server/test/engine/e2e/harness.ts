@@ -10,7 +10,7 @@ import {
 } from '../../../src/engine/shims/install.js';
 import { RecordedResponseResolver, type RecordedResponse } from '../../../src/engine/shims/http-shim.js';
 import type { CookieJarPort } from '../../../src/engine/shims/http-cookies.js';
-import type { EventContext, EventDispatchResult, LuaModuleDescriptor } from '@fmd/contract';
+import type { EventContext, EventDispatchResult, LuaModuleDescriptor } from '../../../src/engine/contract.js';
 import type { MemoryLogger } from '../../../src/engine/lua/logger.js';
 import type { WasmoonLuaEngine } from '../../../src/engine/lua/engine.js';
 import { makeMangaInfoSpec } from '../../../src/engine/lua/mangainfo.js';

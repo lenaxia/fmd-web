@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync, existsSync } from 'node:fs';
 import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
-import type { HttpAbortHandle } from '@fmd/contract';
+import type { HttpAbortHandle } from '../contract.js';
 import { toBool, toInteger, toStr } from './base-globals.js';
 import type { FacadeBridge, FacadeSpec } from './facade.js';
 import { PascalTStrings } from './tstrings.js';

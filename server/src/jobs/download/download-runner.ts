@@ -1,10 +1,10 @@
 import { existsSync } from 'node:fs';
-import { ChapterPipeline, NO_WORK } from '../../engine/pipeline/chapter-pipeline.js';
-import { PAGE_LINK_WAITING, isDoneMarker, isWaitingMarker } from '../../engine/pipeline/markers.js';
-import type { PipelineWorkId } from '../../engine/pipeline/chapter-pipeline.js';
+import { ChapterPipeline, NO_WORK } from '../../engine/facade.js';
+import { PAGE_LINK_WAITING, isDoneMarker, isWaitingMarker } from '../../engine/facade.js';
+import type { PipelineWorkId } from '../../engine/facade.js';
 import { composeFileName } from './filenames.js';
 import { findImageFile, saveImageStreamToFile } from './image-files.js';
-import { HttpImageDownloader } from './http-downloader.js';
+import { ModuleImageDownloader } from '../../engine/facade.js';
 import type {
   CancelToken,
   ChapterModuleHooks,
@@ -90,7 +90,7 @@ export interface DownloadChapterOptions {
   readonly onImageSaved?: (workId: number, byteLength: number) => void;
   /** Extra request headers (module-set, e.g. Referer). */
   readonly extraHeaders?: Readonly<Record<string, string>>;
-  /** Downloader override (tests); default HttpImageDownloader. */
+  /** Downloader override (tests); default ModuleImageDownloader. */
   readonly downloader?: ImageDownloader;
   /** Per-image retry budget (transport/5xx). */
   readonly imageRetryBudget?: number;
@@ -140,7 +140,7 @@ export class DownloadChapterRunner {
     this.maxThreads = Math.max(1, Math.trunc(options.maxThreadPerTaskLimit ?? 1));
     this.downloader =
       options.downloader ??
-      new HttpImageDownloader({
+      new ModuleImageDownloader({
         limiter: deps.limiter,
         cancel: this.cancelToken,
         ...(options.imageRetryBudget !== undefined

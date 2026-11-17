@@ -1,6 +1,6 @@
 import type { ModuleId } from '@fmd/contract';
 import { ApiError } from '../api/errors.js';
-import type { ModuleStatePersistence } from '../engine/state/persistence.js';
+import type { ModuleStatePersistence } from '../engine/facade.js';
 import { openSecret, sealSecret, SecretBoxError } from './secret-box.js';
 import {
   SqliteAccountStore,

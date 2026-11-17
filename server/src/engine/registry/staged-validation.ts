@@ -1,16 +1,18 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
-import type { HostLogger } from '@fmd/contract';
-import { TolerancePolicy, SYNC_FAILURE_TOLERANCE, type ToleranceRefusalReason } from '@fmd/contract';
-import { LuaFactory } from 'wasmoon';
-import { WasmoonChunkCache } from '../../engine/lua/chunk-cache.js';
-import { createLuaHost } from '../../engine/lua/host.js';
-import { DeadlineAbortHandle, createDeadlineCells } from '../../engine/lua/abort.js';
-import { RecordedResponseResolver } from '../../engine/shims/http-shim.js';
-import { initShimsHook } from '../../engine/shims/install.js';
+import type { HostLogger, ToleranceRefusalReason } from '@fmd/contract';
+import { TolerancePolicy, SYNC_FAILURE_TOLERANCE } from '@fmd/contract';
+import type { LuaHostFactory } from '../contract.js';
+import { DeadlineAbortHandle, createDeadlineCells } from '../lua/abort.js';
+import { RecordedResponseResolver } from '../shims/http-shim.js';
+import { initShimsHook } from '../shims/install.js';
 
 /**
- * Staged-tree validation (DESIGN.md §5.1 + §6 sync gate): before anything
+ * Staged-tree validation (DESIGN.md §5.1 + §6 sync gate) — MOVED inside
+ * the engine by the engine-boundary story: the validation drives real
+ * module hosts (parse + Init pass over the staged tree = registry
+ * MECHANISM); the sync layer calls `validateStagedLuaTree` through the
+ * facade. Before anything
  * touches `data/lua/`, the staged tree must prove itself — every `.lua`
  * file in the tree parses (compile-only check via the chunk cache), and
  * every `modules/*.lua` file passes the real Init pass (parse + register).
@@ -72,6 +74,12 @@ export interface StagedValidationOptions {
    * Omitted on first install.
    */
   readonly previousInventory?: readonly { readonly sourceFile: string }[];
+  /**
+   * Lua host factory (injected by the composition root): builds the
+   * validation's hosts + the isolated parse cache behind the contract
+   * interfaces — no wasmoon/host dependency here.
+   */
+  readonly hostFactory: LuaHostFactory;
 }
 
 const MODULES_DIR = 'modules';
@@ -79,7 +87,7 @@ const MODULES_DIR = 'modules';
 export async function validateStagedLuaTree(
   stagedDir: string,
   logger: HostLogger,
-  options: StagedValidationOptions = {},
+  options: StagedValidationOptions,
 ): Promise<StagedTreeValidation> {
   const allFiles = walk(stagedDir).sort(comparePosix);
   const moduleFiles = allFiles.filter(
@@ -92,7 +100,7 @@ export async function validateStagedLuaTree(
 
   const failures: StagedFileFailure[] = [];
   const warnings: string[] = [];
-  const parseCache = new WasmoonChunkCache(new LuaFactory());
+  const parseCache = options.hostFactory.createChunkCache();
 
   // 1. Parse-check every non-module .lua file (templates, utils, …).
   for (const file of parseOnlyFiles) {
@@ -112,7 +120,7 @@ export async function validateStagedLuaTree(
   //    failures throw out of the chunk cache (outside the registry's
   //    tolerant DoInit catch) — both paths land in `failures`.
   const inventory: StagedInventoryEntry[] = [];
-  const host = createLuaHost(logger);
+  const host = options.hostFactory.createHost(logger);
   try {
     for (const file of moduleFiles) {
       const before = logger.records.length;

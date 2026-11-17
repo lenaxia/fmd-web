@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { EventDispatchResult } from '@fmd/contract';
+import type { EventDispatchResult } from '../../../src/engine/contract.js';
 import {
   DEFAULT_SUPERVISOR_OPTIONS,
   EngineSupervisor,

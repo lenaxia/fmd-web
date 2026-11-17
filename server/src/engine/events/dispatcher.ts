@@ -1,23 +1,12 @@
-import type {
-  EventBinding,
-  EventContext,
-  EventDeadlineController,
-  EventDispatchResult,
-  EventDispatcher,
-  EventGlobalValue,
-  EventTaskSeed,
-  HostLogger,
-  HttpAbortHandle,
-  LuaModuleDescriptor,
-  NetStatusCode,
-} from '@fmd/contract';
+import type { EventBinding, HostLogger, NetStatusCode } from '@fmd/contract';
+import type { HttpAbortHandle } from '../contract.js';
+import type { EventContext, EventDeadlineController, EventDispatchResult, EventDispatcher, EventGlobalValue, EventTaskSeed, LuaDispatcherShims, LuaModuleDescriptor } from '../contract.js';
 import { GC_STEP_CALL_THRESHOLD, WasmoonLuaEngine } from '../lua/engine.js';
-import type { FacadeBridge, FacadeSpec } from '../lua/facade.js';
+import type { FacadeBridge } from '../lua/facade.js';
 import { ModuleBacking } from '../lua/module-facade.js';
 import { makeMangaInfoSpec } from '../lua/mangainfo.js';
 import { makeHTTPSpec, makeTStrings } from '../lua/stubs.js';
 import { TStringsStorageStrings } from '../lua/storage.js';
-import type { CookieJarPort } from '../shims/http-cookies.js';
 import { DEFAULT_EVENT_DEADLINE_MS } from '../lua/worker-pool.js';
 import { EVENT_BINDINGS, type EventGlobalName } from './bindings.js';
 import { createDeadlineController } from './deadline.js';
@@ -32,34 +21,12 @@ import { createDeadlineController } from './deadline.js';
  * read-back global, `URL` never read back.
  */
 
-/** Optional v0 shim hooks (§5.4/§5.2): real HTTP objects + accounts. */
-export interface DispatcherShims {
-  /** Fresh request-scoped HTTP facade per event call (FMD2 LoadObject). */
-  readonly makeHTTP?: (bridge: FacadeBridge) => FacadeSpec;
-  /**
-   * Host-level account credentials reached as MODULE.Account (§5.2).
-   * `cookies`/`status` seed the persisted prior-session state (FMD2's
-   * loaded TWebsiteModuleAccount — modules.json Account.Cookies/Status);
-   * the handler reads/writes the same fields (read-back after Login).
-   */
-  readonly account?: {
-    readonly enabled: boolean;
-    readonly username: string;
-    readonly password: string;
-    readonly cookies?: string;
-    readonly status?: number;
-  };
-  /**
-   * The §5.3 per-module cookie store resolver (audit F-2): the MODULE
-   * cookie methods (AddServerCookies/GetServerCookies/RemoveCookies/
-   * ClearCookies) run over the jar this returns — the same SharedCookieJar
-   * the HTTP shims back their request cookie injection with, so module
-   * server cookies merge into that module's outgoing requests and persist
-   * via module_state. Undefined → a private per-engine jar (the methods
-   * still work, just without cross-engine persistence).
-   */
-  readonly moduleCookies?: (moduleId: string) => CookieJarPort | undefined;
-}
+/**
+ * Optional v0 shim hooks (§5.4/§5.2): real HTTP objects + accounts.
+ * Owned by the contract (LuaDispatcherShims) so the LuaHost boundary
+ * carries them; this alias keeps the historical name working.
+ */
+export type DispatcherShims = LuaDispatcherShims;
 
 export class EventNotBoundError extends Error {
   constructor(

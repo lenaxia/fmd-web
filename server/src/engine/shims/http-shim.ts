@@ -1,9 +1,10 @@
 import { Headers, Response } from 'undici';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve as resolvePath, sep } from 'node:path';
-import type { HttpAbortHandle } from '@fmd/contract';
+import type { HttpAbortHandle } from '../contract.js';
+import type { LuaFacadeBridge } from '../contract.js';
 import { toBool, toInteger, toStr } from '../lua/base-globals.js';
-import type { FacadeBridge, FacadeSpec } from '../lua/facade.js';
+import type { FacadeSpec } from '../lua/facade.js';
 import { NameValueMap } from './http-headers.js';
 import { CookieJar, CookieStore, type CookieJarPort } from './http-cookies.js';
 import { EgressPolicy } from './http-egress.js';
@@ -236,7 +237,7 @@ export function resolveJailedPath(jailRoot: string, rawPath: string): string | u
  * binds a fresh request-scoped object per event call (FMD2 LoadObject);
  * cookies persist through `options.sharedCookies` (§5.3).
  */
-export function makeHttpShim(bridge: FacadeBridge, options: HttpShimOptions): HttpShimHandle {
+export function makeHttpShim(bridge: LuaFacadeBridge, options: HttpShimOptions): HttpShimHandle {
   const { abort } = options;
   const cookies = new CookieStore(options.sharedCookies ?? new CookieJar());
   const egress = options.egress ?? new EgressPolicy({ allow: [] });

@@ -15,8 +15,8 @@ import { EgressPolicy } from '../../src/engine/shims/http-egress.js';
 import { RecordedResponseResolver } from '../../src/engine/shims/http-shim.js';
 import { RecordedHttpTransport } from '../../src/engine/shims/http-transport.js';
 import type { RegistrationRecord } from '../../src/engine/registry/capabilities.js';
-import { EngineLoginDriver } from '../../src/runtime/account-login.js';
-import { createLuaHost } from '../../src/engine/lua/host.js';
+import { EngineLoginSession as EngineLoginDriver } from '../../src/engine/services/account-session.js';
+import { createLuaHost, createLuaHostFactory } from '../../src/engine/lua/host.js';
 import { createMemoryLogger } from '../../src/engine/lua/logger.js';
 import { DeadlineAbortHandle, createDeadlineCells } from '../../src/engine/lua/abort.js';
 import {
@@ -110,6 +110,7 @@ describe('EngineLoginDriver: mock module OnLogin through the event runtime', ():
     const resolver = new RecordedResponseResolver([]);
     return new EngineLoginDriver({
       luaRoot,
+      hostFactory: createLuaHostFactory(),
       modules: (): readonly RegistrationRecord[] => [registration('MockLogin.lua')],
       transport: new RecordedHttpTransport((m, u, b, mt, h) => resolver.resolve(m, u, b, mt, h)),
       egress: new EgressPolicy({ allow: ['mocklogin.example'] }),

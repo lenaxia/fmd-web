@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import type { LuaModuleDescriptor, ModuleOptionDescriptor } from '@fmd/contract';
+import type { LuaModuleDescriptor, ModuleOptionDescriptor } from '../contract.js';
 
 /**
  * Per-module capability detection (DESIGN.md §5.7/§5.10, D3 — published via

@@ -1,18 +1,22 @@
-import { applyAcceptImage, composeReset, NameValueMap } from '../../engine/shims/http-headers.js';
-import { DEFAULT_USER_AGENT } from '../../engine/shims/http-pipeline.js';
-import type { CancelToken, ImageDownloader, ImageFetchResult, SiteLimiter } from './types.js';
+import { applyAcceptImage, composeReset, NameValueMap } from '../shims/http-headers.js';
+import { DEFAULT_USER_AGENT } from '../shims/http-pipeline.js';
+import type { CancelToken, ImageDownloader, ImageFetchResult } from './download-ports.js';
 
 /**
- * The per-image HTTP download step (DESIGN §7.1; FMD2
- * `DownloadImage` :367-378 — `HTTP.Reset; HTTP.AcceptImage;
- * HTTP.GET(workURL)`): the §5.4 default header set with AcceptImage,
- * the per-site limiter slot around every hop, the transport retry loop
- * (`>500`/no-response bounded by the retry budget — the per-image retry
- * within the job budget), and §4 cancellation: the abort signal kills
- * in-flight hops, queued limiter waiters fail fast via the limiter.
+ * The per-image HTTP download step (DESIGN §7.1; FMD2 `DownloadImage`
+ * :367-378) — MOVED inside the engine by the engine-boundary story:
+ * §5.4 header parity is engine mechanism. `HTTP.Reset;
+ * HTTP.AcceptImage; HTTP.GET(workURL)`: the §5.4 default header set
+ * with AcceptImage, the per-site limiter slot around every hop, the
+ * transport retry loop (`>500`/no-response bounded by the retry budget
+ * — the per-image retry within the job budget), and §4 cancellation:
+ * the abort signal kills in-flight hops, queued limiter waiters fail
+ * fast via the limiter. The jobs layer's SiteLimiter/CancelToken satisfy
+ * the option ports structurally (supersets of the narrow shapes).
  */
-export interface HttpDownloaderOptions {
-  readonly limiter: SiteLimiter;
+export interface ModuleImageDownloaderOptions {
+  /** Per-site connection limiter (jobs' SiteLimiter satisfies this structurally). */
+  readonly limiter: Pick<SiteLimiterShape, 'acquire'>;
   readonly cancel: CancelToken;
   /** Per-image retry budget for transport failures / 5xx (FMD2 RetryCount analog). */
   readonly retryCount?: number;
@@ -25,12 +29,17 @@ export interface HttpDownloaderOptions {
 const DEFAULT_RETRY_COUNT = 2;
 const DEFAULT_TIMEOUT_MS = 30_000;
 
-export class HttpImageDownloader implements ImageDownloader {
+/** Structural slice the downloader needs from the jobs SiteLimiter. */
+interface SiteLimiterShape {
+  acquire(url: string, isCancelled: () => boolean): Promise<(() => void) | null>;
+}
+
+export class ModuleImageDownloader implements ImageDownloader {
   private readonly headers = new NameValueMap();
   private readonly retryCount: number;
   private readonly timeoutMs: number;
 
-  constructor(private readonly options: HttpDownloaderOptions) {
+  constructor(private readonly options: ModuleImageDownloaderOptions) {
     this.retryCount = Math.max(0, Math.trunc(options.retryCount ?? DEFAULT_RETRY_COUNT));
     this.timeoutMs = Math.trunc(options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   }

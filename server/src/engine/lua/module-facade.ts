@@ -1,4 +1,4 @@
-import type { LuaModuleDescriptor, ModuleOptionDescriptor } from '@fmd/contract';
+import type { LuaModuleDescriptor, ModuleOptionDescriptor } from '../contract.js';
 import { toBool, toInteger, toStr } from './base-globals.js';
 import type { FacadeBridge, FacadeSpec } from './facade.js';
 import { makeStorageSpec, TStringsStorageStrings, type StorageStrings } from './storage.js';
