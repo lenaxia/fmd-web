@@ -306,7 +306,7 @@ export interface Harness {
   readonly app: FastifyInstance;
   readonly modules: InMemoryModuleService;
   readonly jobs: InMemoryJobService;
-  readonly catalogs: InMemoryCatalogStore;
+  readonly catalogs: InMemoryCatalogStore | import('../../src/sync/db/catalog-store.js').CatalogFileStore;
   readonly info: FakeInfoService;
   readonly sync: SyncService;
   readonly library: InMemoryLibraryService;
@@ -368,13 +368,19 @@ export function buildHarness(
     accounts?: import('../../src/accounts/account-service.js').AccountService;
     /** §5.11 config flip: the compose `browser` profile is active. */
     browserProfile?: boolean;
+    /** Extra registration rows appended to the default set (e.g. malformed
+     *  upstream ids for the catalogInstalled join regression). */
+    extraRegistrations?: import('../../src/engine/registry/capabilities.js').RegistrationRecord[];
+    /** Real catalog store override (default: in-memory double). When set,
+     *  the site-first join exercises the REAL path-safety assert chain. */
+    catalogStore?: import('../../src/sync/db/catalog-store.js').CatalogFileStore;
   } = {},
 ): Harness {
   const jobs = new InMemoryJobService();
   const library = new InMemoryLibraryService();
   const favorites = opts.favorites ?? new InMemoryFavoriteService();
   const accounts = opts.accounts ?? new InMemoryAccountService();
-  const catalogs = new InMemoryCatalogStore(catalogFixtures(), [CATALOG_ID]);
+  const catalogs = opts.catalogStore ?? new InMemoryCatalogStore(catalogFixtures(), [CATALOG_ID]);
   const info = opts.info ?? new FakeInfoService([MODULE_A_ID, MODULE_B_ID]);
   const sync = opts.sync ?? makeSyncService(CATALOG_ID);
   const options: AppOptions = {
@@ -384,7 +390,7 @@ export function buildHarness(
     ...(opts.wsHub !== undefined ? { wsHub: opts.wsHub } : {}),
   };
   const modules = new InMemoryModuleService(
-    defaultRegistrations(),
+    [...defaultRegistrations(), ...(opts.extraRegistrations ?? [])],
     opts.browserProfile === true,
     // Site-first browse join: catalogInstalled read LIVE from the
     // CatalogStore double (installed fixtures flip the chip).
@@ -410,6 +416,16 @@ export function buildHarness(
     options,
   );
   return { app, modules, jobs, catalogs, info, sync, library, favorites, accounts };
+}
+
+
+/** Narrow to the default in-memory catalog double — fails loudly when a
+ *  test that mutates catalog fixtures runs against a real-store harness. */
+export function inMemoryCatalogs(h: Harness): InMemoryCatalogStore {
+  if (!(h.catalogs instanceof InMemoryCatalogStore)) {
+    throw new Error('test requires the default in-memory catalog store');
+  }
+  return h.catalogs;
 }
 
 /** Assert a body IS the typed error envelope (shape + code). */

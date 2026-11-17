@@ -13,6 +13,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import type { RegistrationRecord } from '../engine/registry/capabilities.js';
+import { isValidCatalogId } from '../sync/db/catalog-store.js';
 import type { CatalogStore, CatalogSyncProgressT, CatalogSyncPhaseT } from '@fmd/contract';
 import { catalogSyncJobId } from '@fmd/contract';
 import type {
@@ -162,6 +163,8 @@ export class InMemoryModuleService implements ModuleService {
   private readonly enabled = new Map<string, boolean>();
   private readonly cookies = new Map<string, string>();
   private readonly proxy = new Map<string, ProxySettingsT | null>();
+  /** Wrapped in the constructor: non-catalogable ids always report false. */
+  private readonly catalogInstalled: (id: string) => boolean;
 
   constructor(
     private readonly rows: readonly RegistrationRecord[],
@@ -173,8 +176,15 @@ export class InMemoryModuleService implements ModuleService {
      * provision is reflected on the next /api/modules read without any
      * cache invalidation. Default: nothing installed.
      */
-    private readonly catalogInstalled: (id: string) => boolean = (): boolean => false,
+    catalogInstalled: (id: string) => boolean = (): boolean => false,
   ) {
+    // Non-32-hex module ids (upstream typos exist — ColorcitoScan.lua
+    // ships '5450026642ecrrd48apotd81e57f8e40') can never have an
+    // FMD2-DB catalog: guard the join at this single source (production
+    // assembly AND every test harness) so a store's path-safety assert
+    // can never take down /api/modules with a 500.
+    this.catalogInstalled = (id: string): boolean =>
+      isValidCatalogId(id) && catalogInstalled(id);
     for (const row of rows) {
       this.enabled.set(row.id, true);
     }

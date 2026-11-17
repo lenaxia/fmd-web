@@ -10,8 +10,7 @@ import {
   makeRegistration,
   MODULE_A_ID,
   MODULE_B_ID,
-  MODULE_C_ID,
-} from './helpers.js';
+  MODULE_C_ID, inMemoryCatalogs } from './helpers.js';
 import { InMemoryModuleService } from '../../src/api/services.js';
 
 describe('GET /api/modules', (): void => {
@@ -46,7 +45,7 @@ describe('GET /api/modules', (): void => {
     expect(byId.get(MODULE_B_ID)).toBe(false);
 
     // Live-join proof: install MODULE_A_ID's catalog, re-read — flipped.
-    h.catalogs.install(MODULE_A_ID, []);
+    inMemoryCatalogs(h).install(MODULE_A_ID, []);
     const after = await h.app.inject({ method: 'GET', url: '/api/modules' });
     const afterBody = after.json() as { modules: Array<{ id: string; catalogInstalled: boolean }> };
     expect(afterBody.modules.find((m) => m.id === MODULE_A_ID)?.catalogInstalled).toBe(true);

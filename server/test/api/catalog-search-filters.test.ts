@@ -10,7 +10,7 @@
 import { describe, expect, it } from 'vitest';
 import type { CatalogEntry, CatalogSearchQuery } from '@fmd/contract';
 import { jdnToday } from '../../src/sync/db/catalog-store.js';
-import { buildHarness, expectEnvelope, UNKNOWN_CATALOG_ID } from './helpers.js';
+import { buildHarness, expectEnvelope, UNKNOWN_CATALOG_ID, inMemoryCatalogs } from './helpers.js';
 
 /** Filter fixtures: overlapping genres/authors/status for ANY/ALL proofs. */
 function filterFixtures(): CatalogEntry[] {
@@ -34,7 +34,7 @@ function newWindowFixtures(): CatalogEntry[] {
 /** Harness with the filter fixtures installed under a fresh catalog id. */
 function filterHarness(entries: CatalogEntry[] = filterFixtures()) {
   const h = buildHarness();
-  h.catalogs.install(UNKNOWN_CATALOG_ID, entries);
+  inMemoryCatalogs(h).install(UNKNOWN_CATALOG_ID, entries);
   return h;
 }
 

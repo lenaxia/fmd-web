@@ -9,6 +9,7 @@ import {
   catalogFixtures,
   expectEnvelope,
   UNKNOWN_CATALOG_ID,
+  inMemoryCatalogs,
 } from './helpers.js';
 
 describe('POST /api/sync/modules', (): void => {
@@ -201,7 +202,7 @@ describe('GET /api/catalog/:id/search — FTS + cursor pagination (§6.5)', (): 
 
   it('a fresh install becomes visible to the read side (store seam)', async (): Promise<void> => {
     const h = buildHarness();
-    h.catalogs.install(UNKNOWN_CATALOG_ID, catalogFixtures());
+    inMemoryCatalogs(h).install(UNKNOWN_CATALOG_ID, catalogFixtures());
     const res = await h.app.inject({ method: 'GET', url: `/api/catalog/${UNKNOWN_CATALOG_ID}/latest` });
     expect(res.statusCode).toBe(200);
     expect((res.json() as { total: number }).total).toBe(5);
