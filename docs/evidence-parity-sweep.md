@@ -157,15 +157,20 @@ root-level run; numbers below are the exact tail lines):
   `password`/`apiTokenEnv`) was PRE-EXISTING from 00dcd24 — called out
   per the review; it is fixed in this commit (explicit
   `password: undefined, apiTokenEnv: undefined` in the harness default).
-- tests — full suite, one run, zero failures, zero unloadable files:
+- tests — full suite, zero failures, zero unloadable files, run TWICE
+  back-to-back at the final content (both identical):
   **`Test Files 196 passed (196) / Tests 2024 passed | 3 skipped
   (2027)`** (0 failed, no unhandled errors; the 3 skips are the
-  long-standing suite-level drain skips). Story-touched suites all
+  long-standing suite-level drain skips). The vitest surface is
+  unchanged since those runs — the only subsequent edits are
+  Playwright compose-stack specs and the rebuilt `web/dist-web`
+  artifacts, neither of which vitest touches. Story-touched suites all
   green: browse-filter-state, catalog-store-search-filters (SQL
   matrix), catalog-search-filters (routes), settings (round-trips +
   defaults), info (M14 host-resolution matrix), retention (fake
   clock), output-rename-options, download-lane-knobs,
-  parity-sweep-ui, pagination.
+  parity-sweep-ui, pagination, browse-list-polish (13/13, also 6/6 in
+  isolated re-runs).
 - corpus — **PASS** (`COMPAT.md written: 912/912 = 100.00%`,
   `corpus gate passed: >=99% with zero undocumented mismatches`;
   `git diff --exit-code -- docs/COMPAT.md docs/corpus-report.json`
@@ -179,16 +184,39 @@ root-level run; numbers below are the exact tail lines):
   unknown host typed error, Ctrl+Shift+V, `!Ecchi` exclude-chip +
   URL round-trip) and `all-sites-search.spec.ts` green (the union
   seam the shared tree broke mid-sweep is complete again — verified
-  failing at HEAD 0eb423e, passing at this commit)
+  failing at HEAD 0eb423e, passing at this commit). The 10 skips are
+  project-matrix gating inside the specs themselves (arrival +
+  search-home tests carrying `test.skip(project !== 'desktop'/'mobile')`
+  guards) — not unexecuted failures.
 - visual (`npm run e2e:visual -w @fmd/web`) — **32/32** (the suite
   grew from 12 to 32 pages: the parallel [mobile-parity]/
   [search-first-home] stories added mobile/palette/search-home
   fixtures; settings fixtures carry this story's new sections)
+- compose-stack e2e, process-mode twin (`bash scripts/e2e.sh --mode
+  process` then `--phase3`; no docker daemon in this sandbox, the
+  documented twin runs the same fixtures/mock upstream/app entry/
+  specs) — **both PASS**: phase-2 `PASS — process twin green:
+  bootstrap-watch + main scenario`, phase-3 `[e2e] PASS — phase3
+  gate green` (bootstrap-watch + main + all three download
+  scenarios: enqueue→pack→library→artifact-validates, pause/resume
+  via markers, injected-500 retry recovery). Running these exposed
+  three latent staleness gaps in the compose specs vs the coalesced
+  [downloads-parity]/[browse-list-polish] UI, fixed in this commit:
+  (a) row-button regexes anchored (`/^Alpha Quest/` etc. — the
+  per-row Actions kebab also matched the un-anchored form);
+  (b) badge vocabulary updated (`done`→`finished`, plus the
+  `preparing`/`compressing` phases; scenario 2's Cancel button →
+  the Pause primary action, which IS the resume-able user-cancel
+  with persisted markers); (c) library assertions scoped to
+  `.library-row[data-file-id]` (the mobile-parity sticky group
+  header li also carries `.library-row` and CONTAINS its file rows).
 - OpenAPI snapshot + web client regenerated (`api:snapshot` + `gen:api`;
   snapshot byte-for-byte test green inside the suite run above)
-- NOT run in this window: compose-stack e2e phase-2/phase-3
-  (`scripts/e2e.sh`) — the web Playwright gates above ran against the
-  Vite dev server + mocked API per the review's requested gate list.
+- `web/dist-web` committed artifacts refreshed: the PWA sources
+  (manifest/icons) landed in the prior commit while the tracked
+  build output still referenced the old asset hashes — the twin's
+  build regenerated them and they are committed now (byte-stable:
+  a rebuild diffs clean).
 
 ### 5.1 Review-remediation ledger (fail by tinted-granary-plumbs)
 
@@ -211,3 +239,32 @@ root-level run; numbers below are the exact tail lines):
 - **minor** evidence numbers → re-quoted above from the final-commit
   rerun; e2e/visual are now verifiable (app builds; the DownloadsPage
   import fix restored the dev server).
+
+### 5.2 Review-remediation ledger (fail by early-necta-cheers)
+
+- **blocker** (browse-list-polish.test.tsx:359 failing at committed
+  tree 5434769 + the §5 test claims) → root cause: under full-suite
+  load the row's hover popover (opened by the pointer path to the
+  Actions kebab) ALSO renders the row title, so the single-match
+  `findByText('New Ongoing')` settle went strict-mode-ambiguous.
+  Fix (two layers): the settle assertions use the plural
+  `findAllByText` form, and every hover-invoking test ends with
+  `settleHoverTimers()` (unhover + 350ms drain) so no radix timer
+  crosses the jsdom teardown boundary. Verified: 6/6 isolated runs +
+  two consecutive full-suite runs 2024/3 (the vitest surface is
+  unchanged since — quoted numbers remain the final-content truth).
+  The §5 claims are re-scoped to what was actually run.
+- **major** (dirty tree at review: `M browse-list-polish.test.tsx` +
+  untracked `docs/evidence-arrival-experience.md`) → both were the
+  finished-but-uncommitted tail of the parallel [arrival-experience]
+  story (tsk-insular-verdict-ambles, now stage=done): the flake fix
+  above and its evidence doc. They are committed in this remediation
+  commit with attribution; the tree at this commit is CLEAN (the
+  rebuilt `web/dist-web` artifacts are committed too — see §5).
+- **minor** (evidence §5 e2e/visual lines) → the "NOT run in this
+  window" admission is closed: the compose-stack process twin now
+  runs BOTH phases green (quoted above), the 10 web-e2e skips are
+  explained (in-spec project-matrix gating), and running the twin
+  surfaced + fixed three latent compose-spec staleness gaps vs the
+  coalesced UI (anchored regexes, badge vocabulary + Pause-as-cancel,
+  `[data-file-id]` library scoping — details in §5).

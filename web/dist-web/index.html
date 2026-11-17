@@ -4,6 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FMD Web</title>
+    <!-- PWA installability (R5 arrival): manifest + icons live in
+         web/public (served at the SPA root by Vite dev AND the
+         container's static serve alike). Offline service worker =
+         documented SKIP — this is a server-dependent app; the manifest
+         is for installability, not offline (docs/UX-PARITY.md). -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#09090b" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <!-- iOS home-screen install (no beforeinstallprompt there — the
+         Add to Home Screen share-sheet path needs these). -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="FMD Web" />
     <script>
       // Pre-hydration theme resolution (mirrors src/state/theme.tsx):
       // persisted choice → prefers-color-scheme → dark. Runs before any
@@ -21,8 +36,8 @@
         }
       })();
     </script>
-    <script type="module" crossorigin src="/assets/index-b2Mlhp9f.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-5MTk6bIj.css">
+    <script type="module" crossorigin src="/assets/index-DfPW0hIc.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-Dt9o8FAa.css">
   </head>
   <body>
     <!-- Mount point (§11 web/); the SPA root element. -->

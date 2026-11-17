@@ -340,7 +340,10 @@ describe('EntryRowMenu (pmMangaList parity)', (): void => {
     const menu = await screen.findByTestId('entry-row-menu');
     await userEvent.click(within(menu).getByTestId('menu-download-all'));
 
-    await screen.findByText('New Ongoing'); // settle
+    // Settle only — the row's hover popover can also render the title
+    // (pointer path opens it under load), so the plural form avoids
+    // the ambiguity; the wait is for the menu action's re-render.
+    expect((await screen.findAllByText('New Ongoing')).length).toBeGreaterThan(0);
     expect(harness.batchCalls).toHaveLength(1);
     const body = harness.batchCalls[0] as Record<string, unknown>;
     expect(body['moduleId']).toBe(MODULE_ID);
@@ -356,7 +359,7 @@ describe('EntryRowMenu (pmMangaList parity)', (): void => {
       await userEvent.click(screen.getAllByRole('button', { name: /^Actions for / })[0] as HTMLElement);
       const menu = await screen.findByTestId('entry-row-menu');
       await userEvent.click(within(menu).getByTestId('menu-download-all'));
-      await screen.findByText('New Ongoing');
+      expect((await screen.findAllByText('New Ongoing')).length).toBeGreaterThan(0);
     }
     expect(harness.batchCalls).toHaveLength(2);
     // Same derived key both times — the replay reaches the server as an
@@ -390,7 +393,7 @@ describe('EntryRowMenu (pmMangaList parity)', (): void => {
     const menu = await screen.findByTestId('entry-row-menu');
     await userEvent.click(within(menu).getByTestId('menu-add-favorite'));
 
-    await screen.findByText('New Ongoing');
+    expect((await screen.findAllByText('New Ongoing')).length).toBeGreaterThan(0);
     expect(harness.favoritePosts).toHaveLength(1);
     const body = harness.favoritePosts[0] as Record<string, unknown>;
     expect(body['moduleId']).toBe(MODULE_ID);

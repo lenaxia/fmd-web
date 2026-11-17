@@ -1,0 +1,17 @@
+{
+  "name": "FMD Web",
+  "short_name": "FMD Web",
+  "description": "Web-native rebuild of FMD2 (Free Manga Downloader 2): a server-side download queue that works while you're away — search, favorites, library, and the arrival summary that tells you what happened.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#09090b",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-192-maskable.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

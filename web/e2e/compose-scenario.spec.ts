@@ -24,17 +24,17 @@ test('browse latest → search → live info → dry-run enqueue → Downloads q
   // ── 1. browse latest ──────────────────────────────────────────────
   await page.goto(`/#/browse?catalog=${CATALOG_ID}`);
   await expect(page.getByRole('heading', { name: 'FMD Web' })).toBeVisible();
-  const alphaQuest = page.getByRole('button', { name: /Alpha Quest/ });
+  const alphaQuest = page.getByRole('button', { name: /^Alpha Quest/ });
   await expect(alphaQuest).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText('Showing 5 of 5 entries')).toBeVisible();
-  await expect(page.getByRole('button', { name: /Zeta Landing/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Zeta Landing/ })).toBeVisible();
 
   // ── 2. FTS search ─────────────────────────────────────────────────
   // v0.2.0 live-search UX (FMD2 parity): no Search tab/submit — the
   // always-visible SearchBar fires as-you-type (250ms debounce).
   await page.getByLabel('Search').fill(E2E.searchQuery);
-  await expect(page.getByRole('button', { name: /Alpha Quest/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Beta Trails/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Alpha Quest/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Beta Trails/ })).toHaveCount(0);
   await expect(page.getByText('Showing 1 of 1 entries')).toBeVisible();
 
   // ── 3. manga detail: LIVE info through the seed module ────────────
@@ -44,7 +44,7 @@ test('browse latest → search → live info → dry-run enqueue → Downloads q
       downloadRequests.push(req.url());
     }
   });
-  await page.getByRole('button', { name: /Alpha Quest/ }).click();
+  await page.getByRole('button', { name: /^Alpha Quest/ }).click();
   await expect(page.getByRole('heading', { name: 'Alpha Quest' })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText('Alpha Author')).toBeVisible();
   await expect(page.getByText('Action, Adventure')).toBeVisible();
@@ -66,9 +66,12 @@ test('browse latest → search → live info → dry-run enqueue → Downloads q
   await page.getByRole('link', { name: 'Downloads' }).click();
   const jobRow = page.locator('.job-row');
   await expect(jobRow).toBeVisible({ timeout: 30_000 });
-  // The download lane claims within one poll (250 ms), so `queued` is a
-  // transient — assert the job's LIVE badge (queued or already running).
-  await expect(jobRow.locator('.badge')).toHaveText(/^(queued|running)$/);
+  // The download lane claims within one poll (250 ms) and the mock
+  // chapter completes near-instantly, so the badge races through the
+  // lifecycle — assert the job's badge wherever the pipeline is
+  // (queued → running → compressing → finished all prove the job
+  // landed; the row identity assertions below carry the intent).
+  await expect(jobRow.locator('.badge')).toHaveText(/^(queued|running|compressing|finished)$/);
   await expect(jobRow).toContainText('Alpha Quest');
   await expect(jobRow).toContainText('Chapter 1: The Beginning');
 });

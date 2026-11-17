@@ -197,12 +197,14 @@ test.describe('phase3 — download → pack → library → cancel/resume → re
     const jobId = await newestJobId(request);
 
     // WS progress: the Downloads page LIVE-patches the row (no reload) —
-    // badge queued → running → done and the coalesced progress text.
+    // badge queued → running → (compressing →) finished and the coalesced
+    // progress text ([downloads-parity] badge vocabulary; server state
+    // stays 'done' — the badge token is 'finished').
     await page.getByRole('link', { name: 'Downloads' }).click();
     const row = page.locator(`.job-row[data-job-id="${jobId}"]`);
-    await expect(row.locator('.badge')).toHaveText(/queued|running|done/, { timeout: 15_000 });
+    await expect(row.locator('.badge')).toHaveText(/queued|preparing|running|compressing|finished/, { timeout: 30_000 });
     await expect(row).not.toContainText('queued', { timeout: 60_000 });
-    await expect(row.locator('.badge')).toHaveText('done', { timeout: 120_000 });
+    await expect(row.locator('.badge')).toHaveText('finished', { timeout: 120_000 });
     // progress surfaced the download counts (WS snapshots, §4 coalesced)
     await expect(row.locator('.job-progress')).toContainText('"done":3');
     await expect(page.getByText('Event stream: Live')).toBeVisible();
@@ -252,12 +254,15 @@ test.describe('phase3 — download → pack → library → cancel/resume → re
       90_000,
     );
 
-    // cancel FROM THE UI
+    // stop FROM THE UI: [downloads-parity] replaced the standalone Cancel
+    // button with the Pause primary action — pause on a RUNNING job is the
+    // resume-able user-cancel (markers persist; server state 'cancelled',
+    // badge token 'stopped').
     await page.getByRole('link', { name: 'Downloads' }).click();
     const row = page.locator(`.job-row[data-job-id="${jobId}"]`);
     await expect(row).toBeVisible({ timeout: 15_000 });
-    await row.getByRole('button', { name: `Cancel job ${jobId}` }).click();
-    await expect(row.locator('.badge')).toHaveText('cancelled', { timeout: 30_000 });
+    await row.getByRole('button', { name: `Pause job ${jobId}` }).click();
+    await expect(row.locator('.badge')).toHaveText('stopped', { timeout: 30_000 });
     await waitForJob(request, jobId, (j): boolean => j.state === 'cancelled');
     await resetInjection(request);
 
@@ -313,7 +318,7 @@ test.describe('phase3 — download → pack → library → cancel/resume → re
     await page.getByRole('link', { name: 'Downloads' }).click();
     const row = page.locator(`.job-row[data-job-id="${jobId}"]`);
     await expect(row).toBeVisible({ timeout: 15_000 });
-    await expect(row.locator('.badge')).toHaveText('done', { timeout: 30_000 });
+    await expect(row.locator('.badge')).toHaveText('finished', { timeout: 30_000 });
 
     // server request-count: 2 images needed ≥5 GETs (3×500 + ≥2×200)
     const imageRequests = await imageRequestCount(request, chapter);
