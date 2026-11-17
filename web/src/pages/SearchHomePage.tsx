@@ -307,6 +307,9 @@ export function SearchHomePage(props: { route: Route }): ReactElement {
               Type a title — the search runs over every installed site catalog at once and each
               result shows the website it came from. New here? Start from a category:
             </p>
+            <p>
+              The <a className="underline underline-offset-4 max-md:inline-flex max-md:min-h-touch-target max-md:items-center" href="docs/USER-GUIDE.md#finding-manga">finding-manga walkthrough</a> covers search, the site picker, filters and shareable URLs.
+            </p>
             <div
               className="mt-3 flex flex-wrap items-center justify-center gap-1.5"
               aria-label="Categories"

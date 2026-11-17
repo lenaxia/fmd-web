@@ -206,7 +206,7 @@ test.describe('phase3 — download → pack → library → cancel/resume → re
     await expect(row).not.toContainText('queued', { timeout: 60_000 });
     await expect(row.locator('.badge')).toHaveText('finished', { timeout: 120_000 });
     // progress surfaced the download counts (WS snapshots, §4 coalesced)
-    await expect(row.locator('.job-progress')).toContainText('"done":3');
+    await expect(row.locator('.job-progress')).toHaveAttribute('data-done', '3');
     await expect(page.getByText('Event stream: Live')).toBeVisible();
     const job = await waitForJob(request, jobId, (j): boolean => j.state === 'done');
     expect(job.progress?.['total']).toBe(chapterPageCount('1'));

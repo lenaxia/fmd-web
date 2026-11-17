@@ -60,16 +60,16 @@ const unionBody = (q: string): object => ({
 
 /** Layered OVER installMockApi (later routes win): /api/modules with
  * the multi-site fixture set + GET /api/search. */
-function installUnionMock(page: Page): { searchRequests: string[] } {
+async function installUnionMock(page: Page): Promise<{ searchRequests: string[] }> {
   const searchRequests: string[] = [];
-  void page.route(/\/api\/modules/, (route: Route): void => {
+  await page.route(/\/api\/modules/, (route: Route): void => {
     void route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(modulesBody),
     });
   });
-  void page.route(/\/api\/search/, (route: Route): void => {
+  await page.route(/\/api\/search/, (route: Route): void => {
     const url = new URL(route.request().url());
     searchRequests.push(url.search);
     void route.fulfill({
@@ -82,7 +82,7 @@ function installUnionMock(page: Page): { searchRequests: string[] } {
 }
 
 test.beforeEach(async ({ page }: { page: Page }): Promise<void> => {
-  installMockApi(page);
+  await installMockApi(page);
 });
 
 test('all-sites toggle: union over two installed catalogs — merged rows, Website badges, chips, site-context routing', async ({
@@ -90,7 +90,7 @@ test('all-sites toggle: union over two installed catalogs — merged rows, Websi
 }: {
   page: Page;
 }): Promise<void> => {
-  const { searchRequests } = installUnionMock(page);
+  const { searchRequests } = await installUnionMock(page);
   await page.goto(`/#/browse?site=${CATALOG_ID}`);
   await expect(page.getByRole('button', { name: /^Alpha Quest/ })).toBeVisible();
 

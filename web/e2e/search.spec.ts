@@ -12,9 +12,9 @@ import { CATALOG_ID, installMockApi, entries } from './fixtures';
  * honors q (title contains), genres[] + genresMode, status — the same
  * semantics as the server.
  */
-function installDynamicSearch(page: Page): { searchRequests: string[] } {
+async function installDynamicSearch(page: Page): Promise<{ searchRequests: string[] }> {
   const searchRequests: string[] = [];
-  void page.route(/\/api\/catalog\/[^/]+\/search/, (route: Route): void => {
+  await page.route(/\/api\/catalog\/[^/]+\/search/, (route: Route): void => {
     const url = new URL(route.request().url());
     searchRequests.push(url.search);
     const q: string = (url.searchParams.get('q') ?? '').toLowerCase();
@@ -40,7 +40,7 @@ function installDynamicSearch(page: Page): { searchRequests: string[] } {
 }
 
 test.beforeEach(async ({ page }: { page: Page }): Promise<void> => {
-  installMockApi(page);
+  await installMockApi(page);
 });
 
 test('as-you-type: results update while typing (debounced, single fetch for the burst)', async ({
@@ -48,7 +48,7 @@ test('as-you-type: results update while typing (debounced, single fetch for the 
 }: {
   page: Page;
 }): Promise<void> => {
-  const { searchRequests } = installDynamicSearch(page);
+  const { searchRequests } = await installDynamicSearch(page);
   await page.goto(`/#/browse?site=${CATALOG_ID}`);
 
   await expect(page.getByRole('button', { name: /^Alpha Quest/ })).toBeVisible();
@@ -75,7 +75,7 @@ test('genre filter: URL updates; back/forward restore the previous state', async
 }: {
   page: Page;
 }): Promise<void> => {
-  installDynamicSearch(page);
+  await installDynamicSearch(page);
   await page.goto(`/#/browse?site=${CATALOG_ID}`);
   await expect(page.getByRole('button', { name: /^Alpha Quest/ })).toBeVisible();
   const urlBefore: string = page.url();

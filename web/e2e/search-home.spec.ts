@@ -25,8 +25,8 @@ const cleanModulesBody = {
   count: 1,
 };
 
-function installCleanModules(page: Page): void {
-  void page.route(/\/api\/modules/, (route: Route): void => {
+async function installCleanModules(page: Page): Promise<void> {
+  await page.route(/\/api\/modules/, (route: Route): void => {
     void route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -36,9 +36,9 @@ function installCleanModules(page: Page): void {
 }
 
 /** Union search mock: one fixture hit, facets naming the site. */
-function installUnionMock(page: Page): { searchRequests: string[] } {
+async function installUnionMock(page: Page): Promise<{ searchRequests: string[] }> {
   const searchRequests: string[] = [];
-  void page.route(/\/api\/search/, (route: Route): void => {
+  await page.route(/\/api\/search/, (route: Route): void => {
     const url = new URL(route.request().url());
     searchRequests.push(url.search);
     const q: string = url.searchParams.get('q') ?? '';
@@ -65,10 +65,10 @@ function installUnionMock(page: Page): { searchRequests: string[] } {
 }
 
 /** POST-counting wrappers over the installMockApi defaults. */
-function installActionSpies(page: Page): { syncAllCount: () => number; checkCount: () => number } {
+async function installActionSpies(page: Page): Promise<{ syncAllCount: () => number; checkCount: () => number }> {
   let syncAll = 0;
   let check = 0;
-  void page.route(/\/api\/sync\/catalog\/all/, (route: Route): void => {
+  await page.route(/\/api\/sync\/catalog\/all/, (route: Route): void => {
     if (route.request().method() === 'POST') {
       syncAll += 1;
     }
@@ -81,7 +81,7 @@ function installActionSpies(page: Page): { syncAllCount: () => number; checkCoun
       }),
     });
   });
-  void page.route(/\/api\/favorites\/check/, (route: Route): void => {
+  await page.route(/\/api\/favorites\/check/, (route: Route): void => {
     check += 1;
     void route.fulfill({
       status: 200,
@@ -115,7 +115,7 @@ function seedRecents(page: Page): void {
 }
 
 test.beforeEach(async ({ page }: { page: Page }): Promise<void> => {
-  installMockApi(page);
+  await installMockApi(page);
   await page.route(/^https?:\/\/[^/]+\/api\/readyz$/, (route): Promise<void> => {
     return route.fulfill({
       status: 200,
@@ -153,8 +153,8 @@ test('typing yields union results with Website badges; a facet chip narrows into
 }: {
   page: Page;
 }): Promise<void> => {
-  installCleanModules(page);
-  installUnionMock(page);
+  await installCleanModules(page);
+  await installUnionMock(page);
   await page.goto('/#/browse');
 
   const input = page.getByLabel('Search all sites');
@@ -268,7 +268,7 @@ test('palette jump-to-site: searches the registry by name and opens the site', a
 }: {
   page: Page;
 }): Promise<void> => {
-  installCleanModules(page);
+  await installCleanModules(page);
   await page.goto('/#/browse');
   await page.getByRole('button', { name: 'Open command palette' }).click();
 
@@ -292,7 +292,7 @@ test('palette actions execute: Toggle theme flips, Sync all catalogs + favorites
   await page.addInitScript((): void => {
     window.localStorage.setItem('fmd-web-theme', 'dark');
   });
-  const spies = installActionSpies(page);
+  const spies = await installActionSpies(page);
   await page.goto('/#/browse');
 
   // Action 1 — Toggle theme: the html class flips (dark default).
@@ -322,7 +322,7 @@ test('recents: site opens + manga opens feed the shared store; rows render, clea
   page: Page;
 }): Promise<void> => {
   seedRecents(page);
-  installCleanModules(page);
+  await installCleanModules(page);
   await page.goto('/#/browse');
 
   // Seeded rows render on the home (capped, deduped by the store).

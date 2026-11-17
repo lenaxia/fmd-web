@@ -20,8 +20,8 @@ import {
 } from './fixtures';
 import type { FavoriteT, JobT } from '../src/api/hooks';
 
-function installCleanModules(page: Page, modules: object[] = []): void {
-  void page.route(/\/api\/modules/, (route): void => {
+async function installCleanModules(page: Page, modules: object[] = []): Promise<void> {
+  await page.route(/\/api\/modules/, (route): void => {
     void route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -40,7 +40,7 @@ function installCleanModules(page: Page, modules: object[] = []): void {
 }
 
 test.beforeEach(async ({ page }: { page: Page }): Promise<void> => {
-  installMockApi(page);
+  await installMockApi(page);
   await page.route(/^https?:\/\/[^/]+\/api\/readyz$/, (route): Promise<void> => {
     return route.fulfill({
       status: 200,
@@ -57,7 +57,7 @@ test('browse journey: picker chips+search → entries → tap-popover → manga 
   // entries popover → manga enqueue ×2) — headroom over the 20s
   // default for full-suite load.
   test.setTimeout(45_000);
-  installCleanModules(page);
+  await installCleanModules(page);
   const downloadBodies: Record<string, unknown>[] = [];
   await page.route(/\/api\/jobs\/download$/, (route): void => {
     const body = route.request().postDataJSON() as Record<string, unknown>;
@@ -124,16 +124,16 @@ interface DownloadsState {
 }
 
 /** The stateful action matrix the flow drives (pause hold/lift, retry). */
-function installStatefulDownloads(page: Page, state: DownloadsState): void {
+async function installStatefulDownloads(page: Page, state: DownloadsState): Promise<void> {
   const json = (route: Route, body: unknown, status = 200): void => {
     void route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
   };
   const API = (suffix: string): RegExp => new RegExp(`^https?://[^/]+/api/${suffix}`);
 
-  void page.route(API('jobs\\?'), (route): void => {
+  await page.route(API('jobs\\?'), (route): void => {
     json(route, { jobs: [...state.jobs].reverse() });
   });
-  void page.route(API('jobs/\\d+/action'), (route): void => {
+  await page.route(API('jobs/\\d+/action'), (route): void => {
     const id = new URL(route.request().url()).pathname.split('/').at(-2) ?? '';
     const body = route.request().postDataJSON() as { type: string };
     state.actions.push({ id, type: body.type });
@@ -177,7 +177,7 @@ test('downloads: pause/resume round-trip and retry via row controls + kebab menu
     ],
     actions: [],
   };
-  installStatefulDownloads(page, state);
+  await installStatefulDownloads(page, state);
 
   await page.goto('/#/downloads');
   await expect(page.locator('[data-job-id="20"]')).toBeVisible();
@@ -223,7 +223,7 @@ test('downloads: pause/resume round-trip and retry via row controls + kebab menu
 
 // ── Flow 3: favorites new-chapters sheet + drag-dismiss ─────────────
 
-function installFavoritesFlow(page: Page): { downloads: { paused: boolean[] } } {
+async function installFavoritesFlow(page: Page): Promise<{ downloads: { paused: boolean[] } }> {
   const downloads = { paused: [] as boolean[] };
   const row: FavoriteT = {
     id: `${MODULE_ID}${entries[0]?.link ?? ''}`.toLowerCase(),
@@ -247,14 +247,14 @@ function installFavoritesFlow(page: Page): { downloads: { paused: boolean[] } } 
   const json = (route: Route, body: unknown, status = 200): void => {
     void route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
   };
-  void page.route(/^https?:\/\/[^/]+\/api\/favorites(\?|$)/, (route): void => {
+  await page.route(/^https?:\/\/[^/]+\/api\/favorites(\?|$)/, (route): void => {
     if (route.request().method() === 'GET') {
       json(route, { favorites: [row] });
     } else {
       json(route, { favorite: row }, 201);
     }
   });
-  void page.route(/^https?:\/\/[^/]+\/api\/favorites\/check$/, (route): void => {
+  await page.route(/^https?:\/\/[^/]+\/api\/favorites\/check$/, (route): void => {
     json(route, {
       scope: 'all',
       cancelled: false,
@@ -271,7 +271,7 @@ function installFavoritesFlow(page: Page): { downloads: { paused: boolean[] } } 
       ],
     });
   });
-  void page.route(/\/api\/jobs\/download$/, (route): void => {
+  await page.route(/\/api\/jobs\/download$/, (route): void => {
     const body = route.request().postDataJSON() as { paused?: boolean };
     downloads.paused.push(body.paused === true);
     void route.fulfill({
@@ -284,7 +284,7 @@ function installFavoritesFlow(page: Page): { downloads: { paused: boolean[] } } 
 }
 
 test('favorites: batch check opens the sheet; queue decision enqueues PAUSED; drag-dismiss closes', async ({ page }: { page: Page }): Promise<void> => {
-  const { downloads } = installFavoritesFlow(page);
+  const { downloads } = await installFavoritesFlow(page);
 
   await page.goto('/#/favorites');
   // Mobile collapse: the dense grid columns are GONE — the secondary

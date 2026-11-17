@@ -42,14 +42,14 @@ function job(id: string, overrides: Partial<JobT> = {}): JobT {
   };
 }
 
-function installStatefulDownloads(page: Page, state: JobsState): void {
+async function installStatefulDownloads(page: Page, state: JobsState): Promise<void> {
   const json = (route: Route, body: unknown, status = 200): void => {
     void route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
   };
   const API = (suffix: string): RegExp => new RegExp(`^https?://[^/]+/api/${suffix}`);
 
   // List — honors states/q (URL-sync proof: the mock filters).
-  void page.route(API('jobs\\?'), (route): void => {
+  await page.route(API('jobs\\?'), (route): void => {
     const url = new URL(route.request().url());
     state.seenQueries.push(url.search);
     let rows = [...state.jobs];
@@ -72,7 +72,7 @@ function installStatefulDownloads(page: Page, state: JobsState): void {
   });
 
   // Per-job action — the stateful matrix subset the spec drives.
-  void page.route(API('jobs/\\d+/action'), (route): void => {
+  await page.route(API('jobs/\\d+/action'), (route): void => {
     const id = new URL(route.request().url()).pathname.split('/').at(-2) ?? '';
     const body = route.request().postDataJSON() as { type: string };
     state.actions.push({ id, type: body.type });
@@ -130,7 +130,7 @@ function installStatefulDownloads(page: Page, state: JobsState): void {
     );
   });
 
-  void page.route(API('jobs/\\d+$'), (route): void => {
+  await page.route(API('jobs/\\d+$'), (route): void => {
     if (route.request().method() !== 'DELETE') {
       json(route, {}, 404);
       return;
@@ -149,7 +149,7 @@ function installStatefulDownloads(page: Page, state: JobsState): void {
     json(route, { job: removed, dataDeleted: data });
   });
 
-  void page.route(API('jobs/bulk-action'), (route): void => {
+  await page.route(API('jobs/bulk-action'), (route): void => {
     const body = route.request().postDataJSON() as { action: string; scope: string };
     state.bulk.push({ action: body.action, scope: body.scope });
     const touched: JobT[] = [];
@@ -189,7 +189,7 @@ test('pause/resume round-trip: running → stopped → fresh queued row', async 
     seenQueries: [],
   };
   await installMockApi(page);
-  installStatefulDownloads(page, state);
+  await installStatefulDownloads(page, state);
 
   await page.goto('/#downloads');
   await expect(page.locator('[data-job-id="1"]')).toBeVisible();
@@ -220,7 +220,7 @@ test('progress bar renders and advances from the payload (no raw JSON in the DOM
     seenQueries: [],
   };
   await installMockApi(page);
-  installStatefulDownloads(page, state);
+  await installStatefulDownloads(page, state);
 
   await page.goto('/#downloads');
   await expect(page.locator('[data-testid="job-progress-count"]')).toHaveText('2/10');
@@ -252,7 +252,7 @@ test('filters are URL-synced and drive the list (chips, search, date window, cus
     seenQueries: [],
   };
   await installMockApi(page);
-  installStatefulDownloads(page, state);
+  await installStatefulDownloads(page, state);
 
   await page.goto('/#downloads');
   await expect(page.locator('[data-job-id="3"]')).toBeVisible();
@@ -298,7 +298,7 @@ test('toolbar bulk ops round-trip: pause all, resume all, delete completed (conf
     seenQueries: [],
   };
   await installMockApi(page);
-  installStatefulDownloads(page, state);
+  await installStatefulDownloads(page, state);
 
   await page.goto('/#downloads');
   await expect(page.locator('[data-job-id="5"]')).toBeVisible();

@@ -32,10 +32,10 @@ interface SettingsMockState {
  * (bulk writes flip the served enabled set), the accounts CRUD + login
  * routes, and GET /api/settings (output defaults + browser state).
  */
-function installSettingsMockApi(page: Page, state: SettingsMockState): void {
-  installMockApi(page);
+async function installSettingsMockApi(page: Page, state: SettingsMockState): Promise<void> {
+  await installMockApi(page);
 
-  void page.route(API('settings$'), (route): void => {
+  await page.route(API('settings$'), (route): void => {
     void route.fulfill(
       json({
         proxy: { type: '', host: '', port: '', user: '', pass: '' },
@@ -64,7 +64,7 @@ function installSettingsMockApi(page: Page, state: SettingsMockState): void {
   // Stateful module registry: the bulk endpoint rewrites the enabled
   // set and GET serves the live rows (react-query invalidation makes
   // the picker re-fetch — the assertion target of the bulk spec).
-  void page.route(API('modules'), (route): void => {
+  await page.route(API('modules'), (route): void => {
     if (route.request().method() === 'GET') {
       const rows = state.modules.map((m): Record<string, unknown> => ({
         ...fixtureModule,
@@ -76,7 +76,7 @@ function installSettingsMockApi(page: Page, state: SettingsMockState): void {
     }
     void route.fulfill(json({ error: { code: 'not_found', message: 'unmocked' } }, 404));
   });
-  void page.route(API('modules/bulk'), (route): void => {
+  await page.route(API('modules/bulk'), (route): void => {
     const body = route.request().postDataJSON() as Record<string, unknown>;
     state.bulkWrites.push(body);
     const enabled: boolean = body['enabled'] === true;
@@ -95,10 +95,10 @@ function installSettingsMockApi(page: Page, state: SettingsMockState): void {
     void route.fulfill(json({ modules: rows, updated: targets.length }));
   });
 
-  void page.route(API('accounts'), (route): void => {
+  await page.route(API('accounts'), (route): void => {
     void route.fulfill(json({ accounts: [], count: 0 }));
   });
-  void page.route(API('accounts/[^/]+'), (route): void => {
+  await page.route(API('accounts/[^/]+'), (route): void => {
     if (route.request().method() === 'PUT') {
       const body = route.request().postDataJSON() as Record<string, unknown>;
       state.accountSaves.push(body);
@@ -120,7 +120,7 @@ function installSettingsMockApi(page: Page, state: SettingsMockState): void {
     // DELETE
     void route.fulfill(json({ ok: true }));
   });
-  void page.route(API('accounts/[^/]+/login'), (route: Route): void => {
+  await page.route(API('accounts/[^/]+/login'), (route: Route): void => {
     const status: string =
       state.loginStatuses.length > 1 ? (state.loginStatuses.shift() as string) : (state.loginStatuses[0] as string);
     void route.fulfill(
@@ -138,7 +138,7 @@ function installSettingsMockApi(page: Page, state: SettingsMockState): void {
 
   // Per-site re-sync catalog (update-list parity): the existing sync
   // endpoint behind the row action + progress toast.
-  void page.route(API('sync/catalog/[^/]+'), (route): void => {
+  await page.route(API('sync/catalog/[^/]+'), (route): void => {
     void route.fulfill(
       json({ ok: true, result: { id: MODULE_ID, state: 'updated', dbSha: 'cd34'.repeat(16), bytes: 4096 } }),
     );
@@ -146,7 +146,7 @@ function installSettingsMockApi(page: Page, state: SettingsMockState): void {
 }
 
 test.beforeEach(async ({ page }: { page: Page }): Promise<void> => {
-  installSettingsMockApi(page, {
+  await installSettingsMockApi(page, {
     modules: [{ id: MODULE_ID, enabled: true }],
     accountSaves: [],
     bulkWrites: [],

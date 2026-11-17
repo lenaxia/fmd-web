@@ -9,7 +9,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { CATALOG_ID, installMockApi } from './fixtures';
 
 test.beforeEach(async ({ page }: { page: Page }): Promise<void> => {
-  installMockApi(page);
+  await installMockApi(page);
   await page.routeWebSocket(/^ws:\/\/[^/]+\/ws$/, (ws): void => {
     ws.onMessage((): void => {});
   });

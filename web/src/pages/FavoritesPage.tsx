@@ -404,6 +404,9 @@ export function FavoritesPage(): ReactElement {
             per-favorite interval + jitter) and badges the new chapters it
             finds.
           </p>
+          <p>
+            The <a className="underline underline-offset-4 max-md:inline-flex max-md:min-h-touch-target max-md:items-center" href="docs/USER-GUIDE.md#favorites-lifecycle">favorites lifecycle guide</a> walks through checks, the new-chapters sheet, transfers and imports.
+          </p>
         </EmptyState>
       )
     : (

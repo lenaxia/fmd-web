@@ -73,7 +73,7 @@ async function installPickerMockApi(
   page: Page,
   opts?: { readonly hangSync?: boolean; readonly syncBody?: unknown },
 ): Promise<PickerMock> {
-  installMockApi(page); // base §10 mocks (catalog pages, info, jobs, …)
+  await installMockApi(page); // base §10 mocks (catalog pages, info, jobs, …)
 
   const state = { freshInstalled: false, syncCalls: 0 };
   const ws: { current?: WebSocketRoute } = {};

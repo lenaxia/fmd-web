@@ -124,9 +124,14 @@ describe('POST /api/favorites/check — batch scope matrix', (): void => {
     const gate = new Promise<void>((resolve): void => {
       release = resolve;
     });
+    // Deterministic mid-run signal: flips the moment the sweep ENTERS the
+    // gated row (before it awaits the gate) — the blind 10ms sleep raced
+    // the sweep start under CI load and cancel found nothing running.
+    let enteredGatedRow = false;
     const favorites = new (class extends InMemoryFavoriteService {
       public override async checkNow(id: string): Promise<FavoriteCheckResponseT> {
         if (id.endsWith('a')) {
+          enteredGatedRow = true;
           await gate;
         }
         return super.checkNow(id);
@@ -137,10 +142,14 @@ describe('POST /api/favorites/check — batch scope matrix', (): void => {
     await seedFavorite(h, 'https://ex.org/manga/b', 'never-reached');
 
     const pending = h.app.inject({ method: 'POST', url: '/api/favorites/check', payload: { scope: 'all' } });
-    // Let the batch claim the slow row, then cancel + release.
-    await new Promise((resolve): void => {
-      setTimeout(resolve, 10);
-    });
+    // Wait for observable in-flight evidence (sweep inside the gated row),
+    // bounded — never a fixed sleep racing the scheduler.
+    for (let i = 0; i < 500 && !enteredGatedRow; i += 1) {
+      await new Promise((resolve): void => {
+        setTimeout(resolve, 5);
+      });
+    }
+    expect(enteredGatedRow).toBe(true);
     const cancel = await h.app.inject({ method: 'POST', url: '/api/favorites/check/cancel' });
     expect(cancel.statusCode).toBe(200);
     expect(cancel.json()).toEqual({ cancelled: true });

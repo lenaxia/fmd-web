@@ -228,6 +228,9 @@ export function DownloadsPage(): ReactElement {
             current filters. Enqueue chapters from a manga page (Browse → pick a title → select
             chapters → Enqueue).
           </p>
+          <p>
+            The <a className="underline underline-offset-4 max-md:inline-flex max-md:min-h-touch-target max-md:items-center" href="docs/USER-GUIDE.md#downloading">downloading guide</a> covers progress, pause/resume/retry and where files land.
+          </p>
         </EmptyState>
       ) : null}
 

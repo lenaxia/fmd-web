@@ -23,16 +23,16 @@ const siteModule: ModuleSummaryT = {
   catalogInstalled: true,
 };
 
-test.beforeEach(({ page }): void => {
-  installMockApi(page);
-  void page.route('**/api/modules', (route): void => {
+test.beforeEach(async ({ page }): Promise<void> => {
+  await installMockApi(page);
+  await page.route('**/api/modules', (route): void => {
     void route.fulfill({ contentType: 'application/json', body: JSON.stringify({ modules: [siteModule], count: 1 }) });
   });
 });
 
 test.describe('open-by-URL (M14)', (): void => {
-  test.beforeEach(({ page }): void => {
-    void page.route('**/api/info', (route): void => {
+  test.beforeEach(async ({ page }): Promise<void> => {
+    await page.route('**/api/info', (route): void => {
       const body = route.request().postDataJSON() as { moduleId?: string; url: string };
       // The url-only wire form carries NO moduleId (the server resolves
       // by host); the manga page then refetches WITH the resolved id —

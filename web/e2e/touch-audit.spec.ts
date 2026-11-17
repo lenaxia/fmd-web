@@ -30,8 +30,8 @@ import type { FavoriteT, JobT } from '../src/api/hooks';
 
 /** A clean (non-broken, enabled, catalog-installed) registry so the site
  * entries view OPENS without provisioning. */
-function installCleanModules(page: Page): void {
-  void page.route(/\/api\/modules/, (route): void => {
+async function installCleanModules(page: Page): Promise<void> {
+  await page.route(/\/api\/modules/, (route): void => {
     void route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -66,8 +66,8 @@ function favoriteRow(): FavoriteT {
   };
 }
 
-function installFavorites(page: Page, rows: readonly FavoriteT[]): void {
-  void page.route(/\/api\/favorites(\?|$)/, (route): void => {
+async function installFavorites(page: Page, rows: readonly FavoriteT[]): Promise<void> {
+  await page.route(/\/api\/favorites(\?|$)/, (route): void => {
     if (route.request().method() === 'GET') {
       void route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ favorites: rows }) });
     } else {
@@ -86,8 +86,8 @@ function doneJob(): JobT {
   };
 }
 
-function installJobs(page: Page, jobs: readonly JobT[]): void {
-  void page.route(/\/api\/jobs\?/, (route): void => {
+async function installJobs(page: Page, jobs: readonly JobT[]): Promise<void> {
+  await page.route(/\/api\/jobs\?/, (route): void => {
     void route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ jobs }) });
   });
 }
@@ -130,8 +130,8 @@ const TRIGGER_CASES: readonly TriggerCase[] = [
     route: `/#/browse?site=${MODULE_ID}`,
     surface: 'entry metadata popover (row TAP — R3a core)',
     activation: 'tap',
-    setup: (page): void => {
-      installCleanModules(page);
+    setup: async (page): Promise<void> => {
+      await installCleanModules(page);
     },
     open: async (page): Promise<void> => {
       await page.getByRole('button', { name: /^Alpha Quest/ }).tap();
@@ -142,8 +142,8 @@ const TRIGGER_CASES: readonly TriggerCase[] = [
     route: `/#/browse?site=${MODULE_ID}`,
     surface: 'entry row overflow menu (kebab)',
     activation: 'tap',
-    setup: (page): void => {
-      installCleanModules(page);
+    setup: async (page): Promise<void> => {
+      await installCleanModules(page);
     },
     open: async (page): Promise<void> => {
       await page.getByRole('button', { name: 'Actions for Alpha Quest' }).tap();
@@ -154,9 +154,9 @@ const TRIGGER_CASES: readonly TriggerCase[] = [
     route: `/#/browse?site=${MODULE_ID}`,
     surface: 'favorited-row tooltip (menu item, FOCUS path)',
     activation: 'focus',
-    setup: (page): void => {
-      installCleanModules(page);
-      installFavorites(page, [favoriteRow()]);
+    setup: async (page): Promise<void> => {
+      await installCleanModules(page);
+      await installFavorites(page, [favoriteRow()]);
     },
     open: async (page): Promise<void> => {
       await page.getByRole('button', { name: 'Actions for Alpha Quest' }).tap();
@@ -177,8 +177,8 @@ const TRIGGER_CASES: readonly TriggerCase[] = [
     route: '/#/downloads',
     surface: 'job row overflow menu (kebab)',
     activation: 'tap',
-    setup: (page): void => {
-      installJobs(page, [doneJob()]);
+    setup: async (page): Promise<void> => {
+      await installJobs(page, [doneJob()]);
     },
     open: async (page): Promise<void> => {
       await page.getByRole('button', { name: `Actions for job ${doneJob().id}` }).tap();
@@ -189,8 +189,8 @@ const TRIGGER_CASES: readonly TriggerCase[] = [
     route: '/#/downloads',
     surface: 'delete-completed confirm dialog (toolbar)',
     activation: 'tap',
-    setup: (page): void => {
-      installJobs(page, [doneJob()]);
+    setup: async (page): Promise<void> => {
+      await installJobs(page, [doneJob()]);
     },
     open: async (page): Promise<void> => {
       await page.getByTestId('delete-completed').tap();
@@ -201,8 +201,8 @@ const TRIGGER_CASES: readonly TriggerCase[] = [
     route: '/#/favorites',
     surface: 'check-all scope menu',
     activation: 'tap',
-    setup: (page): void => {
-      installFavorites(page, [favoriteRow()]);
+    setup: async (page): Promise<void> => {
+      await installFavorites(page, [favoriteRow()]);
     },
     open: async (page): Promise<void> => {
       await page.getByTestId('check-all-button').tap();
@@ -213,8 +213,8 @@ const TRIGGER_CASES: readonly TriggerCase[] = [
     route: '/#/favorites',
     surface: 'favorite row overflow menu → Transfer website dialog',
     activation: 'tap',
-    setup: (page): void => {
-      installFavorites(page, [favoriteRow()]);
+    setup: async (page): Promise<void> => {
+      await installFavorites(page, [favoriteRow()]);
     },
     open: async (page): Promise<void> => {
       await page.getByTestId(`favorite-menu-${FAVORITE_ID}`).tap();
@@ -226,8 +226,8 @@ const TRIGGER_CASES: readonly TriggerCase[] = [
     route: '/#/favorites',
     surface: 'favorite row overflow menu → Change save-to dialog',
     activation: 'tap',
-    setup: (page): void => {
-      installFavorites(page, [favoriteRow()]);
+    setup: async (page): Promise<void> => {
+      await installFavorites(page, [favoriteRow()]);
     },
     open: async (page): Promise<void> => {
       await page.getByTestId(`favorite-menu-${FAVORITE_ID}`).tap();
@@ -239,8 +239,8 @@ const TRIGGER_CASES: readonly TriggerCase[] = [
     route: '/#/favorites',
     surface: 'import list dialog (toolbar)',
     activation: 'tap',
-    setup: (page): void => {
-      installFavorites(page, [favoriteRow()]);
+    setup: async (page): Promise<void> => {
+      await installFavorites(page, [favoriteRow()]);
     },
     open: async (page): Promise<void> => {
       await page.getByTestId('import-list-button').tap();
@@ -250,7 +250,7 @@ const TRIGGER_CASES: readonly TriggerCase[] = [
 ];
 
 test.beforeEach(async ({ page }: { page: Page }): Promise<void> => {
-  installMockApi(page);
+  await installMockApi(page);
   await page.route(/^https?:\/\/[^/]+\/api\/readyz$/, (route): Promise<void> => {
     return route.fulfill({
       status: 200,
@@ -361,10 +361,10 @@ test.describe('R3b touch-target audit — 44px floor on every interactive elemen
   const ROUTES: readonly { readonly route: string; readonly setup?: (page: Page) => void }[] = [
     { route: '/#/browse' },
     { route: '/#/browse?sites=1' },
-    { route: `/#/browse?site=${MODULE_ID}`, setup: (page): void => installCleanModules(page) },
+    { route: `/#/browse?site=${MODULE_ID}`, setup: async (page): Promise<void> => await installCleanModules(page) },
     { route: MANGA_ROUTE },
-    { route: '/#/downloads', setup: (page): void => installJobs(page, [doneJob()]) },
-    { route: '/#/favorites', setup: (page): void => installFavorites(page, [favoriteRow()]) },
+    { route: '/#/downloads', setup: async (page): Promise<void> => await installJobs(page, [doneJob()]) },
+    { route: '/#/favorites', setup: async (page): Promise<void> => await installFavorites(page, [favoriteRow()]) },
     { route: '/#/library' },
     { route: '/#/settings' },
   ];

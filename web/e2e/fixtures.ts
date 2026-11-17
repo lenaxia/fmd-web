@@ -106,10 +106,10 @@ const API = (suffix: string): RegExp => new RegExp(`^https?://[^/]+/api/${suffix
  * Install the fixture-driven mock API for a page: every §10 route the
  * SPA can hit during the smoke run is answered from these fixtures.
  */
-export function installMockApi(page: Page): void {
+export async function installMockApi(page: Page): Promise<void> {
   // Catch-all FIRST: Playwright matches routes in reverse (registration)
   // order, so the specific fixtures below take precedence over it.
-  void page.route(API(''), (route): void => {
+  await page.route(API(''), (route): void => {
     void route.fulfill(
       json(
         {
@@ -122,7 +122,7 @@ export function installMockApi(page: Page): void {
       ),
     );
   });
-  void page.route(API('modules'), (route): void => {
+  await page.route(API('modules'), (route): void => {
     void route.fulfill(json({ modules: [module], count: 1 }));
   });
   // [parity-sweep] Settings groups + About version: the default GETs
@@ -130,7 +130,7 @@ export function installMockApi(page: Page): void {
   // ANCHORED (`settings$`) — an unanchored pattern would also swallow
   // /api/settings/api-token with this body (no token/mode fields) and
   // crash ApiTokenSection's mask(); the subpath gets its own route.
-  void page.route(API('settings$'), (route): void => {
+  await page.route(API('settings$'), (route): void => {
     void route.fulfill(
       json({
         proxy: { type: '', host: '', port: '', user: '', pass: '' },
@@ -153,13 +153,13 @@ export function installMockApi(page: Page): void {
   });
   // R4 API-token state: the SettingsPage fetches this on every render
   // (ApiTokenSection). Deterministic "no auth configured" answer.
-  void page.route(API('settings/api-token'), (route): void => {
+  await page.route(API('settings/api-token'), (route): void => {
     void route.fulfill(json({ token: null, envManaged: false, mode: 'none' }));
   });
-  void page.route(/\/healthz$/, (route): void => {
+  await page.route(/\/healthz$/, (route): void => {
     void route.fulfill(json({ status: 'ok', version: '0.3.0-e2e' }));
   });
-  void page.route(API('catalog/[^/]+/latest'), (route): void => {
+  await page.route(API('catalog/[^/]+/latest'), (route): void => {
     const url = new URL(route.request().url());
     const pageParam = Number(url.searchParams.get('page') ?? '1');
     if (pageParam === 1) {
@@ -168,7 +168,7 @@ export function installMockApi(page: Page): void {
       void route.fulfill(json({ entries: [entries[1]], total: 2 }));
     }
   });
-  void page.route(API('catalog/[^/]+/search'), (route): void => {
+  await page.route(API('catalog/[^/]+/search'), (route): void => {
     const cursor = new URL(route.request().url()).searchParams.get('cursor');
     if (cursor === null) {
       void route.fulfill(json({ entries: [entries[0]], nextCursor: 'c1', total: 2 }));
@@ -176,10 +176,10 @@ export function installMockApi(page: Page): void {
       void route.fulfill(json({ entries: [entries[1]], total: 2 }));
     }
   });
-  void page.route(API('info'), (route): void => {
+  await page.route(API('info'), (route): void => {
     void route.fulfill(json(info));
   });
-  void page.route(API('jobs\\?'), (route): void => {
+  await page.route(API('jobs\\?'), (route): void => {
     const url = new URL(route.request().url());
     const cursor = url.searchParams.get('cursor');
     if (cursor === null) {
@@ -188,23 +188,23 @@ export function installMockApi(page: Page): void {
       void route.fulfill(json({ jobs: [] }));
     }
   });
-  void page.route(API('jobs/download'), (route): void => {
+  await page.route(API('jobs/download'), (route): void => {
     void route.fulfill(json({ job }, 201));
   });
   // Browse row-menu batch download-all: fresh 201, replay 200 (specs
   // layer stateful variants over this).
-  void page.route(API('jobs/download/batch'), (route): void => {
+  await page.route(API('jobs/download/batch'), (route): void => {
     void route.fulfill(json({ jobs: [job, { ...job, id: 'e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b1' }], replayed: false }, 201));
   });
   // Entry rows derive favorited-ness from this list on mount.
-  void page.route(API('favorites'), (route): void => {
+  await page.route(API('favorites'), (route): void => {
     if (route.request().method() === 'GET') {
       void route.fulfill(json({ favorites: [] }));
     } else {
       void route.fulfill(json({ favorite: {} }, 201));
     }
   });
-  void page.route(API('sync/modules'), (route): void => {
+  await page.route(API('sync/modules'), (route): void => {
     void route.fulfill(
       json({
         ok: true,
@@ -221,7 +221,7 @@ export function installMockApi(page: Page): void {
       }),
     );
   });
-  void page.route(API('sync/catalog/all'), (route): void => {
+  await page.route(API('sync/catalog/all'), (route): void => {
     void route.fulfill(
       json({ ok: true, results: [{ id: CATALOG_ID, state: 'unchanged', dbSha: '01', bytes: 1 }] }),
     );

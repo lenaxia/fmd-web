@@ -41,7 +41,7 @@ interface DownloadsState {
  * the batch check results and every download enqueue observe real
  * state (the Downloads page lists exactly what the sheet created).
  */
-function installStatefulFavorites(page: Page, rows: FavoriteT[], downloads: DownloadsState): void {
+async function installStatefulFavorites(page: Page, rows: FavoriteT[], downloads: DownloadsState): Promise<void> {
   const json = (route: Route, body: unknown, status = 200): void => {
     void route.fulfill({
       status,
@@ -53,7 +53,7 @@ function installStatefulFavorites(page: Page, rows: FavoriteT[], downloads: Down
     { position: 1, link: '/manga/alpha/ch-1', name: 'Chapter 1: The Beginning' },
     { position: 2, link: '/manga/alpha/ch-2', name: 'Chapter 2: The Middle' },
   ];
-  void page.route(/^https?:\/\/[^/]+\/api\/favorites$/, (route): void => {
+  await page.route(/^https?:\/\/[^/]+\/api\/favorites$/, (route): void => {
     const method = route.request().method();
     if (method === 'GET') {
       json(route, { favorites: rows });
@@ -64,7 +64,7 @@ function installStatefulFavorites(page: Page, rows: FavoriteT[], downloads: Down
       json(route, {}, 404);
     }
   });
-  void page.route(/^https?:\/\/[^/]+\/api\/favorites\/check$/, (route): void => {
+  await page.route(/^https?:\/\/[^/]+\/api\/favorites\/check$/, (route): void => {
     const body = route.request().postDataJSON() as { scope?: string };
     // REAL ENGINE CONTRACT (engine.ts: auto-download rows): the FULL
     // newChapters list comes back WITH queuedDownloads > 0 — the sheet
@@ -91,7 +91,7 @@ function installStatefulFavorites(page: Page, rows: FavoriteT[], downloads: Down
       results,
     });
   });
-  void page.route(/^https?:\/\/[^/]+\/api\/jobs\/download$/, (route): void => {
+  await page.route(/^https?:\/\/[^/]+\/api\/jobs\/download$/, (route): void => {
     const body = route.request().postDataJSON() as { mangaTitle?: string; chapterName?: string };
     const job: JobT = {
       id: `job-${downloads.jobs.length + 1}`,
@@ -106,7 +106,7 @@ function installStatefulFavorites(page: Page, rows: FavoriteT[], downloads: Down
     downloads.jobs.push(job);
     json(route, { job }, 201);
   });
-  void page.route(/^https?:\/\/[^/]+\/api\/jobs\?/, (route): void => {
+  await page.route(/^https?:\/\/[^/]+\/api\/jobs\?/, (route): void => {
     json(route, { jobs: [...downloads.jobs].reverse() });
   });
 }
@@ -115,7 +115,7 @@ test('create favorite from the manga page, batch-check, decide in the sheet, dow
   const rows: FavoriteT[] = [];
   const downloads: DownloadsState = { jobs: [] };
   await installMockApi(page);
-  installStatefulFavorites(page, rows, downloads);
+  await installStatefulFavorites(page, rows, downloads);
 
   // 1 — create from the manga page (the interplay story's affordance).
   await page.goto(
@@ -163,7 +163,7 @@ test('auto-download favorites show pre-queued in the sheet (no double enqueue)',
   ];
   const downloads: DownloadsState = { jobs: [] };
   await installMockApi(page);
-  installStatefulFavorites(page, rows, downloads);
+  await installStatefulFavorites(page, rows, downloads);
 
   await page.goto('/#favorites');
   await page.getByTestId('check-all-button').click();

@@ -27,7 +27,7 @@ const ROUTES: Record<PageName, string> = {
 };
 
 test.beforeEach(async ({ page }: { page: Page }): Promise<void> => {
-  installMockApi(page);
+  await installMockApi(page);
   await page.route(/^https?:\/\/[^/]+\/api\/readyz$/, (route): void => {
     void route.fulfill({
       status: 200,

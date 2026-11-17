@@ -19,7 +19,7 @@ import {
 } from './perf-helpers';
 
 test.beforeEach(async ({ page }: { page: Page }): Promise<void> => {
-  installMockApi(page);
+  await installMockApi(page);
 });
 
 test('Browse catalog: 1200 rows render virtualized, scroll to the tail without jank', async ({ page }: { page: Page }): Promise<void> => {

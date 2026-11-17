@@ -4,7 +4,7 @@
  * file streams from `GET /api/library/:id/file`).
  *
  * Design-system retrofit: PageHeader + ListPanel + EntryRow rows;
- * the `.library-row` / `data-file-id` hooks and texts are unchanged.
+ * the `.library-row` hook (with `data-file-id`) lives on the inner FileRow ONLY — the ListPanel wrapper carries no row class (double-stamping made text locators strict-violate: nested duplicates).
  */
 import type { ReactElement } from 'react';
 import { Download } from 'lucide-react';
@@ -70,7 +70,6 @@ export function LibraryPage(): ReactElement {
             ariaLabel="Library files"
             items={rows}
             itemKey={(file): string => file.id}
-            rowClassName="library-row"
             renderItem={(file): ReactElement => <FileRow file={file} />}
           />
           {library.hasNextPage ? (
@@ -92,6 +91,9 @@ export function LibraryPage(): ReactElement {
       {!library.isPending && rows.length === 0 && !library.isError ? (
         <EmptyState title="No chapters downloaded yet">
           <p>Finished downloads land here as packed archives (Browse → pick a title → Enqueue).</p>
+          <p>
+            The <a className="underline underline-offset-4 max-md:inline-flex max-md:min-h-touch-target max-md:items-center" href="docs/USER-GUIDE.md#library">library guide</a> explains formats and retrieving files.
+          </p>
         </EmptyState>
       ) : null}
     </section>

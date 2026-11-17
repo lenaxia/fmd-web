@@ -18,8 +18,8 @@ interface BatchCall {
 }
 
 /** Stateful batch mock: first call 201 fresh, every replay 200 + replayed. */
-function installBatchRecorder(page: Page, calls: BatchCall[]): void {
-  void page.route(/\/api\/jobs\/download\/batch$/, (route: Route): void => {
+async function installBatchRecorder(page: Page, calls: BatchCall[]): Promise<void> {
+  await page.route(/\/api\/jobs\/download\/batch$/, (route: Route): void => {
     const body = route.request().postDataJSON() as Record<string, unknown>;
     const fresh = calls.length === 0;
     const status = fresh ? 201 : 200;
@@ -46,7 +46,7 @@ async function openRowMenu(page: Page, rowTitle: string): Promise<void> {
 }
 
 test.beforeEach(async ({ page }: { page: Page }): Promise<void> => {
-  installMockApi(page);
+  await installMockApi(page);
 });
 
 test('hovering a row shows the full catalog metadata popover (no fetch)', async ({ page }: {
@@ -88,7 +88,7 @@ test('row menu → Download all chapters POSTs one batch per manga; replay is id
   page: Page;
 }): Promise<void> => {
   const calls: BatchCall[] = [];
-  installBatchRecorder(page, calls);
+  await installBatchRecorder(page, calls);
   await page.goto(SITE_URL);
   await expect(page.getByText('Alpha Quest')).toBeVisible();
 
@@ -117,7 +117,7 @@ test('row menu → Add to favorites: POSTs, then disables with a tooltip', async
   const SITE = CATALOG_ID;
   const rows: unknown[] = [];
   // Stateful favorites (registered AFTER installMockApi → wins).
-  void page.route(/\/api\/favorites$/, (route: Route): void => {
+  await page.route(/\/api\/favorites$/, (route: Route): void => {
     if (route.request().method() === 'GET') {
       void route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ favorites: rows }) });
     } else {

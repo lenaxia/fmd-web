@@ -44,7 +44,7 @@ function favoriteRow(): FavoriteFixture {
 }
 
 /** Stateful favorites mock: the round-trip observes real membership. */
-function installStatefulFavorites(page: Page, rows: FavoriteFixture[]): void {
+async function installStatefulFavorites(page: Page, rows: FavoriteFixture[]): Promise<void> {
   const json = (route: Route, body: unknown, status = 200): void => {
     void route.fulfill({
       status,
@@ -52,7 +52,7 @@ function installStatefulFavorites(page: Page, rows: FavoriteFixture[]): void {
       body: JSON.stringify(body),
     });
   };
-  void page.route(/^https?:\/\/[^/]+\/api\/favorites$/, (route): void => {
+  await page.route(/^https?:\/\/[^/]+\/api\/favorites$/, (route): void => {
     if (route.request().method() === 'GET') {
       json(route, { favorites: rows });
     } else {
@@ -60,13 +60,13 @@ function installStatefulFavorites(page: Page, rows: FavoriteFixture[]): void {
       json(route, { favorite: rows[rows.length - 1] }, 201);
     }
   });
-  void page.route(/^https?:\/\/[^/]+\/api\/favorites\/.+$/, (route): void => {
+  await page.route(/^https?:\/\/[^/]+\/api\/favorites\/.+$/, (route): void => {
     const index = rows.findIndex((row): boolean => row.id === FAVORITE_ID);
     if (index >= 0) rows.splice(index, 1);
     json(route, { ok: true });
   });
   // Precedence over the installMockApi info fixture (registered later).
-  void page.route(/^https?:\/\/[^/]+\/api\/info$/, (route): void => {
+  await page.route(/^https?:\/\/[^/]+\/api\/info$/, (route): void => {
     json(route, infoWithDownloads);
   });
 }
@@ -81,14 +81,14 @@ async function gotoManga(page: Page): Promise<void> {
 }
 
 test.beforeEach(async ({ page }: { page: Page }): Promise<void> => {
-  installMockApi(page);
+  await installMockApi(page);
 });
 
 test('favorite round-trip: Add to favorites → In favorites → remove', async ({ page }: {
   page: Page;
 }): Promise<void> => {
   const rows: FavoriteFixture[] = [];
-  installStatefulFavorites(page, rows);
+  await installStatefulFavorites(page, rows);
   await gotoManga(page);
 
   const add = page.getByRole('button', { name: 'Add to favorites' });
@@ -110,7 +110,7 @@ test('favorite round-trip: Add to favorites → In favorites → remove', async 
 test('downloaded chapters are tinted and hide-downloaded drops them', async ({ page }: {
   page: Page;
 }): Promise<void> => {
-  installStatefulFavorites(page, []);
+  await installStatefulFavorites(page, []);
   await gotoManga(page);
 
   // ch-1 carries the downloaded badge (ledger membership via /api/info)
@@ -130,7 +130,7 @@ test('downloaded chapters are tinted and hide-downloaded drops them', async ({ p
 test('Ascending/Descending toggles the chapter presentation order', async ({ page }: {
   page: Page;
 }): Promise<void> => {
-  installStatefulFavorites(page, []);
+  await installStatefulFavorites(page, []);
   await gotoManga(page);
 
   await expect(page.getByLabel('Chapter 1: The Beginning')).toBeVisible();

@@ -8,7 +8,7 @@ import { test, expect, type Page, type WebSocketRoute } from '@playwright/test';
 import { CATALOG_ID, MODULE_ID, installMockApi, job } from './fixtures';
 
 test.beforeEach(async ({ page }: { page: Page }): Promise<void> => {
-  installMockApi(page);
+  await installMockApi(page);
 });
 
 test('Browse: catalog latest list with cursor pagination + search', async ({ page }: { page: Page }): Promise<void> => {
