@@ -7,7 +7,7 @@
  * exercised end-to-end in test/jobs/favorites/service.test.ts.
  */
 import { describe, expect, it } from 'vitest';
-import { buildHarness, expectEnvelope, MODULE_A_ID } from './helpers.js';
+import { buildHarness, expectEnvelope, MODULE_A_ID, MODULE_B_ID } from './helpers.js';
 import {
   InMemoryFavoriteService,
   type InMemoryFavoriteCheckBehavior,
@@ -280,5 +280,182 @@ describe('POST /api/favorites/import — D4 transfer-favorite path', (): void =>
       id: FAV_ID,
       title: 'Transferred',
     });
+  });
+});
+
+// Composite favorite ids are `<moduleId>/<url>` — host-relative for
+// catalog-seeded favorites (§5.8), absolute for canonicalized ones —
+// so the id carries slashes and crosses the wire percent-encoded
+// (`%2F`). Intermediary hops (reverse proxies, the dev-preview
+// tunnel) decode `%2F` into literal path slashes before the request
+// arrives, splitting the id across segments; the regression below is
+// the owner-reported auto-download toggle 404 on an EXISTING
+// favorite (MangaPark `/title/<slug>` shape). Every id-carrying verb
+// must resolve BOTH wire spellings of the SAME stored key.
+describe('favorites composite ids — encoded and decoded wire forms', (): void => {
+  // The owner's exact shape: host-relative catalog link on module 09d49c…
+  // (normalized to the harness module for hermeticity).
+  const REL_URL = '/title/351056-en-sousou-no-frieren-anthology';
+  const REL_ID = `${MODULE_A_ID}${REL_URL}`;
+  const encoded = (id: string): string => `/api/favorites/${encodeURIComponent(id)}`;
+  const raw = (id: string, suffix = ''): string => `/api/favorites/${id}${suffix}`;
+
+  async function seed(h: ReturnType<typeof buildHarness>, url: string): Promise<string> {
+    const res = await h.app.inject({
+      method: 'POST',
+      url: '/api/favorites',
+      payload: { moduleId: MODULE_A_ID, url, title: 'Seeded' },
+    });
+    expect(res.statusCode).toBe(201);
+    return (res.json().favorite as Record<string, unknown>).id as string;
+  }
+
+  it('PUT auto-download toggles resolve through the %2F-encoded id AND the raw decoded path', async (): Promise<void> => {
+    const h = buildHarness();
+    await seed(h, REL_URL);
+
+    // Encoded form (`:id` route): the shape the browser sends.
+    const on = await h.app.inject({
+      method: 'PUT',
+      url: encoded(REL_ID),
+      payload: { autoDownload: true },
+    });
+    expect(on.statusCode).toBe(200);
+    expect(on.json().favorite as Record<string, unknown>).toMatchObject({
+      id: REL_ID,
+      autoDownload: true,
+    });
+
+    // Raw decoded form (wildcard route): the shape a %2F-decoding hop
+    // forwards — this was the 404.
+    const off = await h.app.inject({
+      method: 'PUT',
+      url: raw(REL_ID),
+      payload: { autoDownload: false },
+    });
+    expect(off.statusCode).toBe(200);
+    expect(off.json().favorite as Record<string, unknown>).toMatchObject({
+      id: REL_ID,
+      autoDownload: false,
+    });
+
+    // Persistence: either spelling's write is visible through the other.
+    await h.app.inject({ method: 'PUT', url: raw(REL_ID), payload: { autoDownload: true } });
+    const readBack = await h.app.inject({ method: 'GET', url: encoded(REL_ID) });
+    expect(readBack.statusCode).toBe(200);
+    expect((readBack.json().favorite as Record<string, unknown>).autoDownload).toBe(true);
+  });
+
+  it('the raw decoded path resolves for GET and DELETE too (same stored row)', async (): Promise<void> => {
+    const h = buildHarness();
+    await seed(h, REL_URL);
+
+    const got = await h.app.inject({ method: 'GET', url: raw(REL_ID) });
+    expect(got.statusCode).toBe(200);
+    expect((got.json().favorite as Record<string, unknown>).id).toBe(REL_ID);
+
+    const del = await h.app.inject({ method: 'DELETE', url: raw(REL_ID) });
+    expect(del.statusCode).toBe(200);
+    expect(del.json()).toEqual({ ok: true });
+    expect(h.favorites.get(REL_ID)).toBeUndefined();
+
+    const again = await h.app.inject({ method: 'DELETE', url: raw(REL_ID) });
+    expect(again.statusCode).toBe(404);
+    expectEnvelope(again.body, 'not_found');
+  });
+
+  it('id-suffixed POST routes (/check, /transfer/preview) resolve through the raw decoded path', async (): Promise<void> => {
+    const h = buildHarness({
+      favorites: new InMemoryFavoriteService(
+        behavior({ currentChapter: 7, newChapterCount: 1, queuedDownloads: 0 }),
+      ),
+    });
+    await seed(h, REL_URL);
+
+    const check = await h.app.inject({ method: 'POST', url: raw(REL_ID, '/check') });
+    expect(check.statusCode).toBe(200);
+    expect((check.json().favorite as Record<string, unknown>).id).toBe(REL_ID);
+    expect((check.json().favorite as Record<string, unknown>).currentChapter).toBe(7);
+
+    // Transfer preview: routing must REACH the handler (the in-memory
+    // double resolves no target → typed invalid preview, never a 404).
+    const preview = await h.app.inject({
+      method: 'POST',
+      url: raw(REL_ID, '/transfer/preview'),
+      payload: { targetModuleId: MODULE_B_ID },
+    });
+    expect(preview.statusCode).toBe(200);
+    expect(preview.json() as Record<string, unknown>).toMatchObject({
+      targetModuleId: MODULE_B_ID,
+      valid: false,
+    });
+  });
+
+  it('a canonicalized (absolute-url) favorite id resolves through both forms — :// segments included', async (): Promise<void> => {
+    const h = buildHarness();
+    await seed(h, FAV_URL);
+
+    const viaEncoded = await h.app.inject({
+      method: 'PUT',
+      url: encoded(FAV_ID),
+      payload: { autoDownload: true },
+    });
+    expect(viaEncoded.statusCode).toBe(200);
+
+    const viaRaw = await h.app.inject({
+      method: 'PUT',
+      url: raw(FAV_ID),
+      payload: { autoDownload: false },
+    });
+    expect(viaRaw.statusCode).toBe(200);
+    expect(viaRaw.json().favorite as Record<string, unknown>).toMatchObject({
+      id: FAV_ID,
+      autoDownload: false,
+    });
+  });
+
+  it('a double-encoded hop (%252F) still resolves the stored row', async (): Promise<void> => {
+    const h = buildHarness();
+    await seed(h, REL_URL);
+    const res = await h.app.inject({
+      method: 'PUT',
+      url: `/api/favorites/${encodeURIComponent(encodeURIComponent(REL_ID))}`,
+      payload: { autoDownload: true },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().favorite as Record<string, unknown>).toMatchObject({
+      id: REL_ID,
+      autoDownload: true,
+    });
+  });
+
+  it('the wildcard does not widen the API surface: unknown ids stay typed 404s and bare POST id paths stay route 404s', async (): Promise<void> => {
+    const h = buildHarness();
+    await seed(h, REL_URL);
+
+    // Unknown favorite through either spelling: typed unknown-favorite 404.
+    const missing = await h.app.inject({
+      method: 'PUT',
+      url: raw(`${MODULE_A_ID}/title/does-not-exist`),
+      payload: { autoDownload: true },
+    });
+    expect(missing.statusCode).toBe(404);
+    expectEnvelope(missing.body, 'not_found');
+
+    // There is no bare `POST /api/favorites/:id` — the unsuffixed tail
+    // keeps answering the route-not-found envelope.
+    const bare = await h.app.inject({ method: 'POST', url: raw(REL_ID) });
+    expect(bare.statusCode).toBe(404);
+    expect(bare.json()).toMatchObject({ error: { code: 'not_found', message: 'route not found' } });
+
+    // The static POST routes keep priority over the wildcard.
+    const batch = await h.app.inject({
+      method: 'POST',
+      url: '/api/favorites/check',
+      payload: { scope: 'all' },
+    });
+    expect(batch.statusCode).toBe(200);
+    const cancel = await h.app.inject({ method: 'POST', url: '/api/favorites/check/cancel' });
+    expect(cancel.statusCode).toBe(200);
   });
 });

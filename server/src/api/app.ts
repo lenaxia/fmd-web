@@ -1186,19 +1186,52 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     return FavoriteResponseSchema.parse({ favorite });
   });
 
-  app.get('/api/favorites/:id', async (req): Promise<FavoriteResponseT> => {
-    const id = parseOr400(FavoriteIdSchema, (req.params as Record<string, unknown>)['id'], 'favorite id');
+  // Composite favorite ids are `<moduleId>/<url>` and the url is often
+  // HOST-RELATIVE (catalog links, §5.8) — the id carries slashes and
+  // the browser percent-encodes them (`%2F`). This app's `:id` routes
+  // decode that form fine, but intermediary hops (reverse proxies, the
+  // dev-preview tunnel) routinely decode `%2F` into literal path
+  // slashes before the request arrives — find-my-way matches `:id` as
+  // ONE segment and refuses mid-path wildcards, so the decoded shape
+  // died as a routing 404 (the owner-reported auto-download toggle
+  // failure on an existing favorite). BOTH wire shapes are now
+  // accepted: the `:id` routes keep the encoded form; `*` routes catch
+  // the decoded form and reassemble the tail into the composite id.
+  // The POST family's id-suffixed routes (`/check`, `/transfer`,
+  // `/transfer/preview`) dispatch by suffix inside the wildcard
+  // handler — find-my-way orders static > param > wildcard, so
+  // `/api/favorites/check`, `/check/cancel` and `/import` keep their
+  // exact routes either way.
+  const normalizeFavoriteId = (id: string): string => {
+    // A double-encoding hop (`%252F`) leaves the separator literally
+    // in the param. The verbatim key stays authoritative; the decoded
+    // spelling is only tried when it alone resolves a stored row.
+    if (!/%2[fF]/.test(id)) {
+      return id;
+    }
+    const decoded = id.replace(/%2[fF]/g, '/');
+    return services.favorites.get(decoded) !== undefined && services.favorites.get(id) === undefined
+      ? decoded
+      : id;
+  };
+
+  const favoriteId = (req: FastifyRequest): string => {
+    const params = req.params as Record<string, unknown>;
+    const raw = typeof params['*'] === 'string' ? params['*'] : params['id'];
+    return parseOr400(FavoriteIdSchema, normalizeFavoriteId(typeof raw === 'string' ? raw : ''), 'favorite id');
+  };
+
+  const favoriteGet = async (id: string): Promise<FavoriteResponseT> => {
     const favorite = services.favorites.get(id);
     if (favorite === undefined) {
       throw notFound('Favorite', id);
     }
     return FavoriteResponseSchema.parse({ favorite });
-  });
+  };
 
   // Title + the auto-download toggle + save-to + enable/disable
   // (§7.2 pipeline eligibility, pmFavorites parity).
-  app.put('/api/favorites/:id', async (req): Promise<FavoriteResponseT> => {
-    const id = parseOr400(FavoriteIdSchema, (req.params as Record<string, unknown>)['id'], 'favorite id');
+  const favoriteUpdate = async (id: string, req: FastifyRequest): Promise<FavoriteResponseT> => {
     const patch = parseOr400(FavoriteUpdateRequestSchema, req.body, 'favorite update body');
     if (
       patch.title === undefined &&
@@ -1209,20 +1242,17 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
       throw new ApiError(400, 'validation_error', 'empty favorite update (nothing to change)');
     }
     return FavoriteResponseSchema.parse({ favorite: services.favorites.update(id, patch) });
-  });
+  };
 
-  app.delete('/api/favorites/:id', async (req, reply): Promise<{ ok: true }> => {
-    const id = parseOr400(FavoriteIdSchema, (req.params as Record<string, unknown>)['id'], 'favorite id');
+  const favoriteRemove = (id: string): { ok: true } => {
     services.favorites.remove(id);
-    void reply.code(200);
     return { ok: true };
-  });
+  };
 
   // Manual check-now: the immediate DoCheck cycle for ONE favorite
   // (live info → immediate CurrentChapter/Status update → diff →
   // auto-download when enabled). Live-fetch failures are upstream 502s.
-  app.post('/api/favorites/:id/check', async (req): Promise<FavoriteCheckResponseT> => {
-    const id = parseOr400(FavoriteIdSchema, (req.params as Record<string, unknown>)['id'], 'favorite id');
+  const favoriteCheckNow = async (id: string): Promise<FavoriteCheckResponseT> => {
     try {
       const result = await services.favorites.checkNow(id);
       return FavoriteCheckResponseSchema.parse(result);
@@ -1232,7 +1262,24 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
       }
       throw new ApiError(502, 'upstream_error', `module GetInfo failed: ${err instanceof Error ? err.message : String(err)}`);
     }
+  };
+
+  app.get('/api/favorites/:id', async (req): Promise<FavoriteResponseT> => favoriteGet(favoriteId(req)));
+  app.get('/api/favorites/*', async (req): Promise<FavoriteResponseT> => favoriteGet(favoriteId(req)));
+
+  app.put('/api/favorites/:id', async (req): Promise<FavoriteResponseT> => favoriteUpdate(favoriteId(req), req));
+  app.put('/api/favorites/*', async (req): Promise<FavoriteResponseT> => favoriteUpdate(favoriteId(req), req));
+
+  app.delete('/api/favorites/:id', async (req, reply): Promise<{ ok: true }> => {
+    void reply.code(200);
+    return favoriteRemove(favoriteId(req));
   });
+  app.delete('/api/favorites/*', async (req, reply): Promise<{ ok: true }> => {
+    void reply.code(200);
+    return favoriteRemove(favoriteId(req));
+  });
+
+  app.post('/api/favorites/:id/check', async (req): Promise<FavoriteCheckResponseT> => favoriteCheckNow(favoriteId(req)));
 
   // ── favorites batch check (btFavoritesCheckNewChapter + cancel) ──
   app.post('/api/favorites/check', async (req): Promise<FavoriteCheckBatchResponseT> => {
@@ -1245,8 +1292,10 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
   });
 
   // ── favorites website transfer (frmTransferFavorites parity) ─────
-  app.post('/api/favorites/:id/transfer/preview', async (req): Promise<FavoriteTransferPreviewResponseT> => {
-    const id = parseOr400(FavoriteIdSchema, (req.params as Record<string, unknown>)['id'], 'favorite id');
+  const favoriteTransferPreview = async (
+    id: string,
+    req: FastifyRequest,
+  ): Promise<FavoriteTransferPreviewResponseT> => {
     const body = parseOr400(
       FavoriteTransferPreviewRequestSchema,
       req.body,
@@ -1255,10 +1304,9 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     return FavoriteTransferPreviewResponseSchema.parse(
       await services.favorites.transferPreview(id, body.targetModuleId),
     );
-  });
+  };
 
-  app.post('/api/favorites/:id/transfer', async (req): Promise<FavoriteTransferResponseT> => {
-    const id = parseOr400(FavoriteIdSchema, (req.params as Record<string, unknown>)['id'], 'favorite id');
+  const favoriteTransfer = async (id: string, req: FastifyRequest): Promise<FavoriteTransferResponseT> => {
     const body = parseOr400(FavoriteTransferRequestSchema, req.body, 'favorite transfer body');
     // Resolve the mapping first (the dry-run validation IS the gate —
     // an invalid target is a typed 409, never a silent remap).
@@ -1276,6 +1324,44 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
       clearDownloadedList: body.clearDownloadedList,
     });
     return FavoriteTransferResponseSchema.parse(result);
+  };
+
+  app.post('/api/favorites/:id/transfer/preview', async (req): Promise<FavoriteTransferPreviewResponseT> =>
+    favoriteTransferPreview(favoriteId(req), req),
+  );
+
+  app.post('/api/favorites/:id/transfer', async (req): Promise<FavoriteTransferResponseT> =>
+    favoriteTransfer(favoriteId(req), req),
+  );
+
+  // Decoded composite id + suffix dispatch (see the favorites id block
+  // comment above): `POST /api/favorites/<id-with-slashes>/check` and
+  // the transfer variants. A tail carrying none of the suffixes is NOT
+  // a route (there is no bare `POST /api/favorites/:id`) — the typed
+  // route-not-found envelope answers, exactly as before.
+  app.post('/api/favorites/*', async (req): Promise<unknown> => {
+    const tail = (req.params as Record<string, unknown>)['*'];
+    if (typeof tail !== 'string') {
+      throw new ApiError(404, 'not_found', 'route not found');
+    }
+    for (const suffix of ['/transfer/preview', '/transfer', '/check']) {
+      if (!tail.endsWith(suffix)) {
+        continue;
+      }
+      const id = parseOr400(
+        FavoriteIdSchema,
+        normalizeFavoriteId(tail.slice(0, tail.length - suffix.length)),
+        'favorite id',
+      );
+      if (suffix === '/transfer/preview') {
+        return favoriteTransferPreview(id, req);
+      }
+      if (suffix === '/transfer') {
+        return favoriteTransfer(id, req);
+      }
+      return favoriteCheckNow(id);
+    }
+    throw new ApiError(404, 'not_found', 'route not found');
   });
 
   // ── import from FMD2 (two-phase: analyze → apply) ────────────────

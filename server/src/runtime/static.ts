@@ -26,6 +26,11 @@ const CONTENT_TYPES: Readonly<Record<string, string>> = {
   '.map': 'application/json; charset=utf-8',
   '.woff2': 'font/woff2',
   '.txt': 'text/plain; charset=utf-8',
+  // PWA installability (R5): Chrome/Edge only parse the manifest when
+  // it is served as application/manifest+json — the previous
+  // octet-stream fallback made <link rel="manifest"> unfetchable as a
+  // manifest, silently breaking install.
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
 };
 
 export function registerStatic(app: FastifyInstance, distDir: string): void {
