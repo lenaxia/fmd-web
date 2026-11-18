@@ -409,9 +409,17 @@ export class HttpPipeline {
       };
       const result = this.transport.send(raw);
       if (!result.ok) {
-        // synapse failure path: ResultCode stays at the initial 500 (:615)
+        // synapse failure path: ResultCode stays at the initial 500
+        // (:615). ResultString keeps the transport's failure text — a
+        // documented divergence from synapse's clear: desktop FMD2
+        // surfaces the socket error through its own log, while this
+        // server's diagnosis rides HTTP.ResultString into the module
+        // dispatch error (module-info appends it to the net_problem
+        // message), so the reason must survive the hop. Clearing it
+        // made every transport failure an unattributable net_problem
+        // (the MangaPark parked-domain/slow-origin incident).
         this.resultCode = 500;
-        this.resultString = '';
+        this.resultString = result.error;
         this.document.clear();
         this.headers.clear();
         return { sent: false, status: 500, denied: false };

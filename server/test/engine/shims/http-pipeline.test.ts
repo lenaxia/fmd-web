@@ -476,4 +476,46 @@ function make(entries: ConstructorParameters<typeof RecordedResponseResolver>[0]
       expect(gate.activeFor(`${BASE}/u`)).toBe(0);
     });
   });
+
+  describe('transport-failure diagnosability (net_problem detail)', () => {
+    it('a failed hop keeps the transport error in ResultString (ResultCode 500)', () => {
+      const pipeline = new HttpPipeline({
+        transport: {
+          send: () => ({
+            ok: false,
+            error: 'timeout after 15000ms',
+            status: 0,
+            statusText: '',
+            headers: [],
+            setCookie: [],
+            body: new Uint8Array(0),
+          }),
+        },
+        egress: new EgressPolicy({ allow: [] }),
+        cookies: new CookieStore(new CookieJar()),
+        isTerminated: () => false,
+      });
+      expect(pipeline.get(`https://mock.test/apo/`)).toBe(false);
+      expect(pipeline.resultCode).toBe(500);
+      // the diagnosis survives the hop: module-info appends this text to
+      // the net_problem error (silent '' made the failure unattributable)
+      expect(pipeline.resultString).toBe('timeout after 15000ms');
+    });
+
+    it('an error status with an EMPTY body fails the Size>0 rule keeping the status line', () => {
+      // parked-domain flavor: 405 with Content-Length 0 → HTTP.POST/GET
+      // false (Document.Size = 0) and the response status readable
+      const { pipeline } = make([
+        {
+          url: `https://mock.test/apo/`,
+          status: 405,
+          statusText: 'Method Not Allowed',
+          body: '',
+        },
+      ]);
+      expect(pipeline.post(`https://mock.test/apo/`, '{"query":"{}"}')).toBe(false);
+      expect(pipeline.resultCode).toBe(405);
+      expect(pipeline.resultString).toBe('Method Not Allowed');
+    });
+  });
 });

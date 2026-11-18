@@ -188,7 +188,11 @@ export class EngineInfoService implements ModuleInfoPort {
           );
         }
         if (result.kind !== 'code' || result.value !== NO_ERROR) {
-          throw new ApiError(502, 'upstream_error', `GetInfo returned net_problem for ${url}`);
+          throw new ApiError(
+            502,
+            'upstream_error',
+            `GetInfo returned net_problem for ${url}${this.httpFailureDetail(engine)}`,
+          );
         }
         return this.readNormalizedInfo(engine.doStringSync.bind(engine));
       } finally {
@@ -197,6 +201,31 @@ export class EngineInfoService implements ModuleInfoPort {
     } finally {
       this.hosts.delete(host);
       await host.dispose();
+    }
+  }
+
+  /**
+   * The request-scoped HTTP object survives the dispatch on the engine
+   * (same readback path MANGAINFO uses): after a net_problem its
+   * ResultCode/ResultString name the failing hop — ResultString carries
+   * the transport error text ('timeout', TLS failure…) or the response
+   * status line (an error status with an empty body fails the
+   * Document.Size>0 rule, e.g. a parked domain's 405). Without this the
+   * upstream_error is an unattributable 'net_problem' (the MangaPark
+   * incident: parked mirror + slow-origin 523s both rendered identically
+   * silent). Reads are best-effort — a cleared env keeps the bare
+   * message.
+   */
+  private httpFailureDetail(engine: { doStringSync: (code: string) => unknown }): string {
+    try {
+      const code = Number(engine.doStringSync('return HTTP.ResultCode'));
+      const text = String(engine.doStringSync('return HTTP.ResultString') ?? '');
+      if (!Number.isFinite(code) || text === '') {
+        return '';
+      }
+      return ` (HTTP ${String(code)}: ${text.slice(0, 200)})`;
+    } catch {
+      return '';
     }
   }
 

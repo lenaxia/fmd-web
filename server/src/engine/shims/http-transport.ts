@@ -750,11 +750,23 @@ export class LoopbackHttpTransport implements HttpTransportPort {
     Atomics.store(this.control, 0, seq);
     Atomics.notify(this.control, 0);
 
-    const deadline = Date.now() + Math.min(request.timeoutMs > 0 ? request.timeoutMs : this.maxWaitMs, this.maxWaitMs);
+    const budgetMs = Math.min(request.timeoutMs > 0 ? request.timeoutMs : this.maxWaitMs, this.maxWaitMs);
+    const deadline = Date.now() + budgetMs;
     let observed = Atomics.load(this.control, 1);
     while (Atomics.load(this.control, 1) !== seq) {
       const remaining = deadline - Date.now();
       if (remaining <= 0) {
+        // Host-side deadline overrun: the worker never answered within
+        // the caller's budget (silent origin, wedged socket). The
+        // worker's writeResult logging never runs for this request, so
+        // log here — symmetric with the wire-level diagnostics — or the
+        // failure stays invisible in the app log (exactly the blind
+        // spot of a Cloudflare slow-origin hold: the response lands
+        // after the request timeout, and nothing explains the
+        // net_problem).
+        console.error(
+          `[http-transport] timeout after ${String(budgetMs)}ms: ${request.method} ${request.url}`,
+        );
         return TRANSPORT_ERROR('timeout');
       }
       Atomics.wait(this.control, 1, observed, Math.min(WAIT_CHUNK_MS, remaining));
