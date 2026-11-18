@@ -135,13 +135,14 @@ describe('SqliteFavoritesService (production adapter over the §7.2 engine)', ()
 
   it('import marks every live chapter downloaded in the favorite list (global row untouched)', async (): Promise<void> => {
     const { service, store } = openService(['https://site.example/ch/1', 'https://site.example/ch/2']);
-    const favorite = await service.import({ moduleId: MODULE, url: MANGA_URL });
+    const { favorite, importOutcome } = await service.import({ moduleId: MODULE, url: MANGA_URL });
     const key = downloadedChaptersKey(MODULE, MANGA_URL);
     expect(store.getFavoriteDownloadedList(key)).toBe(
       'https://site.example/ch/1\nhttps://site.example/ch/2\n',
     );
     expect(store.getDownloadedChapters(MODULE, MANGA_URL)).toBe('');
     expect(favorite.newChapterCount).toBe(0);
+    expect(importOutcome).toBe('created');
     // follow-up check finds nothing new
     const check = await service.checkNow(key);
     expect(check.newChapters).toEqual([]);
