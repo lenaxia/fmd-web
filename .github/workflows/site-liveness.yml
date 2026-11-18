@@ -1,0 +1,53 @@
+name: site-liveness
+
+# Weekly site-liveness check: for every enabled site, pick a random
+# series, download one chapter through the real pipeline (in-process
+# server, temp data dir — artifacts discarded), up to 3 series per site
+# before the week is a warn. Three consecutive warn weeks mark the site
+# 'failed' in server/tools/sitecheck/liveness.json (a flag only —
+# nothing gates on it yet).
+#
+# The state file is committed back to main so the counters accumulate
+# week over week.
+
+on:
+  schedule:
+    # Mondays 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: site-liveness
+  cancel-in-progress: false
+
+jobs:
+  sitecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run sitecheck (live)
+        run: node_modules/.bin/tsx server/tools/sitecheck/run.ts --live --budget-minutes 300
+
+      - name: Commit liveness state
+        run: |
+          git config user.name 'fmd-web-ci'
+          git config user.email 'ci@fmd-web.local'
+          git add server/tools/sitecheck/liveness.json server/tools/sitecheck/liveness.report.json
+          if git diff --cached --quiet; then
+            echo "no liveness changes to commit"
+          else
+            git commit -m "site-liveness weekly run [sitecheck]"
+            git push
+          fi
