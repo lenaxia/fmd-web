@@ -40,7 +40,7 @@ export function SaveToDialog(props: {
     <Dialog open={open} onOpenChange={(next): void => { if (!next) close(); }}>
       <DialogContent className="saveto-dialog max-w-md" data-testid="saveto-dialog">
         <DialogHeader>
-          <DialogTitle>Change save-to — {favorite?.title ?? favorite?.url ?? ''}</DialogTitle>
+          <DialogTitle>Change save-to: {favorite?.title ?? favorite?.url ?? ''}</DialogTitle>
           <DialogDescription>
             The per-favorite custom download directory; empty resets to the
             default library layout.

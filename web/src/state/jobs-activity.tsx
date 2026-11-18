@@ -57,7 +57,7 @@ function jobLabel(job: JobT): string {
   const title = typeof payload['mangaTitle'] === 'string' ? payload['mangaTitle'] : '';
   const chapter = typeof payload['chapterName'] === 'string' ? payload['chapterName'] : '';
   if (title !== '' && chapter !== '') {
-    return `${title} — ${chapter}`;
+    return `${title} · ${chapter}`;
   }
   return title !== '' ? title : chapter !== '' ? chapter : `job ${job.id}`;
 }

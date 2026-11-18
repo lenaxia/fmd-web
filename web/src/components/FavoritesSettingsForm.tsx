@@ -94,7 +94,7 @@ export function FavoritesSettingsForm(): ReactElement {
         {update.isError ? <ErrorBanner error={update.error} /> : null}
         {update.isSuccess && !dirty ? (
           <p role="status" className="text-sm text-primary" data-testid="favorites-settings-saved">
-            Saved — the new cadence applies to the running scheduler.
+            Saved. The new cadence applies to the running scheduler.
           </p>
         ) : null}
         <div>

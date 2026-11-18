@@ -17,7 +17,7 @@ import { cn } from 'cn';
 export function siteRowDisabledReason(module: ModuleSummaryT): string | undefined {
   if (module.capabilities.known_broken_flags.length === 0) return undefined;
   return (
-    `Known broken upstream (${module.capabilities.known_broken_flags.join(', ')}) — ` +
+    `Known broken upstream (${module.capabilities.known_broken_flags.join(', ')}); ` +
     'the site adapter fails against the live site until an upstream fix lands.'
   );
 }
@@ -51,7 +51,7 @@ export function SiteRow(props: {
         onClick={onClick}
         disabled={disabled}
         title={brokenReason}
-        aria-label={`${module.name} — browse ${module.category}${disabled ? ' (unavailable: known broken upstream)' : ''}`}
+        aria-label={`${module.name}: browse ${module.category}${disabled ? ' (unavailable: known broken upstream)' : ''}`}
         className={cn(
           'flex w-full flex-col items-start gap-1 rounded-md px-3 py-2 text-left',
           'transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',

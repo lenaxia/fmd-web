@@ -43,7 +43,7 @@ describe('Settings → API token section (*arr semantics)', (): void => {
     expect(await screen.findByTestId('api-token-value')).toHaveTextContent('••••');
     expect(await screen.findByTestId('api-token-regenerate')).toBeInTheDocument();
     // Mode label: open deployment vocabulary, NOT 'API-only mode'.
-    expect(screen.getByTestId('api-token-mode')).toHaveTextContent('open deployment — token for scripts');
+    expect(screen.getByTestId('api-token-mode')).toHaveTextContent('open deployment · token for scripts');
     // The OLD gate copy must never render (it described the removed
     // 'generate only for authed deployments' policy).
     expect(screen.queryByText(/Auth is off/i)).not.toBeInTheDocument();

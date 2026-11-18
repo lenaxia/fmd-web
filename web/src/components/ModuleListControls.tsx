@@ -71,7 +71,7 @@ export function GlobalBulkControls(props: {
             <DialogTitle>Disable {props.scopeLabel}?</DialogTitle>
             <DialogDescription>
               Every site in the current selection is switched off: it disappears from Browse and
-              Favorites checks until re-enabled. Nothing is deleted — re-enable anytime.
+              Favorites checks until re-enabled. Nothing is deleted; re-enable anytime.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

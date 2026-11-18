@@ -74,7 +74,7 @@ test('Downloads: job list, cursor load-more, WS progress updates live', async ({
   await expect(page.getByText(/Event stream:/)).toBeVisible();
 
   // REST list renders first
-  await expect(page.getByText('Alpha Quest — Chapter 1: The Beginning')).toBeVisible();
+  await expect(page.getByText('Alpha Quest · Chapter 1: The Beginning')).toBeVisible();
   await expect(page.getByText('Event stream: Live')).toBeVisible();
 
   // WS event patches the row live (D19)
@@ -93,7 +93,7 @@ test('Downloads: job list, cursor load-more, WS progress updates live', async ({
   // cursor pagination still works
   await page.getByRole('button', { name: 'Load more' }).click();
   // page 2 is empty (fixtures) — row from page 1 remains, no crash
-  await expect(page.getByText('Alpha Quest — Chapter 1: The Beginning')).toBeVisible();
+  await expect(page.getByText('Alpha Quest · Chapter 1: The Beginning')).toBeVisible();
 });
 
 test('Settings: module list with capability/known-broken badges + options editor', async ({ page }: { page: Page }): Promise<void> => {

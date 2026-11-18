@@ -52,13 +52,13 @@ export function EntryRowMenu(props: EntryRowMenuProps): ReactElement {
       .then((result): void => {
         const n: number = result.jobs.length;
         if (result.replayed) {
-          toast.info(`Already queued — showing the existing ${n} download${n === 1 ? '' : 's'} for ${props.mangaTitle ?? 'this manga'}.`);
+          toast.info(`Already queued; showing the existing ${n} download${n === 1 ? '' : 's'} for ${props.mangaTitle ?? 'this manga'}.`);
         } else {
           toast.success(`Queued ${n} chapter download${n === 1 ? '' : 's'} for ${props.mangaTitle ?? 'this manga'}.`);
         }
       })
       .catch((): void => {
-        toast.error(`Couldn’t queue downloads for ${props.mangaTitle ?? 'this manga'} — try again in a moment.`);
+        toast.error(`Couldn’t queue downloads for ${props.mangaTitle ?? 'this manga'}; try again in a moment.`);
       });
   };
 
@@ -71,7 +71,7 @@ export function EntryRowMenu(props: EntryRowMenuProps): ReactElement {
         toast.success(`Added ${props.mangaTitle ?? 'this manga'} to favorites.`);
       })
       .catch((): void => {
-        toast.error(`Couldn’t add ${props.mangaTitle ?? 'this manga'} to favorites — try again in a moment.`);
+        toast.error(`Couldn’t add ${props.mangaTitle ?? 'this manga'} to favorites; try again in a moment.`);
       });
   };
 

@@ -254,9 +254,9 @@ export function NewChaptersSheet(props: {
             New chapters found ({rows.length} {rows.length === 1 ? 'title' : 'titles'})
           </SheetTitle>
           <SheetDescription>
-            frmNewChapter parity: download the new chapters, add them to the
-            queue (paused), or dismiss. Auto-download rows were already queued
-            by the check.
+            Download the new chapters, add them to the queue (paused),
+            or dismiss them. Auto-download rows were already queued by
+            the check.
           </SheetDescription>
         </SheetHeader>
         <ul className="new-chapters-list min-h-0 flex-1 divide-y overflow-y-auto" aria-label="Titles with new chapters">

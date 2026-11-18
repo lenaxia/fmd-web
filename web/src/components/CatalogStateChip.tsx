@@ -20,7 +20,7 @@ export function catalogChipState(module: ModuleSummaryT): CatalogChipState {
 const CHIP: Record<CatalogChipState, { label: string; title: string; className: string }> = {
   installed: {
     label: 'ready',
-    title: 'The site’s list is ready — it opens instantly',
+    title: 'The site’s list is ready; it opens instantly',
     className: 'catalog-chip-installed',
   },
   'not-installed': {

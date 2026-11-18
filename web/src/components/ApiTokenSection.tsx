@@ -34,7 +34,7 @@ function mask(token: string): string {
 const MODE_LABEL: Record<string, string> = {
   none: 'open (no token yet)',
   password: 'password (cookie login)',
-  'api-token': 'open deployment — token for scripts',
+  'api-token': 'open deployment · token for scripts',
   'password+api-token': 'password + API token',
 };
 
@@ -59,7 +59,7 @@ export function ApiTokenSection(): ReactElement {
         setCopied(false);
       }, 1500);
     } catch {
-      toast.error('Clipboard unavailable — reveal the key and copy it manually');
+      toast.error('Clipboard unavailable: reveal the key and copy it manually');
     }
   };
 
@@ -68,7 +68,7 @@ export function ApiTokenSection(): ReactElement {
       onSuccess: (): void => {
         setConfirmOpen(false);
         setRevealed(true);
-        toast.success('API token regenerated — the old key is revoked, update your scripts');
+        toast.success('API token regenerated: the old key is revoked, update your scripts');
       },
       onError: (): void => {
         setConfirmOpen(false);
@@ -83,11 +83,11 @@ export function ApiTokenSection(): ReactElement {
         API
       </h2>
       <p className="mb-2 text-xs text-muted-foreground">
-        The single app-wide API token (Sonarr/Radarr-style) — one key per deployment, used by
+        The single app-wide API token (Sonarr/Radarr-style); one key per deployment, used by
         scripts via <code>Authorization: Bearer &lt;token&gt;</code> on every /api route and
         /ws. It exists and rotates whether or not a password is set: with auth off this is an
         open deployment (reverse-proxy fronting is first-class) and the token is your script
-        key — anyone who can reach the app can read it, like *arr without auth. Cookbook:
+        key; anyone who can reach the app can read it, like *arr without auth. Cookbook:
         docs/API.md. Auth mode:{' '}
         <span data-testid="api-token-mode">{data !== undefined ? (MODE_LABEL[data.mode] ?? data.mode) : '…'}</span>
       </p>
@@ -104,7 +104,7 @@ export function ApiTokenSection(): ReactElement {
             Managed via environment
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            FMD_WEB_API_TOKEN pins the key (env overrides the settings store) — read and rotate
+            FMD_WEB_API_TOKEN pins the key (env overrides the settings store); read and rotate
             it in the deployment environment; Regenerate is disabled here.
           </p>
         </div>
@@ -112,7 +112,7 @@ export function ApiTokenSection(): ReactElement {
         <div className="rounded-lg border bg-surface/40 p-4">
           <p className="text-sm font-medium">No API token stored</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            One is normally generated on first start — Regenerate mints it now. The token is a
+            One is normally generated on first start; Regenerate mints it now. The token is a
             script key independent of auth: it exists and rotates whether or not a password is
             set (docs/runbook.md §API token).
           </p>
@@ -172,7 +172,7 @@ export function ApiTokenSection(): ReactElement {
               <DialogHeader>
                 <DialogTitle>Regenerate API token?</DialogTitle>
                 <DialogDescription>
-                  Revokes the current key immediately — update your scripts.
+                  Revokes the current key immediately; update your scripts.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>

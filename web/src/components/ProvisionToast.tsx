@@ -58,7 +58,7 @@ export function provisionToastMessage(
         message: `${siteName}: no list is available for this site yet.`,
       };
     case 'failed':
-      return { message: `${siteName}: couldn’t open the site — check your connection and retry.` };
+      return { message: `${siteName}: couldn’t open the site; check your connection and retry.` };
     case 'cancelled':
       return { message: `${siteName}: cancelled.` };
     default:

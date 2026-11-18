@@ -154,10 +154,11 @@ test.describe('away summary', (): void => {
     await expect(rows.nth(1)).toContainText('Alpha Quest');
     await expect(rows.nth(1)).toContainText('2 chapters');
 
-    // Deep links target the manga pages with module+url.
-    const href = await rows.first().getAttribute('href');
-    expect(href).toContain('#/manga?');
-    expect(href).toContain(encodeURIComponent('https://fixtures.example/manga/beta-trails'));
+    // Deep links navigate to the manga page with module+url (the row
+    // anchors are preventDefault + navigateToManga since M-1 back-context).
+    await rows.first().click();
+    await expect(page).toHaveURL(/#\/manga\?module=/u);
+    await expect(page).toHaveURL(new RegExp(encodeURIComponent('https://fixtures.example/manga/beta-trails')));
   });
 
   test('favorites-only and both card states', async ({ page }, testInfo: TestInfo): Promise<void> => {
@@ -417,7 +418,7 @@ test.describe('PWA installability', (): void => {
     });
     await expect(page.getByTestId('install-app-action')).toBeVisible();
     await page.getByTestId('install-app-action').click();
-    await expect(page.getByText(/installed — find it/)).toBeVisible();
+    await expect(page.getByText(/installed: find it/)).toBeVisible();
     // Consumed (accepted): the surface hides again.
     await expect(page.getByTestId('install-app-action')).toHaveCount(0);
   });

@@ -31,7 +31,7 @@ export function DeleteFavoriteDialog(props: {
           <DialogDescription>
             {favorite === null
               ? ''
-              : `${favorite.title ?? favorite.url} — the downloaded chapters ledger is kept; only the favorite row is removed.`}
+              : `${favorite.title ?? favorite.url}. The downloaded chapters ledger is kept; only the favorite row is removed.`}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>

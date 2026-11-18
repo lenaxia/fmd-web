@@ -5,7 +5,7 @@
  * the reconnect status; `resync` triggers a refetch.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DownloadsPage } from '../src/pages/DownloadsPage';
 import { patchJobsPage } from '../src/state/use-jobs-feed';
@@ -56,42 +56,76 @@ describe('patchJobsPage (cache patch)', (): void => {
 
 describe('DownloadsPage', (): void => {
   it('renders jobs, filters by state, and loads more via cursor', async (): Promise<void> => {
+    // jsdom's WebSocket is REAL: with the live preview running on this
+    // machine it would connect and inject live jobs into the mocked
+    // list. Pin the no-socket stub (see the reconnect test below).
+    class IsolatedSocket implements WsLike {
+      onopen: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      onmessage: ((ev: { data: unknown }) => void) | null = null;
+      send(): void {}
+      close(): void {}
+    }
+    vi.stubGlobal('WebSocket', IsolatedSocket);
+    try {
     const { fetch, requests } = mockFetch([
       activityRoute(),
       jobsRoutes('', [jobFixture('j1')], { nextCursor: 'c9' }),
       jobsRoutes('', [jobFixture('j2')], { page: 2 }),
       jobsRoutes('done', [jobFixture('j3', { state: 'done' })]),
     ]);
-    renderWithProviders(<DownloadsPage />, { fetch });
+      renderWithProviders(<DownloadsPage />, { fetch });
 
-    expect(await screen.findByText('Fixture Manga — Chapter 1')).toBeInTheDocument();
-    expect(screen.getByText(/Event stream:/)).toBeInTheDocument();
+      expect(await screen.findByText('Fixture Manga · Chapter 1')).toBeInTheDocument();
+      expect(screen.getByText(/Event stream:/)).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Load more' }));
-    expect(await screen.findAllByText('Fixture Manga — Chapter 1')).toHaveLength(2);
-    // both pages' rows are in the DOM (appended, not replaced)
-    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+      await userEvent.click(screen.getByRole('button', { name: 'Load more' }));
+      expect(await screen.findAllByText('Fixture Manga · Chapter 1')).toHaveLength(2);
+      // both pages' rows are in the DOM (appended, not replaced) —
+      // scoped to the jobs list (sonner completion toasts also <li>).
+      expect(
+        within(screen.getByRole('list', { name: 'Download jobs' })).getAllByRole('listitem'),
+      ).toHaveLength(2);
 
-    await userEvent.click(screen.getByTestId('state-chip-done'));
-    expect(requests.some((r): boolean => r.path.includes('states=done'))).toBe(true);
-    const jobsCalls = requests
-      .filter((r): boolean => r.path.startsWith('/api/jobs'))
-      .map((r): string => r.path);
-    // R5 arrival: the shell's activity query (nav badge) rides the same
-    // endpoint — its own call, independent of the page's listings.
-    expect(jobsCalls).toContain('/api/jobs?limit=100&states=queued%2Crunning');
-    expect(jobsCalls.filter((path): boolean => !path.includes('states=queued'))).toEqual([
-      '/api/jobs?limit=20',
-      '/api/jobs?limit=20&cursor=c9',
-      '/api/jobs?limit=20&states=done',
-    ]);
+      await userEvent.click(screen.getByTestId('state-chip-done'));
+      expect(requests.some((r): boolean => r.path.includes('states=done'))).toBe(true);
+      const jobsCalls = requests
+        .filter((r): boolean => r.path.startsWith('/api/jobs'))
+        .map((r): string => r.path);
+      // R5 arrival: the shell's activity query (nav badge) rides the same
+      // endpoint — its own call, independent of the page's listings.
+      expect(jobsCalls).toContain('/api/jobs?limit=100&states=queued%2Crunning');
+      expect(jobsCalls.filter((path): boolean => !path.includes('states=queued'))).toEqual([
+        '/api/jobs?limit=20',
+        '/api/jobs?limit=20&cursor=c9',
+        '/api/jobs?limit=20&states=done',
+      ]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('shows the empty-state guidance when there are no jobs', async (): Promise<void> => {
-    const { fetch } = mockFetch([activityRoute(), jobsRoutes('', [])]);
-    renderWithProviders(<DownloadsPage />, { fetch });
-    expect(await screen.findByText('No download jobs')).toBeInTheDocument();
-    expect(screen.getByText(/Enqueue chapters from a/)).toBeInTheDocument();
+    // Same live-WebSocket isolation as above (empty state must not be
+    // unmounted by a live feed injecting rows mid-test).
+    class IsolatedSocket implements WsLike {
+      onopen: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      onmessage: ((ev: { data: unknown }) => void) | null = null;
+      send(): void {}
+      close(): void {}
+    }
+    vi.stubGlobal('WebSocket', IsolatedSocket);
+    try {
+      const { fetch } = mockFetch([activityRoute(), jobsRoutes('', [])]);
+      renderWithProviders(<DownloadsPage />, { fetch });
+      expect(await screen.findByText('No download jobs')).toBeInTheDocument();
+      expect(screen.getByText(/Enqueue chapters from a/)).toBeInTheDocument();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('surfaces WS reconnect attempts and still lists jobs (offline degrade)', async (): Promise<void> => {
@@ -113,7 +147,7 @@ describe('DownloadsPage', (): void => {
     try {
       const { fetch } = mockFetch([activityRoute(), jobsRoutes('', [jobFixture('j1')])]);
       renderWithProviders(<DownloadsPage />, { fetch });
-      expect(await screen.findByText('Fixture Manga — Chapter 1')).toBeInTheDocument();
+      expect(await screen.findByText('Fixture Manga · Chapter 1')).toBeInTheDocument();
       expect(attempts.count).toBe(1);
       expect(screen.getByText('Connecting…')).toBeInTheDocument();
     } finally {

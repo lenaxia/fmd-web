@@ -190,7 +190,7 @@ function AccountCard(props: {
       {check.isError ? <ErrorBanner error={check.error} /> : null}
       {check.isSuccess ? (
         <p role="status" aria-live="polite" className="text-xs text-muted-foreground">
-          OnLogin finished for <code className="font-mono">{module.name}</code> — status{' '}
+          OnLogin finished for <code className="font-mono">{module.name}</code>: status{' '}
           <code className="font-mono">{check.data.account.status}</code>.
         </p>
       ) : null}
@@ -243,7 +243,7 @@ export function AccountsSection(props: {
       </h2>
       {supported.length === 0 ? (
         <EmptyState title="No enabled account-supporting sites">
-          <p>No enabled module declares AccountSupport — enable a site to manage its account here.</p>
+          <p>No enabled module declares AccountSupport; enable a site to manage its account here.</p>
         </EmptyState>
       ) : accounts.isError ? (
         <ErrorBanner error={accounts.error} />

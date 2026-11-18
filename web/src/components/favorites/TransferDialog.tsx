@@ -100,11 +100,11 @@ export function TransferDialog(props: {
       <DialogContent className="transfer-dialog max-w-lg" data-testid="transfer-dialog">
         <DialogHeader>
           <DialogTitle>
-            Transfer website — {favorite?.title ?? favorite?.url ?? ""}
+            Transfer website: {favorite?.title ?? favorite?.url ?? ""}
           </DialogTitle>
           <DialogDescription>
-            frmTransferFavorites parity: pick the target site; the title is
-            matched against its catalog and dry-run live before anything moves.
+            Pick the target site; the title is matched against its
+            catalog and verified with a live preview before anything moves.
           </DialogDescription>
         </DialogHeader>
 
@@ -166,7 +166,7 @@ export function TransferDialog(props: {
                 </>
               ) : (
                 <p className="font-medium text-destructive" data-testid="transfer-preview-reason">
-                  Invalid mapping — {previewReasonText(preview.reason)}
+                  Invalid mapping: {previewReasonText(preview.reason)}
                 </p>
               )}
             </div>
