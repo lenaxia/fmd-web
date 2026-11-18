@@ -109,18 +109,48 @@ that lane, both are called out.
   DownloadsPage removed).
 - `tsc -b tsconfig.json` — clean.
 - Targeted vitest (library/jobs-cancel-library/openapi/favorites/site-picker/
-  settings-bootstrap/downloads-feed) — 7 files, 56/56 green.
-- Full vitest — 2189 passed; the ONLY failures are `web/test/fmd2-import-card.test.tsx`
-  + `server/test/import/apply.test.ts`, the concurrent FMD2-import lane's own in-flight
-  feature files (not touched by this sweep).
-- Playwright e2e (full) — 90 passed / 10 skipped, then the two real failures fixed
-  (touch-audit scope-menu trigger → caret; settings enabled-label `max-md:min-h-touch-target`)
-  and their specs re-run green (touch-audit 12/12).
+  settings-bootstrap/downloads-feed + the new loading-skeletons) — 8 files, 59/59 green.
+- Full vitest (post-bounce run) — 2237 passed / 3 skipped; the ONLY failures are the
+  concurrent FMD2-import lane's own in-flight feature files (`web/test/fmd2-import-card.test.tsx`,
+  `server/test/import/apply.test.ts`) — not touched by this sweep; the failures fluctuate
+  with that lane's live state (4 earlier, 2 at the final run).
+- Playwright e2e (full, post-bounce) — 91 passed / 10 skipped / 0 failed; the two real
+  touch findings from the first run were fixed (scope-menu trigger → caret; settings
+  enabled-label `max-md:min-h-touch-target`) and every split-button flow converted
+  (favorites-parity ×2, mobile-parity, touch-audit).
 - Visual fixtures regenerated through the reviewed-update flow
   (`playwright test -c playwright.visual.config.ts --update-snapshots`): all 32
-  committed fixtures (browse/manga/downloads/favorites/library/settings/search-home/
-  palette × dark/light × desktop/mobile), then the 4 settings fixtures re-taken after
-  the label touch fix. Fixture deltas in the commit are the review artifact.
+  committed fixtures, then the 4 settings fixtures re-taken after the label touch fix.
+  The bounce fixes (badge text size, brand aria-label) are non-visual in the fixture
+  matrix — badges render only with live download activity, which the mocked fixture
+  state has none of; the aria-label changes nothing pixel-wise (full default-config
+  run includes visual.spec and passed).
+
+## Review bounce remediation (valiant-oregano-pearls, fail → addressed)
+- **Blocker BottomTabNav.tsx:73** — the `text-[9px]` badge regression was a sibling-lane
+  rewrite that took the pre-fix version after my commit; re-applied `text-[11px]`
+  (marker-verified in the bounce commit).
+- **Blocker App.tsx:291-297** — same story: the brand link's `aria-label="FMD Web home"`
+  was clobbered by a later sibling write; re-applied and verified.
+- **Blocker favorites-parity.spec.ts:140-141 (+ mobile-parity.spec.ts:295-296)** — the
+  split-button e2e conversions were lost to the same sibling rewrites AND a third
+  old-flow spot existed at favorites-parity.spec.ts:172-173; all three converted
+  (action runs 'all' directly; caret+item where a specific scope is asserted) and both
+  specs re-run green (26 passed, plus touch-audit 12/12).
+- **Major SearchHomePage.tsx:375 / BrowsePage.tsx:545 / MangaPage.tsx:175 [criterion 0]**
+  — the skeletons were present but UNTESTED; added
+  `web/test/loading-skeletons.test.tsx` (3 tests, hang-release gates): pending renders
+  the skeleton testids inside `role="status"` with 5 structure-mirroring rows
+  (manga: cover+metadata card + the sr-only status line), and the loaded state
+  REPLACES them with content (skeleton gone — the no-pop-in contract).
+- **Major evidence gates section [criterion 6]** — rewritten with the post-bounce
+  full-run numbers above.
+- **Minor server/src/api/app.ts:92-132 [criterion 6]** — those lines are the concurrent
+  FMD2-import lane's coalesced import-block additions (Fmd2Import* schemas/types)
+  that rode my app.ts pathspec commit; no defect in this sweep's own code — the
+  library DELETE route this sweep owns lives further down (verified by marker +
+  green regressions). Noted here for attribution rather than reverted (reverting
+  would break the import lane's committed wiring).
 
 ## Concurrency notes (shared working tree)
 - Three lanes were live in one tree during this sweep (Favorites rework; P1 fixes;

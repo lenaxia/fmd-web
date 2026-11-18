@@ -136,9 +136,8 @@ test('create favorite from the manga page, batch-check, decide in the sheet, dow
   await expect(page.locator('.favorite-columns-meta').first()).toContainText('added 2026-11-12 00:00');
   await expect(page.getByText('Website')).toBeVisible();
 
-  // 3 — toolbar batch check, scope menu → All.
+  // 3 — toolbar batch check: the split-button ACTION runs the default 'all' scope.
   await page.getByTestId('check-all-button').click();
-  await page.getByTestId('check-scope-all').click();
 
   // 4 — the sheet presents the result; Download all enqueues the chapters.
   const sheet = page.getByTestId('new-chapters-sheet');
@@ -170,7 +169,8 @@ test('auto-download favorites show pre-queued in the sheet (no double enqueue)',
   await installStatefulFavorites(page, rows, downloads);
 
   await page.goto('/#favorites');
-  await page.getByTestId('check-all-button').click();
+  // [UX-AUDIT F-6] split-button: the CARET opens the scope menu → Enabled only.
+  await page.getByTestId('check-scope-trigger').click();
   await page.getByTestId('check-scope-enabled').click();
 
   const sheet = page.getByTestId('new-chapters-sheet');

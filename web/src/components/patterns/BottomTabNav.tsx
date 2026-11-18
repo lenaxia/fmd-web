@@ -70,7 +70,7 @@ export function BottomTabNav(props: {
                   {showCount ? (
                     <span
                       data-testid={`bottom-nav-${destination.name}-badge`}
-                      className="absolute -top-1.5 -right-2 inline-flex min-w-4 items-center justify-center rounded-full bg-primary px-1 py-px text-[9px] leading-none font-semibold text-primary-foreground"
+                      className="absolute -top-1.5 -right-2 inline-flex min-w-4 items-center justify-center rounded-full bg-primary px-1 py-px text-[11px] leading-none font-semibold text-primary-foreground"
                     >
                       {(badge?.count ?? 0) > 99 ? '99+' : String(badge?.count ?? 0)}
                     </span>

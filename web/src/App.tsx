@@ -289,6 +289,7 @@ function AppShell(): ReactElement {
            * with the top tab nav at >=md. */}
           <a
             href="#/browse"
+            aria-label="FMD Web home"
             className="flex items-center gap-2 rounded-md py-1 text-sm font-semibold whitespace-nowrap max-md:min-h-touch-target max-md:min-w-touch-target md:py-1"
           >
             <BookOpenText aria-hidden="true" className="size-5 text-primary" />

@@ -111,7 +111,7 @@ test('browse journey: picker chips+search → entries → tap-popover → manga 
   await page.getByText('Chapter 1: The Beginning').tap();
   await page.locator('#enqueue-start-paused').check();
   await page.getByRole('button', { name: /Enqueue 1 chapter/ }).tap();
-  await expect(page.getByText(/paused — resume it from Downloads/)).toBeVisible();
+  await expect(page.getByText(/paused; resume it from Downloads/)).toBeVisible();
   expect(downloadBodies.length).toBe(1);
   expect(downloadBodies[0]).toMatchObject({ paused: true, mangaTitle: 'Alpha Quest' });
 });
@@ -292,8 +292,9 @@ test('favorites: batch check opens the sheet; queue decision enqueues PAUSED; dr
   await expect(page.locator('.favorite-columns-meta').first()).toBeVisible();
   await expect(page.locator('.favorite-col-website').first()).toBeHidden();
 
+  // [UX-AUDIT F-6] the split-button's ACTION half runs the default
+  // 'all' scope directly — one tap, no menu round-trip on mobile.
   await page.getByTestId('check-all-button').tap();
-  await page.getByTestId('check-scope-all').tap();
 
   const sheet = page.getByTestId('new-chapters-sheet');
   await expect(sheet).toBeVisible();
