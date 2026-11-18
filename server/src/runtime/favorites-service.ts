@@ -46,6 +46,7 @@ function toFavoriteWire(row: FavoriteRow): FavoriteT {
     saveTo: row.saveTo ?? null,
     enabled: row.enabled !== false,
     dateAdded: msToIso(row.dateAdded),
+    coverLink: row.coverLink ?? null,
   };
 }
 

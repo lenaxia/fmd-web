@@ -92,6 +92,7 @@ import {
   Fmd2ImportApplyReportSchema,
   Fmd2ImportApplyRequestSchema,
   Fmd2ImportPreviewSchema,
+  CoverQuerySchema,
   parseOr400,
   type AccountListResponseT,
   type AccountLoginResponseT,
@@ -128,6 +129,7 @@ import {
 import { registerAuth, AuthService, type AuthConfig } from './auth.js';
 import { attachWebSocketHub, type WsAttachment } from './ws/attach.js';
 import type { WsHub } from './ws/hub.js';
+import { CoverProxyService } from './cover-proxy.js';
 import { InMemoryAccountService, type AccountService } from '../accounts/account-service.js';
 import { Fmd2ImportService, FMD2_IMPORT_MAX_BYTES, type UploadedPart } from '../import/fmd2/service.js';
 import {
@@ -178,6 +180,15 @@ export interface ApiServices {
    * otherwise. Responses carry the `source` discriminator either way.
    */
   readonly catalogFallback?: CatalogFallbackStore;
+  /**
+   * Cover art proxy (covers live-defect): same-origin cover fetching —
+   * module-bound url validation (never an open proxy), Referer
+   * hotlink posture, https-upgrade, on-disk cache. Optional with the
+   * metrics-route posture: absent → GET /api/cover is not mounted
+   * (API-only test fakes stay minimal); the runtime assembly always
+   * wires the real one under FMD_WEB_DATA_DIR/covers.
+   */
+  readonly covers?: CoverProxyService;
   /** Readiness probe input (default: always ready). */
   readonly readiness?: () => ReadinessStatus;
 }
@@ -892,6 +903,33 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
       ...toInfoWire(info, services.library.downloadedChapters(moduleId, url)),
     });
   });
+
+  // ── cover art proxy (covers live-defect; mounted only when the
+  // service is bound) ───────────────────────────────────────────────
+  // Module GetInfo returns ABSOLUTE CDN cover urls the browser can
+  // never load behind `img-src 'self' data: blob:` (+ mixed content on
+  // the http:// forms) — this is the ONE same-origin seam. The service
+  // validates the url against the ADDRESSED module's permitted hosts
+  // (RootURL domain + curated image-CDN allowance; foreign hosts 400,
+  // never an open proxy), fetches with the module HTTP posture
+  // (Referer = RootURL for the fmcdn hotlink check) and serves the
+  // upstream image/* bytes with cache-friendly headers backed by the
+  // FMD_WEB_DATA_DIR/covers disk cache. A plain GET — never gated
+  // (the *arr ordering; covers are not secrets).
+  if (services.covers !== undefined) {
+    const covers = services.covers;
+    app.get('/api/cover', async (req, reply): Promise<Uint8Array> => {
+      const query = parseOr400(CoverQuerySchema, req.query, 'cover query');
+      const cover = await covers.get(query.moduleId, query.url);
+      void reply
+        .code(200)
+        .header('content-type', cover.contentType)
+        .header('cache-control', `public, max-age=${cover.maxAgeSeconds}`)
+        .header('x-fmd-cover-cache', cover.fromCache ? 'hit' : 'miss')
+        .send(cover.bytes);
+      return cover.bytes;
+    });
+  }
 
   // ── jobs (§7.1, idempotent create) ───────────────────────────────
   // One canonical absolute manga URL (v0.3.1 /api/info principle): the

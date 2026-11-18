@@ -686,6 +686,20 @@ export const InfoRequestSchema = z
 export type InfoRequestT = z.infer<typeof InfoRequestSchema>;
 
 /**
+ * Cover proxy query (live-defect covers story): the ADDRESSED module +
+ * the absolute cover url that module's GetInfo returned. The url is
+ * validated against the module's permitted hosts server-side (RootURL
+ * domain + the curated image-CDN allowance) — this is a same-origin
+ * cover seam, never an open proxy. Plain GET, never auth-gated (the
+ * *arr gate ordering; covers are not secrets).
+ */
+export const CoverQuerySchema = z.object({
+  moduleId: ModuleIdSchema,
+  url: z.string().min(1),
+});
+export type CoverQueryT = z.infer<typeof CoverQuerySchema>;
+
+/**
  * The normalized MANGAINFO state in the oracle's emit order (§5.8) —
  * plus the manga's downloaded-chapter ledger projection: `downloaded`
  * carries the chapter LINKS already recorded in `downloaded_chapters`
@@ -906,6 +920,13 @@ export const FavoriteSchema = z.object({
   enabled: z.boolean(),
   /** Creation stamp (FMD2 DateAdded). */
   dateAdded: TimestampSchema.nullable(),
+  /**
+   * Covers live-defect: the §5.8 coverLink captured at the last
+   * successful check — the favorites grid renders covers through the
+   * same-origin cover proxy (`GET /api/cover`) off this stored url;
+   * null when no check has captured one yet.
+   */
+  coverLink: z.string().nullable(),
   /**
    * R5 arrival (additive, list-call only): does this favorite have
    * news relative to the caller's `since` query param — a check ran at

@@ -17,6 +17,8 @@ import { useMemo, useState, type ReactElement } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, MoreVertical, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { coverSrc } from '../api/cover';
+import { CoverImage } from '@/components/manga/CoverImage';
 import {
   useCancelFavoritesCheck,
   useCheckFavoriteNow,
@@ -162,7 +164,19 @@ function FavoriteListRow(props: {
       </span>
     </span>
   ) : (
-    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+    <span className="flex min-w-0 flex-1 items-center gap-x-3">
+      {/* Covers live-defect: the row cover rides the same-origin proxy
+       * off the coverLink the last check persisted (null before the
+       * first check — the No-cover placeholder stands, R5 web-native
+       * license: FMD2's favorites list is cover-less, the grid is
+       * ours to improve). */}
+      <CoverImage
+        src={coverSrc(favorite.moduleId, favorite.coverLink ?? undefined) ?? ''}
+        alt={`${label} cover`}
+        className="size-12 shrink-0 rounded-md"
+        testId={`favorite-cover-${favorite.id}`}
+      />
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
       <span className="flex w-full flex-wrap items-center gap-x-2 gap-y-0.5">
         <span className="favorite-title min-w-0 truncate text-sm font-medium" title={label}>
           {label}
@@ -178,6 +192,7 @@ function FavoriteListRow(props: {
         )}
       </span>
       <FavoriteColumnMeta favorite={favorite} website={website} />
+      </span>
     </span>
   );
 

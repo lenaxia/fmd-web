@@ -13,6 +13,8 @@ export function CoverImage(props: {
   src: string;
   alt: string;
   className?: string;
+  /** Test id (the manga-page hero keeps 'manga-cover'; grids pass their own). */
+  testId?: string;
 }): ReactElement {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -20,7 +22,7 @@ export function CoverImage(props: {
 
   return (
     <div
-      data-testid="manga-cover"
+      data-testid={props.testId ?? 'manga-cover'}
       className={cn(
         'relative isolate flex size-32 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-surface text-muted-foreground',
         props.className,

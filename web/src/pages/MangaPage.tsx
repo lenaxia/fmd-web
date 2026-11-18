@@ -23,6 +23,7 @@ import {
   visibleChapterIndices,
   type ChapterViewOptions,
 } from '../state/chapter-view-state';
+import { coverSrc } from '../api/cover';
 import { CoverImage } from '@/components/manga/CoverImage';
 import { ChapterToolbar } from '@/components/manga/ChapterToolbar';
 import { EnqueueOptions, loadSaveTo, type EnqueueExtras } from '@/components/manga/EnqueueOptions';
@@ -196,7 +197,7 @@ export function MangaPage(props: { route: Route }): ReactElement {
              * metadata (max-md:flex-col) — a 128px cover + 24px gap
              * left only ~200px for the whole definition list. */}
             <CardContent className="flex max-md:flex-col flex-row gap-6 pt-6">
-              <CoverImage src={info.data.coverLink} alt={`${info.data.title} cover`} />
+              <CoverImage src={coverSrc(info.data.moduleId, info.data.coverLink) ?? ''} alt={`${info.data.title} cover`} />
               <div className="min-w-0 flex-1">
                 {/* Null placeholders (UX audit M-2): sparse fields render
                  * words, never bare punctuation. The four data fields

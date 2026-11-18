@@ -62,6 +62,12 @@ export interface FavoriteRow {
   readonly enabled?: boolean;
   /** Creation stamp (FMD2 `DateAdded`, epoch ms). */
   readonly dateAdded?: number;
+  /**
+   * Covers live-defect: the §5.8 coverLink captured at the last
+   * successful check — favorites rows render covers through the
+   * same-origin proxy without a per-row GetInfo fan-out.
+   */
+  readonly coverLink?: string;
 }
 
 export interface ChapterCompletionRequest {
@@ -199,6 +205,9 @@ export function ensureLibrarySchema(db: Database.Database): void {
   if (!favoriteColumns.has('date_added')) {
     db.exec('ALTER TABLE favorite ADD COLUMN date_added INTEGER');
   }
+  if (!favoriteColumns.has('cover_link')) {
+    db.exec('ALTER TABLE favorite ADD COLUMN cover_link TEXT');
+  }
 }
 
 export class SqliteLibraryStore implements LibraryStore {
@@ -269,8 +278,8 @@ export class SqliteLibraryStore implements LibraryStore {
         `INSERT INTO favorite
             (manga_key, module_id, url, title, status, current_chapter, last_check,
              last_updated, auto_download, new_chapter_count, downloaded_chapter_list,
-             save_to, enabled, date_added)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             save_to, enabled, date_added, cover_link)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(manga_key) DO UPDATE SET
             module_id = excluded.module_id,
             url = excluded.url,
@@ -284,7 +293,8 @@ export class SqliteLibraryStore implements LibraryStore {
             downloaded_chapter_list = excluded.downloaded_chapter_list,
             save_to = excluded.save_to,
             enabled = excluded.enabled,
-            date_added = excluded.date_added`,
+            date_added = excluded.date_added,
+            cover_link = excluded.cover_link`,
       )
       .run(
         favorite.mangaKey,
@@ -301,6 +311,7 @@ export class SqliteLibraryStore implements LibraryStore {
         favorite.saveTo ?? null,
         favorite.enabled === false ? 0 : 1,
         favorite.dateAdded ?? null,
+        favorite.coverLink ?? null,
       );
   }
 
@@ -309,7 +320,7 @@ export class SqliteLibraryStore implements LibraryStore {
       .prepare(
         `SELECT manga_key, module_id, url, title, status, current_chapter, last_check,
                 last_updated, auto_download, new_chapter_count, downloaded_chapter_list,
-                save_to, enabled, date_added
+                save_to, enabled, date_added, cover_link
            FROM favorite WHERE manga_key = ?`,
       )
       .get(mangaKey) as FavoriteDbRow | undefined;
@@ -321,7 +332,7 @@ export class SqliteLibraryStore implements LibraryStore {
       .prepare(
         `SELECT manga_key, module_id, url, title, status, current_chapter, last_check,
                 last_updated, auto_download, new_chapter_count, downloaded_chapter_list,
-                save_to, enabled, date_added
+                save_to, enabled, date_added, cover_link
            FROM favorite ORDER BY rowid`,
       )
       .all() as FavoriteDbRow[];
@@ -507,6 +518,7 @@ interface FavoriteDbRow {
   readonly save_to: string | null;
   readonly enabled: number | null;
   readonly date_added: number | null;
+  readonly cover_link: string | null;
 }
 
 function toFavoriteRow(row: FavoriteDbRow): FavoriteRow {
@@ -527,6 +539,7 @@ function toFavoriteRow(row: FavoriteDbRow): FavoriteRow {
     ...(row.save_to !== null ? { saveTo: row.save_to } : {}),
     enabled: row.enabled !== 0,
     ...(row.date_added !== null ? { dateAdded: row.date_added } : {}),
+    ...(row.cover_link !== null ? { coverLink: row.cover_link } : {}),
   };
 }
 

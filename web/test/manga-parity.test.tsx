@@ -97,7 +97,13 @@ describe('MangaPage parity: cover + read online', (): void => {
     expect(await screen.findByRole('heading', { name: 'Fixture Manga' })).toBeInTheDocument();
     const cover = screen.getByTestId('manga-cover');
     expect(cover).toBeInTheDocument();
-    expect(cover.querySelector('img')).toHaveAttribute('src', infoFixture().coverLink);
+    // The cover rides the same-origin proxy (covers live-defect): the
+    // CDN url never reaches the <img> behind `img-src 'self'`.
+    const fixture = infoFixture();
+    expect(cover.querySelector('img')).toHaveAttribute(
+      'src',
+      `/api/cover?moduleId=${fixture.moduleId}&url=${encodeURIComponent(fixture.coverLink)}`,
+    );
     expect(cover.querySelector('img')).toHaveAttribute('loading', 'lazy');
 
     const link = screen.getByRole('link', { name: /Read online/ });

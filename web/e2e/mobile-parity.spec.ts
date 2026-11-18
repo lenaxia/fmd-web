@@ -239,6 +239,7 @@ async function installFavoritesFlow(page: Page): Promise<{ downloads: { paused: 
     lastCheck: null,
     lastUpdated: null,
     newChapterCount: 0,
+    coverLink: null,
   };
   const NEW_CHAPTERS = [
     { position: 1, link: '/manga/alpha/ch-1', name: 'Chapter 1: The Beginning' },

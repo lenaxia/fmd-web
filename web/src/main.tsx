@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { App } from './App';
 import { ApiClientProvider } from './api/context';
 import { ThemeProvider } from './state/theme';
+import { applyPreviewManifestToken } from './state/preview-manifest';
 import { APP_MOUNT_ID } from './index';
 import './styles/tokens.css';
 
@@ -12,6 +13,11 @@ import './styles/tokens.css';
  * conservative retries (2) so the typed error envelope surfaces fast.
  * The ApiClientProvider mounts here too (App renders inside it).
  */
+// Preview-tunnel manifest token (covers live-defect sibling): when the
+// page URL carries the preview proxy's ?t credential, the manifest
+// link must ride it too or its fetch 401s through the tunnel. No `t`
+// param (every production deployment) — a pure no-op.
+applyPreviewManifestToken(document, window.location.search);
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

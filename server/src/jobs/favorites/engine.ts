@@ -95,7 +95,10 @@ export class FavoritesEngine {
     );
 
     // Immediate favorite update (:346-348, :376-380) — BEFORE any
-    // download bookkeeping, exactly FMD2's order.
+    // download bookkeeping, exactly FMD2's order. The §5.8 coverLink
+    // rides along (covers live-defect): the favorites grid renders
+    // covers through the same-origin proxy off the STORED url — an
+    // empty live cover never clobbers a previously captured one.
     const updated: FavoriteRow = {
       ...favorite,
       currentChapter: outcome.currentChapter,
@@ -104,6 +107,7 @@ export class FavoritesEngine {
       ...(outcome.lastUpdated !== undefined ? { lastUpdated: outcome.lastUpdated } : {}),
       newChapterCount: outcome.newChapterPositions.length,
       downloadedChapterList: outcome.downloadedChapterList,
+      ...(live.coverLink !== '' ? { coverLink: live.coverLink } : {}),
     };
     this.deps.store.upsertFavorite(updated);
 

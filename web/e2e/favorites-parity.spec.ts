@@ -28,6 +28,7 @@ function favoriteRow(overrides: Partial<FavoriteT> = {}): FavoriteT {
     saveTo: null,
     enabled: true,
     dateAdded: '2026-11-12T00:00:00Z',
+    coverLink: null,
     ...overrides,
   };
 }

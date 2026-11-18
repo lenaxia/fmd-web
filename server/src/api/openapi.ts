@@ -18,6 +18,7 @@ import {
   HealthzResponseSchema,
   InfoRequestSchema,
   InfoResponseSchema,
+  CoverQuerySchema,
   FavoriteCheckResponseSchema,
   FavoriteCheckBatchCancelResponseSchema,
   FavoriteCheckBatchRequestSchema,
@@ -567,6 +568,31 @@ const OPERATIONS: readonly RouteOperation[] = [
     responses: {
       200: { description: 'Normalized MANGAINFO state + downloaded chapter links', schema: InfoResponseSchema },
       ...errors(validation(), unauthorized(), notFound('Module'), upstream('Module GetInfo failed'), internal()),
+    },
+  },
+  {
+    method: 'get',
+    path: '/api/cover',
+    operationId: 'proxyCover',
+    summary: 'Same-origin cover art proxy (module-bound, cached)',
+    description:
+      'Streams one cover image for the ADDRESSED module: the url a module GetInfo returned ' +
+      '(e.g. `http://fmcdn.mfcdn.net/store/manga/…/cover.jpg?token=…&ttl=…`) is validated against ' +
+      "that module's permitted hosts (RootURL host + its registrable domain + a curated known " +
+      'image-CDN allowance — foreign or malformed urls are 400, this is never an open proxy), then ' +
+      'fetched with the module HTTP posture (engine User-Agent, AcceptImage, Referer = module ' +
+      'RootURL for hotlink-checked CDNs; http:// urls try https first with a deliberate http ' +
+      'fallback for https-less origins) and the upstream image/* bytes are served with the upstream ' +
+      'content-type. cache-control max-age derives from the url token ttl (1h floor, 24h cap); an ' +
+      'on-disk cache under FMD_WEB_DATA_DIR/covers is keyed by the TOKEN-FREE normalized url so ' +
+      're-issued tokens hit cache (total size capped, oldest entries pruned). Non-image content ' +
+      'or failed origin hops are typed 502s; an unknown module is the typed 404 envelope. Plain ' +
+      'GET — never credential-gated (the *arr ordering; covers are not secrets).',
+    tags: ['info'],
+    query: CoverQuerySchema,
+    responses: {
+      200: { description: 'The cover image bytes (upstream image/* content-type)', schema: z.object({}) },
+      ...errors(validation(), notFound('Module'), upstream('Cover origin failed or returned a non-image'), internal()),
     },
   },
   {

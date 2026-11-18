@@ -14,6 +14,7 @@ import {
   WsPublishingSyncService,
 } from '../api/services.js';
 import { ApiError } from '../api/errors.js';
+import { CoverProxyService } from '../api/cover-proxy.js';
 import { AuthService, resolveApiTokenBootstrap } from '../api/auth.js';
 import { WsHub } from '../api/ws/hub.js';
 import { SqliteAccountService } from '../accounts/account-service.js';
@@ -917,6 +918,14 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     settings,
     catalogs: catalogSync.store,
     catalogFallback,
+    // Covers live-defect: the same-origin cover proxy — module-bound
+    // url validation, Referer hotlink posture, token-free disk cache
+    // under <dataDir>/covers, egress parity with the module HTTP
+    // allow-list (FMD_HTTP_ALLOW_HOSTS).
+    covers: new CoverProxyService(moduleService, {
+      cacheDir: join(config.dataDir, 'covers'),
+      allowedHosts: config.httpAllowedHosts,
+    }),
     info: infoService,
     accounts,
     jobs,

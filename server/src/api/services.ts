@@ -1571,6 +1571,7 @@ export class InMemoryFavoriteService implements FavoriteService {
       saveTo: null,
       enabled: true,
       dateAdded: '2026-01-01T00:00:00Z',
+      coverLink: null,
     };
     this.rows.set(id, favorite);
     this.order.push(id);
@@ -1655,6 +1656,7 @@ export class InMemoryFavoriteService implements FavoriteService {
         saveTo: null,
         enabled: true,
         dateAdded: '2026-01-01T00:00:00Z',
+        coverLink: null,
       }),
       id,
       moduleId: input.moduleId,

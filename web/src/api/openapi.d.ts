@@ -448,6 +448,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Same-origin cover art proxy (module-bound, cached)
+         * @description Streams one cover image for the ADDRESSED module: the url a module GetInfo returned (e.g. `http://fmcdn.mfcdn.net/store/manga/…/cover.jpg?token=…&ttl=…`) is validated against that module's permitted hosts (RootURL host + its registrable domain + a curated known image-CDN allowance — foreign or malformed urls are 400, this is never an open proxy), then fetched with the module HTTP posture (engine User-Agent, AcceptImage, Referer = module RootURL for hotlink-checked CDNs; http:// urls try https first with a deliberate http fallback for https-less origins) and the upstream image/* bytes are served with the upstream content-type. cache-control max-age derives from the url token ttl (1h floor, 24h cap); an on-disk cache under FMD_WEB_DATA_DIR/covers is keyed by the TOKEN-FREE normalized url so re-issued tokens hit cache (total size capped, oldest entries pruned). Non-image content or failed origin hops are typed 502s; an unknown module is the typed 404 envelope. Plain GET — never credential-gated (the *arr ordering; covers are not secrets).
+         */
+        get: operations["proxyCover"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/download": {
         parameters: {
             query?: never;
@@ -1143,6 +1163,7 @@ export interface components {
             saveTo: string | null;
             enabled: boolean;
             dateAdded: components["schemas"]["Timestamp"] | null;
+            coverLink: string | null;
             newsSince?: boolean;
         };
         /** Format: date-time */
@@ -2777,6 +2798,65 @@ export interface operations {
                 };
             };
             /** @description Module GetInfo failed */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    proxyCover: {
+        parameters: {
+            query: {
+                moduleId: string;
+                url: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The cover image bytes (upstream image/* content-type) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Module not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Cover origin failed or returned a non-image */
             502: {
                 headers: {
                     [name: string]: unknown;

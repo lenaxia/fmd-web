@@ -101,6 +101,7 @@ export function favoriteFixture(overrides: Partial<FavoriteT> = {}): FavoriteT {
     saveTo: null,
     enabled: true,
     dateAdded: '2026-01-01T00:00:00Z',
+    coverLink: null,
     ...overrides,
   };
 }

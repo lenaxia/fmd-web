@@ -62,6 +62,7 @@ function newsyFavorite(title: string, chapters: number, checked: string): Favori
     saveTo: null,
     enabled: true,
     dateAdded: STALE_VISIT,
+    coverLink: null,
     ...(checked >= STALE_VISIT ? { newsSince: true } : {}),
   };
 }

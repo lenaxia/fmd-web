@@ -60,6 +60,7 @@ function favoriteRow(): FavoriteT {
     currentChapter: null,
     saveTo: '',
     dateAdded: '2026-11-12T00:00:00Z',
+    coverLink: null,
     lastCheck: null,
     lastUpdated: null,
     newChapterCount: 0,
