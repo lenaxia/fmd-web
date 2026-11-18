@@ -1,9 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createServer, type Server } from 'node:http';
-import { EngineThread, OffloadedInfoService } from '../../../src/engine/services/engine-thread.js';
+import {
+  EngineThread,
+  OffloadedInfoService,
+  offloadEngineSubstrate,
+} from '../../../src/engine/services/engine-thread.js';
 import { createLuaHostFactory } from '../../../src/engine/lua/host.js';
 import { EgressPolicy } from '../../../src/engine/shims/http-egress.js';
 import type { RegistrationRecord } from '../../../src/engine/registry/capabilities.js';
+import type { ModuleRuntime } from '../../../src/engine/services/module-runtime.js';
+import type { TaskWriter } from '../../../src/engine/services/download-ports.js';
 import type { HostLogRecord } from '@fmd/contract';
 import { fileURLToPath } from 'node:url';
 
@@ -67,6 +73,24 @@ let origin: Server;
 let originBase = '';
 let thread: EngineThread;
 
+/** Slow-origin router: the info shape, a two-page chapter shape (the
+ * §5.2 GetPageNumber/GetImageURL flow), and per-page image containers. */
+const bodyFor = (url: string | undefined): Buffer => {
+  if (url !== undefined && url.startsWith('/page/')) {
+    return Buffer.from(
+      `<html><body><img id="image" src="${originBase}/img/1.jpg"/></body></html>`,
+    );
+  }
+  if (url !== undefined && url.includes('/c001')) {
+    return Buffer.from(
+      `<html><body><div id="pages">` +
+        `<a href="${originBase}/page/1"></a><a href="${originBase}/page/2"></a>` +
+        `</div></body></html>`,
+    );
+  }
+  return INFO_BODY;
+};
+
 /** Wall-clock time N macrotask round-trips take (the loop-responsiveness
  * probe: pre-fix these serialize behind the blocked transport). */
 async function loopRoundTrips(rounds: number): Promise<number> {
@@ -80,10 +104,11 @@ async function loopRoundTrips(rounds: number): Promise<number> {
 }
 
 beforeAll(async (): Promise<void> => {
-  origin = createServer((_req, res): void => {
+  origin = createServer((req, res): void => {
+    const body = bodyFor(req.url);
     setTimeout((): void => {
       res.writeHead(200, { 'content-type': 'text/html' });
-      res.end(INFO_BODY);
+      res.end(body);
     }, ORIGIN_DELAY_MS);
   });
   await new Promise<void>((resolve): void => {
@@ -166,5 +191,52 @@ describe('engine thread offload', (): void => {
       status: 404,
       code: 'not_found',
     });
+  }, 30_000);
+
+  it('runs a full chapter session over the thread (task marshal + the unbound BeforeDownloadImage RPC)', async (): Promise<void> => {
+    // The substrate wrapper is the seam production uses; the delegate's
+    // other methods stay untouched (never called here).
+    const substrate = offloadEngineSubstrate({} as ModuleRuntime, thread);
+    const hooks = await substrate.createDownloadHooks(MODULE_ID, {
+      luaRoot: LUA_ROOT,
+      modules: (): readonly RegistrationRecord[] => [registration()],
+      transport: { send: (): never => { throw new Error('main-thread transport must not be used'); } },
+      egress: new EgressPolicy({ allow: ['*'] }),
+      hostFactory: createLuaHostFactory(),
+    }, );
+
+    const task: TaskWriter = {
+      pageLinks: [],
+      pageContainerLinks: [],
+      fileNames: [],
+      pageNumber: 0,
+      link: `${originBase}/manga/alpha-quest/c001`,
+    };
+
+    // GetPageNumber waits out the slow origin on the engine thread —
+    // the main loop must stay responsive for the whole hop.
+    let pending = true;
+    const pageNumber = hooks.getPageNumber(task, task.link);
+    void pageNumber.finally((): void => {
+      pending = false;
+    });
+    const during = await loopRoundTrips(60);
+    expect(pending).toBe(true);
+    expect(during).toBeLessThan(ORIGIN_DELAY_MS);
+    await expect(pageNumber).resolves.toBe(true);
+    expect(task.pageNumber).toBe(2);
+    expect(task.pageLinks).toEqual(['W', 'W']);
+
+    // GetImageURL resolves slot 0 through the two-hop container flow.
+    await expect(hooks.getImageURL(task, 0, task.link)).resolves.toBe(true);
+    expect(task.pageLinks[0]).toBe(`${originBase}/img/1.jpg`);
+
+    // BeforeDownloadImage is UNBOUND in E2ESeed → undefined. This is
+    // the exact RPC shape that regressed live (it carries NO task
+    // snapshot — a worker that required one failed every image of a
+    // fanfox chapter with 'malformed chapter.call request').
+    await expect(hooks.beforeDownloadImage?.(0, task.pageLinks[0] ?? '')).resolves.toBeUndefined();
+
+    await hooks.dispose();
   }, 30_000);
 });

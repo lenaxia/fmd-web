@@ -354,13 +354,22 @@ export function startEngineWorkerThread(parentPort: MessagePort): void {
           return;
         }
         case 'chapter.call': {
-          if (message.sessionId === undefined || message.method === undefined || message.task === undefined) {
+          if (message.sessionId === undefined || message.method === undefined) {
             throw new Error('engine thread: malformed chapter.call request');
           }
+          // BeforeDownloadImage takes no TaskWriter — its page-links
+          // state lives in the worker-side session mirror — so an absent
+          // task snapshot is legal there (empty stand-in).
           const result = await callChapterSession(
             message.sessionId,
             message.method,
-            message.task,
+            message.task ?? {
+              pageLinks: [],
+              pageContainerLinks: [],
+              fileNames: [],
+              pageNumber: 0,
+              link: '',
+            },
             message.args ?? {},
           );
           reply({ ok: true, ...result });
