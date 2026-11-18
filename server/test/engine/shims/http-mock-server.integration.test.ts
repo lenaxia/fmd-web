@@ -375,7 +375,8 @@ describe('http §5.4 integration (local mock server)', () => {
     const get = handle.spec.get('GET') as (u: unknown) => boolean;
     // space is encoded on the wire (massageUrl → MaybeEncodeURL; the
     // ':/'-strip + scheme-prepend paths are covered by the unit tests —
-    // they compose https:// which the http-only loopback transport refuses)
+    // https transport behavior is covered by
+    // http-transport-https.integration.test.ts)
     expect(get(`${server.origin}/ma ssaged`)).toBe(true);
     const captures = await server.captures();
     expect(captures[0]?.url).toBe('/ma%20ssaged');

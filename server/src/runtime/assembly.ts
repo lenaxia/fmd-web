@@ -361,9 +361,9 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
 
   // ── live HTTP path (module engine) ─────────────────────────────────
   // Loopback hosts are always allowed (local mock servers, DESIGN §13);
-  // FMD_HTTP_ALLOW_HOSTS adds the compose e2e mock containers. The
-  // transport ALSO refuses any host outside loopback ∪ the allow-list,
-  // so the egress policy is enforced twice (shim + transport).
+  // FMD_HTTP_ALLOW_HOSTS admits external hosts for live module egress
+  // (http AND https — TLS-verified with SNI; `*` = any host). The
+  // transport re-asserts the host policy before opening any socket.
   const transport = new LoopbackHttpTransport({ allowedHosts: config.httpAllowedHosts });
   const egress = new EgressPolicy({
     allow: [...config.httpAllowedHosts, '127.0.0.1', 'localhost', '::1'],

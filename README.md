@@ -183,7 +183,7 @@ docker compose -f docker/compose.yml up --build
 | `FMD_BOOTSTRAP_DELAY_MS` | `0` | D20 minimum stage wall time (demo/e2e observability; leave 0 in production) |
 | `FMD_BOOTSTRAP_DISABLE` | unset | D20 disable switch: `1` skips the first-run module+catalog sync ENTIRELY (bootstrap short-circuits to done, `/readyz` stays green, the lua-tree readiness check is dropped — the operator owns provisioning) |
 | `FMD_NORMALIZE_PATHS` | unset | D5 opt-out: `1` (or the `--normalize-paths` CLI alias) switches filename resolution from the default Windows-desktop parity (tail truncation over `CurrentMaxFileNameLength`) to sanitized Linux-normalized paths — same sanitization, control units deleted, NO tail truncation |
-| `FMD_HTTP_ALLOW_HOSTS` | empty | Extra (non-loopback) hosts module HTTP may reach (csv); loopback is always allowed |
+| `FMD_HTTP_ALLOW_HOSTS` | empty | Non-loopback hosts module HTTP may reach over http/https (csv; `*` = any host — required for live site traffic; TLS-verified, SNI set); loopback is always allowed |
 | `FMD_STATIC_DIR` | unset | SPA dist dir served at `/` (unset = API-only) |
 | `FMD_WEB_BROWSER_SIDECAR_URL` | empty | §5.11 browser sidecar (FlareSolverr) — enables the `browser` profile wiring |
 | `FMD_FAVORITE_THREADS` / `FMD_FAVORITE_INTERVAL_MS` / `FMD_FAVORITE_JITTER_MS` | scheduler defaults | §7.2 favorites scheduler bounds |

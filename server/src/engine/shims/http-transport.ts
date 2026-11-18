@@ -13,12 +13,15 @@ import { firstCrlfIndex } from './http-headers.js';
  * - {@link LoopbackHttpTransport}: real requests against a LOCAL
  *   node:http mock server, performed on a worker thread and awaited
  *   with `Atomics.wait` (the deadline-watchdog pattern). Loopback hosts
- *   only — the transport refuses and never opens non-loopback sockets,
- *   keeping DESIGN §13's zero-network guarantee. The one sanctioned
- *   extension is an EXPLICIT `allowedHosts` allow-list for local mock
- *   containers on the compose e2e network (docker/compose.e2e.yml):
- *   still http-only, still local-infrastructure-only, never a live
- *   external network path (DESIGN §13).
+ *   are always allowed (DESIGN §13's hermetic test posture: no
+ *   allow-list configured ⇒ loopback-only, exactly like the offline
+ *   suite). The sanctioned egress extension is an EXPLICIT
+ *   `allowedHosts` allow-list (FMD_HTTP_ALLOW_HOSTS): allow-listed
+ *   hosts may be reached over http AND https (TLS-verified, SNI set,
+ *   optional private trust roots via `ca`) — the operator's gate for
+ *   live module traffic. `*` in the list opens egress to any host.
+ *   Proxy hops (HTTP/SOCKS4(a)/SOCKS5) carry https via CONNECT /
+ *   tunneled TLS.
  */
 
 /**
@@ -149,13 +152,18 @@ const LOOPBACK_WORKER_SCRIPT = `
   // workers get ESM/CJS syntax-detected on some node entry paths)
   const { workerData } = await import('node:worker_threads');
   const http = await import('node:http');
+  const https = await import('node:https');
   const net = await import('node:net');
+  const tls = await import('node:tls');
   const control = new Int32Array(workerData.control);
   const reqBuf = new Uint8Array(workerData.reqBuf);
   const resBuf = new Uint8Array(workerData.resBuf);
   const allowedHosts = new Set(
     (workerData.allowedHosts || []).map((h) => String(h).toLowerCase()),
   );
+  const allowAnyHost = allowedHosts.has('*');
+  const tlsCa = (workerData.tlsCa || []).map((p) => String(p));
+  const tlsVerify = workerData.tlsVerify !== false;
   let lastSeq = 0;
 
   function isLoopbackHost(h) {
@@ -167,7 +175,7 @@ const LOOPBACK_WORKER_SCRIPT = `
   }
 
   function isAllowedHost(h) {
-    return isLoopbackHost(h) || allowedHosts.has(String(h).toLowerCase());
+    return isLoopbackHost(h) || allowAnyHost || allowedHosts.has(String(h).toLowerCase());
   }
 
   function crlfIndex(s) {
@@ -186,6 +194,14 @@ const LOOPBACK_WORKER_SCRIPT = `
 
   function writeResult(seq, result) {
     if (Atomics.load(control, 0) !== seq) return; // abandoned request
+    // Wire-level failures (TLS, DNS, connect, timeout) surface on the
+    // process stderr → the app log: policy refusals stay quiet (expected
+    // in hermetic runs), but silent net_problem diagnoses are worse than noise.
+    if (result.ok === false && result.error !== '' &&
+        !String(result.error).startsWith('loopback transport refuses') &&
+        !String(result.error).includes('supports http/https only')) {
+      console.error('[http-transport] ' + result.error);
+    }
     let out = Buffer.from(JSON.stringify(result), 'utf8');
     if (out.length + 8 > resBuf.length) {
       out = Buffer.from(JSON.stringify({
@@ -339,10 +355,12 @@ const LOOPBACK_WORKER_SCRIPT = `
       writeResult(seq, { ok: false, error: 'bad URL', status: 0, statusText: '', headers: [], setCookie: [], bodyB64: '' });
       return;
     }
-    if (u.protocol !== 'http:') {
-      writeResult(seq, { ok: false, error: 'loopback transport is http-only', status: 0, statusText: '', headers: [], setCookie: [], bodyB64: '' });
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+      writeResult(seq, { ok: false, error: 'transport supports http/https only: ' + u.protocol, status: 0, statusText: '', headers: [], setCookie: [], bodyB64: '' });
       return;
     }
+    const secure = u.protocol === 'https:';
+    const originPort = u.port === '' ? (secure ? 443 : 80) : Number(u.port);
     if (!isAllowedHost(u.hostname)) {
       writeResult(seq, { ok: false, error: 'loopback transport refuses non-loopback host: ' + u.hostname, status: 0, statusText: '', headers: [], setCookie: [], bodyB64: '' });
       return;
@@ -383,8 +401,41 @@ const LOOPBACK_WORKER_SCRIPT = `
       done = true;
       writeResult(seq, result);
     };
-    const issueRequest = (targetHost, targetPort, requestPath, requestHeaders, tunnel) => {
-      const upstream = http.request(
+    const transportFailure = (what) => ({
+      ok: false,
+      error: String((what && what.message) || what),
+      status: 0,
+      statusText: '',
+      headers: [],
+      setCookie: [],
+      bodyB64: '',
+    });
+    const wrapTls = (socket, onSecure) => {
+      const tlsSock = tls.connect({
+        socket,
+        servername: u.hostname,
+        rejectUnauthorized: tlsVerify,
+        ...(tlsCa.length > 0 ? { ca: tlsCa } : {}),
+      });
+      const handshakeTimer = setTimeout(
+        () => tlsSock.destroy(new Error('tls handshake timeout')),
+        req.timeoutMs > 0 ? req.timeoutMs : 30000,
+      );
+      tlsSock.on('secureConnect', () => {
+        clearTimeout(handshakeTimer);
+        onSecure(tlsSock);
+      });
+      tlsSock.on('error', (e) => {
+        clearTimeout(handshakeTimer);
+        // finish is idempotent (guarded by done): post-secureConnect
+        // failures are owned by the http request's own error path.
+        finish(transportFailure(e));
+      });
+      return tlsSock;
+    };
+    const issueRequest = (targetHost, targetPort, requestPath, requestHeaders, tunnel, secureHop) => {
+      const lib = secureHop ? https : http;
+      const upstream = lib.request(
         {
           host: targetHost,
           port: targetPort,
@@ -392,6 +443,13 @@ const LOOPBACK_WORKER_SCRIPT = `
           method: req.method,
           headers: requestHeaders,
           ...(tunnel ? { createConnection: () => tunnel } : {}),
+          // direct https: node does the TLS here, so the trust roots and
+          // the verify toggle must ride the request options (tunneled
+          // https already has its TLS from wrapTls)
+          ...(secureHop && tunnel === null ? {
+            rejectUnauthorized: tlsVerify,
+            ...(tlsCa.length > 0 ? { ca: tlsCa } : {}),
+          } : {}),
         },
         (res) => {
           const chunks = [];
@@ -435,38 +493,69 @@ const LOOPBACK_WORKER_SCRIPT = `
 
     if (proxy === null) {
       if (body.length > 0) headers['Content-Length'] = body.length;
-      issueRequest(u.hostname, u.port === '' ? 80 : Number(u.port), u.pathname + u.search, headers, null);
+      issueRequest(u.hostname, originPort, u.pathname + u.search, headers, null, secure);
       return;
     }
     const proxyPort = Number(proxy.port) || (proxy.type === 'HTTP' ? 8080 : 1080);
     if (proxy.type === 'HTTP') {
-      // forward proxy: absolute-form request line + Host of the TARGET;
-      // Proxy-Authorization when credentials are configured (:853-857)
-      const pheaders = { ...headers, Host: u.host };
-      if (body.length > 0) pheaders['Content-Length'] = body.length;
-      if (proxy.user !== '') {
-        pheaders['Proxy-Authorization'] = 'Basic ' +
-          Buffer.from(proxy.user + ':' + proxy.pass, 'utf8').toString('base64');
+      if (!secure) {
+        // forward proxy (plain http): absolute-form request line + Host
+        // of the TARGET; Proxy-Authorization when credentials are
+        // configured (:853-857)
+        const pheaders = { ...headers, Host: u.host };
+        if (body.length > 0) pheaders['Content-Length'] = body.length;
+        if (proxy.user !== '') {
+          pheaders['Proxy-Authorization'] = 'Basic ' +
+            Buffer.from(proxy.user + ':' + proxy.pass, 'utf8').toString('base64');
+        }
+        issueRequest(proxy.host, proxyPort, req.url, pheaders, null, false);
+        return;
       }
-      issueRequest(proxy.host, proxyPort, req.url, pheaders, null);
+      // https through an HTTP forward proxy: CONNECT tunnel, then TLS
+      // inside the tunnel, then the origin-form request over TLS.
+      const connectHeaders = proxy.user !== ''
+        ? { 'Proxy-Authorization': 'Basic ' +
+            Buffer.from(proxy.user + ':' + proxy.pass, 'utf8').toString('base64') }
+        : {};
+      const connectReq = http.request({
+        host: proxy.host,
+        port: proxyPort,
+        method: 'CONNECT',
+        path: u.hostname + ':' + originPort,
+        headers: connectHeaders,
+      });
+      connectReq.setTimeout(req.timeoutMs > 0 ? req.timeoutMs : 0, () => {
+        connectReq.destroy(new Error('timeout'));
+      });
+      connectReq.on('connect', (res, socket) => {
+        if (res.statusCode !== 200) {
+          socket.destroy();
+          finish(transportFailure('proxy CONNECT refused: ' + res.statusCode));
+          return;
+        }
+        if (body.length > 0) headers['Content-Length'] = body.length;
+        wrapTls(socket, (tlsSock) => {
+          issueRequest(u.hostname, originPort, u.pathname + u.search, headers, tlsSock, true);
+        });
+      });
+      connectReq.on('error', (e) => finish(transportFailure(e)));
+      connectReq.end();
       return;
     }
-    socksTunnel(proxy, u.hostname, u.port === '' ? 80 : Number(u.port), req.timeoutMs)
+    socksTunnel(proxy, u.hostname, originPort, req.timeoutMs)
       .then((tunnel) => {
         if (done) { tunnel.destroy(); return; }
         if (body.length > 0) headers['Content-Length'] = body.length;
-        issueRequest(u.hostname, u.port === '' ? 80 : Number(u.port), u.pathname + u.search, headers, tunnel);
+        if (!secure) {
+          issueRequest(u.hostname, originPort, u.pathname + u.search, headers, tunnel, false);
+          return;
+        }
+        wrapTls(tunnel, (tlsSock) => {
+          issueRequest(u.hostname, originPort, u.pathname + u.search, headers, tlsSock, true);
+        });
       })
       .catch((e) => {
-        finish({
-          ok: false,
-          error: String((e && e.message) || e),
-          status: 0,
-          statusText: '',
-          headers: [],
-          setCookie: [],
-          bodyB64: '',
-        });
+        finish(transportFailure(e));
       });
   }
 
@@ -508,25 +597,42 @@ export interface LoopbackTransportOptions {
   readonly maxWaitMs?: number;
   /**
    * Explicit allow-list of EXTRA (non-loopback) hostnames the transport
-   * may open — local mock containers on the compose e2e network only.
-   * Empty/undefined (default): loopback hosts only. Host-side AND
-   * worker-side checks both enforce the same set.
+   * may open — live module egress (FMD_HTTP_ALLOW_HOSTS) plus compose
+   * e2e mock containers. Empty/undefined (default): loopback hosts
+   * only — the hermetic test posture. The entry `*` allows any host.
+   * Host-side AND worker-side checks both enforce the same set.
    */
   readonly allowedHosts?: readonly string[];
+  /**
+   * Additional trust roots (PEM strings) for https connections —
+   * private CA deployments and hermetic TLS tests. Default: the
+   * system store.
+   */
+  readonly ca?: readonly string[];
+  /**
+   * TLS certificate verification toggle. Default true — verification
+   * is a security boundary; `false` exists for hermetic self-signed
+   * test servers only.
+   */
+  readonly tlsVerify?: boolean;
 }
 
 /**
- * Real requests against a LOCAL node:http server, one worker thread
- * per transport (created lazily, `dispose()` terminates). Loopback
- * hosts only (plus an explicit `allowedHosts` allow-list for compose
- * e2e mock containers); the worker re-asserts that before opening any
- * socket.
+ * Real socket requests (http and https), one worker thread per
+ * transport (created lazily, `dispose()` terminates). Loopback hosts
+ * are always allowed; non-loopback hosts require an explicit
+ * `allowedHosts` entry (`FMD_HTTP_ALLOW_HOSTS`) — the worker
+ * re-asserts the same set before opening any socket. https is
+ * TLS-verified with SNI (trust roots extensible via `ca`); proxy
+ * hops carry https via CONNECT / tunneled TLS.
  */
 export class LoopbackHttpTransport implements HttpTransportPort {
   private readonly control: Int32Array;
   private readonly reqBuf: SharedArrayBuffer;
   private readonly resBuf: SharedArrayBuffer;
   private readonly allowedHosts: readonly string[];
+  private readonly tlsCa: readonly string[];
+  private readonly tlsVerify: boolean;
   private seq = 0;
   private worker: Worker | null = null;
   private readonly maxWaitMs: number;
@@ -534,6 +640,8 @@ export class LoopbackHttpTransport implements HttpTransportPort {
   constructor(options: LoopbackTransportOptions = {}) {
     this.maxWaitMs = Math.max(1000, Math.trunc(options.maxWaitMs ?? 120000));
     this.allowedHosts = (options.allowedHosts ?? []).map((h) => h.toLowerCase());
+    this.tlsCa = options.ca ?? [];
+    this.tlsVerify = options.tlsVerify ?? true;
     const controlBuf = new SharedArrayBuffer(2 * Int32Array.BYTES_PER_ELEMENT);
     this.control = new Int32Array(controlBuf);
     this.reqBuf = new SharedArrayBuffer(REQ_BUF_BYTES);
@@ -556,6 +664,8 @@ export class LoopbackHttpTransport implements HttpTransportPort {
           reqBuf: this.reqBuf,
           resBuf: this.resBuf,
           allowedHosts: [...this.allowedHosts],
+          tlsCa: [...this.tlsCa],
+          tlsVerify: this.tlsVerify,
         },
       });
       // Lifecycle (audit F-1): a worker that dies (uncaught fault, OOM,
@@ -583,7 +693,11 @@ export class LoopbackHttpTransport implements HttpTransportPort {
 
   send(request: RawHttpRequest): RawHttpResult {
     const urlHost = hostOfUrl(request.url);
-    if (!isLoopbackHost(urlHost) && !this.allowedHosts.includes(urlHost.toLowerCase())) {
+    if (
+      !isLoopbackHost(urlHost) &&
+      !this.allowedHosts.includes('*') &&
+      !this.allowedHosts.includes(urlHost.toLowerCase())
+    ) {
       return TRANSPORT_ERROR(
         `loopback transport refuses non-loopback host: ${urlHost}`,
       );

@@ -246,10 +246,12 @@ module's own `SetProxy` call still overrides at runtime (FMD2 parity,
   clears the override back to "inherit the global proxy". The module
   summary carries the resolved override (`"proxy": null` = inherit).
 - Precedence: module override → global → direct.
-- Transport notes: the loopback-only transport rule (DESIGN §13) applies
-  to the proxy host too — local mock proxies must listen on loopback or
-  a `FMD_HTTP_ALLOW_HOSTS` entry. HTTP proxies receive the
-  absolute-form request line + `Proxy-Authorization` (basic); SOCKS5
+- Transport notes: the egress host policy applies to the proxy host
+  too — proxies must listen on loopback or carry an
+  `FMD_HTTP_ALLOW_HOSTS` entry. Plain-http targets through HTTP
+  proxies use the absolute-form request line + `Proxy-Authorization`
+  (basic); https targets ride a CONNECT tunnel (HTTP proxies) or a
+  TLS-over-tunnel (SOCKS4(a)/SOCKS5), TLS-verified with SNI; SOCKS5
   gets RFC 1929 auth subnegotiation; SOCKS4 uses the 4a hostname form.
 
 ## Retention tuning (§9)
@@ -345,9 +347,11 @@ A green run leaves no trace artifacts (retained on failure only).
   `FMD2_REPO` / `FMD2_LUA_SHA` / `FMD2_CODELOAD_URL` (module pin, D9),
   `FMD_DB_URL` / `FMD_DB_API_BASE` (catalog upstream override),
   `FMD_BOOTSTRAP_CATALOGS`, `FMD_BOOTSTRAP_DISABLE` (D20 disable,
-  below), `FMD_HTTP_ALLOW_HOSTS` (extra hosts module
-  HTTP may reach — loopback is always allowed; the transport re-checks
-  the same set), `FMD_STATIC_DIR` (SPA dist), `FMD_BOOTSTRAP_DELAY_MS`
+  below), `FMD_HTTP_ALLOW_HOSTS` (non-loopback hosts module HTTP may
+  reach over http/https — csv, `*` = any host; live site traffic
+  requires it; TLS-verified with SNI; loopback is always allowed; the
+  transport re-checks the same set), `FMD_STATIC_DIR` (SPA dist),
+  `FMD_BOOTSTRAP_DELAY_MS`
   (demo/e2e stage pacing; leave 0 in production),
   `FMD_NORMALIZE_PATHS` / `--normalize-paths` (D5 filename opt-out,
   below).
