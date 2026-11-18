@@ -108,8 +108,10 @@ test('Settings: module list with capability/known-broken badges + options editor
   await expect(moduleList.getByText('needs browser')).toBeVisible();
   await expect(moduleList.getByText('account', { exact: true })).toBeVisible();
 
-  // options editor opens honoring the module descriptors
-  await page.getByRole('button', { name: 'Configure' }).click();
+  // options editor opens honoring the module descriptors (scoped to
+  // the list: the collapsed proxy drawer also carries a Configure
+  // trigger)
+  await moduleList.getByRole('button', { name: 'Configure' }).click();
   const quality = page.getByLabel(/Quality/);
   await expect(quality).toBeVisible();
   await expect(quality).toHaveValue('1');

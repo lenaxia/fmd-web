@@ -89,5 +89,9 @@ test('Settings site list @390: 1000 modules render virtualized, scroll without j
   const list = page.locator('.module-list');
   await expect(page.locator('[data-virtualized="true"]')).toHaveCount(1);
   await assertVirtualizedScroll(page, { list, wheelSteps: 100, lastIndexMin: MODULE_ROWS - 20, medianMax: 68 });
-  await expect(page.getByText(`PerfSite ${MODULE_ROWS - 1}`).first()).toBeAttached();
+  // The tail row under the (category, name) sort: the sorted tail is
+  // the lexicographic max of the last string-sorted category 'Cat 9'
+  // (i % 12 === 9 → 993) — the registration-order PerfSite 999 sits
+  // mid-list now (see perf.spec.ts).
+  await expect(page.getByText('PerfSite 993', { exact: true }).first()).toBeAttached();
 });

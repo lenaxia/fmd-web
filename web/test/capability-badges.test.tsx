@@ -7,7 +7,7 @@
  * Also drives the full Settings list over a mock fetch.
  */
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CapabilityBadges } from '../src/components/CapabilityBadges';
 import { SettingsPage } from '../src/pages/SettingsPage';
@@ -93,7 +93,10 @@ describe('Settings page module list (badges over the API)', (): void => {
     expect(screen.queryByText('subprocess')).not.toBeInTheDocument();
 
     // The editor honors the module's option descriptors (combobox index seeds).
-    await userEvent.click(screen.getByRole('button', { name: 'Configure' }));
+    // (scoped to the module list — the collapsed proxy drawer also
+    // carries a "Configure" trigger)
+    const moduleList = screen.getByLabelText('Site modules');
+    await userEvent.click(within(moduleList).getByRole('button', { name: 'Configure' }));
     expect(screen.getByLabelText(`Options for BrowserSite`)).toBeInTheDocument();
   });
 });

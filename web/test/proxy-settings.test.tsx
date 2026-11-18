@@ -16,8 +16,8 @@ import { moduleFixture } from './fixtures';
 
 autoCleanup();
 
-describe('ProxySettingsSection (global proxy + sidecar badge)', (): void => {
-  it('renders the browser sidecar OFF badge and the five SetProxy fields (none default)', async (): Promise<void> => {
+describe('ProxySettingsSection (collapsed drawer + sidecar badge)', (): void => {
+  it('renders collapsed: summary + sidecar badge; the editor fields are hidden until Configure', async (): Promise<void> => {
     const routes: MockRoute[] = [
       {
         method: 'GET',
@@ -30,10 +30,15 @@ describe('ProxySettingsSection (global proxy + sidecar badge)', (): void => {
     const { fetch } = mockFetch(routes);
     renderWithProviders(<ProxySettingsSection />, { fetch });
     expect(await screen.findByTitle(/browser profile .*not active/i)).toHaveTextContent('browser sidecar: off');
-    expect(screen.getByLabelText('Type')).toHaveValue('');
-    expect(screen.getByLabelText('Host')).toBeDisabled();
-    expect(screen.getByLabelText('Port')).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Save proxy' })).toBeDisabled(); // nothing drafted yet
+    // Collapsed by default: a one-line summary, NOT the editor.
+    expect(screen.getByTestId('proxy-summary')).toHaveTextContent('none');
+    expect(screen.queryByLabelText('Host')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('proxy-drawer-open'));
+    const drawer = await screen.findByTestId('proxy-drawer');
+    expect(within(drawer).getByLabelText('Type')).toHaveValue('');
+    expect(within(drawer).getByLabelText('Host')).toBeDisabled();
+    expect(within(drawer).getByLabelText('Port')).toBeDisabled();
+    expect(within(drawer).getByRole('button', { name: 'Save proxy' })).toBeDisabled(); // nothing drafted yet
   });
 
   it('renders the enabled sidecar badge when the profile is active', async (): Promise<void> => {
@@ -54,7 +59,7 @@ describe('ProxySettingsSection (global proxy + sidecar badge)', (): void => {
     expect(await screen.findByTitle(/profile active/i)).toHaveTextContent('browser sidecar: enabled');
   });
 
-  it('edits a SOCKS5 config and PUTs the five-string body on Save', async (): Promise<void> => {
+  it('edits a SOCKS5 config inside the drawer and PUTs the five-string body on Save', async (): Promise<void> => {
     const putBodies: unknown[] = [];
     const routes: MockRoute[] = [
       {
@@ -78,12 +83,14 @@ describe('ProxySettingsSection (global proxy + sidecar badge)', (): void => {
 
     await screen.findByTitle(/not active/i);
     const user = userEvent.setup();
-    await user.selectOptions(screen.getByLabelText('Type'), 'SOCKS5');
-    await user.type(screen.getByLabelText('Host'), 'proxy.example');
-    await user.type(screen.getByLabelText('Port'), '1080');
-    await user.type(screen.getByLabelText('User'), 'u');
-    await user.type(screen.getByLabelText('Password'), 'pw');
-    await user.click(screen.getByRole('button', { name: 'Save proxy' }));
+    await user.click(screen.getByTestId('proxy-drawer-open'));
+    const drawer = await screen.findByTestId('proxy-drawer');
+    await user.selectOptions(within(drawer).getByLabelText('Type'), 'SOCKS5');
+    await user.type(within(drawer).getByLabelText('Host'), 'proxy.example');
+    await user.type(within(drawer).getByLabelText('Port'), '1080');
+    await user.type(within(drawer).getByLabelText('User'), 'u');
+    await user.type(within(drawer).getByLabelText('Password'), 'pw');
+    await user.click(within(drawer).getByRole('button', { name: 'Save proxy' }));
     await waitFor((): void => {
       expect(putBodies).toHaveLength(1);
     });
@@ -146,9 +153,12 @@ describe('Settings page: proxy section + module capability badges + override', (
     // the proxy section is on the page
     expect(screen.getByRole('region', { name: 'Proxy settings' })).toBeInTheDocument();
 
-    // open the module editor and save an override
+    // open the module editor and save an override (scoped to the
+    // module list — the collapsed proxy drawer also carries a
+    // "Configure" trigger)
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: 'Configure' }));
+    const moduleList = await screen.findByLabelText('Site modules');
+    await user.click(within(moduleList).getByRole('button', { name: 'Configure' }));
     const overrideForm = await screen.findByRole('form', { name: /Proxy override for BrowserSite/ });
     const overrideCheckbox = within(overrideForm).getByLabelText(/Module proxy override/) as HTMLInputElement;
     expect(overrideCheckbox.checked).toBe(false);
@@ -202,7 +212,8 @@ describe('Settings page: proxy section + module capability badges + override', (
     renderWithProviders(<SettingsPage />, { fetch });
 
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Configure' }));
+    const moduleList = await screen.findByLabelText('Site modules');
+    await user.click(within(moduleList).getByRole('button', { name: 'Configure' }));
     const overrideForm = await screen.findByRole('form', { name: /Proxy override for OverriddenSite/ });
     const overrideCheckbox = within(overrideForm).getByLabelText(/Module proxy override/) as HTMLInputElement;
     expect(overrideCheckbox.checked).toBe(true); // the module carries an override

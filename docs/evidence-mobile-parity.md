@@ -102,9 +102,13 @@ the Chromium engine — single-engine gate). All green:
   enqueues PAUSED jobs (both POST bodies asserted); **drag-dismiss** — the
   pointer drag past the 72px threshold closes the sheet (grabber handle,
   pointer-capture based; Close/scrim/Escape remain).
-- **settings**: module search narrows (1/1 -> 0/1), per-category bulk
-  Disable fires exactly `{ enabled: false, category }` on
-  POST /api/modules/bulk.
+- **settings** [websites-rebuild]: facet chips tappable at 390px —
+  LANGUAGE narrows the list AND lands in the URL (`?lang=`), NEEDS
+  SETUP "No setup needed" hides credential sites, module search
+  AND-composes; per-category bulk Disable fires exactly
+  `{ enabled: false, category }` on POST /api/modules/bulk; the
+  collapsed proxy drawer opens via its single tap affordance (SetProxy
+  editor usable inside, drag-safe Close).
 
 ## 5. Visual matrix + mobile perf (AC4)
 

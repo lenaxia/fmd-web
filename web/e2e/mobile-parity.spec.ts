@@ -315,32 +315,71 @@ test('favorites: batch check opens the sheet; queue decision enqueues PAUSED; dr
   await expect(sheet).toBeHidden();
 });
 
-// ── Flow 4: settings module search + bulk category toggle ───────────
+// ── Flow 4: settings Websites facets + bulk on the touch surface ────
 
-test('settings: module search narrows; category bulk toggle fires one write', async ({ page }: { page: Page }): Promise<void> => {
-  const bulkWrites: Record<string, unknown>[] = [];
+test('settings: facets + module search narrow; bulk toggles fire scoped writes; proxy drawer opens via tap', async ({
+  page,
+}: {
+  page: Page;
+}): Promise<void> => {
+  // A no-setup sibling so the NEEDS SETUP facet has both values.
+  // (installed BEFORE the bulk route: Playwright matches handlers in
+  // reverse registration order and this broad /api/modules/ pattern
+  // would otherwise swallow the POST /api/modules/bulk capture)
+  await installCleanModules(page, [
+    { ...moduleFixture, id: '9'.repeat(32), name: 'PlainSite', category: 'Fixtures', accountSupport: false },
+  ]);
+  const bulkWrites: Array<Record<string, unknown>> = [];
   await page.route(/\/api\/modules\/bulk$/, (route): void => {
     if (route.request().method() === 'POST') {
       bulkWrites.push(route.request().postDataJSON() as Record<string, unknown>);
     }
-    void route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ updated: 1 }) });
+    void route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        modules: [],
+        updated: 1,
+      }),
+    });
   });
 
   await page.goto('/#/settings');
+
+  // The facet bar is fully tappable at 390px: the LANGUAGE chip
+  // narrows the list AND lands in the URL.
+  const facets = page.getByTestId('module-facets');
+  await expect(facets.getByRole('group', { name: 'Language' }).getByRole('button', { name: /Fixtures 2/ })).toBeVisible();
+  await facets.getByRole('group', { name: 'Language' }).getByRole('button', { name: /Fixtures 2/ }).tap();
+  await expect(page).toHaveURL(/#\/settings\?lang=Fixtures$/);
+  await expect(page.getByRole('status').filter({ hasText: '2/2 sites match' })).toBeVisible();
+
+  // The user-requested "no setup" filter is a tap away.
+  await facets.getByRole('group', { name: 'Needs setup' }).getByRole('button', { name: /No setup needed 1/ }).tap();
+  await expect(page.getByLabel('PlainSite', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('FixtureSite', { exact: true })).toHaveCount(0);
+
+  // Module search still narrows (AND-composed with the facets).
   const search = page.getByLabel('Search modules by name or category');
-  await expect(search).toBeVisible();
-  await search.fill('Fixture');
-  await expect(page.getByText(/1\/1 modules match/)).toBeVisible();
-  await search.fill('no-such-site');
-  await expect(page.getByText(/0\/1 modules match/)).toBeVisible();
-  await search.fill('');
+  await search.fill('Plain');
+  await expect(page.getByRole('status').filter({ hasText: '1/2 sites match' })).toBeVisible();
 
   // Per-category bulk disable through the category header (tap).
-  const header = page.getByTestId('module-category-header');
+  const header = page.getByTestId('module-category-header').first();
   await expect(header).toBeVisible();
   await header.getByRole('button', { name: 'Disable all modules in Fixtures' }).tap();
   await expect
     .poll((): number => bulkWrites.length)
     .toBeGreaterThanOrEqual(1);
   expect(bulkWrites[0]).toMatchObject({ enabled: false, category: 'Fixtures' });
+
+  // The collapsed proxy drawer opens via its single tap affordance and
+  // the SetProxy editor inside is usable.
+  const section = page.getByTestId('proxy-section');
+  await section.getByTestId('proxy-drawer-open').tap();
+  const drawer = page.getByTestId('proxy-drawer');
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByLabel('Type')).toBeVisible();
+  await drawer.getByRole('button', { name: 'Close' }).tap();
+  await expect(drawer).toBeHidden();
 });

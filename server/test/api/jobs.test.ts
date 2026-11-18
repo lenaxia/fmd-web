@@ -258,9 +258,15 @@ describe('GET /api/jobs — R5 arrival `since` (last-transition floor)', (): voi
     expect((all.json() as { jobs: Array<{ id: string }> }).jobs.map((j) => j.id)).toEqual([ids[1], ids[0]]);
 
     // since AFTER everything → empty (the 'nothing new' away state).
+    // The floor must be computed from the LIVE clock AFTER the rows
+    // exist: the queued row keeps its real creation stamp (the two
+    // done rows carry the hand-set stamps above), so a hardcoded
+    // wall-clock constant time-bombs the suite the moment the local
+    // clock passes it.
+    const afterEverything = new Date(Date.now() + 60_000).toISOString();
     const none = await h.app.inject({
       method: 'GET',
-      url: `/api/jobs?since=${encodeURIComponent('2026-11-17T23:00:00.000Z')}`,
+      url: `/api/jobs?since=${encodeURIComponent(afterEverything)}`,
     });
     expect((none.json() as { jobs: unknown[] }).jobs).toEqual([]);
   });

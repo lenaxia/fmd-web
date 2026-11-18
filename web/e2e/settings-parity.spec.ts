@@ -1,8 +1,13 @@
 /**
- * Settings parity e2e (tsk-ethereal-verdict-orders): the accounts card
- * round-trip vs a mock OnLogin (save PUT → check-login POST → §5.2
- * status badge), and the FMD2 Websites-tree bulk controls (global
- * Select-all/None + per-category) reflected live in the site picker.
+ * Settings parity e2e: the accounts card round-trip vs a mock OnLogin
+ * (save PUT → check-login POST → §5.2 status badge), and the rebuilt
+ * Websites surface (tsk-skilled-tabby-blooms): faceted filtering
+ * (LANGUAGE with the scanlation collapse, H-STATUS, NEEDS SETUP +
+ * text search, URL-synced and back-navigation-safe), client-side
+ * category grouping (ONE header per category over interleaved
+ * registration order — the "only 1 english site" fix), bulk controls
+ * scoped to the CURRENT filtered selection with a disable-all
+ * confirm, and the collapsed proxy drawer.
  * Fixture-driven like every smoke spec: the SPA runs against the real
  * Vite dev server, the §10 API is interception only.
  */
@@ -15,10 +20,33 @@ function json(body: unknown, status = 200): { status: number; contentType: strin
 
 const API = (suffix: string): RegExp => new RegExp(`^https?://[^/]+/api/${suffix}`);
 
+/**
+ * Production shape in miniature: categories INTERLEAVE in registration
+ * (directory-walk) order, one site ships an EMPTY category, and
+ * accountSupport mixes — the exact inputs behind the user's "only 1
+ * english site" misread.
+ */
+interface MockModuleRow {
+  readonly id: string;
+  readonly name: string;
+  readonly category: string;
+  readonly accountSupport: boolean;
+  enabled: boolean;
+}
+
+const REGISTRY: readonly MockModuleRow[] = [
+  { id: MODULE_ID, name: 'FixtureSite', category: 'English', accountSupport: true, enabled: true },
+  { id: '1'.repeat(32), name: 'RawDex', category: 'Raw', accountSupport: false, enabled: true },
+  { id: '2'.repeat(32), name: 'ScanHaven', category: 'English-Scanlation', accountSupport: false, enabled: true },
+  { id: '3'.repeat(32), name: 'HDen', category: 'H-Sites', accountSupport: false, enabled: true },
+  { id: '4'.repeat(32), name: 'NoCatOne', category: '', accountSupport: false, enabled: true },
+  { id: '5'.repeat(32), name: 'SpanishSun', category: 'Spanish', accountSupport: false, enabled: true },
+];
+
 /** The mock API state the settings-parity specs mutate + observe. */
 interface SettingsMockState {
   /** Live copy of the module registry the bulk endpoint rewrites. */
-  modules: Array<{ id: string; enabled: boolean }>;
+  modules: MockModuleRow[];
   /** Captured PUT /api/accounts/:moduleId bodies. */
   accountSaves: Array<Record<string, unknown>>;
   /** Captured POST /api/modules/bulk bodies. */
@@ -64,11 +92,16 @@ async function installSettingsMockApi(page: Page, state: SettingsMockState): Pro
   // Stateful module registry: the bulk endpoint rewrites the enabled
   // set and GET serves the live rows (react-query invalidation makes
   // the picker re-fetch — the assertion target of the bulk spec).
+  // Served in REGISTRATION order (interleaved categories) — the input
+  // the client-side grouping fix sorts into one-header-per-category.
   await page.route(API('modules'), (route): void => {
     if (route.request().method() === 'GET') {
       const rows = state.modules.map((m): Record<string, unknown> => ({
         ...fixtureModule,
         id: m.id,
+        name: m.name,
+        category: m.category,
+        accountSupport: m.accountSupport,
         enabled: m.enabled,
       }));
       void route.fulfill(json({ modules: rows, count: rows.length }));
@@ -81,15 +114,29 @@ async function installSettingsMockApi(page: Page, state: SettingsMockState): Pro
     state.bulkWrites.push(body);
     const enabled: boolean = body['enabled'] === true;
     const category: string | undefined = typeof body['category'] === 'string' ? (body['category'] as string) : undefined;
-    const targets = state.modules.filter((_m): boolean =>
-      category !== undefined ? category === fixtureModule.category : true,
-    );
+    const ids: readonly string[] | undefined = Array.isArray(body['ids'])
+      ? (body['ids'] as readonly string[])
+      : undefined;
+    // targets = explicit ids[] > exact category > every module (the
+    // server's documented precedence — the scoped bulk contract).
+    const targets = state.modules.filter((m): boolean => {
+      if (ids !== undefined) {
+        return ids.includes(m.id);
+      }
+      if (category !== undefined) {
+        return m.category === category;
+      }
+      return true;
+    });
     for (const target of targets) {
       target.enabled = enabled;
     }
     const rows = state.modules.map((m): Record<string, unknown> => ({
       ...fixtureModule,
       id: m.id,
+      name: m.name,
+      category: m.category,
+      accountSupport: m.accountSupport,
       enabled: m.enabled,
     }));
     void route.fulfill(json({ modules: rows, updated: targets.length }));
@@ -147,7 +194,7 @@ async function installSettingsMockApi(page: Page, state: SettingsMockState): Pro
 
 test.beforeEach(async ({ page }: { page: Page }): Promise<void> => {
   await installSettingsMockApi(page, {
-    modules: [{ id: MODULE_ID, enabled: true }],
+    modules: REGISTRY.map((row): MockModuleRow => ({ ...row })),
     accountSaves: [],
     bulkWrites: [],
     loginStatuses: ['asValid', 'asInvalid'],
@@ -199,6 +246,122 @@ test('Settings: account card round-trip — save (PUT) then check login (POST) w
   await expect(page.getByTestId('account-status-asInvalid')).toBeVisible();
 });
 
+test('Settings → Websites: interleaved registry groups into ONE header per category (the "only 1 english site" fix)', async ({
+  page,
+}: {
+  page: Page;
+}): Promise<void> => {
+  await page.goto('/#/settings');
+
+  // The mock serves registration order (English, Raw, English-Scanlation,
+  // H-Sites, '', Spanish — categories INTERLEAVE). The client sorts by
+  // (category, name): exactly one header per category, TRUE counts.
+  const headers = page.getByTestId('module-category-header');
+  await expect(headers).toHaveCount(6);
+  const english = headers.filter({ hasText: 'English' }).first();
+  await expect(english).toBeVisible();
+  await expect(english).toContainText('(1)'); // FixtureSite
+  await expect(headers.filter({ hasText: 'English-Scanlation' })).toContainText('(1)'); // ScanHaven
+  // The raw-empty category displays as 'Unknown'.
+  await expect(headers.filter({ hasText: 'Unknown' })).toContainText('(1)');
+
+  // The LANGUAGE facet chips show the collapsed distribution at a
+  // glance: English 2 (English 1 + English-Scanlation 1), Raw 1,
+  // H-Sites 1, Spanish 1, Unknown 1.
+  const facets = page.getByTestId('module-facets');
+  const langGroup = facets.getByRole('group', { name: 'Language' });
+  await expect(langGroup.getByRole('button', { name: /English 2/ })).toBeVisible();
+  await expect(langGroup.getByRole('button', { name: /Raw 1/ })).toBeVisible();
+  await expect(langGroup.getByRole('button', { name: /H-Sites 1/ })).toBeVisible();
+  await expect(langGroup.getByRole('button', { name: /Spanish 1/ })).toBeVisible();
+  await expect(langGroup.getByRole('button', { name: /Unknown 1/ })).toBeVisible();
+  const setupGroup = facets.getByRole('group', { name: 'Needs setup' });
+  await expect(setupGroup.getByRole('button', { name: /No setup needed 5/ })).toBeVisible();
+  await expect(setupGroup.getByRole('button', { name: /Needs credentials 1/ })).toBeVisible();
+});
+
+test('Settings → Websites: facet chips filter the list and SURVIVE back-navigation (URL-synced)', async ({
+  page,
+}: {
+  page: Page;
+}): Promise<void> => {
+  await page.goto('/#/settings');
+  const facets = page.getByTestId('module-facets');
+  const langGroup = facets.getByRole('group', { name: 'Language' });
+
+  // Clicking the collapsed English chip narrows to English +
+  // English-Scanlation and lands in the URL (push → back restores).
+  await langGroup.getByRole('button', { name: /English 2/ }).click();
+  await expect(page).toHaveURL(/#\/settings\?lang=English$/);
+  await expect(page.getByLabel('FixtureSite', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('ScanHaven', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('RawDex', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('HDen', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('status').filter({ hasText: '2/6 sites match' })).toBeVisible();
+
+  // "No setup needed" composes (AND across groups): only ScanHaven
+  // stays (FixtureSite carries AccountSupport).
+  await facets.getByRole('group', { name: 'Needs setup' }).getByRole('button', { name: /No setup needed/ }).click();
+  await expect(page).toHaveURL(/#\/settings\?lang=English&setup=no-setup$/);
+  await expect(page.getByLabel('ScanHaven', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('FixtureSite', { exact: true })).toHaveCount(0);
+
+  // Navigate away, then BACK: the facet selection (URL) is restored.
+  await page.goto('/#/browse?sites=1');
+  await page.goBack();
+  await expect(page).toHaveURL(/#\/settings\?lang=English&setup=no-setup$/);
+  await expect(page.getByLabel('ScanHaven', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('RawDex', { exact: true })).toHaveCount(0);
+  const restored = page.getByTestId('module-facets').getByRole('group', { name: 'Language' });
+  await expect(restored.getByRole('button', { name: /English/ })).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('Settings → Websites: bulk controls operate on the CURRENT filtered selection, with confirm on disable-all', async ({
+  page,
+}: {
+  page: Page;
+}): Promise<void> => {
+  await page.goto('/#/settings');
+
+  const bulkWrites: Array<Record<string, unknown>> = [];
+  page.on('request', (req): void => {
+    if (/\/api\/modules\/bulk$/.test(req.url())) {
+      bulkWrites.push(req.postDataJSON() as Record<string, unknown>);
+    }
+  });
+
+  // Filter to Raw (exactly one site: RawDex).
+  const facets = page.getByTestId('module-facets');
+  await facets.getByRole('group', { name: 'Language' }).getByRole('button', { name: /Raw 1/ }).click();
+  await expect(page).toHaveURL(/#\/settings\?lang=Raw$/);
+  await expect(page.getByRole('status').filter({ hasText: '1/6 sites match' })).toBeVisible();
+
+  // Enable all under the filter: scoped ids write, no confirm needed.
+  await page.getByTestId('module-bulk-global').getByRole('button', { name: 'Enable all' }).click();
+  await expect
+    .poll((): number => bulkWrites.length)
+    .toBeGreaterThanOrEqual(1);
+  expect(bulkWrites[0]).toMatchObject({ enabled: true, ids: ['1'.repeat(32)] });
+
+  // Disable all (destructive): the confirm dialog gates the write.
+  await page.getByTestId('module-bulk-global').getByRole('button', { name: 'Disable all' }).click();
+  const dialog = page.getByTestId('module-disable-all-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: /Disable 1 filtered sites\?/ })).toBeVisible();
+  const writesBeforeConfirm: number = bulkWrites.length;
+  await dialog.getByTestId('module-disable-all-confirm').click();
+  await expect
+    .poll((): number => bulkWrites.length)
+    .toBe(writesBeforeConfirm + 1);
+  expect(bulkWrites[bulkWrites.length - 1]).toMatchObject({ enabled: false, ids: ['1'.repeat(32)] });
+
+  // The disabled site disappears from the picker immediately (the
+  // stateful mock + react-query invalidation).
+  await page.goto('/#/browse?sites=1');
+  await expect(page.getByText('RawDex')).toHaveCount(0);
+  await expect(page.getByText('FixtureSite').first()).toBeVisible();
+});
+
 test('Settings: bulk category Disable all rewrites module_state; the site picker reflects it immediately', async ({
   page,
 }: {
@@ -207,9 +370,8 @@ test('Settings: bulk category Disable all rewrites module_state; the site picker
   await page.goto('/#/settings');
 
   // The category header carries the FMD2 tree bulk controls.
-  const header = page.getByTestId('module-category-header');
+  const header = page.getByTestId('module-category-header').filter({ hasText: 'English' }).first();
   await expect(header).toBeVisible();
-  await expect(header.getByText('Fixtures')).toBeVisible();
 
   // The module row starts enabled.
   const enabledBox = page.getByLabel('FixtureSite', { exact: true });
@@ -222,7 +384,7 @@ test('Settings: bulk category Disable all rewrites module_state; the site picker
       bulkWrites.push(req.postDataJSON() as Record<string, unknown>);
     }
   });
-  await header.getByRole('button', { name: 'Disable all modules in Fixtures' }).click();
+  await header.getByRole('button', { name: 'Disable all modules in English' }).click();
 
   // The list (stateful mock) reflects the rewrite immediately.
   await expect(enabledBox).not.toBeChecked();
@@ -232,9 +394,10 @@ test('Settings: bulk category Disable all rewrites module_state; the site picker
   await expect(page.getByText(/Pick a site/i)).toBeVisible();
   await expect(page.getByText('FixtureSite')).toHaveCount(0);
 
-  // Back to Settings: global Select all (FMD2 Select All) re-enables.
+  // Back to Settings: global Enable all re-enables (registry-wide —
+  // no filter active).
   await page.goto('/#/settings');
-  await page.getByRole('button', { name: 'Select all' }).click();
+  await page.getByTestId('module-bulk-global').getByRole('button', { name: 'Enable all' }).click();
   const checkbox = page.getByLabel('FixtureSite', { exact: true });
   await expect(checkbox).toBeChecked();
   await page.goto('/#/browse?sites=1');
@@ -242,8 +405,55 @@ test('Settings: bulk category Disable all rewrites module_state; the site picker
 
   // Exactly two bulk writes: category disable + global enable.
   expect(bulkWrites).toHaveLength(2);
-  expect(bulkWrites[0]).toMatchObject({ enabled: false, category: 'Fixtures' });
+  expect(bulkWrites[0]).toMatchObject({ enabled: false, category: 'English' });
   expect(bulkWrites[1]).toMatchObject({ enabled: true });
+});
+
+test('Settings → Websites: the proxy editor lives in a collapsed drawer (hidden by default)', async ({
+  page,
+}: {
+  page: Page;
+}): Promise<void> => {
+  await page.goto('/#/settings');
+
+  // Collapsed: a one-line summary + the sidecar badge; the editor
+  // fields are NOT on the page.
+  const section = page.getByTestId('proxy-section');
+  await expect(section).toBeVisible();
+  await expect(section.getByTestId('proxy-summary')).toHaveText('none');
+  await expect(page.getByLabel('Host', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Password', { exact: true })).toHaveCount(0);
+
+  // One affordance opens the drawer (Save stays disabled: nothing
+  // drafted — the editor is intact inside).
+  await section.getByTestId('proxy-drawer-open').click();
+  const drawer = page.getByTestId('proxy-drawer');
+  await expect(drawer).toBeVisible();
+  await expect(drawer.getByLabel('Type')).toHaveValue('');
+  await expect(drawer.getByRole('button', { name: 'Save proxy' })).toBeDisabled();
+});
+
+test('Settings: module search narrows by name and category', async ({ page }: { page: Page }): Promise<void> => {
+  await page.goto('/#/settings');
+  const search = page.getByLabel('Search modules by name or category');
+
+  // No search: the fixture site is listed.
+  await expect(page.getByLabel('FixtureSite', { exact: true })).toBeVisible();
+
+  // Name hit.
+  await search.fill('fixture');
+  await expect(page.getByLabel('FixtureSite', { exact: true })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: '1/6 sites match' })).toBeVisible();
+
+  // Category hit (the category text 'Raw' matches too).
+  await search.fill('raw');
+  await expect(page.getByLabel('RawDex', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('FixtureSite', { exact: true })).toHaveCount(0);
+
+  // Miss: empty state, no rows.
+  await search.fill('zzz-does-not-exist');
+  await expect(page.getByLabel('FixtureSite', { exact: true })).toHaveCount(0);
+  await expect(page.getByText(/No modules match the filters/)).toBeVisible();
 });
 
 test('Settings: per-site Re-sync catalog (update-list parity) runs the sync endpoint behind a progress toast', async ({
@@ -267,26 +477,4 @@ test('Settings: per-site Re-sync catalog (update-list parity) runs the sync endp
   await expect(page.getByText('FixtureSite catalog sync updated')).toBeVisible();
   expect(syncs).toHaveLength(1);
   expect(syncs[0]).toContain(`/api/sync/catalog/${MODULE_ID}`);
-});
-
-test('Settings: module search narrows by name and category', async ({ page }: { page: Page }): Promise<void> => {
-  await page.goto('/#/settings');
-  const search = page.getByLabel('Search modules by name or category');
-
-  // No search: the fixture site is listed.
-  await expect(page.getByLabel('FixtureSite', { exact: true })).toBeVisible();
-
-  // Name hit.
-  await search.fill('fixture');
-  await expect(page.getByLabel('FixtureSite', { exact: true })).toBeVisible();
-  await expect(page.getByRole('status').filter({ hasText: '1/1 modules match' })).toBeVisible();
-
-  // Category hit (the category text 'Fixtures' matches too).
-  await search.fill('fixtures');
-  await expect(page.getByLabel('FixtureSite', { exact: true })).toBeVisible();
-
-  // Miss: empty state, no rows.
-  await search.fill('zzz-does-not-exist');
-  await expect(page.getByLabel('FixtureSite', { exact: true })).toHaveCount(0);
-  await expect(page.getByText(/No modules match the search/)).toBeVisible();
 });

@@ -100,6 +100,13 @@ test('all-sites toggle: union over two installed catalogs — merged rows, Websi
   // could re-assert its state.
   await page.getByRole('checkbox', { name: /All sites/ }).click();
   await expect(page).toHaveURL(/allsites=1/);
+  // Deterministic gate BEFORE typing: the union view must be MOUNTED,
+  // not just the URL updated — the hash mutation and React's re-render
+  // are decoupled (navigate's notification is same-tick, but the
+  // assertion pins the contract). The site view carries an
+  // identically-named searchbox whose typing would navigate BACK to
+  // site-scoped mode.
+  await expect(page.getByRole('region', { name: 'All-sites search' })).toBeVisible();
 
   // Type a query — merged results from BOTH installed catalogs, each
   // row badged with its Website.

@@ -4,18 +4,25 @@
  * semantics) + cookies editor, sync buttons (modules / all catalogs),
  * and the D20 first-run bootstrap empty state with surfaced progress.
  *
- * v0.3.0 settings-parity additions: module-list search + bulk
- * enable/disable (global Select all/None + per-category headers — FMD2
- * Websites-tree parity pas:6400), per-site 'Re-sync catalog' row
- * action (update-list parity) with a progress toast, the Accounts
- * section (frmAccountManager adaptation) and Output defaults (FMD2
- * Save-to subset).
+ * v0.3.1 Websites rebuild (tsk-skilled-tabby-blooms): the module list
+ * is a FACETED registry view — LANGUAGE (FMD2 categories with the
+ * -Scanlation suffix collapsed), H-STATUS and NEEDS SETUP chips with
+ * live counts + text search, all URL-synced (?q=&lang=&h=&setup=,
+ * chips push / typing replaces — back-navigation restores the
+ * selection). The registry is sorted by (category, name) client-side
+ * so each category renders ONE header with its true count (the
+ * v0.3.0 adjacent-equals grouping over registration-ordered rows
+ * split languages into "English (1)" shards — the "only 1 english
+ * site" misread). Global Enable/Disable-all bulk controls scope to
+ * the CURRENT filtered selection (ids[] write) with a confirm on the
+ * destructive direction; the global proxy editor collapsed into a
+ * drawer (ProxySettings).
  *
  * Design-system retrofit: PageHeader + toolbar Buttons (with sonner
  * progress toasts — additive, distinct from the pinned inline status
- * texts) + Proxy Card + the virtualized module list. The registry is
- * 454 sites in production — ListPanel virtualizes it above the
- * threshold while fixture-sized lists stay plain DOM.
+ * texts) + the virtualized module list. The registry is 454 sites in
+ * production — ListPanel virtualizes it above the threshold while
+ * fixture-sized lists stay plain DOM.
  */
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';
 import { RefreshCw, RotateCw, X } from 'lucide-react';
@@ -31,7 +38,8 @@ import {
 import { AccountsSection } from '../components/AccountsSection';
 import { ApiTokenSection } from '../components/ApiTokenSection';
 import { CapabilityBadges } from '../components/CapabilityBadges';
-import { ModuleListSearch, GlobalBulkControls, CategoryBulkControls } from '../components/ModuleListControls';
+import { GlobalBulkControls, CategoryBulkControls } from '../components/ModuleListControls';
+import { ModuleFacets } from '../components/settings/ModuleFacets';
 import { OutputDefaultsForm } from '../components/OutputDefaultsForm';
 import { FavoritesSettingsForm } from '../components/FavoritesSettingsForm';
 import { ProxySettingsSection } from '../components/ProxySettings';
@@ -51,6 +59,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/patterns/NativeSelect';
 import { OptionsEditor } from '../components/OptionsEditor';
+import { navigate, replaceRoute } from '../router';
+import { useRoute } from '../state/use-route';
+import {
+  facetCounts,
+  filterModules,
+  languageOf,
+  parseModuleFilter,
+  serializeModuleFilter,
+  type ModuleFilterState,
+} from '../state/module-facets';
+
+function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((v, i): boolean => v === b[i]);
+}
 
 const EMPTY_PROXY: ProxySettingsT = { type: '', host: '', port: '', user: '', pass: '' };
 
@@ -295,8 +317,12 @@ export function SettingsPage(): ReactElement {
   const moduleToast = useRef<ProgressToastHandle | null>(null);
   const catalogToast = useRef<ProgressToastHandle | null>(null);
 
-  const [search, setSearch] = useState('');
   const [openEditorFor, setOpenEditorFor] = useState<string | null>(null);
+
+  // The live hash is the facet/filter truth (App owns routing; this
+  // subscription keeps ?q/?lang/?h/?setup pure under typing + back/
+  // forward — the same URL-sync channel the site picker uses).
+  const route = useRoute({ name: 'settings', query: {} });
 
   const list = modules.data?.modules ?? [];
   const bootstrapRunning = syncModules.isPending || syncCatalogs.isPending;
@@ -396,26 +422,66 @@ export function SettingsPage(): ReactElement {
     );
   }
 
-  // ── module-list search + category grouping (FMD2 Websites tree) ──
+  // ── faceted module list (Settings→Websites rebuild) ────────────────
+  // Facet state lives in the URL (?q=&lang=&h=&setup=): chip clicks
+  // PUSH (back/forward restore the selection), typing REPLACES (no
+  // history spam) — the site picker's ?cats= channel, one facet
+  // language app-wide. Unknown lang values drop against the registry
+  // (a shared URL never filters to a mismatched registry).
+  const validLangs: readonly string[] = [
+    ...new Set(list.map((m): string => m.category.trim()).map(languageOf)),
+  ];
+  const filter = parseModuleFilter(route.query, validLangs);
+  const writeFilter = (next: ModuleFilterState, mode: 'push' | 'replace' = 'push'): void => {
+    const query = serializeModuleFilter(next);
+    if (mode === 'push') {
+      navigate('settings', query);
+    } else {
+      replaceRoute('settings', query);
+    }
+  };
+  const onFacetsChange = (next: ModuleFilterState): void => {
+    // Typing carries q only → REPLACE (shareable URL, no history
+    // spam); chip toggles are discrete facet changes → PUSH
+    // (back/forward restore the selection).
+    if (next.q !== filter.q && arraysEqual(next.lang, filter.lang) && arraysEqual(next.h, filter.h) && arraysEqual(next.setup, filter.setup)) {
+      writeFilter(next, 'replace');
+      return;
+    }
+    writeFilter(next, 'push');
+  };
+
+  const counts = facetCounts(list, filter);
+  const filtered = filterModules(list, filter);
+  const filterActive: boolean =
+    filter.q !== '' || filter.lang.length > 0 || filter.h.length > 0 || filter.setup.length > 0;
+
   // ONE ListPanel stays virtualized for production-sized registries
   // (perf contract: 1000 modules); the category headers ride along as
-  // interleaved list rows carrying the bulk controls (FMD2 tree nodes).
-  const needle: string = search.trim().toLowerCase();
-  const filtered: readonly ModuleSummaryT[] =
-    needle === ''
-      ? list
-      : list.filter(
-          (m): boolean =>
-            m.name.toLowerCase().includes(needle) || m.category.toLowerCase().includes(needle),
-        );
+  // interleaved list rows carrying the bulk controls (FMD2 tree
+  // nodes). GROUPING FIX: the registry arrives in REGISTRATION order
+  // (directory walk — categories interleave), so the list is sorted
+  // by (category, name) client-side FIRST: one header per category
+  // with its TRUE count (the v0.3.0 adjacent-equals bug split e.g.
+  // English into dozens of "English (1)" headers — the "only 1
+  // english site" misread). Raw registry rows with an EMPTY category
+  // group as 'Unknown' (27 production sites ship categoryless).
+  const categoryLabel = (category: string): string => (category.trim() === '' ? 'Unknown' : category);
+  const sorted = [...filtered].sort((a, b): number => {
+    const byCategory: number = categoryLabel(a.category).localeCompare(categoryLabel(b.category));
+    return byCategory !== 0 ? byCategory : a.name.localeCompare(b.name);
+  });
   type ModuleListRow =
-    | { readonly kind: 'header'; readonly category: string; count: number }
+    | { readonly kind: 'header'; readonly category: string; readonly label: string; count: number }
     | { readonly kind: 'module'; readonly module: ModuleSummaryT };
   const rows: ModuleListRow[] = [];
-  let currentHeader: { readonly kind: 'header'; readonly category: string; count: number } | undefined;
-  for (const module of filtered) {
-    if (currentHeader === undefined || currentHeader.category !== module.category) {
-      currentHeader = { kind: 'header', category: module.category, count: 0 };
+  let currentHeader:
+    | { readonly kind: 'header'; readonly category: string; readonly label: string; count: number }
+    | undefined;
+  for (const module of sorted) {
+    const label = categoryLabel(module.category);
+    if (currentHeader === undefined || currentHeader.label !== label) {
+      currentHeader = { kind: 'header', category: module.category, label, count: 0 };
       rows.push(currentHeader);
     }
     currentHeader.count += 1;
@@ -509,30 +575,54 @@ export function SettingsPage(): ReactElement {
       <AccountsSection
         modules={list}
         onOpenCookies={(moduleId): void => {
-          setSearch('');
+          // Clear the whole filter so the target row is guaranteed
+          // visible before the forced scroll (replace: a programmatic
+          // jump, not a user filter action).
+          replaceRoute('settings', {});
           setOpenEditorFor(moduleId);
         }}
       />
 
       <h2 className="mb-2 mt-6 text-lg font-semibold">Modules ({list.length})</h2>
+      <ModuleFacets
+        filter={filter}
+        counts={counts}
+        onChange={onFacetsChange}
+        resultCount={filtered.length}
+        totalCount={list.length}
+      />
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <ModuleListSearch value={search} onChange={setSearch} resultCount={filtered.length} totalCount={list.length} />
-        <GlobalBulkControls busy={bootstrapRunning} />
+        <span className="text-xs text-muted-foreground">
+          {filterActive
+            ? `Bulk controls operate on the ${String(filtered.length)} filtered sites`
+            : 'Bulk controls operate on every site'}
+        </span>
+        <GlobalBulkControls
+          busy={bootstrapRunning}
+          targetIds={filtered.map((m): string => m.id)}
+          filtered={filterActive}
+          scopeLabel={filterActive ? `${String(filtered.length)} filtered sites` : 'all sites'}
+        />
       </div>
       {filtered.length === 0 ? (
-        <EmptyState title="No modules match the search">
-          <p>No module name or category contains “{search}”.</p>
+        <EmptyState title="No modules match the filters">
+          <p>No module name, id or category matches the current search and facet selection.</p>
         </EmptyState>
       ) : (
         <ListPanel
           className="module-list"
           ariaLabel="Site modules"
           items={rows}
-          itemKey={(row): string => (row.kind === 'header' ? `category:${row.category}` : row.module.id)}
+          itemKey={(row): string => (row.kind === 'header' ? `category:${row.label}` : row.module.id)}
           rowClassName="module-row"
           renderItem={(row): ReactElement =>
             row.kind === 'header' ? (
-              <CategoryBulkControls category={row.category} count={row.count} busy={bootstrapRunning} />
+              <CategoryBulkControls
+                category={row.category}
+                label={row.label}
+                count={row.count}
+                busy={bootstrapRunning}
+              />
             ) : (
               <ModuleRow
                 module={row.module}

@@ -91,5 +91,9 @@ test('Settings site list: 1000 modules render virtualized, scroll without jank',
   // not the estimate. (Virtualization + jank is the contract, not
   // the page count.)
   await assertVirtualizedScroll(page, { list, wheelSteps: 100, lastIndexMin: MODULE_ROWS - 20 });
-  await expect(page.getByText(`PerfSite ${MODULE_ROWS - 1}`).first()).toBeAttached();
+  // The tail row: the Websites list sorts by (category, name) — the
+  // registration-order LAST module (PerfSite 999, category 'Cat 3')
+  // sits mid-list now; the sorted tail is the lexicographic max of
+  // the last string-sorted category 'Cat 9' (i % 12 === 9 → 993).
+  await expect(page.getByText('PerfSite 993', { exact: true }).first()).toBeAttached();
 });
