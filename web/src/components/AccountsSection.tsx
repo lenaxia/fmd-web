@@ -199,9 +199,11 @@ function AccountCard(props: {
 }
 
 /**
- * The accounts list: cards for every AccountSupport module, joined
- * against GET /api/accounts for the stored username + login status.
- * FMD2 parity: exactly one account per site (frmAccountManager).
+ * The accounts list: cards for every ENABLED AccountSupport module,
+ * joined against GET /api/accounts for the stored username + login
+ * status. FMD2 parity: exactly one account per site
+ * (frmAccountManager). Owner directive: only ENABLED sites are listed
+ * (disabled sites are off the manager until re-enabled).
  *
  * Render cap (ADAPT): sites WITH a stored account always render;
  * credential-less sites render the first UNSTORED_CAP with a "Show
@@ -216,7 +218,9 @@ export function AccountsSection(props: {
 }): ReactElement {
   const accounts = useAccounts();
   const [showAll, setShowAll] = useState(false);
-  const supported: readonly ModuleSummaryT[] = props.modules.filter((m): boolean => m.accountSupport);
+  const supported: readonly ModuleSummaryT[] = props.modules.filter(
+    (m): boolean => m.accountSupport && m.enabled,
+  );
   const byId: Map<string, { username: string; status: AccountStatusT }> = new Map(
     (accounts.data?.accounts ?? []).map((a): [string, { username: string; status: AccountStatusT }] => [
       a.moduleId,
@@ -234,12 +238,12 @@ export function AccountsSection(props: {
       <h2 className="mb-2 text-lg font-semibold">
         Accounts{' '}
         <span className="text-sm font-normal text-muted-foreground">
-          ({supported.length} site{supported.length === 1 ? '' : 's'} with account support)
+          ({supported.length} enabled site{supported.length === 1 ? '' : 's'} with account support)
         </span>
       </h2>
       {supported.length === 0 ? (
-        <EmptyState title="No account-supporting sites registered">
-          <p>No registered module declares AccountSupport — there is nothing to manage yet.</p>
+        <EmptyState title="No enabled account-supporting sites">
+          <p>No enabled module declares AccountSupport — enable a site to manage its account here.</p>
         </EmptyState>
       ) : accounts.isError ? (
         <ErrorBanner error={accounts.error} />

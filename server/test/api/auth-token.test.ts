@@ -107,27 +107,30 @@ describe('R4 matrix: token + password set', (): void => {
   });
 });
 
-// ── matrix cell: token only → API-ONLY mode (R4d) ────────────────────
+// ── matrix cell: token set + password unset → open deployment ───────
 
-describe('R4 matrix: token set + password unset → API-only mode', (): void => {
+describe('R4 matrix: token set + password unset → open deployment (*arr semantics)', (): void => {
   const CONFIG: AuthConfig = { password: undefined, apiToken: TOKEN };
 
-  it('EVERY /api route (reads included) requires the token', async (): Promise<void> => {
+  it('SPA flows work login-free: reads AND state-changing POSTs stay open', async (): Promise<void> => {
     const h = buildHarness({ auth: CONFIG });
-    const noAuth = await h.app.inject({ method: 'GET', url: '/api/modules' });
-    expect(noAuth.statusCode).toBe(401);
-    expectEnvelope(noAuth.body, 'unauthorized');
+    // A token's mere existence NEVER gates — the deployment is open for
+    // the browser (reverse-proxy deployments front it themselves).
+    expect((await h.app.inject({ method: 'GET', url: '/api/modules' })).statusCode).toBe(200);
+    expect((await h.app.inject(writeJob())).statusCode).toBe(201);
+  });
 
-    const withToken = await h.app.inject({
-      method: 'GET',
-      url: '/api/modules',
-      headers: authed({ authorization: `Bearer ${TOKEN}` }),
-    });
-    expect(withToken.statusCode).toBe(200);
-
-    expect((await h.app.inject(writeJob())).statusCode).toBe(401);
+  it('the token is ACCEPTED wherever presented (scripts ride the open API too)', async (): Promise<void> => {
+    const h = buildHarness({ auth: CONFIG });
     expect((await h.app.inject(writeJob(TOKEN))).statusCode).toBe(201);
-    expect((await h.app.inject(writeJob(OTHER_TOKEN))).statusCode).toBe(401);
+    expect((await h.app.inject(writeJob(OTHER_TOKEN))).statusCode).toBe(201);
+  });
+
+  it('the token-settings reads are open (auth-None parity: whoever reaches the app reads it)', async (): Promise<void> => {
+    const h = buildHarness({ auth: CONFIG });
+    const res = await h.app.inject({ method: 'GET', url: '/api/settings/api-token' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ token: TOKEN, envManaged: false, mode: 'api-token' });
   });
 
   it('health probes stay open (Docker healthcheck) + login reports auth_disabled', async (): Promise<void> => {
@@ -143,15 +146,9 @@ describe('R4 matrix: token set + password unset → API-only mode', (): void => 
     expectEnvelope(login.body, 'bad_request');
   });
 
-  it('/api/metrics is gated like every other /api route', async (): Promise<void> => {
+  it('/api/metrics stays open (no password ⇒ no gate)', async (): Promise<void> => {
     const h = buildHarness({ auth: CONFIG, metrics: new FmdMetrics() });
-    expect((await h.app.inject({ method: 'GET', url: '/api/metrics' })).statusCode).toBe(401);
-    const withToken = await h.app.inject({
-      method: 'GET',
-      url: '/api/metrics',
-      headers: authed({ authorization: `Bearer ${TOKEN}` }),
-    });
-    expect(withToken.statusCode).toBe(200);
+    expect((await h.app.inject({ method: 'GET', url: '/api/metrics' })).statusCode).toBe(200);
   });
 });
 
@@ -193,11 +190,16 @@ describe('R4 matrix: both unset → auth off', (): void => {
     expect(res.json()).toEqual({ token: null, envManaged: false, mode: 'none' });
   });
 
-  it('regenerate refuses when no auth is configured (no silent API-only flip)', async (): Promise<void> => {
+  it('regenerate MINTS a token with no auth configured (*arr script key, no lockout)', async (): Promise<void> => {
     const h = buildHarness();
     const res = await h.app.inject({ method: 'POST', url: '/api/settings/api-token/regenerate' });
-    expect(res.statusCode).toBe(409);
-    expectEnvelope(res.body, 'conflict');
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { token: string; envManaged: boolean; mode: string };
+    expect(body.token).toMatch(/^[0-9a-f]{64}$/);
+    expect(body.envManaged).toBe(false);
+    expect(body.mode).toBe('none');
+    // Minting never raises a wall: state-changing POSTs stay open.
+    expect((await h.app.inject(writeJob())).statusCode).toBe(201);
   });
 });
 
@@ -343,6 +345,38 @@ describe('R4: regeneration rotates the ONE value in place', (): void => {
     });
     expect(res.statusCode).toBe(200);
   });
+
+  it('regenerate works with auth OFF (no password): open deployment still rotates its script key', async (): Promise<void> => {
+    const settings = new InMemorySettingsService();
+    settings.setApiToken(TOKEN);
+    const audit: string[] = [];
+    const h = buildHarness({
+      settings,
+      onAudit: (event): void => {
+        audit.push(`${event.setting}:${event.action}`);
+      },
+      auth: { password: undefined, apiToken: (): string | undefined => settings.getApiToken() ?? undefined },
+    });
+    // No credential at all — the deployment is open (*arr auth-None).
+    const res = await h.app.inject({ method: 'POST', url: '/api/settings/api-token/regenerate' });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { token: string; mode: string };
+    expect(body.token).toMatch(/^[0-9a-f]{64}$/);
+    expect(body.mode).toBe('api-token');
+    expect(audit).toEqual(['api_token:regenerate']);
+    // The SPA stays open after minting (token existence never gates).
+    expect((await h.app.inject(writeJob())).statusCode).toBe(201);
+  });
+
+  it('env-pinned deployments refuse (409) even with NO password (rotate in the environment)', async (): Promise<void> => {
+    const pin = 'e'.repeat(64);
+    const h = buildHarness({ auth: { password: undefined, apiToken: pin, apiTokenEnvPinned: true } });
+    const state = await h.app.inject({ method: 'GET', url: '/api/settings/api-token' });
+    expect(state.json()).toEqual({ token: null, envManaged: true, mode: 'api-token' });
+    const rotate = await h.app.inject({ method: 'POST', url: '/api/settings/api-token/regenerate' });
+    expect(rotate.statusCode).toBe(409);
+    expectEnvelope(rotate.body, 'conflict');
+  });
 });
 
 // ── env-pin precedence (mock env) ────────────────────────────────────
@@ -352,37 +386,38 @@ describe('R4: FMD_WEB_API_TOKEN env pin precedence (env > settings store)', (): 
     vi.unstubAllEnvs();
   });
 
-  it('bootstrap: env pin wins over a stored value; generation only for authed, unpinned, empty stores', (): void => {
+  it('bootstrap: env pin wins over a stored value; generation is UNCONDITIONAL (no pin, nothing stored)', (): void => {
     const pin = 'p'.repeat(64);
     // pin > stored
-    expect(resolveApiTokenBootstrap({ envPin: pin, stored: TOKEN, passwordSet: false })).toEqual({
+    expect(resolveApiTokenBootstrap({ envPin: pin, stored: TOKEN })).toEqual({
       generated: false,
       envPinned: true,
       store: TOKEN,
     });
     // stored, no pin → nothing to do
-    expect(resolveApiTokenBootstrap({ envPin: undefined, stored: TOKEN, passwordSet: true })).toEqual({
+    expect(resolveApiTokenBootstrap({ envPin: undefined, stored: TOKEN })).toEqual({
       generated: false,
       envPinned: false,
       store: TOKEN,
     });
-    // no pin, no stored, password set → FIRST-RUN GENERATION
-    const generated = resolveApiTokenBootstrap({ envPin: undefined, stored: null, passwordSet: true });
+    // no pin, no stored → FIRST-RUN GENERATION with NO password
+    // configured (*arr semantics: the token is a script key, not a
+    // password companion — reverse-proxy deployments are first-class)
+    const generated = resolveApiTokenBootstrap({ envPin: undefined, stored: null });
     expect(generated.generated).toBe(true);
     expect(generated.store).toMatch(/^[0-9a-f]{64}$/);
-    // no pin, no stored, no password → auth stays OFF (default no-auth
-    // deployments never generate — out-of-box flows untouched)
-    expect(resolveApiTokenBootstrap({ envPin: undefined, stored: null, passwordSet: false })).toEqual({
-      generated: false,
-      envPinned: false,
-      store: null,
-    });
-    // a pinned deployment never generates, even with a password
-    expect(resolveApiTokenBootstrap({ envPin: pin, stored: null, passwordSet: true })).toEqual({
+    // a pinned deployment never generates
+    expect(resolveApiTokenBootstrap({ envPin: pin, stored: null })).toEqual({
       generated: false,
       envPinned: true,
       store: null,
     });
+    // empty-string pin is UNSET (deployments pinning '' mean "off")
+    expect(resolveApiTokenBootstrap({ envPin: '', stored: null }).generated).toBe(true);
+    // the generate hook is honored (tests pin deterministic values)
+    expect(resolveApiTokenBootstrap({ envPin: undefined, stored: null, generate: (): string => 'f'.repeat(64) }).store).toBe(
+      'f'.repeat(64),
+    );
   });
 
   it('live provider: a pinned env stays in charge while the stored value rotates under it', async (): Promise<void> => {

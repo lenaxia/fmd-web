@@ -1,11 +1,11 @@
 /**
- * R4 /ws upgrade auth (real loopback WebSockets, offline): the single
- * API token gates the upgrade whenever it is active — Authorization
+ * R4 /ws upgrade auth (real loopback WebSockets, offline): the upgrade
+ * gate keys on the PASSWORD flow only (*arr semantics) — Authorization
  * header preferred, `?token=` query param for browser WS clients, the
- * session cookie also granting when the password flow is on. Wrong or
- * missing credentials reject the handshake with a plain-HTTP 401
- * before any hub state exists; token-less deployments keep today's
- * open hub.
+ * session cookie also granting when the password flow is on. Password
+ * off (even with a token present) keeps the open hub; password on:
+ * wrong or missing credentials reject the handshake with a plain-HTTP
+ * 401 before any hub state exists.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
@@ -129,34 +129,39 @@ afterEach(async () => {
   }
 });
 
-// ── token active → gated upgrade ─────────────────────────────────────
+// ── token present + password unset → OPEN upgrade (*arr) ────────────
 
-describe('R4 /ws upgrade: token-only deployment (API-only mode)', (): void => {
-  it('rejects missing or wrong credentials with a 401 handshake', async (): Promise<void> => {
+describe('R4 /ws upgrade: token present + password unset → open upgrade', (): void => {
+  it('browser live tiles connect with NO credentials (a token never gates)', async (): Promise<void> => {
     const s = await server({ password: undefined, apiToken: TOKEN });
-    await expectRejected(s.port, {});
-    await expectRejected(s.port, { headers: { authorization: `Bearer ${'b'.repeat(64)}` } });
-    await expectRejected(s.port, { path: `/ws?token=${'b'.repeat(64)}` });
-    await expectRejected(s.port, { headers: { authorization: 'Bearer nope' } });
+    const ws = await tryConnect(s.port);
+    ws.send(JSON.stringify({ type: 'hello' }));
+    const id = publish(s.hub);
+    expect((await nextFrame(ws)).id).toBe(id);
+    ws.close();
   });
 
-  it('accepts the Authorization header (preferred) and serves the hub', async (): Promise<void> => {
+  it('the Authorization header is still accepted (and serves the hub)', async (): Promise<void> => {
     const s = await server({ password: undefined, apiToken: TOKEN });
     const ws = await tryConnect(s.port, { headers: { authorization: `Bearer ${TOKEN}` } });
     ws.send(JSON.stringify({ type: 'hello' }));
     const id = publish(s.hub);
-    const frame = await nextFrame(ws);
-    expect(frame.type).toBe('event'); // {type:'event', id, job} per the D19 protocol
-    expect(frame.id).toBe(id);
+    expect((await nextFrame(ws)).id).toBe(id);
     ws.close();
   });
 
-  it('accepts the ?token= query param (browser WS clients)', async (): Promise<void> => {
+  it('the ?token= query param still connects (browser WS clients)', async (): Promise<void> => {
     const s = await server({ password: undefined, apiToken: TOKEN });
     const ws = await tryConnect(s.port, { path: `/ws?token=${TOKEN}` });
     ws.send(JSON.stringify({ type: 'hello' }));
     const id = publish(s.hub);
     expect((await nextFrame(ws)).id).toBe(id);
+    ws.close();
+  });
+
+  it('a WRONG token is simply ignored when the password is off (open upgrade)', async (): Promise<void> => {
+    const s = await server({ password: undefined, apiToken: TOKEN });
+    const ws = await tryConnect(s.port, { headers: { authorization: `Bearer ${'b'.repeat(64)}` } });
     ws.close();
   });
 });
@@ -183,21 +188,27 @@ describe('R4 /ws upgrade: token + password deployment', (): void => {
   });
 });
 
-// ── token inactive → today's open hub ────────────────────────────────
+// ── password unset → open hub ────────────────────────────────────────
 
-describe('R4 /ws upgrade: token-less deployments keep today\'s open hub', (): void => {
-  it('password-only: the upgrade stays open (pre-login SPA live updates)', async (): Promise<void> => {
-    const s = await server({ password: PASSWORD });
+describe('R4 /ws upgrade: password-less deployments keep the open hub', (): void => {
+  it('no auth at all: open upgrade (no-auth deployments)', async (): Promise<void> => {
+    const s = await server({ password: undefined });
     const ws = await tryConnect(s.port);
     ws.send(JSON.stringify({ type: 'hello' }));
     const id = publish(s.hub);
     expect((await nextFrame(ws)).id).toBe(id);
     ws.close();
   });
+});
 
-  it('no auth at all: open upgrade (no-auth deployments)', async (): Promise<void> => {
-    const s = await server({ password: undefined });
-    const ws = await tryConnect(s.port);
+// ── password on (token absent) → cookie-gated hub ────────────────────
+
+describe('R4 /ws upgrade: password-only deployment', (): void => {
+  it('anonymous upgrade rejects (401); a browser session cookie grants it', async (): Promise<void> => {
+    const s = await server({ password: PASSWORD });
+    await expectRejected(s.port, {});
+    const cookie = await loginCookie(s);
+    const ws = await tryConnect(s.port, { headers: { cookie } });
     ws.send(JSON.stringify({ type: 'hello' }));
     const id = publish(s.hub);
     expect((await nextFrame(ws)).id).toBe(id);

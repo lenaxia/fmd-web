@@ -217,3 +217,69 @@ describe('[parity-sweep] M14 — open-by-URL host resolution (FMD2 edURL parity)
     expect(h.info.calls).toHaveLength(1);
   });
 });
+
+describe('host-relative catalog urls with an explicit moduleId (FMD2 MaybeFillHost parity)', (): void => {
+  // FMD2-DB catalog links are stored HOST-RELATIVE (§5.8
+  // RemoveHostFromURLsPair): the client posts them raw and the SERVER
+  // joins them against the module's RootURL — never a 400 url-shape
+  // rejection (observed live: catalog row → POST /api/info → 400
+  // "url must be an absolute http(s) URL").
+  const MODULE_A_ROOT = 'https://example.org'; // makeRegistration default
+
+  it('a relative url + moduleId is joined against the module rootURL (200, canonical url to the engine)', async (): Promise<void> => {
+    const h = buildHarness();
+    const res = await h.app.inject({
+      method: 'POST',
+      url: '/api/info',
+      payload: { moduleId: MODULE_A_ID, url: '/title/116496-en-null' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(h.info.calls).toEqual([
+      { moduleId: MODULE_A_ID, url: `${MODULE_A_ROOT}/title/116496-en-null` },
+    ]);
+    // The response echoes the CANONICAL absolute url.
+    expect((res.json() as { url: string }).url).toBe(`${MODULE_A_ROOT}/title/116496-en-null`);
+  });
+
+  it('cache-key convergence: the relative request and its absolute equivalent share ONE snapshot', async (): Promise<void> => {
+    const h = buildHarness({ infoTtlMs: 10_000 });
+    const r1 = await h.app.inject({
+      method: 'POST',
+      url: '/api/info',
+      payload: { moduleId: MODULE_A_ID, url: '/manga/rel' },
+    });
+    const r2 = await h.app.inject({
+      method: 'POST',
+      url: '/api/info',
+      payload: { moduleId: MODULE_A_ID, url: `${MODULE_A_ROOT}/manga/rel` },
+    });
+    expect(r1.statusCode).toBe(200);
+    expect(r2.statusCode).toBe(200);
+    expect(r2.body).toBe(r1.body);
+    expect(h.info.calls).toHaveLength(1);
+  });
+
+  it('the downloaded-chapters ledger is keyed by the CANONICAL url (relative request sees it)', async (): Promise<void> => {
+    const h = buildHarness();
+    h.library.setDownloadedChapters(MODULE_A_ID, `${MODULE_A_ROOT}/manga/ledger`, ['https://example.org/ch/1']);
+    const res = await h.app.inject({
+      method: 'POST',
+      url: '/api/info',
+      payload: { moduleId: MODULE_A_ID, url: '/manga/ledger' },
+    });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as { downloaded: string[] }).downloaded).toEqual(['https://example.org/ch/1']);
+  });
+
+  it('a relative url WITHOUT a moduleId is still the M14 validation case (host resolution needs absolute)', async (): Promise<void> => {
+    const h = buildHarness();
+    const res = await h.app.inject({
+      method: 'POST',
+      url: '/api/info',
+      payload: { url: '/title/116496-en-null' },
+    });
+    expect(res.statusCode).toBe(400);
+    expectEnvelope(res.body, 'validation_error');
+    expect(h.info.calls).toHaveLength(0);
+  });
+});

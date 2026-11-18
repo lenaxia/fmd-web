@@ -6,6 +6,11 @@
  * Env-pinned deployments (FMD_WEB_API_TOKEN) show "Managed via
  * environment" and hide Regenerate — the secret lives in the
  * deployment environment, rotation happens there (runbook §API token).
+ *
+ * *arr semantics (owner directive): the token ALWAYS renders — it
+ * exists and rotates with NO password configured. Auth off = an open
+ * deployment (reverse-proxy fronting is first-class); the token is the
+ * script key, not a password companion.
  */
 import { useState, type ReactElement } from 'react';
 import { Check, Copy, Eye, EyeOff, KeyRound, RotateCw } from 'lucide-react';
@@ -27,9 +32,9 @@ function mask(token: string): string {
 }
 
 const MODE_LABEL: Record<string, string> = {
-  none: 'no auth (open)',
+  none: 'open (no token yet)',
   password: 'password (cookie login)',
-  'api-token': 'API token only (API-only mode)',
+  'api-token': 'open deployment — token for scripts',
   'password+api-token': 'password + API token',
 };
 
@@ -80,7 +85,10 @@ export function ApiTokenSection(): ReactElement {
       <p className="mb-2 text-xs text-muted-foreground">
         The single app-wide API token (Sonarr/Radarr-style) — one key per deployment, used by
         scripts via <code>Authorization: Bearer &lt;token&gt;</code> on every /api route and
-        /ws. Cookbook: docs/API.md. Auth mode:{' '}
+        /ws. It exists and rotates whether or not a password is set: with auth off this is an
+        open deployment (reverse-proxy fronting is first-class) and the token is your script
+        key — anyone who can reach the app can read it, like *arr without auth. Cookbook:
+        docs/API.md. Auth mode:{' '}
         <span data-testid="api-token-mode">{data !== undefined ? (MODE_LABEL[data.mode] ?? data.mode) : '…'}</span>
       </p>
 
@@ -102,11 +110,11 @@ export function ApiTokenSection(): ReactElement {
         </div>
       ) : data.token === null ? (
         <div className="rounded-lg border bg-surface/40 p-4">
-          <p className="text-sm font-medium">No API token</p>
+          <p className="text-sm font-medium">No API token stored</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Auth is off. A token is generated automatically on first start once a password is
-            set (FMD_WEB_PASSWORD), or pin one headless via FMD_WEB_API_TOKEN — see
-            docs/runbook.md §API token.
+            One is normally generated on first start — Regenerate mints it now. The token is a
+            script key independent of auth: it exists and rotates whether or not a password is
+            set (docs/runbook.md §API token).
           </p>
         </div>
       ) : (

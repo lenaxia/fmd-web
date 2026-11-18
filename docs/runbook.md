@@ -167,25 +167,34 @@ the `/ws` upgrade (`?token=` query param for browser WS clients).
 Never multiple tokens, lists, per-user or per-scope tokens — a future
 need that sounds like "another token" is a regenerate of the one key.
 
+The token is an ***arr-style script key***: it EXISTS and ROTATES with
+NO password/auth configured. Password auth (`FMD_WEB_PASSWORD`) is the
+opt-in login gate for the UI; the token is the machine credential
+independent of it. Reverse-proxy deployments (authelia/authentik in
+front, no local password) are first-class.
+
 ### Lifecycle
 
-1. **First-run generation** — when a deployment starts with
-   `FMD_WEB_PASSWORD` set, no stored token and no env pin, one is
-   generated (32-byte hex), persisted in the app_settings store
-   (`api.token`) and logged as
-   `auth: api token generated on first run — copy it from Settings → API`.
-   Default no-env deployments (no password, no pin) stay token-less —
-   "both unset → auth off" — so out-of-box no-auth flows (incl. the
-   e2e harness) are untouched.
+1. **First-run generation** — when a deployment starts with no stored
+   token and no env pin, one is generated UNCONDITIONALLY (32-byte
+   hex), persisted in the app_settings store (`api.token`) and logged
+   as `auth: api token generated on first run — copy it from Settings → API`.
+   With no password set the API stays OPEN for the browser SPA — a
+   token's existence never gates anything (out-of-box flows, incl. the
+   e2e harness, are untouched in behavior; they simply also have a
+   script key now).
 2. **Settings → API** — the key is shown masked with a reveal toggle,
    a copy button and **Regenerate** behind a confirm dialog
    ("Revokes the current key immediately — update your scripts").
-   The value only ever travels on the credential-gated
-   `GET /api/settings/api-token` (never on `GET /api/settings`).
+   The value only ever travels on `GET /api/settings/api-token`
+   (credential-gated when a password is set; on an open deployment it
+   is readable by whoever can reach the app — exactly *arr's
+   auth-None semantics, front it with a reverse proxy if that matters).
 3. **Regeneration / immediate revocation** — rotation replaces the ONE
    value in place; the old key is rejected on its very NEXT request
-   (constant-time compare against the live value). Rotation is
-   audit-logged as a settings change
+   (constant-time compare against the live value). Rotation needs NO
+   password auth — open deployments rotate their script key like any
+   other. It is audit-logged as a settings change
    (`{"event":"audit","setting":"api_token","action":"regenerate"}`)
    — the log never carries the token value. Scripts may rotate the key
    themselves (the endpoint accepts the current token).
@@ -200,9 +209,9 @@ need that sounds like "another token" is a regenerate of the one key.
 | `FMD_WEB_PASSWORD` | token (effective) | Behavior |
 | --- | --- | --- |
 | set | set | Either credential grants the gated set (state-changing routes, the token-settings read, `/ws`): session cookie or Bearer. Plain reads stay open (pre-login SPA). |
-| unset | set | **API-only mode** — every `/api` route (reads included) and `/ws` require the token. The SPA cannot authenticate (no login exists) — scripts are the interface. |
+| unset | set | **Open deployment** — the token never gates: reads, state-changing POSTs and `/ws` stay open for the SPA (login-free); the token is additionally ACCEPTED wherever presented (scripts use it as a Bearer key; it also bypasses the login rate limit). Front the app with your reverse proxy's auth when you need a gate. |
 | set | unset | Today's cookie flow unchanged: login mints the session, writes gated, reads open. |
-| unset | unset | Auth off — everything open. |
+| unset | unset | Auth off — everything open. A token is still generated (script key, not an auth surface). |
 
 Notes:
 
@@ -213,10 +222,11 @@ Notes:
 - The startup log states the active auth modes (never the value):
   `fmd: auth: api-token (password off, api token on, env-pinned)`.
 - Metrics: `fmd_http_requests_total{auth="none|cookie|token",…}`.
-- Entering API-only mode WITHOUT an env pin: run once with a password
-  (a token is auto-generated), copy it, then drop the password — the
-  stored token keeps the API token-only. The regenerate endpoint
-  refuses when no auth is configured at all (no silent mode flip).
+- Reverse-proxy recipe (authelia/authentik/nginx basic-auth): leave
+  `FMD_WEB_PASSWORD` unset, let the proxy authenticate humans, hand
+  scripts the token (Settings → API or `GET /api/settings/api-token`
+  from inside the network). The proxy gate covers the token read too —
+  nothing inside the container re-authenticates.
 
 Key-rotation walk-through (executed): docs/API.md § *Key-rotation
 runbook* and docs/evidence-api-scripting.md § 14.

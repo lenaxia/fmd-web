@@ -6,19 +6,21 @@
  * `?token=` query param for browser WS clients). ONE token value, ever —
  * no lists, no per-user/per-scope variants (R2 single-operator).
  *
- * Auth-mode matrix (every cell offline-tested):
+ * Auth-mode matrix (every cell offline-tested; *arr semantics — the
+ * gate keys on the PASSWORD only, a token never raises a wall):
  * - token + password → either credential grants the gated set
  *   (state-changing routes + the token-settings reads + /ws); plain
  *   GETs stay open so the pre-login SPA still renders (§10).
- * - token only        → API-ONLY mode (R4d): no password means no
- *   cookie path, so EVERY /api route (reads included) and /ws require
- *   the token. Scripts are the interface; the SPA is not.
+ * - token only        → OPEN deployment: no password means no gate —
+ *   the SPA works login-free (reverse-proxy deployments front it),
+ *   and the token is ACCEPTED wherever presented (scripts).
  * - password only     → today's cookie flow, unchanged.
- * - both unset        → auth off, everything open.
+ * - both unset        → auth off, everything open (a token is still
+ *   generated — it is a script key, not an auth surface).
  *
- * Token facts: 32-byte hex; auto-generated on first start of an authed
- * deployment (no env pin, nothing stored — the runtime assembly owns
- * generation, `resolveApiTokenBootstrap`); FMD_WEB_API_TOKEN pins it
+ * Token facts: 32-byte hex; auto-generated on first start of EVERY
+ * unpinned deployment (no env pin, nothing stored — the runtime
+ * assembly owns generation, `resolveApiTokenBootstrap`); FMD_WEB_API_TOKEN pins it
  * (precedence env > settings store, runbook §API token); comparison is
  * constant-time (SHA-256 fingerprints + timingSafeEqual); wrong/missing
  * token when required → 401 typed envelope; token-authenticated
@@ -147,10 +149,12 @@ function tokenFromQuery(url: string | undefined): string | undefined {
 /**
  * First-run token bootstrap (R4): the stored settings value and the env
  * pin resolve to the effective token + whether this boot generated one.
- * Generation happens ONLY for authed deployments (password set, no env
- * pin, nothing stored): a default no-env deployment stays token-less —
- * "both unset → auth off" — so out-of-box no-auth flows (and the e2e
- * harness) are untouched; headless deployments pin FMD_WEB_API_TOKEN.
+ * Generation is UNCONDITIONAL (no pin, nothing stored → generate): the
+ * token is an *arr-style API key, not a password companion — reverse-
+ * proxy deployments (authelia/authentik gate the UI; FMD_WEB_PASSWORD
+ * unset) still get a script key on first run. With password auth OFF
+ * the API stays open for the browser SPA; the token is additionally
+ * ACCEPTED wherever it is presented.
  */
 export interface ApiTokenBootstrap {
   /** True when this boot generated the first token (persist it now). */
@@ -164,7 +168,6 @@ export interface ApiTokenBootstrap {
 export function resolveApiTokenBootstrap(input: {
   readonly envPin: string | undefined;
   readonly stored: string | null;
-  readonly passwordSet: boolean;
   readonly generate?: () => string;
 }): ApiTokenBootstrap {
   const generate = input.generate ?? ((): string => randomBytes(32).toString('hex'));
@@ -177,10 +180,7 @@ export function resolveApiTokenBootstrap(input: {
   if (input.stored !== null) {
     return { generated: false, envPinned: false, store: input.stored };
   }
-  if (input.passwordSet) {
-    return { generated: true, envPinned: false, store: generate() };
-  }
-  return { generated: false, envPinned: false, store: null };
+  return { generated: true, envPinned: false, store: generate() };
 }
 
 /**
@@ -227,16 +227,6 @@ export class AuthService {
     return this.tokenEnvPinned;
   }
 
-  /** True when ANY auth surface is configured (password or token). */
-  get authActive(): boolean {
-    return this.enabled || this.tokenActive;
-  }
-
-  /** API-ONLY mode (R4d): token set, password unset — every /api route gated. */
-  get apiOnlyMode(): boolean {
-    return this.tokenActive && !this.enabled;
-  }
-
   /** The active auth surface, for the startup log + Settings panel. */
   authMode(): AuthMode {
     if (this.enabled && this.tokenActive) {
@@ -272,13 +262,14 @@ export class AuthService {
   }
 
   /**
-   * /ws upgrade gate: open unless the token is active (today's password
-   * flow never gated the hub). Token via Authorization header
-   * (preferred) or `?token=` (browser clients); a session cookie also
-   * grants when the password flow is on.
+   * /ws upgrade gate: open unless the PASSWORD flow is on (a token's
+   * existence never gates — *arr semantics; browser live-tiles must not
+   * demand a bearer on password-less deployments). When the password is
+   * on: token via Authorization header (preferred) or `?token=`
+   * (browser clients); a session cookie also grants.
    */
   checkUpgradeRequest(req: IncomingMessage): boolean {
-    if (!this.tokenActive) {
+    if (!this.enabled) {
       return true;
     }
     if (this.verifyApiToken(readBearerToken(req.headers.authorization))) {
@@ -372,14 +363,19 @@ const TOKEN_SECRET_ROUTES = new Set(['/api/settings/api-token']);
 /**
  * Register POST /api/auth/login and the credential gate. The gate is a
  * Fastify `onRequest` hook so gated requests 401 before any body work
- * happens. Gated set per the R4 matrix:
- * - state-changing routes when any auth surface is on;
- * - the token-secret reads when any auth surface is on;
- * - EVERY /api route in API-only mode (token set, password unset).
+ * happens. Gated set per the R4 matrix (*arr semantics):
+ * - the gate turns on ONLY with a password (FMD_WEB_PASSWORD) — the
+ *   deliberate auth surface. A token's mere existence never raises a
+ *   wall: reverse-proxy deployments (authelia/authentik in front) run
+ *   password-less with the SPA fully open;
+ * - with the password on: state-changing routes + the token-secret
+ *   reads require a session cookie OR the bearer token;
+ * - the token is ACCEPTED wherever presented (also bypasses the login
+ *   rate limit) and gates the /ws upgrade when the password is on.
  */
 export function registerAuth(app: FastifyInstance, auth: AuthService): void {
   app.addHook('onRequest', (req: FastifyRequest, _reply: FastifyReply, done: (err?: Error) => void): void => {
-    if (!auth.authActive) {
+    if (!auth.enabled) {
       done();
       return;
     }
@@ -388,10 +384,7 @@ export function registerAuth(app: FastifyInstance, auth: AuthService): void {
       done();
       return;
     }
-    const gated =
-      isStateChanging(req.method) ||
-      TOKEN_SECRET_ROUTES.has(url) ||
-      (auth.apiOnlyMode && url.startsWith('/api/'));
+    const gated = isStateChanging(req.method) || TOKEN_SECRET_ROUTES.has(url);
     if (!gated) {
       done();
       return;
@@ -401,9 +394,7 @@ export function registerAuth(app: FastifyInstance, auth: AuthService): void {
         new ApiError(
           401,
           'unauthorized',
-          auth.apiOnlyMode
-            ? 'api token required (Authorization: Bearer <token>)'
-            : 'session required (POST /api/auth/login) or Bearer api token',
+          'session required (POST /api/auth/login) or Bearer api token',
         ),
       );
       return;

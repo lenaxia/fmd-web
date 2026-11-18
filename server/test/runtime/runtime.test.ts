@@ -349,6 +349,49 @@ describe('D20 auto-bootstrap (offline, real pipelines, real mock script)', (): v
     fs.rmSync(dataDir, { recursive: true, force: true });
   }, 120_000);
 
+  it('R4 *arr token bootstrap: fresh data dir, no FMD_WEB_PASSWORD/FMD_WEB_API_TOKEN → generated, persisted, served, rotatable', async (): Promise<void> => {
+    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fmd-runtime-data-'));
+    const logs: string[] = [];
+    const first = await buildRuntime({
+      config: runtimeConfig(dataDir, mock.base),
+      log: (message): void => {
+        logs.push(message);
+      },
+      version: '0.1.0-test',
+    });
+    // First boot GENERATED (unconditional — no password configured).
+    expect(logs).toContainEqual(expect.stringContaining('auth: api token generated on first run'));
+    expect(logs).toContainEqual(expect.stringContaining('auth: api-token (password off, api token on)'));
+    // The token read is OPEN (password off = open deployment).
+    const t1 = await first.app.inject({ method: 'GET', url: '/api/settings/api-token' });
+    expect(t1.statusCode).toBe(200);
+    const body1 = t1.json() as { token: string | null; envManaged: boolean; mode: string };
+    expect(body1.token).toMatch(/^[0-9a-f]{64}$/);
+    expect(body1.envManaged).toBe(false);
+    expect(body1.mode).toBe('api-token');
+    await first.dispose();
+
+    // Second boot on the SAME data dir → the SAME token (persisted in
+    // app_settings `api.token`, not regenerated).
+    const second = await buildRuntime({
+      config: runtimeConfig(dataDir, mock.base),
+      log: (): void => undefined,
+      version: '0.1.0-test',
+    });
+    const t2 = await second.app.inject({ method: 'GET', url: '/api/settings/api-token' });
+    expect((t2.json() as { token: string | null }).token).toBe(body1.token);
+
+    // Regenerate with NO auth configured: 200 (*arr script-key rotation).
+    const reg = await second.app.inject({ method: 'POST', url: '/api/settings/api-token/regenerate' });
+    expect(reg.statusCode).toBe(200);
+    const rotated = (reg.json() as { token: string }).token;
+    expect(rotated).toMatch(/^[0-9a-f]{64}$/);
+    expect(rotated).not.toBe(body1.token);
+
+    await second.dispose();
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  }, 120_000);
+
   it('FMD_BOOTSTRAP_DISABLE=1: empty data dir → zero sync work, /readyz green', async (): Promise<void> => {
     const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fmd-runtime-data-'));
     const logs: string[] = [];

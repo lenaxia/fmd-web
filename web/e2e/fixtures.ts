@@ -152,9 +152,11 @@ export async function installMockApi(page: Page): Promise<void> {
     );
   });
   // R4 API-token state: the SettingsPage fetches this on every render
-  // (ApiTokenSection). Deterministic "no auth configured" answer.
+  // (ApiTokenSection). Deterministic answer — a real deployment ALWAYS
+  // carries a token now (*arr semantics: generated on first boot, auth
+  // off = open deployment).
   await page.route(API('settings/api-token'), (route): void => {
-    void route.fulfill(json({ token: null, envManaged: false, mode: 'none' }));
+    void route.fulfill(json({ token: 'e'.repeat(64), envManaged: false, mode: 'api-token' }));
   });
   await page.route(/\/healthz$/, (route): void => {
     void route.fulfill(json({ status: 'ok', version: '0.3.0-e2e' }));

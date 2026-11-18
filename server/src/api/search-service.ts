@@ -48,9 +48,10 @@
  *   are page-size-independent, so a client may change `limit` between
  *   pages without invalidating its position.
  */
-import type { CatalogEntry, CatalogStore } from '@fmd/contract';
+import type { CatalogEntry, CatalogMeta, CatalogStore } from '@fmd/contract';
 import type { ModuleService } from './services.js';
 import { ApiError } from './errors.js';
+import { isValidCatalogId } from '../sync/db/catalog-store.js';
 import type {
   AllSitesSearchResponseT,
   ExcludedSiteT,
@@ -229,12 +230,22 @@ export class UnionSearchService {
     // runs over the INSTALLED subset, catalog-less sites are excluded
     // with a surfaced reason). Deterministic: lanes sorted by site id,
     // so fan-out order can never leak into the output.
-    const enabled = this.modules.list().filter((m): boolean => m.enabled);
+    //
+    // Non-32-hex module ids (upstream typos — ColorcitoScan.lua ships
+    // '5450026642ecrrd48apotd81e57f8e40') can never have an installed
+    // catalog and the store's path-safety assert would throw OUTSIDE
+    // the per-lane try/catch, 500ing the whole union — the same guard
+    // class as services.ts's catalogInstalled wrapper.
+    const enabled = this.modules
+      .list()
+      .filter((m): boolean => m.enabled && isValidCatalogId(m.id));
+    const metaFor = (m: (typeof enabled)[number]): CatalogMeta | undefined =>
+      this.catalogs.getMeta(m.id);
     const participating = enabled
-      .filter((m): boolean => this.catalogs.getMeta(m.id) !== undefined)
+      .filter((m): boolean => metaFor(m) !== undefined)
       .sort((a, b): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     const excluded: ExcludedSiteT[] = enabled
-      .filter((m): boolean => this.catalogs.getMeta(m.id) === undefined)
+      .filter((m): boolean => metaFor(m) === undefined)
       .sort((a, b): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
       .map((m): ExcludedSiteT => ({ siteId: m.id, siteName: m.name, reason: 'no-catalog' }));
 

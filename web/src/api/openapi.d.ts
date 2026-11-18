@@ -875,7 +875,7 @@ export interface paths {
         put?: never;
         /**
          * Rotate the single API token in place (audit-logged)
-         * @description Generates a new 32-byte-hex value and replaces the old one IMMEDIATELY — the old key is rejected on the next request, so update your scripts right after rotating (docs/API.md key-rotation runbook). Audit-logged as a settings change (the log never carries the value). 409 when FMD_WEB_API_TOKEN pins the token (rotate the env instead) or when no auth is configured at all (set FMD_WEB_PASSWORD or the env pin first — minting a token into an open deployment would lock the UI out, runbook §API token).
+         * @description Generates a new 32-byte-hex value and replaces the old one IMMEDIATELY — the old key is rejected on the next request, so update your scripts right after rotating (docs/API.md key-rotation runbook). Audit-logged as a settings change (the log never carries the value). 409 when FMD_WEB_API_TOKEN pins the token (rotate the env instead). Rotation needs NO password auth (*arr semantics: the token is a script key independent of the login gate; a token never gates the deployment — runbook §API token).
          */
         post: operations["regenerateApiToken"];
         delete?: never;
@@ -4235,7 +4235,7 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Env-pinned (FMD_WEB_API_TOKEN) or no auth configured */
+            /** @description Env-pinned (FMD_WEB_API_TOKEN) — rotate the secret in the deployment environment */
             409: {
                 headers: {
                     [name: string]: unknown;

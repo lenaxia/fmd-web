@@ -1006,8 +1006,8 @@ const OPERATIONS: readonly RouteOperation[] = [
       'key is rejected on the next request, so update your scripts right after rotating ' +
       '(docs/API.md key-rotation runbook). Audit-logged as a settings change (the log never ' +
       'carries the value). 409 when FMD_WEB_API_TOKEN pins the token (rotate the env ' +
-      'instead) or when no auth is configured at all (set FMD_WEB_PASSWORD or the env pin ' +
-      'first — minting a token into an open deployment would lock the UI out, runbook ' +
+      'instead). Rotation needs NO password auth (*arr semantics: the token is a script ' +
+      'key independent of the login gate; a token never gates the deployment — runbook ' +
       '§API token).',
     tags: ['auth'],
     bodyRequired: false,
@@ -1015,7 +1015,7 @@ const OPERATIONS: readonly RouteOperation[] = [
       200: { description: 'The new token state (value included, shown once)', schema: ApiTokenResponseSchema },
       ...errors(
         unauthorized(),
-        errorResponse(409, 'Env-pinned (FMD_WEB_API_TOKEN) or no auth configured'),
+        errorResponse(409, 'Env-pinned (FMD_WEB_API_TOKEN) — rotate the secret in the deployment environment'),
         internal(),
       ),
     },
@@ -1367,10 +1367,12 @@ export function generateOpenApiDocument(version: string): OpenApiDocument {
           scheme: 'bearer',
           description:
             'R4 SINGLE app-wide API token (Sonarr/Radarr model): `Authorization: Bearer <token>`. ' +
-            'One value per deployment — auto-generated on first start, rotated in Settings → API ' +
+            'One value per deployment — auto-generated on first start (with or without a ' +
+            'password: it is an *arr-style script key), rotated in Settings → API ' +
             '(regenerate) or pinned via FMD_WEB_API_TOKEN (env > settings). Valid on EVERY /api ' +
-            'route and the /ws upgrade; with no password set the API runs token-only (API-only ' +
-            'mode: reads included). Constant-time verified; never multiple/per-user tokens.',
+            'route and the /ws upgrade; a token never gates anything — the login gate is the ' +
+            'password only, so password-less deployments run open with the token accepted ' +
+            'wherever presented. Constant-time verified; never multiple/per-user tokens.',
         },
         sessionCookie: {
           type: 'apiKey',

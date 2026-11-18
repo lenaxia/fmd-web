@@ -615,13 +615,16 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
   // Precedence: a non-empty FMD_WEB_API_TOKEN pin OVERRIDES the stored
   // app_settings `api.token` row (headless/compose deployments keep
   // the secret out of the settings store; the UI shows 'Managed via
-  // environment' and regenerate refuses). First-run generation happens
-  // ONLY for authed deployments (password set, nothing stored, no pin):
-  // a default no-env deployment stays token-less — "both unset → auth
-  // off" — so out-of-box no-auth flows (incl. the e2e harness) are
-  // untouched. The effective provider reads the settings store LIVE, so
-  // UI regeneration applies to the very next request (old key rejected
-  // immediately) and env precedence holds per-request.
+  // environment' and regenerate refuses). First-run generation is
+  // UNCONDITIONAL (no pin, nothing stored): the token is an *arr-style
+  // API key independent of password auth — reverse-proxy deployments
+  // (authelia/authentik in front, no local password) get a script key
+  // on first start. Password auth stays opt-in for the UI login gate;
+  // with it off the API is open to the browser SPA and the token is
+  // additionally accepted wherever presented. The effective provider
+  // reads the settings store LIVE, so UI regeneration applies to the
+  // very next request (old key rejected immediately) and env
+  // precedence holds per-request.
   const storedApiTokenRaw = libraryStore.getSetting('api.token');
   const storedApiToken: string | null =
     typeof storedApiTokenRaw === 'string' && /^[0-9a-f]{64}$/.test(storedApiTokenRaw)
@@ -630,7 +633,6 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
   const apiTokenBootstrap = resolveApiTokenBootstrap({
     envPin: config.apiTokenEnv,
     stored: storedApiToken,
-    passwordSet: config.password !== undefined,
   });
   settings.bindApiTokenPersistence(apiTokenBootstrap.store, (token: string): void => {
     libraryStore.setSetting('api.token', token);

@@ -666,6 +666,14 @@ export const InfoRequestSchema = z
   })
   .refine(
     (body): boolean => {
+      // [parity-sweep] M14 url-only mode (host resolution) needs an
+      // absolute URL. With an EXPLICIT moduleId a host-relative url is
+      // accepted: FMD2-DB catalog links are stored host-relative
+      // (RemoveHostFromURLsPair) and the route joins them against the
+      // module's RootURL (FMD2 MaybeFillHost parity).
+      if (body.moduleId !== undefined) {
+        return true;
+      }
       try {
         const parsed = new URL(body.url);
         return parsed.protocol === 'http:' || parsed.protocol === 'https:';

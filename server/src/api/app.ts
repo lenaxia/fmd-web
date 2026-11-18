@@ -577,22 +577,16 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
   // Regenerate rotates the ONE value in place (old key rejected on the
   // next request — the provider reads the store live). Env-pinned
   // deployments refuse: the secret lives in the environment, rotate it
-  // there. No-auth deployments refuse: minting a token without any
-  // auth configured would silently flip the deployment into API-only
-  // mode and lock the UI out (runbook §API token).
+  // there. Rotation needs NO password auth: the token is an *arr-style
+  // script key — a reverse-proxy deployment (password unset) rotates it
+  // like any other, and with auth off the API stays open to the SPA
+  // regardless (token existence never gates).
   app.post('/api/settings/api-token/regenerate', async (): Promise<ApiTokenResponseT> => {
     if (auth.tokenEnvManaged) {
       throw new ApiError(
         409,
         'conflict',
         'API token is pinned via FMD_WEB_API_TOKEN (managed environment) — rotate it in the deployment environment',
-      );
-    }
-    if (!auth.authActive) {
-      throw new ApiError(
-        409,
-        'conflict',
-        'no auth configured — set FMD_WEB_PASSWORD or FMD_WEB_API_TOKEN before generating an API token',
       );
     }
     const token = randomBytes(32).toString('hex');
@@ -824,18 +818,34 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
         throw new ApiError(400, 'no_site_match', 'no site matches this URL');
       }
     }
-    const key = infoCache.key(moduleId, body.url);
+    // Catalog links are stored HOST-RELATIVE (§5.8 RemoveHostFromURLsPair
+    // parity) — join against the addressed module's RootURL before any
+    // downstream use (FMD2 MaybeFillHost parity). One canonical absolute
+    // URL flows to the cache key, the downloaded ledger, and the engine.
+    let url: string = body.url;
+    if (!/^https?:\/\//i.test(url)) {
+      const module = services.modules.list().find((m): boolean => m.id === moduleId);
+      const root: string | undefined = module?.rootURL;
+      if (root !== undefined && root !== '') {
+        try {
+          url = new URL(url, root).toString();
+        } catch {
+          // malformed join — let the engine surface the typed failure
+        }
+      }
+    }
+    const key = infoCache.key(moduleId, url);
     // The downloaded set is computed at RESPONSE time (never cached with
     // the info snapshot) so a just-finished download flips the set on
     // the very next call, cache hit or not.
-    const downloaded = services.library.downloadedChapters(moduleId, body.url);
+    const downloaded = services.library.downloadedChapters(moduleId, url);
     const cached = infoCache.get(key, Date.now());
     if (cached !== undefined) {
       return InfoResponseSchema.parse({ moduleId, ...toInfoWire(cached, downloaded) });
     }
     let info: NormalizedInfo;
     try {
-      info = await instrumentInfo(moduleId, () => services.info.getInfo(moduleId, body.url));
+      info = await instrumentInfo(moduleId, () => services.info.getInfo(moduleId, url));
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         throw err;
@@ -849,7 +859,7 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     infoCache.set(key, info, Date.now());
     return InfoResponseSchema.parse({
       moduleId,
-      ...toInfoWire(info, services.library.downloadedChapters(moduleId, body.url)),
+      ...toInfoWire(info, services.library.downloadedChapters(moduleId, url)),
     });
   });
 
