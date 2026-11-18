@@ -172,9 +172,9 @@ export function ImportFavoritesDialog(props: {
         <DialogHeader>
           <DialogTitle>Import favorites list</DialogTitle>
           <DialogDescription>
-            frmImportFavorites parity (ADAPT): a JSON list of favorites —
-            FMD2 field names (`moduleid`/`website`/`link`/`title`) or the
-            fmd-web names. Every entry imports marked fully downloaded
+            Import a JSON list of favorites; use the FMD2 export field
+            names (`moduleid`/`website`/`link`/`title`) or the fmd-web
+            names. Every entry imports marked fully downloaded
             (nothing re-downloads).
           </DialogDescription>
         </DialogHeader>

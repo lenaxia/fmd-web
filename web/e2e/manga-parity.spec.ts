@@ -164,3 +164,58 @@ test('Ascending/Descending toggles the chapter presentation order', async ({ pag
     .toBe(1);
   expect(JSON.parse(posted[0] ?? '{}')).toMatchObject({ paused: true });
 });
+
+/**
+ * Back-context (UX audit M-1): opening the detail page from a LIST and
+ * pressing Back must restore that list with its full URL state — the
+ * recents chips on the search home and the command palette both stamp
+ * the origin (`from=`), so Back returns to the exact hash that
+ * launched the visit instead of the bare search home.
+ */
+test('back-context (M-1): a recents-origin visit returns to the search home that launched it', async ({ page }: {
+  page: Page;
+}): Promise<void> => {
+  await page.addInitScript(
+    (seed: { moduleId: string; url: string }): void => {
+      window.localStorage.setItem(
+        'fmd.recent-manga',
+        JSON.stringify([{ moduleId: seed.moduleId, url: seed.url, title: 'Alpha Quest' }]),
+      );
+    },
+    { moduleId: MODULE_ID, url: MANGA_URL },
+  );
+  await page.goto('/#/browse');
+  await expect(page.getByTestId('recent-manga')).toBeVisible();
+  await page.getByTestId('recent-manga').getByRole('button', { name: 'Alpha Quest' }).click();
+  await expect(page.getByRole('heading', { name: 'Alpha Quest' })).toBeVisible();
+  // The origin rode along as from= (encoded current hash at click time).
+  await expect(page).toHaveURL(/from=%23%2Fbrowse/);
+  await page.getByRole('button', { name: /Back to browse/ }).click();
+  await expect(page).toHaveURL(/#\/browse$/);
+  await expect(page.getByTestId('recent-manga')).toBeVisible();
+});
+
+test('back-context (M-1): a palette-origin visit returns to the view that launched it', async ({ page }: {
+  page: Page;
+}): Promise<void> => {
+  await page.addInitScript(
+    (seed: { moduleId: string; url: string }): void => {
+      window.localStorage.setItem(
+        'fmd.recent-manga',
+        JSON.stringify([{ moduleId: seed.moduleId, url: seed.url, title: 'Alpha Quest' }]),
+      );
+    },
+    { moduleId: MODULE_ID, url: MANGA_URL },
+  );
+  // A DISTINGUISHABLE origin: the site picker (not the search home).
+  await page.goto('/#/browse?sites=1');
+  await expect(page.getByRole('heading', { name: 'Browse sites' })).toBeVisible();
+  await page.keyboard.press('Control+K');
+  await page.getByRole('combobox').fill('Alpha');
+  await page.getByRole('option', { name: /Alpha Quest/ }).click();
+  await expect(page.getByRole('heading', { name: 'Alpha Quest' })).toBeVisible();
+  await expect(page).toHaveURL(/from=%23%2Fbrowse%3Fsites%3D1/);
+  await page.getByRole('button', { name: /Back to browse/ }).click();
+  await expect(page).toHaveURL(/#\/browse\?sites=1$/);
+  await expect(page.getByRole('heading', { name: 'Browse sites' })).toBeVisible();
+});

@@ -31,7 +31,7 @@ describe('App bootstrap banner (D20 progress)', (): void => {
     renderWithProviders(<App />, { fetch });
 
     const banner = await screen.findByTestId('bootstrap-status');
-    expect(banner).toHaveTextContent('First-run bootstrap running (D20)');
+    expect(banner).toHaveTextContent('First-run bootstrap running');
     // The stage (server `reason`) replaces the connecting state once the
     // first /readyz poll answers 503.
     await screen.findByText(/bootstrap: modules…/);

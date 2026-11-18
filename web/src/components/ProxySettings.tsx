@@ -69,7 +69,7 @@ export function ProxySettingsSection(): ReactElement {
               <Badge
                 variant="secondary"
                 className="badge-capability"
-                title={`Browser sidecar profile active (§5.11): ${browser.url} — satisfied known-broken flags are flipped`}
+                title={`Browser sidecar profile active: ${browser.url}; satisfied known-broken flags are flipped`}
               >
                 browser sidecar: enabled
               </Badge>
@@ -77,7 +77,7 @@ export function ProxySettingsSection(): ReactElement {
               <Badge
                 variant="destructive"
                 className="badge-broken"
-                title="The compose browser profile (§5.11) is not active; browser-dependent modules stay known-broken"
+                title="The browser profile is not active; browser-dependent modules stay known-broken"
               >
                 browser sidecar: off
               </Badge>

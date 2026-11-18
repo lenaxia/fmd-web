@@ -26,7 +26,7 @@
 import { useEffect, useMemo, type FormEvent, type KeyboardEvent, type ReactElement } from 'react';
 import { LayoutGrid, Loader2, Search, X } from 'lucide-react';
 import type { Route } from '../router';
-import { navigate, replaceRoute } from '../router';
+import { navigate, navigateToManga, replaceRoute } from '../router';
 import { useRoute } from '../state/use-route';
 import { useAllSitesSearch, useModules, type SearchEntryT } from '../api/hooks';
 import { SEARCH_DEBOUNCE_MS, useDebouncedValue } from '../state/use-catalog-query';
@@ -53,6 +53,7 @@ import { WebsiteBadge } from '@/components/catalog/WebsiteBadge';
 import { FacetChips, UnionExcludedChips, UnionWarningChips } from '@/components/catalog/UnionSearchChips';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const PAGE_LIMIT = 20;
 /** Category quick-chips in the empty state (top languages by size). */
@@ -152,7 +153,7 @@ function RecentMangaRow(props: {
               size="sm"
               className="h-7 max-w-64 rounded-full px-3"
               onClick={(): void => {
-                navigate('manga', {
+                navigateToManga({
                   module: manga.moduleId,
                   url: manga.url,
                   title: manga.title,
@@ -165,6 +166,38 @@ function RecentMangaRow(props: {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/** The category quick-chips (top languages by site count) — extracted
+ * so the idle EmptyState and the recents-compact variant share them. */
+function CategoryQuickChips(props: {
+  readonly categories: readonly { readonly category: string; readonly count: number }[];
+}): ReactElement {
+  return (
+    <div
+      className="mt-3 flex flex-wrap items-center justify-center gap-1.5"
+      aria-label="Categories"
+      data-testid="category-quick-chips"
+    >
+      {props.categories.map((facet): ReactElement => (
+        <Button
+          key={facet.category}
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="h-7 rounded-full px-3"
+          aria-label={`Browse ${facet.category} sites`}
+          onClick={(): void => {
+            // Quick-chip = the picker pre-filtered to the category
+            // (existing ?cats= param).
+            navigate('browse', { sites: '1', cats: facet.category });
+          }}
+        >
+          {facet.category}
+        </Button>
+      ))}
     </div>
   );
 }
@@ -281,7 +314,7 @@ export function SearchHomePage(props: { route: Route }): ReactElement {
           <Button
             type="button"
             variant="outline"
-            aria-label="Browse sites — the full site picker"
+            aria-label="Browse sites: the full site picker"
             onClick={(): void => {
               navigate('browse', { sites: '1' });
             }}
@@ -302,46 +335,54 @@ export function SearchHomePage(props: { route: Route }): ReactElement {
         <>
           {recentSites.length > 0 ? <RecentSitesRow sites={recentSites} /> : null}
           {recentManga.length > 0 ? <RecentMangaRow manga={recentManga} /> : null}
-          <EmptyState title="What do you want to read?">
-            <p>
-              Type a title — the search runs over every installed site catalog at once and each
-              result shows the website it came from. New here? Start from a category:
-            </p>
-            <p>
-              The <a className="underline underline-offset-4 max-md:inline-flex max-md:min-h-touch-target max-md:items-center" href="docs/USER-GUIDE.md#finding-manga">finding-manga walkthrough</a> covers search, the site picker, filters and shareable URLs.
-            </p>
+          {/* [UX-AUDIT H-2] with recents on screen the empty-state prose
+           * collapses to one line — no double-height filler on first
+           * paint; the full teaching copy shows only for a fresh user. */}
+          {recentSites.length > 0 || recentManga.length > 0 ? (
             <div
-              className="mt-3 flex flex-wrap items-center justify-center gap-1.5"
-              aria-label="Categories"
-              data-testid="category-quick-chips"
+              className="mx-auto max-w-2xl rounded-xl border border-dashed border-border bg-surface/40 px-6 py-4 text-center"
+              data-testid="idle-compact"
             >
-              {quickCategories.map((facet): ReactElement => (
-                <Button
-                  key={facet.category}
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="h-7 rounded-full px-3"
-                  aria-label={`Browse ${facet.category} sites`}
-                  onClick={(): void => {
-                    // Quick-chip = the picker pre-filtered to the
-                    // category (existing ?cats= param).
-                    navigate('browse', { sites: '1', cats: facet.category });
-                  }}
-                >
-                  {facet.category}
-                </Button>
-              ))}
+              <p className="text-sm text-muted-foreground">
+                Type a title to search every installed site, or start from a category:
+              </p>
+              <CategoryQuickChips categories={quickCategories} />
             </div>
-          </EmptyState>
+          ) : (
+            <EmptyState title="What do you want to read?">
+              <p>
+                Type a title; the search runs over every installed site catalog at once and each
+                result shows the website it came from. New here? Start from a category:
+              </p>
+              <p>
+                The <a className="underline underline-offset-4 max-md:inline-flex max-md:min-h-touch-target max-md:items-center" href="docs/USER-GUIDE.md#finding-manga">finding-manga walkthrough</a> covers search, the site picker, filters and shareable URLs.
+              </p>
+              <CategoryQuickChips categories={quickCategories} />
+            </EmptyState>
+          )}
         </>
       ) : (
         <>
           {pages.isError ? <ErrorBanner error={pages.error} /> : null}
           {pages.isPending ? (
-            <p role="status" className="text-sm text-muted-foreground">
-              Searching every installed catalog…
-            </p>
+            // [UX-AUDIT H-1] skeleton rows while the union search runs —
+            // same EntryRow sizing (min-h-row + px-3 py-2) so the result
+            // list never pops in under the StatPill count.
+            <div
+              role="status"
+              aria-live="polite"
+              aria-label="Searching every installed catalog"
+              data-testid="search-skeleton"
+              className="catalog-list overflow-hidden rounded-lg border"
+            >
+              {Array.from({ length: 5 }, (_, i): ReactElement => (
+                <div key={i} className="flex min-h-row items-center gap-3 px-3 py-2">
+                  <Skeleton className="h-4 w-2/5" />
+                  <Skeleton className="h-3 w-1/5" />
+                  <Skeleton className="ml-auto h-3 w-14" />
+                </div>
+              ))}
+            </div>
           ) : null}
 
           <UnionWarningChips warnings={warnings} />

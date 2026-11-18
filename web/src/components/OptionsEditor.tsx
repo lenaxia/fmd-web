@@ -120,7 +120,7 @@ export function OptionsEditor(props: {
       }}
     >
       <fieldset className="rounded-lg border px-4 py-3">
-        <legend className="px-1 text-xs text-muted-foreground">Options (§5.1 — combobox values store the item INDEX)</legend>
+        <legend className="px-1 text-xs text-muted-foreground">Options (combobox values store the item index)</legend>
         <div className="flex flex-col gap-3">
           {descriptors.map((descriptor): ReactElement => {
             const controlId = `option-${props.module.id}-${descriptor.name}`;

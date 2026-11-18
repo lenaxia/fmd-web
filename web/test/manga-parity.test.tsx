@@ -294,3 +294,75 @@ describe('MangaPage parity: enqueue options (Start paused + Save to)', (): void 
     expect(globalThis.localStorage.getItem(`fmd:saveto:${MODULE_ID}|${QUERY.url}`)).toBe('kept/dir');
   });
 });
+
+describe('MangaPage metadata null placeholders (M-2)', (): void => {
+  /** All six audited fields empty: altTitles/authors/artists/genres/
+   * status/summary — the page must render words or omit the row,
+   * never a bare em dash (the "stray em dash" null pattern). */
+  const EMPTY_INFO = infoFixture({
+    altTitles: '',
+    authors: '',
+    artists: '',
+    genres: '',
+    status: '',
+    summary: '',
+  });
+
+  it('the four data fields show a muted "Unknown" word, not a bare em dash', async (): Promise<void> => {
+    const { favorites } = buildRoutes([]);
+    const { fetch } = mockFetch([
+      ...favorites,
+      {
+        method: 'POST',
+        match: (url): boolean => url.pathname === '/api/info',
+        respond: (): { body: object } => ({ body: EMPTY_INFO }),
+      },
+    ]);
+    renderWithProviders(<MangaPage route={parseHash(hash())} />, { fetch });
+
+    const dl = (await screen.findByText('Authors')).closest('dl');
+    expect(dl).not.toBeNull();
+    if (dl === null) return;
+    // Exactly four "Unknown" placeholder cells — one per empty data
+    // field (altTitles/summary rows are OMITTED, see the next test).
+    expect(dl.querySelectorAll('dd')).toHaveLength(5); // 4 placeholders + chapter count
+    expect(screen.getAllByText('Unknown')).toHaveLength(4);
+    // The pinned shape: no <dd> anywhere renders only punctuation.
+    for (const dd of [...dl.querySelectorAll('dd')]) {
+      expect(dd.textContent?.trim()).not.toBe('—');
+      expect(dd.textContent?.trim()).not.toBe('');
+    }
+  });
+
+  it('empty long-form fields (alternative titles, summary) are omitted entirely', async (): Promise<void> => {
+    const { favorites } = buildRoutes([]);
+    const { fetch } = mockFetch([
+      ...favorites,
+      {
+        method: 'POST',
+        match: (url): boolean => url.pathname === '/api/info',
+        respond: (): { body: object } => ({ body: EMPTY_INFO }),
+      },
+    ]);
+    renderWithProviders(<MangaPage route={parseHash(hash())} />, { fetch });
+
+    await screen.findByText('Authors');
+    expect(screen.queryByText('Alternative titles')).toBeNull();
+    expect(screen.queryByText('Summary')).toBeNull();
+  });
+
+  it('populated fields render verbatim (no regression of the happy path)', async (): Promise<void> => {
+    const { favorites, info } = buildRoutes([]);
+    const { fetch } = mockFetch([...favorites, ...info]);
+    renderWithProviders(<MangaPage route={parseHash(hash())} />, { fetch });
+
+    expect(await screen.findByText('Author A')).toBeInTheDocument();
+    expect(screen.getByText('Artist B')).toBeInTheDocument();
+    expect(screen.getByText('Action, Comedy')).toBeInTheDocument();
+    expect(screen.getByText('Ongoing')).toBeInTheDocument();
+    expect(screen.getByText('Fixtue Manhua')).toBeInTheDocument();
+    // Summary renders twice by design (PageHeader description + dl row).
+    expect(screen.getAllByText('A fixture summary.').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('Unknown')).toBeNull();
+  });
+});

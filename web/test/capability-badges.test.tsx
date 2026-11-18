@@ -36,8 +36,8 @@ describe('CapabilityBadges component', (): void => {
         })}
       />,
     );
-    expect(screen.getByTitle('Upstream regression flag (D3): ehentai-image')).toHaveTextContent('known broken: ehentai-image');
-    expect(screen.getByTitle('Upstream regression flag (D3): tapas-cloudflare')).toHaveTextContent('known broken: tapas-cloudflare');
+    expect(screen.getByTitle('Known upstream regression: ehentai-image')).toHaveTextContent('known broken: ehentai-image');
+    expect(screen.getByTitle('Known upstream regression: tapas-cloudflare')).toHaveTextContent('known broken: tapas-cloudflare');
     expect(screen.getByTitle(/browser\/antibot sidecar profile/)).toHaveTextContent('needs browser');
     expect(screen.getByTitle(/shells out to a subprocess/)).toHaveTextContent('subprocess');
     expect(screen.getByTitle(/python-gated bypass/)).toHaveTextContent('bypass-gated');

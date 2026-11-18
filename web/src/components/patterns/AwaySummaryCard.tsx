@@ -25,7 +25,7 @@ import { CalendarClock, Download as DownloadIcon, Heart, X } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import { cn } from 'cn';
 import { useFavoritesNews, useJobsList, type FavoriteT, type JobT } from '../../api/hooks';
-import { routeToHash } from '../../router';
+import { navigateToManga, routeToHash } from '../../router';
 import {
   beginVisit,
   isStaleVisit,
@@ -167,11 +167,15 @@ export function AwaySummaryCard(): ReactElement | null {
                 <li key={`${group.moduleId}|${group.mangaUrl}`}>
                   <a
                     data-testid="away-summary-download"
-                    href={routeToHash('manga', {
-                      module: group.moduleId,
-                      url: group.mangaUrl,
-                      ...(group.title !== '' ? { title: group.title } : {}),
-                    })}
+                    href="#"
+                    onClick={(event): void => {
+                      event.preventDefault();
+                      navigateToManga({
+                        module: group.moduleId,
+                        url: group.mangaUrl,
+                        ...(group.title !== '' ? { title: group.title } : {}),
+                      });
+                    }}
                     className={cn(
                       'flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-sm',
                       'transition-colors hover:bg-surface-hover',

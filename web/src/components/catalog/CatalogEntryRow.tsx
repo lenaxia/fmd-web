@@ -16,7 +16,7 @@
  * — no ad-hoc colors; the gate script enforces token-only styling).
  */
 import { useState, type ReactElement, type ReactNode } from 'react';
-import { navigate } from '../../router';
+import { navigateToManga } from '../../router';
 import { isNewEntry } from '../../state/highlight-new';
 import { useMediaQuery } from '../../state/use-media-query';
 import { EntryRow } from '@/components/patterns/EntryRow';
@@ -88,7 +88,7 @@ export function CatalogEntryRow(props: CatalogEntryRowProps): ReactElement {
   const [hoverOpen, setHoverOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const open = (): void => {
-    navigate('manga', {
+    navigateToManga({
       catalog: props.siteId,
       module: props.siteId,
       url: entry.link,

@@ -231,7 +231,7 @@ export function FilenamePolicySection(): ReactElement {
         Filename policy
       </h2>
       <p className="mb-2 text-xs text-muted-foreground">
-        Linux-normalized filenames vs the FMD2-desktop-parity default (D5). Precedence: the
+        Linux-normalized filenames vs the FMD2-desktop-parity default. Precedence: the
         FMD_NORMALIZE_PATHS environment variable overrides this setting when set.
       </p>
       <form
@@ -350,9 +350,9 @@ export function AboutSection(): ReactElement {
   const onInstall = (): void => {
     void promptInstall().then((outcome): void => {
       if (outcome === 'accepted') {
-        toast.success('FMD Web installed — find it on your home screen / desktop.');
+        toast.success('FMD Web installed: find it on your home screen / desktop.');
       } else if (outcome === 'dismissed') {
-        toast.message('Install dismissed — the browser re-offers after its cooldown.');
+        toast.message('Install dismissed: the browser re-offers after its cooldown.');
       }
     });
   };

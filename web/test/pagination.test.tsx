@@ -169,18 +169,19 @@ describe('BrowsePage pagination', (): void => {
     expect(screen.getByTitle('Prebuilt list from FMD2-DB')).toHaveTextContent('from catalog');
   });
 
-  it('entry rows navigate to the manga detail route', async (): Promise<void> => {
+  it('entry rows navigate to the manga detail route (with the origin stamped as from= — M-1)', async (): Promise<void> => {
+    const currentHash: string = `#/browse?catalog=${CATALOG_ID}`;
     const { fetch } = mockFetch([
       modulesRoute,
       latestRoute(1, { body: { entries: [entryFixture('/a', 'Alpha')] } }),
     ]);
-    renderWithProviders(<BrowsePage route={parseHash(`#/browse?catalog=${CATALOG_ID}`)} />, { fetch, hash: `#/browse?catalog=${CATALOG_ID}` });
+    renderWithProviders(<BrowsePage route={parseHash(currentHash)} />, { fetch, hash: currentHash });
     const list = await screen.findByRole('list');
     const row = within(list).getByRole('button', { name: /^Alpha/ });
     expect(row).toBeInTheDocument();
     await userEvent.click(row);
     expect(globalThis.location.hash).toBe(
-      `#/manga?catalog=${CATALOG_ID}&module=${CATALOG_ID}&url=%2Fa&title=Alpha`,
+      `#/manga?catalog=${CATALOG_ID}&module=${CATALOG_ID}&url=%2Fa&title=Alpha&from=${encodeURIComponent(currentHash)}`,
     );
   });
 });

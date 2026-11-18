@@ -18,11 +18,11 @@
  * are plain list items in the same virtualized list.
  */
 import { useMemo, useState, type FormEvent, type ReactElement } from 'react';
-import { Search } from 'lucide-react';
 import type { ModuleSummaryT } from '../api/hooks';
 import { useModules } from '../api/hooks';
 import { SiteRow } from '@/components/SiteRow';
 import { OpenByUrlInput } from '@/components/catalog/OpenByUrlInput';
+import { EmptyState } from '@/components/patterns/EmptyState';
 import { ErrorBanner } from '@/components/patterns/ErrorBanner';
 import { FilterBar } from '@/components/patterns/FilterBar';
 import { ListPanel } from '@/components/patterns/ListPanel';
@@ -151,7 +151,7 @@ export function SitePickerPage(props: {
     <section aria-label="Browse sites" className="site-picker">
       <PageHeader
         title="Browse sites"
-        description="Pick a site by name — its list opens instantly when synced, or is prepared automatically when not."
+        description="Pick a site by name; its list opens instantly when synced, or is prepared automatically when not."
       />
 
       <FilterBar ariaLabel="Site filters">
@@ -174,10 +174,10 @@ export function SitePickerPage(props: {
               setSearchText(e.target.value);
             }}
           />
-          <Button type="submit" variant="secondary" size="sm">
-            <Search aria-hidden="true" />
-            Search
-          </Button>
+          {/* [UX-AUDIT SP-2] No submit button: filtering is live per
+           * keystroke (type="search" carries its own clear affordance)
+           * — a no-op primary button breaks “buttons do what they
+           * say”. The form stays for Enter-key focus stability. */}
         </form>
         {/* [parity-sweep] M14 — FMD2 edURL paste-and-go parity */}
         <OpenByUrlInput />
@@ -195,10 +195,25 @@ export function SitePickerPage(props: {
       ) : null}
 
       {modules.data !== undefined && modules.data.count === 0 ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          No site modules registered yet — the first-run module sync (D20) populates this list;
-          Settings shows its progress.
-        </p>
+        <EmptyState
+          title="No site modules registered yet"
+          action={
+            <Button
+              type="button"
+              variant="outline"
+              onClick={(): void => {
+                navigate('settings', {});
+              }}
+            >
+              Open Settings
+            </Button>
+          }
+        >
+          <p>
+            The first-run module sync populates this list; Settings shows its progress and has a
+            manual trigger.
+          </p>
+        </EmptyState>
       ) : null}
 
       {items.length > 0 ? (
@@ -229,13 +244,30 @@ export function SitePickerPage(props: {
       ) : null}
 
       {!modules.isPending && items.length === 0 && modules.data !== undefined && modules.data.count > 0 ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          {cats.length > 0 && needle === ''
-            ? `No sites in the selected categories (${cats.join(', ')}).`
-            : cats.length > 0
-              ? `No sites match “${searchText.trim()}” in the selected categories.`
-              : `No sites match “${searchText.trim()}”.`}
-        </p>
+        <EmptyState
+          title="No matching sites"
+          action={
+            <Button
+              type="button"
+              variant="outline"
+              data-testid="site-picker-clear-filters"
+              onClick={(): void => {
+                setSearchText('');
+                navigate('browse', { sites: '1' });
+              }}
+            >
+              Clear filters
+            </Button>
+          }
+        >
+          <p>
+            {cats.length > 0 && needle === ''
+              ? `No sites in the selected categories (${cats.join(', ')}).`
+              : cats.length > 0
+                ? `No sites match “${searchText.trim()}” in the selected categories.`
+                : `No sites match “${searchText.trim()}”.`}
+          </p>
+        </EmptyState>
       ) : null}
     </section>
   );

@@ -96,7 +96,7 @@ export function UnionExcludedChips(props: {
           key={site.siteId}
           variant="secondary"
           className="excluded-chip gap-1"
-          title="FMD2 parity: the all-sites search unions installed local lists — a site without one is skipped, not fetched from the site."
+          title="The all-sites search uses each site's installed local catalog; a site without one is skipped, not fetched from the site."
         >
           <FolderX aria-hidden="true" className="size-3" />
           {site.siteName}: no catalog installed

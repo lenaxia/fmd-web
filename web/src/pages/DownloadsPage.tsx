@@ -27,7 +27,7 @@ import {
   downloadsFiltersToQuery,
   parseDownloadsFilters,
 } from '../state/downloads-filter-state';
-import { navigate, replaceRoute, type Route } from '../router';
+import { navigateToManga, replaceRoute, type Route } from '../router';
 import { useRoute } from '../state/use-route';
 import { EmptyState } from '@/components/patterns/EmptyState';
 import { ErrorBanner } from '@/components/patterns/ErrorBanner';
@@ -68,7 +68,7 @@ function WsStatusLine(props: {
     <p className="ws-status mb-4 text-sm text-muted-foreground" aria-live="polite">
       <StatPill className="mb-0">
         Event stream: <strong className="font-semibold text-foreground">{label}</strong>
-        {props.resyncCount > 0 ? ' · resynced after missed-event window (D19)' : ''}
+        {props.resyncCount > 0 ? ' · resynced after missed-event window' : ''}
       </StatPill>
     </p>
   );
@@ -133,6 +133,8 @@ export function DownloadsPage(): ReactElement {
 
   const rows = jobs.data?.pages.flatMap((page): JobT[] => [...page.jobs]) ?? [];
   const hasCompleted = rows.some((job): boolean => job.state === 'done');
+  // [UX-AUDIT D-3] the bulk-delete confirm names the exact row count.
+  const completedCount = rows.filter((job): boolean => job.state === 'done').length;
 
   const onAction = (jobId: string, type: Parameters<typeof action.mutate>[0]['type']): void => {
     void action
@@ -162,6 +164,7 @@ export function DownloadsPage(): ReactElement {
         onBulk={onBulk}
         bulkPending={bulk.isPending}
         hasCompleted={hasCompleted}
+        completedCount={completedCount}
         confirmOpen={confirmBulkDelete}
         onConfirmOpen={setConfirmBulkDelete}
       />
@@ -200,7 +203,7 @@ export function DownloadsPage(): ReactElement {
                   const module = typeof payload['moduleId'] === 'string' ? payload['moduleId'] : target.moduleId;
                   const url = typeof payload['mangaUrl'] === 'string' ? payload['mangaUrl'] : '';
                   const title = typeof payload['mangaTitle'] === 'string' ? payload['mangaTitle'] : '';
-                  navigate('manga', { module, url, title });
+                  navigateToManga({ module, url, title });
                 }}
               />
             )}

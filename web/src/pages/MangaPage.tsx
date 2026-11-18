@@ -33,8 +33,9 @@ import { PageHeader } from '@/components/patterns/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from 'cn';
-import { navigate, type Route } from '../router';
+import { hasInAppHistory, navigate, type Route } from '../router';
 import { pushRecentManga } from '../state/recents';
 
 export function MangaPage(props: { route: Route }): ReactElement {
@@ -79,7 +80,7 @@ export function MangaPage(props: { route: Route }): ReactElement {
       <section aria-label="Manga detail">
         <PageHeader title="Manga" description="Live info, chapters and the enqueue dry-run." />
         <EmptyState title="No manga selected">
-          <p>Pick a title on the Browse page — this view needs a site module id and a manga URL.</p>
+          <p>Pick a title on the Browse page; this view needs a site module id and a manga URL.</p>
         </EmptyState>
       </section>
     );
@@ -140,6 +141,21 @@ export function MangaPage(props: { route: Route }): ReactElement {
         size="sm"
         className="-ml-2 mb-2"
         onClick={(): void => {
+          // Back-context chain (UX audit M-1): the recorded origin wins
+          // (entry rows stamp `from=` with the full origin hash — site
+          // list, facets and all), then in-app history (covers origin
+          // paths that navigate without the helper, e.g. the favorites
+          // row), then the legacy deep-link fallback (catalog site
+          // list / search home).
+          const from = props.route.query['from'] ?? '';
+          if (from.startsWith('#/')) {
+            globalThis.location.hash = from;
+            return;
+          }
+          if (hasInAppHistory() && globalThis.history.length > 1) {
+            globalThis.history.back();
+            return;
+          }
           navigate('browse', catalogId === '' ? {} : { catalog: catalogId });
         }}
       >
@@ -147,7 +163,28 @@ export function MangaPage(props: { route: Route }): ReactElement {
         ← Back to browse
       </Button>
 
-      {info.isPending ? <p role="status" className="text-sm text-muted-foreground">Fetching live info…</p> : null}
+      {info.isPending ? (
+        // [UX-AUDIT M-6] skeleton card mirroring the loaded layout
+        // (cover block + metadata lines) so the page's primary content
+        // has a structure preview instead of a bare text line.
+        <p role="status" aria-live="polite" className="sr-only">
+          Fetching live info…
+        </p>
+      ) : null}
+      {info.isPending ? (
+        <Card className="mb-6" data-testid="manga-skeleton">
+          <CardContent className="flex max-md:flex-col flex-row gap-6 pt-6">
+            <Skeleton className="h-40 w-32 shrink-0 rounded-md" aria-hidden="true" />
+            <div className="min-w-0 flex-1 space-y-2" aria-hidden="true">
+              <Skeleton className="h-5 w-1/2" />
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-4 w-3/5" />
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-4 w-2/3" />
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
       {info.isError ? <ErrorBanner error={info.error} /> : null}
 
       {info.data !== undefined ? (
@@ -155,24 +192,41 @@ export function MangaPage(props: { route: Route }): ReactElement {
           <PageHeader title={info.data.title} description={info.data.summary || undefined} />
 
           <Card className="mb-6">
-            <CardContent className="flex flex-row gap-6 pt-6">
+            {/* [UX-AUDIT M-4] on phones the cover stacks ABOVE the
+             * metadata (max-md:flex-col) — a 128px cover + 24px gap
+             * left only ~200px for the whole definition list. */}
+            <CardContent className="flex max-md:flex-col flex-row gap-6 pt-6">
               <CoverImage src={info.data.coverLink} alt={`${info.data.title} cover`} />
               <div className="min-w-0 flex-1">
+                {/* Null placeholders (UX audit M-2): sparse fields render
+                 * words, never bare punctuation. The four data fields
+                 * show a muted "Unknown"; the two long-form fields
+                 * (alternative titles, summary) are OMITTED when empty
+                 * — an "Unknown summary" row is pure noise. Pinned by
+                 * web/test/manga-parity.test.tsx. */}
                 <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1.5 text-sm">
-                  <dt className="font-medium text-muted-foreground">Alternative titles</dt>
-                  <dd>{info.data.altTitles || '—'}</dd>
+                  {info.data.altTitles !== '' ? (
+                    <>
+                      <dt className="font-medium text-muted-foreground">Alternative titles</dt>
+                      <dd>{info.data.altTitles}</dd>
+                    </>
+                  ) : null}
                   <dt className="font-medium text-muted-foreground">Authors</dt>
-                  <dd>{info.data.authors || '—'}</dd>
+                  <dd>{info.data.authors !== '' ? info.data.authors : <span className="text-muted-foreground">Unknown</span>}</dd>
                   <dt className="font-medium text-muted-foreground">Artists</dt>
-                  <dd>{info.data.artists || '—'}</dd>
+                  <dd>{info.data.artists !== '' ? info.data.artists : <span className="text-muted-foreground">Unknown</span>}</dd>
                   <dt className="font-medium text-muted-foreground">Genres</dt>
-                  <dd>{info.data.genres || '—'}</dd>
+                  <dd>{info.data.genres !== '' ? info.data.genres : <span className="text-muted-foreground">Unknown</span>}</dd>
                   <dt className="font-medium text-muted-foreground">Status</dt>
-                  <dd>{info.data.status || '—'}</dd>
+                  <dd>{info.data.status !== '' ? info.data.status : <span className="text-muted-foreground">Unknown</span>}</dd>
                   <dt className="font-medium text-muted-foreground">Chapters</dt>
                   <dd>{info.data.numChapter}</dd>
-                  <dt className="font-medium text-muted-foreground">Summary</dt>
-                  <dd className="max-w-prose text-muted-foreground">{info.data.summary || '—'}</dd>
+                  {info.data.summary !== '' ? (
+                    <>
+                      <dt className="font-medium text-muted-foreground">Summary</dt>
+                      <dd className="max-w-prose text-muted-foreground">{info.data.summary}</dd>
+                    </>
+                  ) : null}
                 </dl>
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   {info.data.url !== '' ? (
@@ -253,7 +307,7 @@ export function MangaPage(props: { route: Route }): ReactElement {
           {createJob.isSuccess ? (
             <p role="status" aria-live="polite" className="mb-3 text-sm">
               Job <code className="rounded bg-surface px-1 py-0.5 font-mono text-xs">{createJob.data.job.id}</code> queued
-              {createJob.data.job.paused === true ? ' (paused — resume it from Downloads)' : ''}
+              {createJob.data.job.paused === true ? ' (paused; resume it from Downloads)' : ''}
               {createJob.data.job.idempotencyKey !== undefined ? ' (idempotency key recorded)' : ''}.
             </p>
           ) : null}

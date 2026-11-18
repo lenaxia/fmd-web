@@ -50,7 +50,7 @@ export function entryFixture(link: string, title: string, overrides?: Partial<Ca
   };
 }
 
-export function infoFixture(): InfoResponseT {
+export function infoFixture(overrides?: Partial<InfoResponseT>): InfoResponseT {
   return {
     moduleId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     title: 'Fixture Manga',
@@ -67,6 +67,7 @@ export function infoFixture(): InfoResponseT {
     chapterNames: ['Chapter 1', 'Chapter 2', 'Chapter 3'],
     numChapter: 3,
     downloaded: ['/manga/fixture/ch-1'],
+    ...overrides,
   };
 }
 

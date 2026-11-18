@@ -487,3 +487,54 @@ test('Settings: per-site Re-sync catalog (update-list parity) runs the sync endp
   expect(syncs).toHaveLength(1);
   expect(syncs[0]).toContain(`/api/sync/catalog/${MODULE_ID}`);
 });
+
+/**
+ * Section wayfinding (UX audit T-1/T-2): the sticky section nav makes
+ * every one of the 11 sections reachable in one click from the top,
+ * `?section=` is the URL anchor (deep-linkable, back/forward restore
+ * the jump), and the Websites registry renders FIRST (T-2) — the
+ * page's main job is the default view.
+ */
+test('Settings section nav (T-1): a deep link scrolls the section into view and marks its chip current', async ({
+  page,
+}: {
+  page: Page;
+}): Promise<void> => {
+  await page.goto('/#/settings?section=accounts');
+  await expect(page.getByTestId('settings-section-nav')).toBeVisible();
+  await expect(page.getByTestId('settings-section-link-accounts')).toHaveAttribute('aria-current', 'true');
+  await expect(page.locator('#settings-section-accounts')).toBeInViewport({ ratio: 0.1 });
+});
+
+test('Settings section nav (T-1): every section is one click from the top, with ?section= URL anchoring', async ({
+  page,
+}: {
+  page: Page;
+}): Promise<void> => {
+  await page.goto('/#/settings');
+  await expect(page.getByTestId('settings-section-nav')).toBeVisible();
+  // Diagnostics sits near the bottom of a ~4.7k-px scroll — one click.
+  await page.getByTestId('settings-section-link-diagnostics').click();
+  await expect(page).toHaveURL(/section=diagnostics/);
+  await expect(page.getByTestId('settings-section-link-diagnostics')).toHaveAttribute('aria-current', 'true');
+  await expect(page.locator('#settings-section-diagnostics')).toBeInViewport({ ratio: 0.1 });
+  // Back undoes the wayfinding jump (URL-anchored history).
+  await page.goBack();
+  await expect(page).toHaveURL(/#\/settings$/);
+});
+
+test('Settings Websites registry renders first (T-2): the default view is the site list, not a config form', async ({
+  page,
+}: {
+  page: Page;
+}): Promise<void> => {
+  await page.goto('/#/settings');
+  const nav = page.getByTestId('settings-section-nav');
+  await expect(nav).toBeVisible();
+  // The registry anchor is the FIRST section wrapper after the nav.
+  const firstSection: string | null = await nav
+    .locator('xpath=following::*[self::div[starts-with(@id,"settings-section-")]][1]')
+    .getAttribute('id');
+  expect(firstSection).toBe('settings-section-websites');
+  await expect(page.getByRole('heading', { name: /^Websites \(/ })).toBeVisible();
+});

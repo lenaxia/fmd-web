@@ -16,12 +16,12 @@ export function CapabilityBadges(props: { module: ModuleSummaryT }): ReactElemen
     <ul className="badge-list flex list-none flex-wrap items-center gap-1 p-0" aria-label={`Capability flags for ${props.module.name}`}>
       {caps.known_broken_flags.map((flag): ReactElement => (
         <li key={`broken-${flag}`}>
-          <Badge variant="destructive" className="badge-broken" title={`Upstream regression flag (D3): ${flag}`}>known broken: {flag}</Badge>
+          <Badge variant="destructive" className="badge-broken" title={`Known upstream regression: ${flag}`}>known broken: {flag}</Badge>
         </li>
       ))}
       {caps.requires_browser ? (
         <li>
-          <Badge variant="secondary" className="badge-capability" title="Module requires the browser/antibot sidecar profile (D2)">needs browser</Badge>
+          <Badge variant="secondary" className="badge-capability" title="Module requires the browser/antibot sidecar profile">needs browser</Badge>
         </li>
       ) : null}
       {caps.requires_subprocess ? (

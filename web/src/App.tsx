@@ -86,7 +86,7 @@ function Nav(props: { current: RouteName }): ReactElement {
                 <span
                   data-testid="nav-downloads-badge"
                   aria-label={`${badgeLabel(activeCount)} active downloads`}
-                  className="inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[10px] leading-none font-semibold text-primary-foreground"
+                  className="inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[11px] leading-none font-semibold text-primary-foreground"
                 >
                   {badgeLabel(activeCount)}
                 </span>
@@ -135,7 +135,7 @@ function BootstrapBanner(): ReactElement | null {
       data-testid="bootstrap-status"
       className="border-b border-primary/50 bg-surface px-4 py-2 text-sm text-foreground"
     >
-      First-run bootstrap running (D20) — {stage}
+      First-run bootstrap running: {stage}
     </div>
   );
 }

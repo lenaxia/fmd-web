@@ -42,6 +42,7 @@ import { GlobalBulkControls, CategoryBulkControls } from '../components/ModuleLi
 import { ModuleFacets } from '../components/settings/ModuleFacets';
 import { OutputDefaultsForm } from '../components/OutputDefaultsForm';
 import { FavoritesSettingsForm } from '../components/FavoritesSettingsForm';
+import { ImportFromFmd2Card } from '../components/settings/ImportFromFmd2Card';
 import { ProxySettingsSection } from '../components/ProxySettings';
 import {
   AboutSection,
@@ -72,6 +73,37 @@ import {
 
 function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((v, i): boolean => v === b[i]);
+}
+
+/**
+ * Section wayfinding (UX audit T-1/T-2): the page is one long scroll
+ * by design (every section stays in flow — printable, findable,
+ * screen-reader heading-jump friendly); this registry drives the
+ * STICKY section nav that makes each section one click away from
+ * anywhere. The Websites registry is FIRST (T-2): it is the page's
+ * main job — 454 sites — while the rarely-touched global forms follow.
+ * `?section=` is the URL-as-truth anchor (deep-linkable, back/forward
+ * restores the jump); section ids are stable API for e2e/docs.
+ */
+const SETTINGS_SECTIONS: readonly { readonly id: string; readonly label: string }[] = [
+  { id: 'websites', label: 'Websites' },
+  { id: 'proxy', label: 'Proxy' },
+  { id: 'api-token', label: 'API token' },
+  { id: 'performance', label: 'Performance' },
+  { id: 'retention', label: 'Retention' },
+  { id: 'filename-policy', label: 'Filename policy' },
+  { id: 'output', label: 'Output' },
+  { id: 'favorites', label: 'Favorites' },
+  { id: 'accounts', label: 'Accounts' },
+  { id: 'diagnostics', label: 'Diagnostics' },
+  { id: 'about', label: 'About' },
+];
+
+const SETTINGS_SECTION_IDS: readonly string[] = SETTINGS_SECTIONS.map((s): string => s.id);
+
+/** Anchor wrapper id for a section (`settings-section-<id>`). */
+export function settingsSectionAnchor(id: string): string {
+  return `settings-section-${id}`;
 }
 
 const EMPTY_PROXY: ProxySettingsT = { type: '', host: '', port: '', user: '', pass: '' };
@@ -176,7 +208,7 @@ function ModuleEditor(props: { module: ModuleSummaryT; onDone: () => void }): Re
         <textarea
           id={`cookies-${props.module.id}`}
           rows={2}
-          className="w-full max-w-md rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40"
+          className="w-full max-w-md rounded-md border border-input bg-transparent px-3 py-2 font-mono text-xs max-md:text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40"
           value={cookies}
           onChange={(e): void => {
             setCookies(e.target.value);
@@ -190,7 +222,8 @@ function ModuleEditor(props: { module: ModuleSummaryT; onDone: () => void }): Re
       {update.isError ? <ErrorBanner error={update.error} /> : null}
       {update.isSuccess ? (
         <p role="status" aria-live="polite" className="mt-3 text-sm text-muted-foreground">
-          Saved. Module <code className="rounded bg-surface px-1 py-0.5 font-mono text-xs">{update.data.id}</code> updated
+          {/* [UX-AUDIT T-5] the module NAME, never the raw hex id. */}
+          Saved. Module <span className="font-medium">{props.module.name}</span> updated
           {update.data.enabled ? '' : ' (disabled)'}.
         </p>
       ) : null}
@@ -324,6 +357,24 @@ export function SettingsPage(): ReactElement {
   // forward — the same URL-sync channel the site picker uses).
   const route = useRoute({ name: 'settings', query: {} });
 
+  // ── section wayfinding (T-1): ?section= is the anchor truth ──────
+  // A nav chip click PUSHES the section into the URL (back/forward
+  // restore the jump) and scrolls; the effect covers the OTHER
+  // hashchange sources (deep links, back/forward into a sectioned
+  // URL). Manual scrolling never rewrites the URL — wayfinding is
+  // click-driven only, no history noise.
+  const activeSection: string = SETTINGS_SECTION_IDS.includes(route.query.section ?? '')
+    ? (route.query.section ?? '')
+    : '';
+  useEffect((): void => {
+    if (activeSection === '') {
+      return;
+    }
+    document
+      .getElementById(settingsSectionAnchor(activeSection))
+      ?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }, [activeSection]);
+
   const list = modules.data?.modules ?? [];
   const bootstrapRunning = syncModules.isPending || syncCatalogs.isPending;
 
@@ -332,7 +383,7 @@ export function SettingsPage(): ReactElement {
     syncModules.mutate(undefined, {
       onSuccess: (data): void => {
         if (moduleToast.current !== null) {
-          progressToast.done(moduleToast.current, `Module sync complete — ${data.summary.totalModules} modules`);
+          progressToast.done(moduleToast.current, `Module sync complete: ${data.summary.totalModules} modules`);
         }
       },
       onError: (): void => {
@@ -348,7 +399,7 @@ export function SettingsPage(): ReactElement {
     syncCatalogs.mutate(undefined, {
       onSuccess: (data): void => {
         if (catalogToast.current !== null) {
-          progressToast.done(catalogToast.current, `Catalog sync complete — ${data.results.length} catalog(s)`);
+          progressToast.done(catalogToast.current, `Catalog sync complete: ${data.results.length} catalog(s)`);
         }
       },
       onError: (): void => {
@@ -396,8 +447,8 @@ export function SettingsPage(): ReactElement {
           }
         >
           <p>
-            First-run bootstrap (D20): with an empty data dir the server auto-triggers module and
-            catalog sync — progress shows here. If the registry is still empty, trigger it
+            First-run bootstrap: with an empty data dir the server auto-triggers module and
+            catalog sync, and progress shows here. If the registry is still empty, trigger it
             manually:
           </p>
           {syncModules.isPending ? <p role="status">Module sync running…</p> : null}
@@ -410,7 +461,7 @@ export function SettingsPage(): ReactElement {
               </p>
               {syncModules.data.summary.failures.length > 0 ? (
                 <p role="status">
-                  {String(syncModules.data.summary.failures.length)} upstream-broken file(s) tolerated —
+                  {String(syncModules.data.summary.failures.length)} upstream-broken file(s) tolerated;
                   see the full list under Settings after the registry loads.
                 </p>
               ) : null}
@@ -527,11 +578,20 @@ export function SettingsPage(): ReactElement {
       {syncCatalogs.isError ? <ErrorBanner error={syncCatalogs.error} /> : null}
       {syncModules.isSuccess ? (
         <>
-          <p role="status" aria-live="polite">
-            Module sync: {syncModules.data.summary.registeredFiles}/{syncModules.data.summary.totalFiles}{' '}
-            files registered, {syncModules.data.summary.failedFiles} failed,{' '}
-            {syncModules.data.summary.totalModules} modules (tree {syncModules.data.summary.treeSha.slice(0, 10)}).
+          {/* [UX-AUDIT T-6] the sync-summary wall collapsed to a one-line
+           * status + a <details> for the technical detail (tree SHA,
+           * file counts); FAILURES stay expanded and visible. */}
+          <p role="status" aria-live="polite" className="mb-1 text-sm text-muted-foreground">
+            Module sync complete: {syncModules.data.summary.totalModules} modules.
           </p>
+          <details className="sync-summary mb-2 text-sm text-muted-foreground" data-testid="module-sync-details">
+            <summary className="cursor-pointer">Sync details</summary>
+            <p className="mt-1">
+              {syncModules.data.summary.registeredFiles}/{syncModules.data.summary.totalFiles}{' '}
+              files registered, {syncModules.data.summary.failedFiles} failed (tree{' '}
+              {syncModules.data.summary.treeSha.slice(0, 10)}).
+            </p>
+          </details>
           {syncModules.data.summary.failures.length > 0 ? (
             <div className="sync-failures">
               <p>
@@ -550,89 +610,171 @@ export function SettingsPage(): ReactElement {
         </>
       ) : null}
       {syncCatalogs.isSuccess ? (
-        <p role="status" aria-live="polite" className="mb-3 text-sm text-muted-foreground">
-          Catalog sync: {syncCatalogs.data.results.length} catalog(s) —{' '}
-          {syncCatalogs.data.results.map((r): string => `${r.id.slice(0, 8)}:${r.state}`).join(', ')}.
-        </p>
+        <>
+          <p role="status" aria-live="polite" className="mb-1 text-sm text-muted-foreground">
+            Catalog sync complete: {syncCatalogs.data.results.length} catalog(s).
+          </p>
+          <details className="sync-summary mb-3 text-sm text-muted-foreground" data-testid="catalog-sync-details">
+            <summary className="cursor-pointer">Catalog sync details</summary>
+            <p className="mt-1">
+              {syncCatalogs.data.results.map((r): string => `${r.id.slice(0, 8)}: ${r.state}`).join(', ')}.
+            </p>
+          </details>
+        </>
       ) : null}
 
-      <ProxySettingsSection />
+      {/* Section wayfinding (UX audit T-1): sticky under the app header,
+       * horizontally scrollable on mobile (R3 touch targets via the
+       * site-chip base class), ?section= as the anchor truth. Chip
+       * styling is the app-wide facet-chip pattern (ModuleFacets/
+       * SiteFilterChips) — one design language. */}
+      <nav
+        aria-label="Settings sections"
+        data-testid="settings-section-nav"
+        className="sticky top-14 z-30 -mx-4 mb-4 border-b bg-background/95 px-4 py-2 backdrop-blur-sm"
+      >
+        <ul className="m-0 flex list-none items-center gap-1.5 overflow-x-auto p-0">
+          {SETTINGS_SECTIONS.map(
+            (section): ReactElement => (
+              <li key={section.id}>
+                <button
+                  type="button"
+                  data-testid={`settings-section-link-${section.id}`}
+                  className={
+                    activeSection === section.id
+                      ? 'site-chip max-md:min-h-touch-target whitespace-nowrap rounded-full border border-transparent bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition-colors'
+                      : 'site-chip max-md:min-h-touch-target whitespace-nowrap rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-surface-hover hover:text-foreground'
+                  }
+                  aria-current={activeSection === section.id ? 'true' : undefined}
+                  onClick={(): void => {
+                    // PUSH (back/forward restore the jump); the facet
+                    // params ride along so the registry filters survive
+                    // a wayfinding hop and back.
+                    navigate('settings', {
+                      ...serializeModuleFilter(filter),
+                      section: section.id,
+                    });
+                    document
+                      .getElementById(settingsSectionAnchor(section.id))
+                      ?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+                  }}
+                >
+                  {section.label}
+                </button>
+              </li>
+            ),
+          )}
+        </ul>
+      </nav>
+
+      {/* Websites registry FIRST (UX audit T-2): the page's main job —
+       * every site with facets + bulk controls — above the global
+       * forms, so the default view is the content users come for. */}
+      <div id={settingsSectionAnchor('websites')} className="scroll-mt-28">
+        <h2 className="mb-2 mt-6 text-lg font-semibold">Websites ({list.length})</h2>
+        <ModuleFacets
+          filter={filter}
+          counts={counts}
+          onChange={onFacetsChange}
+          resultCount={filtered.length}
+          totalCount={list.length}
+        />
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs text-muted-foreground">
+            {filterActive
+              ? `Bulk controls operate on the ${String(filtered.length)} filtered sites`
+              : 'Bulk controls operate on every site'}
+          </span>
+          <GlobalBulkControls
+            busy={bootstrapRunning}
+            targetIds={filtered.map((m): string => m.id)}
+            filtered={filterActive}
+            scopeLabel={filterActive ? `${String(filtered.length)} filtered sites` : 'all sites'}
+          />
+        </div>
+        {filtered.length === 0 ? (
+          <EmptyState title="No modules match the filters">
+            <p>No module name, id or category matches the current search and facet selection.</p>
+          </EmptyState>
+        ) : (
+          <ListPanel
+            className="module-list"
+            ariaLabel="Site modules"
+            items={rows}
+            itemKey={(row): string => (row.kind === 'header' ? `category:${row.label}` : row.module.id)}
+            rowClassName="module-row"
+            renderItem={(row): ReactElement =>
+              row.kind === 'header' ? (
+                <CategoryBulkControls
+                  category={row.category}
+                  label={row.label}
+                  count={row.count}
+                  busy={bootstrapRunning}
+                />
+              ) : (
+                <ModuleRow
+                  module={row.module}
+                  forceOpen={openEditorFor === row.module.id}
+                  onForceOpenHandled={(): void => setOpenEditorFor(null)}
+                />
+              )
+            }
+          />
+        )}
+      </div>
+
+      <div id={settingsSectionAnchor('proxy')} className="scroll-mt-28">
+        <ProxySettingsSection />
+      </div>
 
       {/* R4 single app-wide API token (Settings → API) */}
-      <ApiTokenSection />
+      <div id={settingsSectionAnchor('api-token')} className="scroll-mt-28">
+        <ApiTokenSection />
+      </div>
 
       {/* [parity-sweep] audit M2/M4/M10/M12/M13 groups */}
-      <PerformanceSection />
-      <RetentionSection />
-      <FilenamePolicySection />
-      <DiagnosticsSection />
-      <AboutSection />
+      <div id={settingsSectionAnchor('performance')} className="scroll-mt-28">
+        <PerformanceSection />
+      </div>
+      <div id={settingsSectionAnchor('retention')} className="scroll-mt-28">
+        <RetentionSection />
+      </div>
+      <div id={settingsSectionAnchor('filename-policy')} className="scroll-mt-28">
+        <FilenamePolicySection />
+      </div>
 
-      <OutputDefaultsForm />
+      <div id={settingsSectionAnchor('output')} className="scroll-mt-28">
+        <OutputDefaultsForm />
+      </div>
 
-      <FavoritesSettingsForm />
+      <div id={settingsSectionAnchor('favorites')} className="scroll-mt-28">
+        <FavoritesSettingsForm />
+      </div>
 
-      <AccountsSection
-        modules={list}
-        onOpenCookies={(moduleId): void => {
-          // Clear the whole filter so the target row is guaranteed
-          // visible before the forced scroll (replace: a programmatic
-          // jump, not a user filter action).
-          replaceRoute('settings', {});
-          setOpenEditorFor(moduleId);
-        }}
-      />
+      <div id={settingsSectionAnchor('import')} className="scroll-mt-28">
+        <ImportFromFmd2Card />
+      </div>
 
-      <h2 className="mb-2 mt-6 text-lg font-semibold">Modules ({list.length})</h2>
-      <ModuleFacets
-        filter={filter}
-        counts={counts}
-        onChange={onFacetsChange}
-        resultCount={filtered.length}
-        totalCount={list.length}
-      />
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-xs text-muted-foreground">
-          {filterActive
-            ? `Bulk controls operate on the ${String(filtered.length)} filtered sites`
-            : 'Bulk controls operate on every site'}
-        </span>
-        <GlobalBulkControls
-          busy={bootstrapRunning}
-          targetIds={filtered.map((m): string => m.id)}
-          filtered={filterActive}
-          scopeLabel={filterActive ? `${String(filtered.length)} filtered sites` : 'all sites'}
+      <div id={settingsSectionAnchor('accounts')} className="scroll-mt-28">
+        <AccountsSection
+          modules={list}
+          onOpenCookies={(moduleId): void => {
+            // Clear the whole filter so the target row is guaranteed
+            // visible before the forced scroll (replace: a programmatic
+            // jump, not a user filter action).
+            replaceRoute('settings', {});
+            setOpenEditorFor(moduleId);
+          }}
         />
       </div>
-      {filtered.length === 0 ? (
-        <EmptyState title="No modules match the filters">
-          <p>No module name, id or category matches the current search and facet selection.</p>
-        </EmptyState>
-      ) : (
-        <ListPanel
-          className="module-list"
-          ariaLabel="Site modules"
-          items={rows}
-          itemKey={(row): string => (row.kind === 'header' ? `category:${row.label}` : row.module.id)}
-          rowClassName="module-row"
-          renderItem={(row): ReactElement =>
-            row.kind === 'header' ? (
-              <CategoryBulkControls
-                category={row.category}
-                label={row.label}
-                count={row.count}
-                busy={bootstrapRunning}
-              />
-            ) : (
-              <ModuleRow
-                module={row.module}
-                forceOpen={openEditorFor === row.module.id}
-                onForceOpenHandled={(): void => setOpenEditorFor(null)}
-              />
-            )
-          }
-        />
-      )}
+
+      {/* Reference + troubleshooting close the page. */}
+      <div id={settingsSectionAnchor('diagnostics')} className="scroll-mt-28">
+        <DiagnosticsSection />
+      </div>
+      <div id={settingsSectionAnchor('about')} className="scroll-mt-28">
+        <AboutSection />
+      </div>
     </section>
   );
 }

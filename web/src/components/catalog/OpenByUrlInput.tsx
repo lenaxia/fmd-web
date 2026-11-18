@@ -12,14 +12,14 @@ import { useOpenByUrl } from '../../api/hooks';
 import { ApiError } from '../../api/errors';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { navigate } from '../../router';
+import { navigateToManga } from '../../router';
 
 function describeError(error: ApiError): string {
   if (error.code === 'no_site_match') {
     return 'No site matches this URL';
   }
   if (error.code === 'ambiguous_site') {
-    return `Ambiguous host — ${error.message}`;
+    return `Ambiguous host: ${error.message}`;
   }
   return error.message;
 }
@@ -37,7 +37,7 @@ export function OpenByUrlInput(): ReactElement {
     setError('');
     try {
       const info = await open.mutateAsync({ url: target });
-      navigate('manga', { module: info.moduleId, url: info.url, title: info.title });
+      navigateToManga({ module: info.moduleId, url: info.url, title: info.title });
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         setError(describeError(err));
@@ -57,7 +57,7 @@ export function OpenByUrlInput(): ReactElement {
         await go(text);
       }
     } catch {
-      setError('Clipboard read failed — paste into the box and press Enter');
+      setError('Clipboard read failed: paste into the box and press Enter');
     }
   };
 

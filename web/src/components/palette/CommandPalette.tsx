@@ -20,6 +20,7 @@
  * role=listbox, items role=option) and arrow-key selection.
  */
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   BookOpenText,
   Bookmark,
@@ -31,7 +32,7 @@ import {
   Settings,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { navigate, type RouteName } from '../../router';
+import { navigate, navigateToManga, type RouteName } from '../../router';
 import { useFavoritesCheckBatch, useModules, useSyncAllCatalogs } from '../../api/hooks';
 import { promptInstall, useInstallAvailability } from '../../state/pwa-install';
 import { useRecentManga, type RecentManga } from '../../state/recents';
@@ -74,7 +75,7 @@ function matchModule(
 }
 
 function openRecentManga(manga: RecentManga): void {
-  navigate('manga', {
+  navigateToManga({
     module: manga.moduleId,
     url: manga.url,
     title: manga.title,
@@ -98,6 +99,7 @@ export function CommandPalette(props: {
   const recentManga = useRecentManga();
   const syncAll = useSyncAllCatalogs();
   const checkFavorites = useFavoritesCheckBatch();
+  const queryClient = useQueryClient();
   const { toggleTheme } = useTheme();
   // R5 arrival: the install action exists ONLY when the browser fired
   // beforeinstallprompt (hidden on iOS Safari/Firefox by design).
@@ -147,7 +149,7 @@ export function CommandPalette(props: {
     syncAll.mutate(undefined, {
       onSuccess: (result): void => {
         const updated = result.results.filter((row): boolean => row.state === 'updated').length;
-        toast.success(`Catalog sync finished — ${String(updated)} updated`);
+        toast.success(`Catalog sync finished: ${String(updated)} updated`);
       },
       onError: (): void => {
         toast.error('Catalog sync failed');
@@ -160,7 +162,17 @@ export function CommandPalette(props: {
     checkFavorites.mutate('all', {
       onSuccess: (result): void => {
         const withNew = result.results.filter((row): boolean => row.newChapters.length > 0).length;
-        toast.success(`Favorites check finished — ${String(withNew)} with new chapters`);
+        // [UX-AUDIT CommandPalette] surface, don't dead-end: the check
+        // results live on the Favorites tab (new-chapter badges + the
+        // per-row decisions) — refresh the list and land the user
+        // there instead of a toast that goes nowhere.
+        void queryClient.invalidateQueries({ queryKey: ['favorites'] });
+        navigate('favorites', {});
+        toast.success(
+          withNew > 0
+            ? `Favorites check finished: ${String(withNew)} with new chapters; opening Favorites`
+            : 'Favorites check finished: no new chapters; opening Favorites',
+        );
       },
       onError: (): void => {
         toast.error('Favorites check failed');
@@ -265,9 +277,9 @@ export function CommandPalette(props: {
                 runAndClose((): void => {
                   void promptInstall().then((outcome): void => {
                     if (outcome === 'accepted') {
-                      toast.success('FMD Web installed — find it on your home screen / desktop.');
+                      toast.success('FMD Web installed: find it on your home screen / desktop.');
                     } else if (outcome === 'dismissed') {
-                      toast.message('Install dismissed — the browser re-offers after its cooldown.');
+                      toast.message('Install dismissed: the browser re-offers after its cooldown.');
                     }
                   });
                 });

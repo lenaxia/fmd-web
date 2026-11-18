@@ -41,6 +41,59 @@ export function navigate(name: RouteName, query: Record<string, string> = {}): v
 }
 
 /**
+ * Back-context (UX audit M-1): every entry row that opens the manga
+ * detail page navigates through this helper so the detail page's Back
+ * can restore the ORIGINATING list with its full URL state (site
+ * filters, facets, scroll-era query). The origin rides as the `from`
+ * query param carrying the complete current hash — shareable URLs keep
+ * working (from survives reload, where session history does not).
+ *
+ * Chained manga→manga navigation (palette from the detail page)
+ * preserves the ORIGINAL origin instead of pointing back at the
+ * previous detail page: Back always returns to a LIST, never to
+ * another detail view. Opening a detail page from a deep link (no
+ * prior in-app hash) simply omits `from` — Back then falls back to
+ * history.back()/browse home.
+ */
+export function navigateToManga(query: Record<string, string>): void {
+  const current = parseHash(globalThis.location.hash);
+  let origin: string | undefined;
+  if (current.name === 'manga') {
+    const chained: string | undefined = current.query.from;
+    origin = chained !== undefined && chained !== '' ? chained : undefined;
+  } else {
+    origin = globalThis.location.hash;
+  }
+  const next: Record<string, string> = { ...query };
+  if (origin !== undefined && origin !== '') {
+    next['from'] = origin;
+  }
+  navigate('manga', next);
+}
+
+/**
+ * True once ANY hashchange fired in this document — i.e. the user
+ * navigated within the SPA at least once, so `history.back()` from a
+ * detail page is guaranteed to land on an in-app view rather than
+ * leaving the app (the deep-link-in-fresh-tab case reports false).
+ * Module state resets on reload BY DESIGN: after a reload the only
+ * durable origin record is the `from` param.
+ */
+let inAppHashObserved = false;
+if (typeof globalThis.addEventListener === 'function') {
+  globalThis.addEventListener(
+    'hashchange',
+    (): void => {
+      inAppHashObserved = true;
+    },
+    { passive: true },
+  );
+}
+export function hasInAppHistory(): boolean {
+  return inAppHashObserved;
+}
+
+/**
  * Replace the current history entry (no back-button footprint) and
  * notify the app shell — the URL-sync channel for high-frequency state
  * (as-you-type search text): the URL stays shareable/current while
