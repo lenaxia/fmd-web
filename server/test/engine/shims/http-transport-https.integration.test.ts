@@ -27,7 +27,7 @@ interface TlsHarness {
   originPort: number;
   connectProxyPort: number;
   socks5Port: number;
-  records(): Promise<{ origin: string[]; connect: string[]; socks5: string[] }>;
+  records(): Promise<{ origin: string[]; originPorts: number[]; connect: string[]; socks5: string[] }>;
   close(): Promise<void>;
 }
 
@@ -37,6 +37,7 @@ const HARNESS_SCRIPT = `
   const https = await import('node:https');
   const net = await import('node:net');
   const origin = [];
+  const originPorts = [];
   const connect = [];
   const socks5 = [];
 
@@ -44,6 +45,7 @@ const HARNESS_SCRIPT = `
     { key: workerData.key, cert: workerData.cert },
     (req, res) => {
       origin.push(req.method + ' ' + String(req.url));
+      originPorts.push(req.socket.remotePort);
       res.writeHead(200, { 'Content-Type': 'text/plain' });
       res.end('tls-body-' + origin.length);
     },
@@ -97,7 +99,7 @@ const HARNESS_SCRIPT = `
 
   parentPort.on('message', (m) => {
     if (m === 'records') {
-      parentPort.postMessage({ origin, connect, socks5 });
+      parentPort.postMessage({ origin, originPorts, connect, socks5 });
     } else if (m === 'close') {
       tlsServer.close(); connectProxy.close(); socks5Proxy.close();
       setTimeout(() => parentPort.postMessage('closed'), 50);
@@ -123,7 +125,7 @@ async function startHarness(): Promise<TlsHarness> {
     originPort: ports.originPort,
     connectProxyPort: ports.connectProxyPort,
     socks5Port: ports.socks5Port,
-    records(): Promise<{ origin: string[]; connect: string[]; socks5: string[] }> {
+    records(): Promise<{ origin: string[]; originPorts: number[]; connect: string[]; socks5: string[] }> {
       return new Promise((resolve) => {
         worker.once('message', (m) => resolve(m));
         worker.postMessage('records');
@@ -230,6 +232,24 @@ describe('LoopbackHttpTransport https egress', () => {
       t.dispose();
     }
   }, 20000);
+
+  it('fresh connection per request (synapse parity): no keep-alive socket reuse', async () => {
+    harness = harness ?? (await startHarness());
+    const t = new LoopbackHttpTransport({ ca: [CERT] });
+    try {
+      const r1 = t.send(GET(`${harness.originBase}/ka-1`));
+      const r2 = t.send(GET(`${harness.originBase}/ka-2`));
+      expect(r1.ok).toBe(true);
+      expect(r2.ok).toBe(true);
+      const rec = await harness.records();
+      // every observed request rode its own TCP connection (the harness
+      // accumulates across the file — assert global uniqueness)
+      expect(new Set(rec.originPorts).size).toBe(rec.originPorts.length);
+      expect(rec.originPorts.length).toBeGreaterThanOrEqual(2);
+    } finally {
+      t.dispose();
+    }
+  });
 
   it('https through an HTTP forward proxy rides a CONNECT tunnel', async () => {
     harness = harness ?? (await startHarness());

@@ -442,7 +442,15 @@ const LOOPBACK_WORKER_SCRIPT = `
           path: requestPath,
           method: req.method,
           headers: requestHeaders,
-          ...(tunnel ? { createConnection: () => tunnel } : {}),
+          // fresh connection per request (synapse parity: httpsendthread
+          // opens a new TCP/TLS session per HTTPMethod and never pools —
+          // a reused keep-alive socket reset by an idle-timeout (CDN RST)
+          // would surface as a transport failure FMD2 cannot have).
+          // Tunneled hops keep createConnection (agent:false would
+          // ignore the provided socket — node honors createConnection
+          // only when no agent is set); the tunnel is per-request
+          // already, so freshness holds there by construction.
+          ...(tunnel ? { createConnection: () => tunnel } : { agent: false }),
           // direct https: node does the TLS here, so the trust roots and
           // the verify toggle must ride the request options (tunneled
           // https already has its TLS from wrapTls)
@@ -523,6 +531,7 @@ const LOOPBACK_WORKER_SCRIPT = `
         method: 'CONNECT',
         path: u.hostname + ':' + originPort,
         headers: connectHeaders,
+        agent: false,
       });
       connectReq.setTimeout(req.timeoutMs > 0 ? req.timeoutMs : 0, () => {
         connectReq.destroy(new Error('timeout'));

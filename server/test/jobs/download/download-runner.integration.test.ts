@@ -70,7 +70,10 @@ class HookLogModule implements ChapterModuleHooks {
   taskStart?: (task: TaskWriter) => Promise<boolean>;
   getPageNumber: (task: TaskWriter, url: string) => Promise<boolean>;
   getImageURL: (task: TaskWriter, workId: number, url: string) => Promise<boolean>;
-  beforeDownloadImage?: (workId: number, url: string) => Promise<string | undefined>;
+  beforeDownloadImage?: (
+    workId: number,
+    url: string,
+  ) => Promise<{ url?: string; headers?: Record<string, string> } | undefined>;
   saveImage?: (dir: string, fileName: string, image: FetchedImage) => Promise<string>;
   afterImageSaved?: (savedPath: string) => Promise<boolean>;
 
@@ -116,7 +119,8 @@ class HookLogModule implements ChapterModuleHooks {
     if (cfg.bindBeforeDownload !== false) {
       this.beforeDownloadImage = async (workId: number, url: string) => {
         this.log.push({ hook: 'beforeDownloadImage', workId, url });
-        return cfg.rewrite?.(workId, url);
+        const rewritten = cfg.rewrite?.(workId, url);
+        return rewritten !== undefined ? { url: rewritten } : undefined;
       };
     }
 

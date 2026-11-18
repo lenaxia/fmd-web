@@ -42,7 +42,13 @@ export class ChapterPipeline {
    * reported no pages (success := False branch).
    */
   prepareFromPageNumber(fetchedLinks: readonly string[], pageNumber: number): boolean {
-    if (!(pageNumber > 0)) {
+    // FMD2 acceptance (uDownloadsManager.pas:1196-1211): links present →
+    // adopt them (PageNumber := PageLinks.Count lands in the runner
+    // right after — modules may legally leave PageNumber at 0 when they
+    // fill links directly, FanFox's newImgs branch does); NO links but a
+    // declared PageNumber > 0 → all-waiting placeholders (the dynamic
+    // GetImageURL flow); neither → the task produced nothing.
+    if (fetchedLinks.length === 0 && !(pageNumber > 0)) {
       return false;
     }
     this.pageLinks.length = 0;

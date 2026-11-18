@@ -60,14 +60,28 @@ describe('Duktape shim v0', () => {
     );
     const result = ExecJS(script);
     expect(result).toBeDefined();
-    // The template consumes the ExecJS string exactly like
-    // templates/Madara.lua:186: for image in images:gmatch('"([^",]+)')
-    const images = [...String(result).matchAll(/"([^",]+)"/gu)].map((m) => m[1]);
-    expect(images).toEqual([
+    // duk_safe_to_string parity (Duktape.pas:93-94): the array completion
+    // value renders comma-joined, no brackets, no quotes. NOTE: upstream
+    // templates/Madara.lua:184-186 gsubs brackets and gmatches QUOTED
+    // entries — against this ToString form it extracts nothing, which is
+    // the desktop FMD2 behavior for that flow as well (the v0 shim's
+    // JSON rendering made OUR output differ from the desktop oracle).
+    expect(String(result)).toBe([
       'https://images.wuxiaworld.site/file/manga-sites/an-manga/ch-001/001.jpg',
       'https://images.wuxiaworld.site/file/manga-sites/an-manga/ch-001/002.jpg',
       'https://i1.wp.com/images.wuxiaworld.site/file/manga-sites/an-manga/ch-001/003.jpg',
-    ]);
+    ].join(','));
+  });
+
+  it('array completion values stringify comma-joined (FanFox newImgs → CommaText)', () => {
+    const shim = makeDuktapeShim({ luaRoot: '/workspace/FMD2/lua', logger: null, moduleId: 'test' });
+    const ExecJS = shim.ExecJS as (js: unknown) => string | undefined;
+    // the FanFox GetPageNumber shape: 'var $=...,newImgs,guidkey;' +
+    // script + ';newImgs||guidkey;' — newImgs is an ARRAY on live pages
+    // and PageLinks.CommaText consumes the comma-joined ToString form
+    expect(ExecJS('var newImgs=["//h/a1.jpg","//h/a2.jpg","//h/a3.jpg"]; newImgs||"";'))
+      .toBe('//h/a1.jpg,//h/a2.jpg,//h/a3.jpg');
+    expect(ExecJS('({a:1})')).toBe('[object Object]');
   });
 
   it('require is cached per runtime (module identity stable) and jailed', () => {

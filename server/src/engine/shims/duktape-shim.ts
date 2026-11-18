@@ -169,19 +169,16 @@ export class DuktapeHeap {
 }
 
 /**
- * duk_safe_to_string result text. Object/array completion values render
- * as their JSON source text — the observable FMD2 behavior the Madara
- * template relies on (it gsubs `\/`, `[`, `]` and gmatches quoted
- * strings out of the ExecJS output, templates/Madara.lua:184-186).
+ * duk_safe_to_string parity (FMD2 Duktape.pas:93-94: duk_peval →
+ * duk_safe_to_string): plain JS ToString coercion. Array completion
+ * values render comma-joined — FanFox's newImgs feeds
+ * TStrings.CommaText in exactly that form on desktop. The v0 JSON
+ * rendering was a misread of templates/Madara.lua:184-186's bracket
+ * gsub + quoted gmatch — against real duk_safe_to_string output that
+ * template finds no images upstream either (the Madara
+ * image-extraction family is broken on desktop FMD2 the same way).
  */
 function stringifyResult(result: unknown): string {
-  if (typeof result === 'object' && result !== null) {
-    try {
-      return JSON.stringify(result);
-    } catch {
-      // fall through to String()
-    }
-  }
   return String(result);
 }
 

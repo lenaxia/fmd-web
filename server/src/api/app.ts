@@ -864,12 +864,31 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
   });
 
   // ── jobs (§7.1, idempotent create) ───────────────────────────────
+  // One canonical absolute manga URL (v0.3.1 /api/info principle): the
+  // download settle cascade keys `downloaded_chapters` by job.mangaUrl —
+  // joining host-relative links against the module RootURL here keeps
+  // the ledger key identical to the /api/info lookup key.
+  const canonicalMangaUrl = (moduleId: string, url: string): string => {
+    if (/^https?:\/\//i.test(url)) {
+      return url;
+    }
+    const root = services.modules.list().find((m): boolean => m.id === moduleId)?.rootURL;
+    if (root !== undefined && root !== '') {
+      try {
+        return new URL(url, root).toString();
+      } catch {
+        // malformed join — enqueue verbatim; the engine surfaces it
+      }
+    }
+    return url;
+  };
+
   app.post('/api/jobs/download', async (req, reply): Promise<JobCreatedResponseT> => {
     const body = parseOr400(JobCreateRequestSchema, req.body, 'download job body');
     const { job, replayed } = services.jobs.createDownload(
       {
         moduleId: body.moduleId,
-        mangaUrl: body.mangaUrl,
+        mangaUrl: canonicalMangaUrl(body.moduleId, body.mangaUrl),
         ...(body.mangaTitle !== undefined ? { mangaTitle: body.mangaTitle } : {}),
         chapterLink: body.chapterLink,
         ...(body.chapterName !== undefined ? { chapterName: body.chapterName } : {}),
@@ -896,19 +915,20 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
   // exactly like the single-chapter endpoint.
   app.post('/api/jobs/download/batch', async (req, reply): Promise<JobBatchCreatedResponseT> => {
     const body = parseOr400(JobBatchCreateRequestSchema, req.body, 'download batch body');
+    const mangaUrl = canonicalMangaUrl(body.moduleId, body.mangaUrl);
     let chapterLinks: string[];
     let chapterNames: ReadonlyMap<string, string>;
     if (Array.isArray(body.chapters)) {
       chapterLinks = [...body.chapters];
       chapterNames = new Map();
     } else {
-      const key = infoCache.key(body.moduleId, body.mangaUrl);
+      const key = infoCache.key(body.moduleId, mangaUrl);
       const cached = infoCache.get(key, Date.now());
       let info: NormalizedInfo | undefined = cached;
       if (info === undefined) {
         try {
           info = await instrumentInfo(body.moduleId, () =>
-            services.info.getInfo(body.moduleId, body.mangaUrl),
+            services.info.getInfo(body.moduleId, mangaUrl),
           );
         } catch (err: unknown) {
           if (err instanceof ApiError) {
@@ -936,7 +956,7 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
       return services.jobs.createDownload(
         {
           moduleId: body.moduleId,
-          mangaUrl: body.mangaUrl,
+          mangaUrl,
           ...(body.mangaTitle !== undefined ? { mangaTitle: body.mangaTitle } : {}),
           chapterLink,
           ...(chapterName !== undefined ? { chapterName } : {}),

@@ -11,7 +11,7 @@ import { initShimsHook, installShims, loadRealModuleFile } from '../shims/instal
 import type { ProxyConfig } from '../shims/http-proxy.js';
 import type { BypassExecutorPort } from '../sidecar/bypass-adapter.js';
 import { RecordedResponseResolver } from '../shims/http-shim.js';
-import type { EgressPolicy, HttpTransportPort } from '../shims/http-shim.js';
+import type { EgressPolicy, HttpShimHandle, HttpTransportPort } from '../shims/http-shim.js';
 import type { SwallowSharedDeduper } from '../shims/txquery-shim.js';
 import type { HostLogRecord } from '@fmd/contract';
 import type { EventDispatchResult, EventDispatcher, LuaEngine, LuaHost, LuaHostFactory, LuaModuleDescriptor } from '../contract.js';
@@ -29,10 +29,14 @@ import type { ChapterModuleHooks, TaskWriter } from './download-ports.js';
  * [WORKID-1] and writes the resolved image URL back, LuaDownloadTask
  * parity) and reads the backing after the call (dispatcher `readTask`).
  *
- * BeforeDownloadImage / SaveImage / AfterImageSaved stay HOST-DEFAULT:
- * the hooks bind only what the descriptor registers, and the seed
- * fixture registers none — the runner then downloads verbatim and
- * writes files itself (FMD2's default writer path).
+ * BeforeDownloadImage is dispatched here too (its HTTP side effects —
+ * e.g. FanFox's Referer for the CDN hotlink check — ride the seam's
+ * header read-back, since the dispatcher builds a fresh HTTP object per
+ * dispatch where FMD2 has one shared object per download thread).
+ * SaveImage / AfterImageSaved stay HOST-DEFAULT: the hooks bind only
+ * what the descriptor registers, and the seed fixture registers none —
+ * the runner then downloads verbatim and writes files itself (FMD2's
+ * default writer path).
  */
 
 /** no_error (§5.2 dispatch result codes; GetPageNumber returns boolean). */
@@ -85,6 +89,7 @@ export class EngineDownloadHooks implements ModuleDownloadHooks {
   private readonly taskStartHandler: string | undefined;
   private readonly getPageNumberHandler: string | undefined;
   private readonly getImageURLHandler: string | undefined;
+  private readonly beforeDownloadImageHandler: string | undefined;
   /** TASK.PageLinks mirror — the seed for the next dispatch. */
   private readonly pageLinksMirror: string[] = [];
 
@@ -94,11 +99,13 @@ export class EngineDownloadHooks implements ModuleDownloadHooks {
     private readonly host: LuaHost,
     private readonly engine: LuaEngine,
     private readonly logger: MemoryLogger,
+    private readonly lastHttpHandle: () => HttpShimHandle | undefined,
     private readonly sharedState?: ModuleSharedState,
   ) {
     this.taskStartHandler = descriptor.eventHandlers['TaskStart'];
     this.getPageNumberHandler = descriptor.eventHandlers['GetPageNumber'];
     this.getImageURLHandler = descriptor.eventHandlers['GetImageURL'];
+    this.beforeDownloadImageHandler = descriptor.eventHandlers['BeforeDownloadImage'];
   }
 
   /** Load the module (Init pass + chunk cache) and bind the engine. */
@@ -171,7 +178,15 @@ export class EngineDownloadHooks implements ModuleDownloadHooks {
       if (sharedState !== undefined) {
         await sharedState.persist();
       }
-      return new EngineDownloadHooks(dispatcher, descriptor, host, engine, logger, sharedState);
+      return new EngineDownloadHooks(
+        dispatcher,
+        descriptor,
+        host,
+        engine,
+        logger,
+        installed.lastHttpHandle,
+        sharedState,
+      );
     } catch (error: unknown) {
       await engine.dispose();
       await host.dispose();
@@ -256,6 +271,50 @@ export class EngineDownloadHooks implements ModuleDownloadHooks {
       return false;
     }
     return (this.pageLinksMirror[workId] ?? '').trim() !== '';
+  }
+
+  /**
+   * §5.2 BeforeDownloadImage (:328-348, :370-371): dispatched before
+   * each image fetch. FMD2 runs the hook on the download thread's ONE
+   * shared HTTP object, so the module's header writes (FanFox sets
+   * Referer = MODULE.RootURL for the CDN's hotlink check) persist into
+   * the image GET. The dispatcher builds a fresh HTTP object per
+   * dispatch, so the seam reads the dispatch-scoped handle back out and
+   * returns the module-set headers for the runner to attach. The URL
+   * itself stays push-only (binding semantics — never read back).
+   */
+  async beforeDownloadImage(
+    workId: number,
+    url: string,
+  ): Promise<{ url?: string; headers?: Record<string, string> } | undefined> {
+    if (this.beforeDownloadImageHandler === undefined) {
+      return undefined;
+    }
+    const result = this.dispatcher.dispatch(this.descriptor, 'BeforeDownloadImage', {
+      url,
+      workId: workId + 1,
+      task: { pageLinks: [...this.pageLinksMirror] },
+    });
+    if (!this.toBoolean(result, 'BeforeDownloadImage')) {
+      return undefined;
+    }
+    const handle = this.lastHttpHandle();
+    if (handle === undefined) {
+      return undefined;
+    }
+    const headers: Record<string, string> = {};
+    for (const [name, value] of handle.headers.entries()) {
+      headers[name] = value;
+    }
+    // URL rewrite: the module may have reassigned TASK.PageLinks[WORKID-1]
+    const read = this.dispatcher.readTask();
+    const rewritten = read.pageLinks[workId];
+    return {
+      ...(rewritten !== undefined && rewritten.trim() !== '' && rewritten !== url
+        ? { url: rewritten }
+        : {}),
+      ...(Object.keys(headers).length > 0 ? { headers } : {}),
+    };
   }
 
   /**

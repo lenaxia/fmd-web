@@ -1,5 +1,6 @@
 import { applyAcceptImage, composeReset, NameValueMap } from '../shims/http-headers.js';
 import { DEFAULT_USER_AGENT } from '../shims/http-pipeline.js';
+import { massageUrl } from '../shims/http-url.js';
 import type { CancelToken, ImageDownloader, ImageFetchResult } from './download-ports.js';
 
 /**
@@ -44,7 +45,7 @@ export class ModuleImageDownloader implements ImageDownloader {
     this.timeoutMs = Math.trunc(options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   }
 
-  async download(url: string): Promise<ImageFetchResult> {
+  async download(url: string, extraHeaders?: Readonly<Record<string, string>>): Promise<ImageFetchResult> {
     if (this.options.cancel.cancelled) {
       return { ok: false, status: 0, contentType: '', bytes: new Uint8Array(0), cancelled: true };
     }
@@ -62,7 +63,7 @@ export class ModuleImageDownloader implements ImageDownloader {
         cancelled: false,
       };
       for (let attempt = 0; attempt <= this.retryCount; attempt += 1) {
-        result = await this.hop(url);
+        result = await this.hop(url, extraHeaders);
         if (result.cancelled || result.ok) {
           return result;
         }
@@ -82,12 +83,17 @@ export class ModuleImageDownloader implements ImageDownloader {
   }
 
   /** One transport hop with the Reset+AcceptImage header set (:367-369). */
-  private async hop(url: string): Promise<ImageFetchResult> {
+  private async hop(url: string, extraHeaders?: Readonly<Record<string, string>>): Promise<ImageFetchResult> {
     composeReset(this.headers, true);
     applyAcceptImage(this.headers); // HTTP.AcceptImage (httpsendthread.pas:919-922)
     // the request-side UA insert (httpsendthread.pas:469-477)
     this.headers.set('User-Agent', DEFAULT_USER_AGENT);
     for (const [name, value] of Object.entries(this.options.extraHeaders ?? {})) {
+      this.headers.set(name, value);
+    }
+    // per-image module headers (BeforeDownloadImage seam) override the
+    // constructor-level set — FMD2's single shared HTTP object semantics
+    for (const [name, value] of Object.entries(extraHeaders ?? {})) {
       this.headers.set(name, value);
     }
     const requestHeaders: Record<string, string> = {};
@@ -99,7 +105,10 @@ export class ModuleImageDownloader implements ImageDownloader {
     this.options.cancel.signal.addEventListener('abort', onAbort, { once: true });
     const timer = setTimeout(() => controller.abort(new Error('timeout')), this.timeoutMs);
     try {
-      const response = await fetch(url, {
+      // FMD2 URL massaging parity (:612-616): protocol-relative image
+      // links (FanFox serves `//zjcdn…`) get their scheme prepended —
+      // raw fetch would refuse to parse them
+      const response = await fetch(massageUrl(url), {
         method: 'GET',
         headers: requestHeaders,
         signal: controller.signal,

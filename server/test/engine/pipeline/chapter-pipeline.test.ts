@@ -39,6 +39,22 @@ describe('ChapterPipeline — prepare + padding (uDownloadsManager.pas:849-856)'
     expect(pipeline.pageLinks).toEqual([]);
   });
 
+  it('accepts links with PageNumber unset — FanFox newImgs shape (:1196-1198)', () => {
+    const pipeline = new ChapterPipeline();
+    // modules that fill TASK.PageLinks directly may legally leave
+    // PageNumber at 0; FMD2 assigns PageNumber := PageLinks.Count right
+    // after DoGetPageNumber (the runner does the same)
+    const ok = pipeline.prepareFromPageNumber(['//h/1.jpg', '//h/2.jpg', '//h/3.jpg', '//h/4.jpg'], 0);
+    expect(ok).toBe(true);
+    expect(pipeline.pageLinks).toEqual(['//h/1.jpg', '//h/2.jpg', '//h/3.jpg', '//h/4.jpg']);
+  });
+
+  it('no links but PageNumber declared → all-W placeholders (dynamic GetImageURL flow)', () => {
+    const pipeline = new ChapterPipeline();
+    expect(pipeline.prepareFromPageNumber([], 3)).toBe(true);
+    expect(pipeline.pageLinks).toEqual(['W', 'W', 'W']);
+  });
+
   it('a fresh chapter without page links gets one W placeholder (:1205-1211)', () => {
     const pipeline = new ChapterPipeline();
     pipeline.preparePlaceholder();

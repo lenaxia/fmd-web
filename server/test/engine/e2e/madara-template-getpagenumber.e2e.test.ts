@@ -40,7 +40,7 @@ const EXPECTED_LINKS = [
 ];
 
 describe('seed flow: Madara template GetPageNumber (BrainRotComics)', () => {
-  it('decrypts chapter_data via Duktape JS require and fills TASK.PageLinks', async () => {
+  it('decrypts chapter_data via Duktape JS require; the template quote-gmatch extracts nothing (desktop parity)', async () => {
     const session = await openSession({
       moduleFile: 'modules/BrainRotComics.lua',
       responses: [
@@ -65,7 +65,14 @@ describe('seed flow: Madara template GetPageNumber (BrainRotComics)', () => {
       for (let i = 0; i < count; i += 1) {
         links.push(String(session.runLua(`return TASK.PageLinks[${i}]`)));
       }
-      expect(links).toEqual(EXPECTED_LINKS);
+      // Desktop parity (Duktape.pas:93-94: duk_peval → duk_safe_to_string):
+      // ExecJS stringifies the decrypted ARRAY comma-joined — no quotes,
+      // no brackets — and templates/Madara.lua:184-186's quote-gmatch
+      // (`'"([^",]+)'`) extracts NOTHING from that form. The v0 shim's
+      // JSON rendering made this flow fill links OUR side only; the
+      // pinned desktop build has the same empty result (FanFox's
+      // CommaText path is the consumer duk_safe_to_string serves).
+      expect(links).toEqual([]);
 
       // TASK.PageNumber is a read-write int field (contract.json taskFields)
       session.runLua('TASK.PageNumber = 2');

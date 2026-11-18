@@ -331,15 +331,16 @@ export class DownloadChapterRunner {
     }
 
     try {
-      // :370-371 — OnBeforeDownloadImage (URL rewrite via the seam return)
-      const rewritten = await this.deps.module.beforeDownloadImage?.(workId, url);
+      // :370-371 — OnBeforeDownloadImage (URL rewrite via the seam return;
+      // module HTTP side effects — FanFox's Referer — ride the header map)
+      const hooked = await this.deps.module.beforeDownloadImage?.(workId, url);
       if (this.cancelToken.cancelled) {
         return;
       }
-      const targetUrl = rewritten === undefined || rewritten === '' ? url : rewritten;
+      const targetUrl = hooked?.url !== undefined && hooked.url !== '' ? hooked.url : url;
 
       // :373-378 — HTTP.GET (AcceptImage + limiter + retry inside)
-      const fetched = await this.downloader.download(targetUrl);
+      const fetched = await this.downloader.download(targetUrl, hooked?.headers);
       if (fetched.cancelled) {
         return; // §4 aborted in-flight
       }

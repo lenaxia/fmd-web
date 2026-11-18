@@ -34,10 +34,15 @@ export interface ChapterModuleHooks {
   getImageURL(task: TaskWriter, workId: number, url: string): Promise<boolean>;
   /**
    * `DoBeforeDownloadImage` (:328-348) — side-effect/rewrite hook. FMD2
-   * pushes URL push-only (never read back); the fmd-web seam returns
-   * the (possibly rewritten) download URL — undefined keeps `url`.
+   * pushes URL push-only; the module may still rewrite the slot via
+   * TASK.PageLinks[WORKID-1] (read back through the seam) and its HTTP
+   * header side effects (Referer etc.) ride the seam's header map for
+   * the image fetch — undefined keeps `url` and the default header set.
    */
-  beforeDownloadImage?(workId: number, url: string): Promise<string | undefined>;
+  beforeDownloadImage?(
+    workId: number,
+    url: string,
+  ): Promise<{ url?: string; headers?: Record<string, string> } | undefined>;
   /**
    * `DoSaveImage` (:382-392) — returns the saved path; '' = failure.
    * Receives PATH + FILENAME + the fetched image (FMD2 reaches the same
@@ -83,7 +88,7 @@ export interface ImageFetchResult {
  * HTTP.GET(workURL)`, :367-378).
  */
 export interface ImageDownloader {
-  download(url: string): Promise<ImageFetchResult>;
+  download(url: string, extraHeaders?: Readonly<Record<string, string>>): Promise<ImageFetchResult>;
 }
 
 /** Cancellation handle (§4: job flag → HTTP.Terminated → aborts). */

@@ -9,6 +9,7 @@ import {
   type CookieJarPort,
   type EgressPolicy,
   type HttpDocument,
+  type HttpShimHandle,
   type HostGatePort,
   type HttpTransportPort,
   type RecordedResponseResolver,
@@ -88,6 +89,12 @@ export interface InstalledShims {
   readonly txquery: TxQueryShim;
   /** Bind a fresh request-scoped HTTP object (dispatcher HTTP factory). */
   readonly makeHTTP: () => LuaFacadeSpec;
+  /**
+   * The most recently bound HTTP handle — after a dispatch whose module
+   * code wrote HTTP side effects (BeforeDownloadImage sets Referer),
+   * the caller reads them off this handle's headers.
+   */
+  readonly lastHttpHandle: () => HttpShimHandle | undefined;
   /** HTTP Document facade id → backing stream (ParseHTML resolution). */
   readonly documents: Map<number, HttpDocument>;
 }
@@ -146,8 +153,9 @@ export function installShims(
     ...(options.bypass !== undefined ? { bypass: options.bypass } : {}),
   });
 
-  const makeHTTP = (): LuaFacadeSpec =>
-    makeHttpShim(bridge, {
+  let lastHandle: ReturnType<typeof makeHttpShim> | undefined;
+  const makeHTTP = (): LuaFacadeSpec => {
+    const handle = makeHttpShim(bridge, {
       resolver: options.resolver,
       abort: options.abort,
       documents,
@@ -156,7 +164,10 @@ export function installShims(
       ...(options.egress !== undefined ? { egress: options.egress } : {}),
       ...(options.transport !== undefined ? { transport: options.transport } : {}),
       ...(options.fsJail !== undefined ? { fsJail: options.fsJail } : {}),
-    }).spec;
+    });
+    lastHandle = handle;
+    return handle.spec;
+  };
 
   // CreateTXQuery: HTTP.Document facade | HTML string | none
   // (LuaXQuery.pas:209-212)
@@ -185,6 +196,7 @@ export function installShims(
   return {
     txquery,
     makeHTTP,
+    lastHttpHandle: () => lastHandle,
     documents,
   };
 }

@@ -9,11 +9,7 @@
     "kind": "boolean",
     "value": true
   },
-  "taskPageLinks": [
-    "https://images.wuxiaworld.site/file/manga-sites/an-manga/ch-001/001.jpg",
-    "https://images.wuxiaworld.site/file/manga-sites/an-manga/ch-001/002.jpg",
-    "https://images.wuxiaworld.site/file/manga-sites/an-manga/ch-001/003.jpg"
-  ],
+  "taskPageLinks": [],
   "taskPageNumberReadWrite": 2,
   "workidBinding": {
     "beforeDownloadImage": "MODULE/TASK/HTTP/WORKID/URL per contract.json; module binds no handler → EventNotBoundError",
