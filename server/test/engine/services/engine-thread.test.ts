@@ -1,0 +1,170 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createServer, type Server } from 'node:http';
+import { EngineThread, OffloadedInfoService } from '../../../src/engine/services/engine-thread.js';
+import { createLuaHostFactory } from '../../../src/engine/lua/host.js';
+import { EgressPolicy } from '../../../src/engine/shims/http-egress.js';
+import type { RegistrationRecord } from '../../../src/engine/registry/capabilities.js';
+import type { HostLogRecord } from '@fmd/contract';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * Engine-thread offload regression (the Downloads-page lockup):
+ * a module HTTP hop that hangs on a slow origin must NEVER block the
+ * main event loop — the hop blocks the ENGINE worker thread (where the
+ * synchronous transport belongs), while the process that serves HTTP
+ * stays responsive.
+ *
+ * Hermetic (DESIGN §13): the slow origin is a loopback node:http server
+ * with a per-request delay; the module is the E2ESeed fixture driven
+ * through the REAL offloaded engine path (worker thread + wasmoon +
+ * §5.4 shims + LoopbackHttpTransport). No external network.
+ *
+ * Pre-fix, this exact scenario froze the process: the transport's
+ * chunked Atomics.wait ran on the MAIN thread (wasmoon in-process), so
+ * a 15 s silent origin stalled every concurrent request — measured
+ * live as GET /api/jobs taking 14.8 s while a chapter dispatched.
+ */
+
+const LUA_ROOT = fileURLToPath(new URL('../../../../e2e/fixtures/lua/lua/', import.meta.url));
+const MODULE_ID = 'e2ee000000000000000000000000ca7a';
+
+/** Slow loopback origin: every response is held ORIGIN_DELAY_MS. */
+const ORIGIN_DELAY_MS = 900;
+const INFO_BODY = Buffer.from(
+  '<html><body>' +
+    '<h1 id="manga-title">Alpha Quest</h1>' +
+    '<span id="authors">Author A</span>' +
+    '<span id="genres">Action</span>' +
+    '<span id="status">Ongoing</span>' +
+    '<p id="summary">A quest.</p>' +
+    '<ul id="chapters"><li><a href="/manga/alpha-quest/c001">Ch.001</a></li></ul>' +
+    '</body></html>',
+);
+
+function registration(): RegistrationRecord {
+  return {
+    id: MODULE_ID,
+    name: 'E2ESeed',
+    rootURL: '',
+    category: 'English',
+    accountSupport: false,
+    options: [],
+    capabilities: {
+      requires_subprocess: false,
+      requires_browser: false,
+      bypass_python_gated: false,
+      requires_imagepuzzle: false,
+      requires_mangafoxwatermark: false,
+      events: ['GetInfo', 'GetPageNumber', 'GetImageURL'],
+      known_broken_flags: [],
+      live_scrape_fallback: false,
+    },
+    file: 'E2ESeed.lua',
+  };
+}
+
+let origin: Server;
+let originBase = '';
+let thread: EngineThread;
+
+/** Wall-clock time N macrotask round-trips take (the loop-responsiveness
+ * probe: pre-fix these serialize behind the blocked transport). */
+async function loopRoundTrips(rounds: number): Promise<number> {
+  const started = Date.now();
+  for (let i = 0; i < rounds; i += 1) {
+    await new Promise<void>((resolve): void => {
+      setTimeout(resolve, 0);
+    });
+  }
+  return Date.now() - started;
+}
+
+beforeAll(async (): Promise<void> => {
+  origin = createServer((_req, res): void => {
+    setTimeout((): void => {
+      res.writeHead(200, { 'content-type': 'text/html' });
+      res.end(INFO_BODY);
+    }, ORIGIN_DELAY_MS);
+  });
+  await new Promise<void>((resolve): void => {
+    origin.listen(0, '127.0.0.1', (): void => {
+      resolve();
+    });
+  });
+  const address = origin.address();
+  if (address === null || typeof address === 'string') {
+    throw new Error('slow origin did not bind');
+  }
+  originBase = `http://127.0.0.1:${String(address.port)}`;
+  thread = new EngineThread({ allowedHosts: [], egressAllow: ['*', '127.0.0.1'] });
+}, 30_000);
+
+afterAll(async (): Promise<void> => {
+  thread.dispose();
+  await new Promise<void>((resolve): void => {
+    origin.close((): void => {
+      resolve();
+    });
+  });
+}, 30_000);
+
+describe('engine thread offload', (): void => {
+  it('keeps the main event loop responsive while a module hop waits on a slow origin', async (): Promise<void> => {
+    const records: HostLogRecord[] = [];
+    const service = new OffloadedInfoService(
+      {
+        luaRoot: LUA_ROOT,
+        modules: (): readonly RegistrationRecord[] => [registration()],
+        // Unused by the offloaded path (the worker builds its own) but
+        // part of the options contract:
+        transport: { send: (): never => { throw new Error('main-thread transport must not be used'); } },
+        egress: new EgressPolicy({ allow: ['*'] }),
+        logSink: (record): void => {
+          records.push(record);
+        },
+        hostFactory: createLuaHostFactory(),
+      },
+      thread,
+      { allowedHosts: [], egressAllow: ['*', '127.0.0.1'] },
+    );
+
+    let pending = true;
+    const infoPromise = service.getInfo(MODULE_ID, `${originBase}/manga/alpha-quest`);
+    void infoPromise.finally((): void => {
+      pending = false;
+    });
+    // While the engine's HTTP hop waits out the slow origin, the main
+    // loop must keep cycling macrotasks. Pre-fix, this window was
+    // blocked for the FULL origin delay per hop.
+    const rounds = 60;
+    const during = await loopRoundTrips(rounds);
+    expect(pending).toBe(true); // the hop is genuinely still in flight
+    // 60 timer round-trips on a free loop: tens of ms. A blocked loop
+    // cannot finish before the ~900 ms origin delay elapses.
+    expect(during).toBeLessThan(ORIGIN_DELAY_MS);
+
+    const info = await infoPromise;
+    expect(info.title).toBe('Alpha Quest');
+    expect(info.chapterLinks).toContain('/manga/alpha-quest/c001');
+    // engine log records flow back through the main-thread sink
+    expect(Array.isArray(records)).toBe(true);
+  }, 30_000);
+
+  it('rejects with the typed ApiError envelope from the worker', async (): Promise<void> => {
+    const service = new OffloadedInfoService(
+      {
+        luaRoot: LUA_ROOT,
+        modules: (): readonly RegistrationRecord[] => [registration()],
+        transport: { send: (): never => { throw new Error('unused'); } },
+        egress: new EgressPolicy({ allow: ['*'] }),
+        hostFactory: createLuaHostFactory(),
+      },
+      thread,
+      { allowedHosts: [], egressAllow: ['*', '127.0.0.1'] },
+    );
+    await expect(service.getInfo('f'.repeat(32), `${originBase}/x`)).rejects.toMatchObject({
+      status: 404,
+      code: 'not_found',
+    });
+  }, 30_000);
+});

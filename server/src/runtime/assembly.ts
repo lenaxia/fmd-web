@@ -69,6 +69,7 @@ import type {
 } from '../api/schemas.js';
 import { openQueueDb, ensureJobSchema } from '../jobs/queue/connection.js';
 import { SqliteJobQueue } from '../jobs/queue/queue.js';
+import { EngineThread, offloadEngineSubstrate } from '../engine/services/engine-thread.js';
 import { SqliteLibraryStore } from '../jobs/library/store.js';
 import {
   ActiveDownloadRegistry,
@@ -338,8 +339,26 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
   const luaRoot = join(config.dataDir, 'lua');
   // The substrate seam: injected (stub/tests) or the wasmoon default,
   // loaded lazily so the substituted path never evaluates wasmoon.
-  const substrate: ModuleRuntime =
+  const baseSubstrate: ModuleRuntime =
     options.substrate ?? (await import('../engine/index.js')).createModuleRuntime();
+  // [engine-thread] the wasmoon engine + its SYNCHRONOUS §5.4 HTTP
+  // transport hop run on a dedicated worker thread, not the main event
+  // loop: every module HTTP hop blocks its caller until the response or
+  // timeout (a silent origin = the full 15 s request budget), and on the
+  // main thread that froze the whole server — the Downloads-page lockup
+  // (GET /api/jobs and /readyz stalled for the duration of a chapter's
+  // GetPageNumber/GetImageURL dispatches). Injected substrates (tests)
+  // keep the in-process behavior exactly as before.
+  const engineThread = options.substrate === undefined
+    ? new EngineThread({
+      allowedHosts: config.httpAllowedHosts,
+      egressAllow: [...config.httpAllowedHosts, '127.0.0.1', 'localhost', '::1'],
+      ...(config.browserSidecarUrl !== '' ? { bypassUrl: config.browserSidecarUrl } : {}),
+    })
+    : undefined;
+  const substrate: ModuleRuntime = engineThread === undefined
+    ? baseSubstrate
+    : offloadEngineSubstrate(baseSubstrate, engineThread);
   const luaHostFactory = substrate.createHostFactory();
 
   // ── observability (§4/§15) ─────────────────────────────────────────
