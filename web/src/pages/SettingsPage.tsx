@@ -306,7 +306,7 @@ function ModuleRow(props: {
   return (
     <div className="module-row w-full" id={`module-row-${props.module.id}`} ref={rowRef}>
       <div className="module-head flex flex-wrap items-center gap-x-3 gap-y-1.5 py-2.5">
-        <label htmlFor={`enabled-${props.module.id}`} className="flex items-center gap-2 text-sm font-medium">
+        <label htmlFor={`enabled-${props.module.id}`} className="flex items-center gap-2 text-sm font-medium max-md:min-h-touch-target">
           <input
             id={`enabled-${props.module.id}`}
             type="checkbox"

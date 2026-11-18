@@ -906,6 +906,19 @@ export function useLibrary(): UseInfiniteQueryResult<InfiniteData<LibraryPageT, 
   });
 }
 
+/** [UX-AUDIT L-2] delete one library artifact (file + row). */
+export function useDeleteLibraryFile(): UseMutationResult<{ ok: true }, ApiError, string> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation<{ ok: true }, ApiError, string>({
+    mutationFn: async (id): Promise<{ ok: true }> =>
+      unwrap(client.DELETE('/api/library/{id}', { params: { path: { id } } })),
+    onSuccess: (): void => {
+      void queryClient.invalidateQueries({ queryKey: ['library'] });
+    },
+  });
+}
+
 // ── readiness / D20 bootstrap banner ─────────────────────────────────
 
 export interface BootstrapStatusT {

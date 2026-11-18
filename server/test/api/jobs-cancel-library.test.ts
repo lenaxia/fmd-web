@@ -5,7 +5,7 @@
  * the library listing + artifact download surface.
  */
 import { describe, expect, it } from 'vitest';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildHarness, expectEnvelope, MODULE_A_ID } from './helpers.js';
@@ -151,6 +151,54 @@ describe('GET /api/library — listing + artifact download (§7.1)', (): void =>
       const id = (list.json().files as { id: string }[])[0]?.id;
       const gone = await h.app.inject({ method: 'GET', url: `/api/library/${String(id)}/file` });
       expect(gone.statusCode).toBe(404);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('DELETE /api/library/:id — delete one artifact (UX-AUDIT L-2)', (): void => {
+  it('removes the file from disk and the row from the listing', async (): Promise<void> => {
+    const h = buildHarness();
+    const dir = mkdtempSync(join(tmpdir(), 'fmd-library-del-'));
+    try {
+      const file = join(dir, 'ch1.zip');
+      writeFileSync(file, Buffer.from('artifact-ch1'));
+      h.library.put({ moduleId: MODULE_A_ID, manga: 'Fixture Manga', fileName: 'ch1.zip', bytes: 12, path: file });
+      const list = await h.app.inject({ method: 'GET', url: '/api/library' });
+      const id = (list.json().files as { id: string }[])[0]?.id;
+      expect(id).toBeDefined();
+      const res = await h.app.inject({ method: 'DELETE', url: `/api/library/${String(id)}` });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ ok: true });
+      // the file is gone from disk AND the listing is empty again
+      expect(existsSync(file)).toBe(false);
+      const after = await h.app.inject({ method: 'GET', url: '/api/library' });
+      expect(after.json()).toEqual({ files: [] });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('removes the row even when the file is already gone; 404s unknown ids, 400s malformed', async (): Promise<void> => {
+    const h = buildHarness();
+    const dir = mkdtempSync(join(tmpdir(), 'fmd-library-del2-'));
+    try {
+      const file = join(dir, 'ghost.zip');
+      h.library.put({ moduleId: MODULE_A_ID, manga: 'M', fileName: 'ghost.zip', bytes: 5, path: file });
+      const list = await h.app.inject({ method: 'GET', url: '/api/library' });
+      const id = (list.json().files as { id: string }[])[0]?.id;
+      const res = await h.app.inject({ method: 'DELETE', url: `/api/library/${String(id)}` });
+      expect(res.statusCode).toBe(200);
+      const after = await h.app.inject({ method: 'GET', url: '/api/library' });
+      expect(after.json()).toEqual({ files: [] });
+      // second delete of the same id → 404 (row gone)
+      const again = await h.app.inject({ method: 'DELETE', url: `/api/library/${String(id)}` });
+      expect(again.statusCode).toBe(404);
+      expectEnvelope(again.json(), 'not_found');
+      const malformed = await h.app.inject({ method: 'DELETE', url: '/api/library/not-a-number' });
+      expect(malformed.statusCode).toBe(400);
+      expectEnvelope(malformed.json(), 'validation_error');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

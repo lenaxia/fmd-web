@@ -6,7 +6,7 @@
  * Redownload/Enable/Disable + delete with the data choice) behind a
  * primary control + kebab overflow. No raw JSON anywhere.
  */
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import { MoreHorizontal, Pause, Play } from 'lucide-react';
 import type { JobActionTypeT, JobT } from '../../api/hooks';
 import { Badge } from '@/components/ui/badge';
@@ -107,6 +107,9 @@ export function JobRow(props: {
   const legal = legalJobActions(job);
   const percent = progress !== undefined ? jobPercent(progress) : 0;
   const hasArtifact = progress?.libraryPath !== undefined;
+  // [UX-AUDIT D-4] long errors expand in place instead of living in a
+  // title tooltip only (keyboard/touch users could never read them).
+  const [errorExpanded, setErrorExpanded] = useState(false);
   const primary: JobActionTypeT | undefined =
     job.state === 'queued' && job.paused === true
       ? 'resume'
@@ -128,10 +131,15 @@ export function JobRow(props: {
     // badge + progress + error) with the id chip hidden.
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
       <StatusBadge status={status} />
-      <code className="rounded bg-surface px-1 py-0.5 font-mono text-xs max-md:hidden">{job.id.slice(0, 8)}</code>
-      <span className="job-title min-w-0 flex-1 truncate font-medium max-md:order-1">
+      {/* [UX-AUDIT D-2] the raw job-id chip moved out of the scan line
+       * (machine vocabulary) — the full id rides the title tooltip and
+       * the row menu's info line instead. */}
+      <span
+        className="job-title min-w-0 flex-1 truncate font-medium max-md:order-1"
+        title={job.payload['mangaTitle'] !== undefined ? `${String(job.payload['mangaTitle'])} (job ${job.id})` : `job ${job.id}`}
+      >
         {job.payload['mangaTitle'] !== undefined ? String(job.payload['mangaTitle']) : job.moduleId}
-        {job.payload['chapterName'] !== undefined ? ` — ${String(job.payload['chapterName'])}` : ''}
+        {job.payload['chapterName'] !== undefined ? ` · ${String(job.payload['chapterName'])}` : ''}
       </span>
 
       {progress !== undefined && progress.total > 0 ? (
@@ -157,8 +165,29 @@ export function JobRow(props: {
       ) : null}
 
       {job.error !== undefined ? (
-        <span className="job-error max-w-60 truncate text-xs text-destructive max-md:order-4 max-md:max-w-full" title={job.error}>
-          error: {job.error}
+        <span
+          className="job-error text-xs text-destructive max-md:order-4"
+          data-expanded={errorExpanded ? 'true' : undefined}
+        >
+          <span className={errorExpanded ? 'break-all whitespace-normal' : 'inline-block max-w-60 align-bottom truncate'}>
+            error: {job.error}
+          </span>
+          {job.error.length > 60 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="ml-1 h-4 px-1 text-xs max-md:min-h-touch-target max-md:min-w-touch-target max-md:align-baseline"
+              aria-expanded={errorExpanded}
+              aria-label={errorExpanded ? 'Collapse error detail' : 'Expand error detail'}
+              data-testid="job-error-toggle"
+              onClick={(): void => {
+                setErrorExpanded((expanded): boolean => !expanded);
+              }}
+            >
+              {errorExpanded ? 'less' : 'more'}
+            </Button>
+          ) : null}
         </span>
       ) : null}
 
@@ -193,6 +222,15 @@ export function JobRow(props: {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" data-testid={`job-menu-${job.id}`}>
+          {/* [UX-AUDIT D-2] the job id lives HERE (muted, copyable
+           * text) — never in the row's scan line. */}
+          <div
+            className="px-2 py-1.5 font-mono text-xs text-muted-foreground"
+            data-testid={`job-id-${job.id}`}
+          >
+            job {job.id}
+          </div>
+          <DropdownMenuSeparator />
           {(['pause', 'resume', 'retry', 'redownload', 'enable', 'disable'] as const)
             .filter((type): boolean => legal.includes(type) && type !== primary)
             .map((type): ReactElement => (

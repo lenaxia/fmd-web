@@ -60,6 +60,13 @@ const downloadRoute: MockRoute = {
   respond: (): { body: object; status?: number } => ({ body: { job: { id: 'j1' } }, status: 201 }),
 };
 
+/** Opens the (single) row action kebab and waits for its content. */
+async function openRowMenu(): Promise<void> {
+  await screen.findByText('Fixture Favorite');
+  await userEvent.click(screen.getByTestId(`favorite-menu-${FAV_ID}`));
+  await screen.findByTestId(`favorite-menu-content-${FAV_ID}`);
+}
+
 const NEW_CHAPTERS = [
   { position: 12, link: 'https://ex.org/manga/fav/ch-13', name: 'Chapter 13' },
   { position: 13, link: 'https://ex.org/manga/fav/ch-14', name: 'Chapter 14' },
@@ -136,12 +143,13 @@ describe('FavoritesPage', (): void => {
     ]);
     renderWithProviders(<FavoritesPage />, { fetch });
 
-    const toggle = await screen.findByTestId('autodownload-Fixture Favorite');
-    expect(toggle).not.toBeChecked();
+    await openRowMenu();
+    const toggle = screen.getByTestId(`favorite-menu-autodownload-${FAV_ID}`);
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
     await userEvent.click(toggle);
 
     await waitFor((): void => {
-      expect(screen.getByTestId('autodownload-Fixture Favorite')).toBeChecked();
+      expect(screen.getByTestId(`favorite-menu-autodownload-${FAV_ID}`)).toHaveAttribute('aria-checked', 'true');
     });
     const put = requests.find((r) => r.method === 'PUT');
     expect(put?.body).toEqual({ autoDownload: true });
@@ -171,9 +179,8 @@ describe('FavoritesPage', (): void => {
     ]);
     renderWithProviders(<FavoritesPage />, { fetch });
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Check Fixture Favorite for new chapters now' }),
-    );
+    await openRowMenu();
+    await userEvent.click(screen.getByTestId(`favorite-menu-check-${FAV_ID}`));
 
     const badge = await screen.findByTestId('new-chapter-badge');
     expect(badge).toHaveTextContent('5 new');
@@ -204,9 +211,8 @@ describe('FavoritesPage', (): void => {
     ]);
     renderWithProviders(<FavoritesPage />, { fetch });
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: 'Check Fixture Favorite for new chapters now' }),
-    );
+    await openRowMenu();
+    await userEvent.click(screen.getByTestId(`favorite-menu-check-${FAV_ID}`));
 
     const sheet = await screen.findByTestId('new-chapters-sheet');
     expect(within(sheet).getByText(/Fixture Favorite/u)).toBeInTheDocument();
@@ -237,7 +243,8 @@ describe('FavoritesPage', (): void => {
     ]);
     renderWithProviders(<FavoritesPage />, { fetch });
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Remove favorite Fixture Favorite' }));
+    await openRowMenu();
+    await userEvent.click(screen.getByTestId(`favorite-menu-delete-${FAV_ID}`));
     // The confirm dialog gates the DELETE (FMD2 asks before removing).
     expect(screen.getByTestId('delete-favorite-dialog')).toBeInTheDocument();
     expect(requests.filter((r): boolean => r.method === 'DELETE')).toHaveLength(0);
@@ -306,7 +313,8 @@ describe('FavoritesPage toolbar — batch check scopes + sheet', (): void => {
     renderWithProviders(<FavoritesPage />, { fetch });
 
     await screen.findByText('Fixture Favorite');
-    await userEvent.click(screen.getByTestId('check-all-button'));
+    // [UX-AUDIT F-6] true split-button: the caret opens the scope menu.
+    await userEvent.click(screen.getByTestId('check-scope-trigger'));
     await userEvent.click(screen.getByTestId('check-scope-enabled'));
 
     expect(capture.scope).toBe('enabled');
@@ -337,8 +345,8 @@ describe('FavoritesPage toolbar — batch check scopes + sheet', (): void => {
     renderWithProviders(<FavoritesPage />, { fetch });
 
     await screen.findByText('Fixture Favorite');
+    // [UX-AUDIT F-6] the action half runs the default scope ('all').
     await userEvent.click(screen.getByTestId('check-all-button'));
-    await userEvent.click(screen.getByTestId('check-scope-all'));
     const sheet = await screen.findByTestId('new-chapters-sheet');
     await userEvent.click(within(sheet).getByTestId('newchapter-queue-all'));
 
@@ -353,11 +361,6 @@ describe('FavoritesPage toolbar — batch check scopes + sheet', (): void => {
 });
 
 describe('FavoritesPage row menu (pmFavorites parity)', (): void => {
-  async function openMenu(): Promise<void> {
-    await screen.findByText('Fixture Favorite');
-    await userEvent.click(screen.getByTestId(`favorite-menu-${FAV_ID}`));
-    await screen.findByTestId(`favorite-menu-content-${FAV_ID}`);
-  }
 
   it('Rename edits inline and PUTs the new title', async (): Promise<void> => {
     const state = favoritesState([favoriteFixture()]);
@@ -375,7 +378,7 @@ describe('FavoritesPage row menu (pmFavorites parity)', (): void => {
     ]);
     renderWithProviders(<FavoritesPage />, { fetch });
 
-    await openMenu();
+    await openRowMenu();
     await userEvent.click(screen.getByTestId(`favorite-menu-rename-${FAV_ID}`));
     const input = screen.getByTestId(`favorite-rename-input-${FAV_ID}`);
     await userEvent.clear(input);
@@ -404,7 +407,7 @@ describe('FavoritesPage row menu (pmFavorites parity)', (): void => {
     ]);
     renderWithProviders(<FavoritesPage />, { fetch });
 
-    await openMenu();
+    await openRowMenu();
     await userEvent.click(screen.getByTestId(`favorite-menu-saveto-${FAV_ID}`));
     const input = screen.getByTestId('saveto-input');
     await userEvent.type(input, '/new/dir');
@@ -431,7 +434,7 @@ describe('FavoritesPage row menu (pmFavorites parity)', (): void => {
     ]);
     renderWithProviders(<FavoritesPage />, { fetch });
 
-    await openMenu();
+    await openRowMenu();
     await userEvent.click(screen.getByTestId(`favorite-menu-toggle-${FAV_ID}`));
 
     expect(requests.some((r): boolean => r.method === 'PUT' && (r.body as { enabled?: boolean }).enabled === false)).toBe(true);
@@ -444,7 +447,7 @@ describe('FavoritesPage row menu (pmFavorites parity)', (): void => {
     const originalHash = globalThis.location.hash;
     renderWithProviders(<FavoritesPage />, { fetch });
 
-    await openMenu();
+    await openRowMenu();
     await userEvent.click(screen.getByTestId(`favorite-menu-view-info-${FAV_ID}`));
 
     expect(globalThis.location.hash).toBe(
@@ -487,7 +490,7 @@ describe('FavoritesPage row menu (pmFavorites parity)', (): void => {
     ]);
     renderWithProviders(<FavoritesPage />, { fetch });
 
-    await openMenu();
+    await openRowMenu();
     await userEvent.click(screen.getByTestId(`favorite-menu-transfer-${FAV_ID}`));
     const dialog = await screen.findByTestId('transfer-dialog');
     await userEvent.selectOptions(within(dialog).getByTestId('transfer-target-select'), TARGET);

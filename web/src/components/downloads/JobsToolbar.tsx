@@ -26,6 +26,8 @@ export function JobsToolbar(props: {
   readonly bulkPending: boolean;
   /** Completed (done) rows exist — gates Delete completed. */
   readonly hasCompleted: boolean;
+  /** [UX-AUDIT D-3] exact done-row count for the confirm copy. */
+  readonly completedCount: number;
   readonly confirmOpen: boolean;
   readonly onConfirmOpen: (open: boolean) => void;
 }): ReactElement {
@@ -96,9 +98,10 @@ export function JobsToolbar(props: {
         <DialogContent className="max-w-sm" data-testid="delete-completed-dialog">
           <DialogHeader>
             <DialogTitle>Delete completed jobs?</DialogTitle>
-            <DialogDescription>
-              Every finished job row is removed (FMD2 RemoveAllFinishedTasks). The downloaded
-              files stay in the library — delete job + file is the per-row choice.
+            <DialogDescription data-testid="delete-completed-count">
+              This will delete {String(props.completedCount)} completed job
+              {props.completedCount === 1 ? '' : 's'}. The downloaded files stay in the library;
+              delete job + file is the per-row choice.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

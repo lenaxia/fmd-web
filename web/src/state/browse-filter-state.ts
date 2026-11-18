@@ -120,6 +120,25 @@ export function hasActiveFilters(state: BrowseFilterState): boolean {
   );
 }
 
+/**
+ * Active-filter COUNT for the Filters button badge (UX audit B-1):
+ * mirrors the AppliedFilterChips dimensions exactly — one per active
+ * facet (genres + customGenres share the single 'genres' chip), so the
+ * badge number always equals the removable-chip count.
+ */
+export function activeFilterCount(state: BrowseFilterState): number {
+  let count = 0;
+  if (state.q !== '') count += 1;
+  if (state.status !== '') count += 1;
+  if (state.authors !== '') count += 1;
+  if (state.artists !== '') count += 1;
+  if (state.summary !== '') count += 1;
+  if (state.genres.length > 0 || state.customGenres.length > 0) count += 1;
+  if (state.excludedGenres.length > 0) count += 1;
+  if (state.newDays !== undefined) count += 1;
+  return count;
+}
+
 /** The API's combined genres[] list: fixed + custom merged. */
 export function apiGenres(state: BrowseFilterState): readonly string[] {
   return [...state.genres, ...state.customGenres];

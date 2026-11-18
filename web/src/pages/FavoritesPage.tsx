@@ -1,19 +1,22 @@
 /**
  * Favorites (§7.2 + favorites-parity): the full FMD2 favorites-tab
- * surface — the column listing (Website / Current chapter / Save to /
- * Date added / Last checked / Last updated, responsive secondary line
- * on narrow), the toolbar batch check with scopes (All / Enabled /
- * Disabled) + cancel + the list import, the per-row Check now, the
- * row overflow menu (View info / Download all new / Rename / Transfer
- * website / Change save-to / Enable-Disable / Delete with confirm) and
- * the NewChaptersSheet decision UI after every check with results.
+ * surface — the column listing (Title primary + Website / Current
+ * chapter / Save to / Last checked / Last updated on one shared
+ * header/row grid, responsive secondary line on narrow), the toolbar
+ * batch check with scopes (All / Enabled / Disabled) + cancel + the
+ * list import, every per-row action behind the single kebab column
+ * (Check now / Auto-download / Download all new / Rename / Transfer
+ * website / Change save-to / Enable-Disable / View info / Delete with
+ * confirm) and the NewChaptersSheet decision UI after every check
+ * with results.
  *
  * Design-system retrofit: PageHeader + ListPanel + EntryRow rows with
  * token-styled controls; testids, aria-labels and texts stable.
  */
 import { useMemo, useState, type ReactElement } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { MoreVertical, RefreshCw, Trash2 } from 'lucide-react';
+import { ChevronDown, MoreVertical, RefreshCw, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   useCancelFavoritesCheck,
   useCheckFavoriteNow,
@@ -23,6 +26,7 @@ import {
   useModules,
   useUpdateFavorite,
   type FavoriteCheckBatchItemT,
+  type FavoriteCheckScopeT,
   type FavoriteT,
 } from '../api/hooks';
 import type { ModuleSummaryT } from '../api/hooks';
@@ -34,8 +38,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -87,7 +93,6 @@ interface RowDialogsState {
 }
 
 function FavoriteListRow(props: {
-  readonly index: number;
   readonly favorite: FavoriteT;
   readonly website: string;
   readonly renaming: boolean;
@@ -97,16 +102,19 @@ function FavoriteListRow(props: {
   readonly onOpenDialogs: (state: Partial<RowDialogsState>) => void;
   readonly pending: boolean;
 }): ReactElement {
-  const { favorite, website, index } = props;
+  const { favorite, website } = props;
   const update = useUpdateFavorite();
   const [renameDraft, setRenameDraft] = useState(favorite.title ?? favorite.url);
 
   const label = favorite.title ?? favorite.url;
   const pending = props.pending || update.isPending;
 
+  // Title = the flexible primary column: the truncating title (the
+  // title attr carries the full text on overflow) + the status/new/
+  // disabled badges, with the compact meta line underneath.
   const titleCell = props.renaming ? (
-    <span className="flex min-w-0 flex-1 flex-col gap-1 md:col-span-6 md:row-span-1">
-      <span className="flex w-full items-center gap-2">
+    <span className="flex min-w-0 flex-col gap-1 md:col-span-full">
+      <span className="flex w-full flex-wrap items-center gap-2">
         <input
           className="favorite-rename-input h-7 min-w-0 flex-1 rounded-md border border-input bg-transparent px-2 text-sm"
           aria-label={`Rename favorite ${label}`}
@@ -115,6 +123,17 @@ function FavoriteListRow(props: {
           autoFocus
           disabled={update.isPending}
           onChange={(event): void => setRenameDraft(event.target.value)}
+          onKeyDown={(event): void => {
+            if (event.key === 'Enter' && renameDraft.trim() !== '' && !update.isPending) {
+              update.mutate(
+                { id: favorite.id, title: renameDraft.trim() },
+                { onSuccess: (): void => props.onStartRename('') },
+              );
+            } else if (event.key === 'Escape') {
+              event.stopPropagation();
+              props.onStartRename('');
+            }
+          }}
         />
         <Button
           type="button"
@@ -144,13 +163,14 @@ function FavoriteListRow(props: {
     </span>
   ) : (
     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-      <span className="flex w-full flex-wrap items-center gap-2">
-        <span className="favorite-index hidden w-6 shrink-0 text-right text-xs text-muted-foreground tabular-nums md:inline">
-          {index + 1}
+      <span className="flex w-full flex-wrap items-center gap-x-2 gap-y-0.5">
+        <span className="favorite-title min-w-0 truncate text-sm font-medium" title={label}>
+          {label}
         </span>
-        <span className="favorite-title min-w-0 truncate text-sm font-medium">{label}</span>
         <NewChapterBadge count={favorite.newChapterCount} />
-        <Badge variant="outline" className="favorite-status">{favorite.status ?? '—'}</Badge>
+        {favorite.status !== null && favorite.status !== '' ? (
+          <Badge variant="outline" className="favorite-status">{favorite.status}</Badge>
+        ) : null}
         {favorite.enabled ? null : (
           <Badge variant="secondary" data-testid={`favorite-disabled-${favorite.id}`}>
             disabled
@@ -161,54 +181,18 @@ function FavoriteListRow(props: {
     </span>
   );
 
-  const actionsCell = (
-    <div className="flex shrink-0 items-center gap-2">
-      <label className="favorite-autodownload flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground max-md:min-h-touch-target max-md:min-w-touch-target max-md:rounded-md max-md:px-1.5">
-        <input
-          type="checkbox"
-          className="size-4 accent-(--primary)"
-          checked={favorite.autoDownload}
-          disabled={pending}
-          data-testid={`autodownload-${label}`}
-          aria-label={`Auto-download new chapters for ${label}`}
-          title="auto-download"
-          onChange={(event): void => {
-            update.mutate({ id: favorite.id, autoDownload: event.target.checked });
-          }}
-        />
-        <span className="hidden 2xl:inline">auto-download</span>
-      </label>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="favorite-check h-7"
-        disabled={pending}
-        aria-label={`Check ${label} for new chapters now`}
-        onClick={(): void => props.onCheckNow(favorite)}
-      >
-        <RefreshCw aria-hidden="true" />
-        <span className="hidden 2xl:inline">Check now</span>
-      </Button>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="favorite-delete h-7 text-destructive hover:bg-destructive/10"
-        disabled={pending}
-        aria-label={`Remove favorite ${label}`}
-        onClick={(): void => props.onOpenDialogs({ remove: favorite })}
-      >
-        <Trash2 aria-hidden="true" />
-        <span className="hidden 2xl:inline">Remove</span>
-      </Button>
+  // ONE narrow right-aligned icon column: every row action (check now,
+  // auto-download, download all new, rename, transfer, save-to,
+  // enable/disable, view info, delete) lives behind the single kebab.
+  const actionsCell = props.renaming ? null : (
+    <div className="favorite-actions flex shrink-0 items-center justify-end md:justify-self-end">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="favorite-menu h-7 w-8 p-0"
+            className="favorite-menu h-8 w-8 p-0 max-md:min-h-touch-target max-md:min-w-touch-target"
             aria-label={`Actions for ${label}`}
             data-testid={`favorite-menu-${favorite.id}`}
           >
@@ -217,13 +201,26 @@ function FavoriteListRow(props: {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" data-testid={`favorite-menu-content-${favorite.id}`}>
           <DropdownMenuItem
-            data-testid={`favorite-menu-view-info-${favorite.id}`}
-            onSelect={(): void => {
-              globalThis.location.hash = `#/manga?module=${encodeURIComponent(favorite.moduleId)}&url=${encodeURIComponent(favorite.url)}`;
+            data-testid={`favorite-menu-check-${favorite.id}`}
+            disabled={pending}
+            aria-label={`Check ${label} for new chapters now`}
+            onSelect={(): void => props.onCheckNow(favorite)}
+          >
+            <RefreshCw aria-hidden="true" />
+            Check now
+          </DropdownMenuItem>
+          <DropdownMenuCheckboxItem
+            data-testid={`favorite-menu-autodownload-${favorite.id}`}
+            checked={favorite.autoDownload}
+            disabled={pending}
+            aria-label={`Auto-download new chapters for ${label}`}
+            onSelect={(event): void => event.preventDefault()}
+            onCheckedChange={(checked): void => {
+              update.mutate({ id: favorite.id, autoDownload: checked === true });
             }}
           >
-            View manga info
-          </DropdownMenuItem>
+            Auto-download new chapters
+          </DropdownMenuCheckboxItem>
           <DropdownMenuItem
             data-testid={`favorite-menu-download-new-${favorite.id}`}
             disabled={pending}
@@ -231,6 +228,7 @@ function FavoriteListRow(props: {
           >
             Download all new
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem
             data-testid={`favorite-menu-rename-${favorite.id}`}
             onSelect={(): void => props.onStartRename(favorite.id)}
@@ -258,11 +256,22 @@ function FavoriteListRow(props: {
           >
             {favorite.enabled ? 'Disable' : 'Enable'}
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            data-testid={`favorite-menu-view-info-${favorite.id}`}
+            onSelect={(): void => {
+              globalThis.location.hash = `#/manga?module=${encodeURIComponent(favorite.moduleId)}&url=${encodeURIComponent(favorite.url)}`;
+            }}
+          >
+            View manga info
+          </DropdownMenuItem>
           <DropdownMenuItem
             className="text-destructive"
             data-testid={`favorite-menu-delete-${favorite.id}`}
+            aria-label={`Remove favorite ${label}`}
             onSelect={(): void => props.onOpenDialogs({ remove: favorite })}
           >
+            <Trash2 aria-hidden="true" />
             Delete
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -290,6 +299,9 @@ export function FavoritesPage(): ReactElement {
   const createDownload = useCreateDownloadJob();
   const [sheetRows, setSheetRows] = useState<NewChapterRow[] | null>(null);
   const [renamingId, setRenamingId] = useState('');
+  // [UX-AUDIT F-6] the true split-button's default scope — the action
+  // half runs THIS; the caret half's menu items re-set it.
+  const [checkScope, setCheckScope] = useState<FavoriteCheckScopeT>('all');
   const [dialogs, setDialogs] = useState<RowDialogsState>({
     saveTo: null,
     transfer: null,
@@ -311,6 +323,21 @@ export function FavoritesPage(): ReactElement {
 
   const refreshFavorites = (): void => {
     void queryClient.invalidateQueries({ queryKey: ['favorites'] });
+  };
+
+  /** Shared batch-check wiring — the split-button's action half and
+   * every scope-menu item land here (F-5's error toast included). */
+  const runBatchCheck = (scope: FavoriteCheckScopeT): void => {
+    batch.mutate(scope, {
+      onSuccess: (result): void => {
+        refreshFavorites();
+        const sheet = toSheetRows(result.results);
+        setSheetRows(sheet.length > 0 ? sheet : null);
+      },
+      onError: (): void => {
+        toast.error('Checking favorites for new chapters failed; try again in a moment.');
+      },
+    });
   };
 
   /** Enqueue one favorite's new chapters (Download or Add-to-queue). */
@@ -354,6 +381,9 @@ export function FavoritesPage(): ReactElement {
           setSheetRows(sheet.length > 0 ? sheet : null);
         }
       },
+      onError: (): void => {
+        toast.error(`Checking ${favorite.title ?? favorite.url} for new chapters failed; try again in a moment.`);
+      },
     });
   };
 
@@ -373,6 +403,9 @@ export function FavoritesPage(): ReactElement {
             false,
           );
         }
+      },
+      onError: (): void => {
+        toast.error(`Checking ${favorite.title ?? favorite.url} for new chapters failed; try again in a moment.`);
       },
     });
   };
@@ -399,7 +432,7 @@ export function FavoritesPage(): ReactElement {
     ? (
         <EmptyState title="No favorites yet">
           <p>
-            Add favorites from a manga page or import a list — the
+            Add favorites from a manga page or import a list; the
             favorites engine checks them on schedule (bounded concurrency,
             per-favorite interval + jitter) and badges the new chapters it
             finds.
@@ -415,10 +448,10 @@ export function FavoritesPage(): ReactElement {
           ariaLabel="Favorites"
           items={rows}
           itemKey={(favorite): string => favorite.id}
-          rowClassName="favorite-row"
+          rowClassName="favorite-row px-3"
+          header={<FavoriteColumnHeader />}
           renderItem={(favorite): ReactElement => (
             <FavoriteListRow
-              index={rows.indexOf(favorite)}
               favorite={favorite}
               website={moduleNames.get(favorite.moduleId) ?? favorite.moduleId}
               renaming={renamingId === favorite.id}
@@ -438,49 +471,62 @@ export function FavoritesPage(): ReactElement {
     <section aria-label="Favorites">
       <PageHeader title="Favorites" description="Tracked titles with new-chapter checks on schedule." />
       <div className="favorites-toolbar mb-4 flex flex-wrap items-center gap-2" data-testid="favorites-toolbar">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                size="sm"
-                className="favorite-check-all h-8"
-                disabled={batch.isPending}
-                data-testid="check-all-button"
-              >
-                <RefreshCw aria-hidden="true" />
-                {batch.isPending ? 'Checking…' : 'Check for new chapters'}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" data-testid="check-scope-menu">
-              <DropdownMenuItem data-testid="check-scope-all" onSelect={(): void => {
-                batch.mutate('all', { onSuccess: (result): void => {
-                  refreshFavorites();
-                  const sheet = toSheetRows(result.results);
-                  setSheetRows(sheet.length > 0 ? sheet : null);
-                } });
-              }}>
-                All favorites
-              </DropdownMenuItem>
-              <DropdownMenuItem data-testid="check-scope-enabled" onSelect={(): void => {
-                batch.mutate('enabled', { onSuccess: (result): void => {
-                  refreshFavorites();
-                  const sheet = toSheetRows(result.results);
-                  setSheetRows(sheet.length > 0 ? sheet : null);
-                } });
-              }}>
-                Enabled only
-              </DropdownMenuItem>
-              <DropdownMenuItem data-testid="check-scope-disabled" onSelect={(): void => {
-                batch.mutate('disabled', { onSuccess: (result): void => {
-                  refreshFavorites();
-                  const sheet = toSheetRows(result.results);
-                  setSheetRows(sheet.length > 0 ? sheet : null);
-                } });
-              }}>
-                Disabled only
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* [UX-AUDIT F-6] TRUE split-button: the label half RUNS the
+           * default (last-chosen) scope; the caret half opens the scope
+           * menu (each pick re-sets the default and runs). The old
+           * single trigger looked like an action but only opened the
+           * menu — a disguised split-button. */}
+          <div className="flex items-stretch" role="group" aria-label="Check favorites for new chapters">
+            <Button
+              type="button"
+              size="sm"
+              className="favorite-check-all h-8 rounded-r-none pr-3"
+              disabled={batch.isPending}
+              aria-label={`Check ${checkScope === 'all' ? 'all favorites' : `${checkScope} favorites`} for new chapters`}
+              data-testid="check-all-button"
+              onClick={(): void => {
+                runBatchCheck(checkScope);
+              }}
+            >
+              <RefreshCw aria-hidden="true" />
+              {batch.isPending ? 'Checking…' : 'Check for new chapters'}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 rounded-l-none border-l-0 px-2"
+                  aria-label="Choose check scope"
+                  aria-haspopup="menu"
+                  disabled={batch.isPending}
+                  data-testid="check-scope-trigger"
+                >
+                  <ChevronDown aria-hidden="true" className="size-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" data-testid="check-scope-menu">
+                <DropdownMenuItem data-testid="check-scope-all" onSelect={(): void => {
+                  setCheckScope('all');
+                  runBatchCheck('all');
+                }}>
+                  All favorites
+                </DropdownMenuItem>
+                <DropdownMenuItem data-testid="check-scope-enabled" onSelect={(): void => {
+                  setCheckScope('enabled');
+                  runBatchCheck('enabled');
+                }}>
+                  Enabled only
+                </DropdownMenuItem>
+                <DropdownMenuItem data-testid="check-scope-disabled" onSelect={(): void => {
+                  setCheckScope('disabled');
+                  runBatchCheck('disabled');
+                }}>
+                  Disabled only
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           {batch.isPending ? (
             <Button
               type="button"
@@ -505,7 +551,6 @@ export function FavoritesPage(): ReactElement {
             Import list
           </Button>
       </div>
-      {rows.length > 0 ? <FavoriteColumnHeader /> : null}
       {body}
 
       <NewChaptersSheet

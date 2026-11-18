@@ -205,7 +205,8 @@ const TRIGGER_CASES: readonly TriggerCase[] = [
       await installFavorites(page, [favoriteRow()]);
     },
     open: async (page): Promise<void> => {
-      await page.getByTestId('check-all-button').tap();
+      // [UX-AUDIT F-6] the split-button's CARET opens the scope menu.
+      await page.getByTestId('check-scope-trigger').tap();
     },
     content: (page): Locator => page.getByTestId('check-scope-menu'),
   },

@@ -15,6 +15,7 @@ import { createReadStream } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { performance } from 'node:perf_hooks';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
+import multipart from '@fastify/multipart';
 import type {
   CatalogFallbackStore,
   CatalogPage,
@@ -88,6 +89,9 @@ import {
   FavoriteTransferRequestSchema,
   FavoriteTransferResponseSchema,
   FavoriteUpdateRequestSchema,
+  Fmd2ImportApplyReportSchema,
+  Fmd2ImportApplyRequestSchema,
+  Fmd2ImportPreviewSchema,
   parseOr400,
   type AccountListResponseT,
   type AccountLoginResponseT,
@@ -103,6 +107,9 @@ import {
   type FavoriteTransferResponseT,
   type FavoriteT,
   type FavoriteListResponseT,
+  type Fmd2ImportApplyReportT,
+  type Fmd2ImportApplyRequestT,
+  type Fmd2ImportPreviewT,
   type InfoResponseT,
   type JobCreatedResponseT,
   type JobBatchCreatedResponseT,
@@ -122,6 +129,7 @@ import { registerAuth, AuthService, type AuthConfig } from './auth.js';
 import { attachWebSocketHub, type WsAttachment } from './ws/attach.js';
 import type { WsHub } from './ws/hub.js';
 import { InMemoryAccountService, type AccountService } from '../accounts/account-service.js';
+import { Fmd2ImportService, FMD2_IMPORT_MAX_BYTES, type UploadedPart } from '../import/fmd2/service.js';
 import {
   InfoResponseCache,
   InMemorySettingsService,
@@ -338,6 +346,21 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     void reply.code(404).send({ error: { code: 'not_found', message: 'route not found' } });
   });
 
+  // ── multipart uploads (import-from-FMD2 only consumer) ───────────
+  // buildApp stays sync; fastify queues plugin registration and loads
+  // it at ready() — every consumer (inject, listen) triggers ready.
+  // Per-file cap = the 100MB upload limit (DESIGN); the route ALSO
+  // content-length pre-checks so oversize rejects before buffering.
+  void app.register(multipart, {
+    limits: {
+      fileSize: FMD2_IMPORT_MAX_BYTES,
+      files: 8,
+      // The apply route carries a small `selections` JSON field too.
+      fieldSize: 64 * 1024,
+      fields: 4,
+    },
+  });
+
   // ── auth (§10 cookie flow + the R4 single API token) ─────────────
   // The runtime assembly may hand in a pre-built service so the raw
   // server's /ws gate (runtime-entry) shares the SAME session store +
@@ -404,6 +427,13 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
 
   // ── modules ───────────────────────────────────────────────────────
   const settings: SettingsService = services.settings ?? new InMemorySettingsService();
+
+  // Import-from-FMD2 (two-phase API): favorites go through the ONE
+  // import code path (services.favorites.import — offline seed mode),
+  // settings through the SettingsService setters, credentials through
+  // the account store when one is wired (the in-memory dev default is
+  // NOT handed in — an ephemeral store would report false success).
+  const fmd2Import = new Fmd2ImportService(services.modules, settings, services.favorites, services.accounts);
 
   app.get('/api/modules', async (): Promise<ModuleListResponseT> => {
     const modules: ModuleSummaryT[] = services.modules.list();
@@ -1099,6 +1129,18 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     return stream;
   });
 
+  // [UX-AUDIT L-2] delete-one-artifact from the library row (the
+  // finished-file management that previously lived only on the
+  // Downloads job's delete+data action — a job deleted after
+  // finalization left its file unreachable from the UI).
+  app.delete('/api/library/:id', async (req): Promise<{ ok: true }> => {
+    const id = parseOr400(JobIdSchema, (req.params as Record<string, unknown>)['id'], 'library file id');
+    if (!services.library.remove(id)) {
+      throw notFound('Library file', id);
+    }
+    return { ok: true };
+  });
+
   // ── favorites (§7.2 DoCheck engine + scheduler) ───────────────────
   // R5 arrival (additive): `?since=<ISO>` switches each row's additive
   // `newsSince` flag on — "a check ran at/after `since` and found new
@@ -1133,7 +1175,7 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     const body = parseOr400(FavoriteImportRequestSchema, req.body, 'favorite import body');
     let favorite: FavoriteT;
     try {
-      favorite = await services.favorites.import(body);
+      ({ favorite } = await services.favorites.import(body));
     } catch (err: unknown) {
       if (err instanceof ApiError) {
         throw err;
@@ -1236,7 +1278,100 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     return FavoriteTransferResponseSchema.parse(result);
   });
 
+  // ── import from FMD2 (two-phase: analyze → apply) ────────────────
+  app.post('/api/import/fmd2/analyze', async (req): Promise<Fmd2ImportPreviewT> => {
+    const upload = await collectMultipartUpload(req, 'FMD2 analyze');
+    const preview = fmd2Import.analyze(upload.parts);
+    return Fmd2ImportPreviewSchema.parse(preview);
+  });
+
+  app.post('/api/import/fmd2/apply', async (req): Promise<Fmd2ImportApplyReportT> => {
+    let parts: readonly UploadedPart[];
+    let selections: Fmd2ImportApplyRequestT;
+    if (typeof req.isMultipart === 'function' && req.isMultipart()) {
+      const upload = await collectMultipartUpload(req, 'FMD2 apply');
+      parts = upload.parts;
+      selections =
+        upload.fields['selections'] === undefined
+          ? {}
+          : parseOr400(Fmd2ImportApplyRequestSchema, safeJson(upload.fields['selections']), 'FMD2 apply selections field');
+    } else {
+      const body = parseOr400(Fmd2ImportApplyRequestSchema, req.body, 'FMD2 apply body');
+      if (body.token === undefined) {
+        throw new ApiError(400, 'bad_request', 'FMD2 apply needs either the multipart upload or the analyze token');
+      }
+      parts = fmd2Import.stagedParts(body.token);
+      selections = body;
+    }
+    const report = await fmd2Import.apply(parts, selections);
+    return Fmd2ImportApplyReportSchema.parse(report);
+  });
+
   return app;
+}
+
+// ── multipart upload collection (import-from-FMD2) ──────────────────
+
+interface CollectedUpload {
+  readonly parts: readonly UploadedPart[];
+  readonly fields: Readonly<Record<string, string>>;
+}
+
+function safeJson(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Collect one multipart request into file parts + form fields, mapping
+ * every failure mode to a typed 400 (never a 500): wrong content type,
+ * the 100MB cap (content-length pre-check AND the per-file stream
+ * limit), malformed bodies. An upload with NO files lets the analyze
+ * service render its own 'no recognizable FMD2 file' 400.
+ */
+async function collectMultipartUpload(req: FastifyRequest, what: string): Promise<CollectedUpload> {
+  if (typeof req.isMultipart !== 'function' || !req.isMultipart()) {
+    throw new ApiError(400, 'bad_request', `${what}: multipart/form-data with the FMD2 file(s) is required`);
+  }
+  const contentLength = Number(req.headers['content-length'] ?? '0');
+  if (Number.isFinite(contentLength) && contentLength > FMD2_IMPORT_MAX_BYTES + 1024 * 1024) {
+    throw new ApiError(400, 'bad_request', `${what}: upload exceeds the 100 MB cap`);
+  }
+  const parts: UploadedPart[] = [];
+  const fields: Record<string, string> = {};
+  try {
+    for await (const part of req.parts()) {
+      if (part.type === 'file') {
+        if (part.filename === '') {
+          continue; // empty file input (nothing chosen)
+        }
+        if (part.file.truncated) {
+          throw new ApiError(400, 'bad_request', `${what}: ${part.filename} exceeds the 100 MB cap`);
+        }
+        const bytes = await part.toBuffer();
+        if (bytes.length > FMD2_IMPORT_MAX_BYTES) {
+          throw new ApiError(400, 'bad_request', `${what}: ${part.filename} exceeds the 100 MB cap`);
+        }
+        parts.push({ name: part.filename, bytes });
+      } else {
+        fields[part.fieldname] = typeof part.value === 'string' ? part.value : String(part.value ?? '');
+      }
+    }
+  } catch (err: unknown) {
+    if (err instanceof ApiError) {
+      throw err;
+    }
+    // @fastify/multipart limit errors (RequestFileTooLargeError etc.)
+    throw new ApiError(
+      400,
+      'bad_request',
+      `${what}: unreadable multipart body (${err instanceof Error ? err.message : String(err)})`,
+    );
+  }
+  return { parts, fields };
 }
 
 export type {

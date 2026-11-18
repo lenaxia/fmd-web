@@ -128,8 +128,12 @@ test('create favorite from the manga page, batch-check, decide in the sheet, dow
   // 2 — the listing shows the parity columns (website join + dates).
   await page.goto('/#favorites');
   await expect(page.getByText('Alpha Quest')).toBeVisible();
-  await expect(page.getByText('FixtureSite').first()).toBeVisible();
-  await expect(page.getByText(/added 2026-11-12 00:00/u).first()).toBeVisible();
+  // exact: the Website COLUMN cell (the <xl meta line also carries the
+  // name but is display:none at this width).
+  await expect(page.getByText('FixtureSite', { exact: true })).toBeVisible();
+  // The meta line carries the Added date at EVERY width (its visible
+  // child swaps to the compact added-only form at xl).
+  await expect(page.locator('.favorite-columns-meta').first()).toContainText('added 2026-11-12 00:00');
   await expect(page.getByText('Website')).toBeVisible();
 
   // 3 — toolbar batch check, scope menu → All.

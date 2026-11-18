@@ -147,7 +147,10 @@ describe('SettingsPage D20 bootstrap empty state', (): void => {
     renderWithProviders(<SettingsPage />, { fetch });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Sync modules' }));
-    expect(await screen.findByText(/Module sync: 412\/417 files registered/)).toBeInTheDocument();
+    // [UX-AUDIT T-6] one-line status + collapsed technical detail (the
+    // tree-SHA/file-count wall lives inside <details> now).
+    expect(await screen.findByText('Module sync complete: 454 modules.')).toBeInTheDocument();
+    expect(screen.getByText(/412\/417 files registered, 5 failed/)).toBeInTheDocument();
     // the tolerated failures list, in full, in the Settings surface
     expect(await screen.findByText(/2 upstream-broken file\(s\) tolerated/)).toBeInTheDocument();
     const list = screen.getByLabelText('Tolerated broken module files');

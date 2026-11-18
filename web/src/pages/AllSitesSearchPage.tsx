@@ -87,7 +87,7 @@ export function AllSitesSearchPage(props: { route: Route }): ReactElement {
           <>
             <span className="site-title">All installed sites</span>
             <p className="mt-1 text-xs text-muted-foreground">
-              Searches every installed site catalog at once — a local catalog union, exactly like
+              Searches every installed site catalog at once; a local catalog union, exactly like
               FMD2’s “search from all sites”. Sites without an installed catalog are skipped
               (shown below).
             </p>
@@ -173,14 +173,9 @@ export function AllSitesSearchPage(props: { route: Route }): ReactElement {
         </EmptyState>
       ) : null}
 
-      {q === '' ? (
-        <EmptyState title="Search every installed site at once">
-          <p>
-            Type a title (or set filters from a site’s Browse page) — the union runs over every
-            INSTALLED catalog simultaneously and each result row shows the website it came from.
-          </p>
-        </EmptyState>
-      ) : null}
+      {/* [UX-AUDIT AS-2] the idle state no longer repeats the header's
+       * explanation in a second card — the PageHeader description above
+       * the search bar is the single teacher. */}
     </section>
   );
 }

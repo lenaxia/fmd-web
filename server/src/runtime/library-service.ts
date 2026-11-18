@@ -67,4 +67,14 @@ export class SqliteLibraryService implements LibraryService {
     const text = this.store.getDownloadedChapters(moduleId, url);
     return text === '' ? [] : splitTextLines(text);
   }
+
+  /** [UX-AUDIT L-2] delete-one-artifact (file + row) — the store's
+   * deleteLibraryFileByPath already owns the unlink safety guard. */
+  remove(id: string): boolean {
+    const row = this.store.getLibraryFile(id);
+    if (row === undefined) {
+      return false;
+    }
+    return this.store.deleteLibraryFileByPath(row.path);
+  }
 }

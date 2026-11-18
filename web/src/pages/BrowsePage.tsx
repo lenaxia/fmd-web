@@ -59,6 +59,7 @@ import { useHighlightNew } from '../state/highlight-new';
 import { catalogSyncJobId } from '../state/ws-protocol';
 import {
   EMPTY_FILTERS,
+  activeFilterCount,
   hasActiveFilters,
   parseFilterQuery,
   serializeFilterQuery,
@@ -69,7 +70,9 @@ import {
   useSyncCatalogProgress,
   type ProvisionMachine,
 } from '../state/use-sync-catalog-progress';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { navigate, replaceRoute, type Route } from '../router';
 import { useRoute } from '../state/use-route';
@@ -270,25 +273,26 @@ function SiteBrowse(props: { siteId: string; route: Route }): ReactElement {
 
       <PageHeader
         title="Browse"
-        description={
-          <>
-            <span className="site-title">{siteName}</span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="ml-2 h-7"
-              onClick={(): void => {
-                // Back to the full picker (site-first secondary mode),
-                // not the search home — 'Change site' keeps its FMD2
-                // meaning of swapping to another site.
-                navigate('browse', { sites: '1' });
-              }}
-            >
-              <Undo2 aria-hidden="true" />
-              Change site
-            </Button>
-          </>
+        description={<span className="site-title">{siteName}</span>}
+        actions={
+          // [UX-AUDIT B-2] an action belongs in the header actions slot,
+          // never inside the description paragraph.
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 max-md:min-h-touch-target"
+            data-testid="change-site"
+            onClick={(): void => {
+              // Back to the full picker (site-first secondary mode),
+              // not the search home — 'Change site' keeps its FMD2
+              // meaning of swapping to another site.
+              navigate('browse', { sites: '1' });
+            }}
+          >
+            <Undo2 aria-hidden="true" />
+            Change site
+          </Button>
         }
       />
 
@@ -297,7 +301,7 @@ function SiteBrowse(props: { siteId: string; route: Route }): ReactElement {
       {brokenReason !== undefined ? (
         <EmptyState title="This site is unavailable">
           <p>
-            {siteName} is known broken upstream — opening it is disabled until an upstream fix
+            {siteName} is known broken upstream; opening it is disabled until an upstream fix
             lands.
           </p>
           <p className="text-xs">{brokenReason}</p>
@@ -358,7 +362,7 @@ function ProvisionPanel(props: {
       >
         <p>
           A transient error interrupted opening {props.siteName}. Retry when your connection
-          allows — nothing partial was installed.
+          allows; nothing partial was installed.
         </p>
         {v.detail !== undefined ? <p className="text-xs">{v.detail}</p> : null}
       </EmptyState>
@@ -385,7 +389,7 @@ function ProvisionPanel(props: {
       <p className="text-sm font-medium">Preparing {props.siteName}…</p>
       <p className="text-xs text-muted-foreground">
         {v.view === 'installing'
-          ? 'Getting the site ready — this only happens the first time you open it.'
+          ? 'Getting the site ready; this only happens the first time you open it.'
           : 'Starting…'}
       </p>
       <Button type="button" variant="outline" size="sm" className="mt-2" onClick={props.onCancel}>
@@ -449,6 +453,7 @@ function CatalogEntries(props: {
   };
 
   const filtering: boolean = hasActiveFilters(state);
+  const filterCount: number = activeFilterCount(state);
   // FMD2 lbMode parity: All / Filtered (+ which tab served the list).
   const modeLabel: SearchModeLabel = filtering ? 'filtered' : view === 'title' ? 'all' : 'latest';
 
@@ -494,12 +499,26 @@ function CatalogEntries(props: {
           variant="outline"
           size="sm"
           aria-expanded={filtersOpen}
+          aria-label={filterCount > 0 ? `Filters, ${String(filterCount)} active` : 'Filters'}
+          data-testid="filters-toggle"
           onClick={(): void => {
             setFiltersOpen((open): boolean => !open);
           }}
         >
           <ChevronDown aria-hidden="true" className={filtersOpen ? 'rotate-180 transition-transform' : 'transition-transform'} />
-          Filters{filtering ? ' •' : ''}
+          Filters
+          {/* [UX-AUDIT B-1] the '•' glyph was invisible + unannounced;
+           * the count badge mirrors the AppliedFilterChips dimensions. */}
+          {filterCount > 0 ? (
+            <Badge
+              variant="secondary"
+              aria-hidden="true"
+              data-testid="filters-count"
+              className="ml-1 px-1.5 py-0 text-[11px] leading-none font-semibold"
+            >
+              {filterCount}
+            </Badge>
+          ) : null}
         </Button>
 
         <HighlightNewToggle />
@@ -516,7 +535,25 @@ function CatalogEntries(props: {
       <AppliedFilterChips state={state} onChange={onFiltersChange} />
 
       {pages.isError ? <ErrorBanner error={pages.error} /> : null}
-      {pages.isPending ? <p role="status" className="text-sm text-muted-foreground">Loading…</p> : null}
+      {pages.isPending ? (
+        // [UX-AUDIT B-3] skeleton rows sized like the real entries
+        // (EntryRow: min-h-row + px-3 py-2) so the list doesn't pop in.
+        <div
+          role="status"
+          aria-live="polite"
+          aria-label="Loading catalog entries"
+          data-testid="catalog-skeleton"
+          className="catalog-list overflow-hidden rounded-lg border"
+        >
+          {Array.from({ length: 5 }, (_, i): ReactElement => (
+            <div key={i} className="flex min-h-row items-center gap-3 px-3 py-2">
+              <Skeleton className="h-4 w-1/3" />
+              <Skeleton className="h-3 w-1/4" />
+              <Skeleton className="ml-auto h-3 w-16" />
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {entries.length > 0 ? (
         <>
