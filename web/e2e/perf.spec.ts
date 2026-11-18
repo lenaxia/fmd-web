@@ -81,7 +81,7 @@ test('Settings site list: 1000 modules render virtualized, scroll without jank',
   // cards (settings-parity) whose texts carry the same site names.
   const moduleList = page.getByRole('list', { name: 'Site modules' });
   await expect(moduleList.getByText('PerfSite 0', { exact: true })).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByText(/Modules \(1000\)/)).toBeVisible();
+  await expect(page.getByText(/Websites \(1000\)/)).toBeVisible();
 
   const list = page.locator('.module-list');
   await expect(page.locator('[data-virtualized="true"]')).toHaveCount(1);

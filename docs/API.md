@@ -224,6 +224,36 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/
   "$BASE/api/favorites/import" | jq '.favorite'
 ```
 
+### Import from FMD2 (the desktop app's own files)
+
+Two phases: `analyze` parses the upload read-only and returns a preview
+(favorites by site, unmapped catalog ids, mappable settings, detected
+credential FIELDS — never values) plus a token; `apply` performs the
+confirmed import. Credentials are opt-in (`credentials: [...]`) and default
+OFF. Re-running apply on the same data is idempotent — favorites upsert by
+module id + canonical URL, never duplicate.
+
+```bash
+# phase 1 — multipart: favorites.db / downloadedchapters.db / settings.json /
+# modules.json / config.json, or a zip of the FMD2 data dir (100MB/file cap)
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  -F 'file=@favorites.db' -F 'file=@settings.json' \
+  "$BASE/api/import/fmd2/analyze" > /tmp/preview.json
+jq '{favorites: .favorites.importable, unmapped: .favorites.unmappedSiteIds,
+     settings: [.settings.mappable[].key], token: .analyzeToken}' /tmp/preview.json
+
+# phase 2 — the token from analyze (no re-upload); pick selections
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"token":"'"$(jq -r .analyzeToken /tmp/preview.json)"'",
+       "favorites":true,
+       "settings":["proxy","performance","favorites-scheduler"],
+       "credentials":[]}' \
+  "$BASE/api/import/fmd2/apply" \
+  | jq '{created: .favorites.created, updated: .favorites.updated,
+         skipped: (.favorites.skipped|length),
+         notImported: (.settings.notImportable|length)}'
+```
+
 ### Library — finalized chapters
 
 ```bash

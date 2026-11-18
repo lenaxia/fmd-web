@@ -120,6 +120,7 @@ export default tseslint.config(
     files: ['server/src/**/*.ts'],
     ignores: [
       'server/src/tools/import/**',
+      'server/src/import/fmd2/**',
       'server/src/engine/shims/install.ts',
     ],
     rules: {

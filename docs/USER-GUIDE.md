@@ -341,6 +341,33 @@ installed sites when `moduleid` is absent. Every entry reports
 imported/failed individually. Imported favorites mark all currently-live
 chapters as downloaded — nothing re-downloads en masse.
 
+### Bringing over a desktop install (Import from FMD2)
+
+Settings → **Import from FMD2** reads the desktop app's own files — no
+hand-edited formats. Drop `favorites.db` and/or `downloadedchapters.db`
+and/or `settings.json` and/or `modules.json`, or a **zip of the whole FMD2
+data folder**, and the server parses them read-only into a preview: how many
+favorites per site (with your downloaded-chapter history), which settings
+map onto the server's, and which sites are **no longer in the catalog**
+(dead or renamed ids are listed and skipped — the rest still imports).
+
+Confirm what you want:
+
+- **Favorites** — upserted idempotently; re-importing the same file never
+  duplicates. Titles, statuses, current chapters and the
+  downloaded-chapter lists carry over (desktop save-to *paths* don't — the
+  server manages its own library layout).
+- **Settings** — only the fields the server supports (proxy, connections
+  subset, output defaults, favorites schedule); everything else is listed
+  as *not imported* in the result.
+- **Credentials** — per-site logins and the proxy login are **off by
+  default**: tick the sites you want (they decrypt with FMD2's built-in
+  key and land in Settings → Accounts).
+
+API users: the same flow is scriptable — `POST /api/import/fmd2/analyze`
+(multipart, returns the preview + a token) then `POST /api/import/fmd2/apply`
+(see [API.md](API.md) and the OpenAPI spec).
+
 ## Accounts
 
 Some sites need a login for full access. Per-site accounts live in
@@ -442,6 +469,7 @@ feature-by-feature disposition matrix lives in
 | Tray menu *Resume all / Stop all* | Downloads toolbar **Resume all / Pause all** |
 | Site **combo box** (cbSelectManga) | Search-first **home** (all-sites search) + the **Browse sites** picker with category chips |
 | The **Filter sub-tab** (genres/authors/only-new) | The **Filters** panel on a site's browse page |
+| **Options → Import favorites** (another FMD install's folder) | Settings → **Import from FMD2** — upload the desktop data files (favorites.db, settings.json, modules.json or a zip of the folder) and pick what lands |
 | Right-click **Update list** | **Re-sync catalog** on the site's Settings row |
 | **Accounts manager** | Settings → **Accounts** (per-site cards, status badges, cookies) |
 | Website **options grid** | Settings → Modules → **Configure** (per-module options, cookies, proxy override) |

@@ -74,6 +74,7 @@ describe('FMD2-key isolation (criterion 3)', (): void => {
     const importers = srcFiles.filter((file) => importsMigrationModule(readFileSync(file, 'utf8')));
     expect(importers.map(rel).sort()).toEqual([
       'server/src/engine/shims/install.ts', // fmd.crypto surface wiring (documented)
+      'server/src/import/fmd2/secrets.ts', // the import FEATURE adapter (analyze/apply)
       'server/src/tools/import/fmd2-accounts.ts', // the import path itself
     ]);
   });
