@@ -232,35 +232,95 @@ export class FavoritesEngine {
   }
 
   /**
-   * Favorites-import path (D4): create a favorite and immediately run
-   * the tag-100 transfer branch (:356-361) — every live chapter lands
-   * in the favorite's stored downloaded list. Re-adding an existing key
-   * re-ingests from the CURRENT live list (idempotent: the merge keeps
-   * one case-insensitive set).
+   * Favorites-import path — the ONE import primitive both entry points
+   * share (the JSON-list tag-100 route and the FMD2 file import):
+   *
+   * - WITHOUT `seed` (tag-100, D4): create and immediately run the
+   *   transfer branch (:356-361) — every live chapter lands in the
+   *   favorite's stored downloaded list. Re-adding an existing key
+   *   re-ingests from the CURRENT live list (idempotent: the merge
+   *   keeps one case-insensitive set).
+   *
+   * - WITH `seed` (FMD2 favorites.db import, MD_ImportToFavorites
+   *   parity — uSilentThread.pas:507-513: NO live fetch): the row is
+   *   seeded offline from the file's own fields (status, current
+   *   chapter, downloaded list, enabled, date added) and the optional
+   *   `ledgerChapters` merges into the global downloaded_chapters row
+   *   (SetChapters merge parity). Idempotent by mangaKey: an existing
+   *   row merges (lists union, file values win where present) and the
+   *   result reports whether anything actually changed.
    */
   public async importFavorite(input: {
     moduleId: string;
     url: string;
     title?: string;
     autoDownload?: boolean;
-  }): Promise<FavoriteCheckResult> {
+    seed?: {
+      status?: string;
+      currentChapter?: number | null;
+      downloadedChapterList?: string;
+      enabled?: boolean;
+      dateAdded?: number;
+      /** Ledger text for downloaded_chapters (merged, never replaced). */
+      ledgerChapters?: string;
+    };
+  }): Promise<FavoriteCheckResult & { readonly importOutcome: 'created' | 'updated' | 'unchanged' }> {
     const mangaKey = downloadedChaptersKey(input.moduleId, input.url);
     const existing = this.deps.store.getFavorite(mangaKey);
-    const seed: FavoriteRow = {
+    const seed = input.seed;
+    const seedList =
+      seed?.downloadedChapterList !== undefined && seed.downloadedChapterList !== ''
+        ? seed.downloadedChapterList
+        : undefined;
+    const mergedList =
+      seedList !== undefined && existing?.downloadedChapterList !== undefined
+        ? mergeCaseInsensitive(existing.downloadedChapterList, seedList)
+        : seedList ?? existing?.downloadedChapterList ?? '';
+    const candidate: FavoriteRow = {
       // Re-ingest keeps the stored row's shape (status/currentChapter/
       // saveTo/enabled/dateAdded — only the diff-relevant fields reset).
       ...(existing !== undefined ? existing : {}),
       mangaKey,
       moduleId: input.moduleId,
       url: input.url,
-      ...(input.title !== undefined ? { title: input.title } : {}),
+      ...(input.title !== undefined && input.title !== '' ? { title: input.title } : {}),
       autoDownload: input.autoDownload ?? existing?.autoDownload ?? false,
       newChapterCount: 0,
-      ...(existing?.downloadedChapterList !== undefined
-        ? { downloadedChapterList: existing.downloadedChapterList }
+      downloadedChapterList: mergedList,
+      ...(seed !== undefined
+        ? {
+            ...(seed.status !== '' ? { status: seed.status } : {}),
+            ...(seed.currentChapter !== null && seed.currentChapter !== undefined
+              ? { currentChapter: seed.currentChapter }
+              : {}),
+            ...(seed.enabled !== undefined ? { enabled: seed.enabled } : {}),
+            ...(seed.dateAdded !== undefined && existing === undefined ? { dateAdded: seed.dateAdded } : {}),
+          }
         : {}),
     };
-    this.deps.store.upsertFavorite(seed);
+    const before = existing;
+    this.deps.store.upsertFavorite(candidate);
+    if (seed !== undefined) {
+      if (seed.ledgerChapters !== undefined && seed.ledgerChapters !== '') {
+        // SetChapters parity: new row stores as-is, existing merges
+        // case-insensitively (store-level semantics).
+        this.deps.store.setDownloadedChapters(input.moduleId, input.url, seed.ledgerChapters);
+      }
+      const importOutcome: 'created' | 'updated' | 'unchanged' =
+        before === undefined
+          ? 'created'
+          : favoriteRowsEqual(before, candidate)
+            ? 'unchanged'
+            : 'updated';
+      return {
+        favorite: candidate,
+        outcome: 'checked',
+        newChapters: [],
+        queuedDownloads: 0,
+        transferIngest: false,
+        importOutcome,
+      };
+    }
     // The transfer branch reads the intent off the check input, then
     // the persisted row never carries the flag (FMD2 resets Tag to 0).
     const favorite = this.deps.store.getFavorite(mangaKey);
@@ -268,7 +328,7 @@ export class FavoritesEngine {
       throw new ApiError(500, 'internal_error', `favorite vanished during import: ${mangaKey}`);
     }
     if (favorite.url === '') {
-      return { favorite, outcome: 'skipped', newChapters: [], queuedDownloads: 0, transferIngest: false };
+      return { favorite, outcome: 'skipped', newChapters: [], queuedDownloads: 0, transferIngest: false, importOutcome: 'unchanged' };
     }
     const live = await this.deps.info.getInfo(favorite.moduleId, favorite.url);
     const outcome = doCheck({ ...favorite, transferIngest: true }, live, this.now());
@@ -281,7 +341,14 @@ export class FavoritesEngine {
       downloadedChapterList: outcome.downloadedChapterList,
     };
     this.deps.store.upsertFavorite(updated);
-    return { favorite: updated, outcome: 'checked', newChapters: [], queuedDownloads: 0, transferIngest: true };
+    return {
+      favorite: updated,
+      outcome: 'checked',
+      newChapters: [],
+      queuedDownloads: 0,
+      transferIngest: true,
+      importOutcome: before === undefined ? 'created' : 'updated',
+    };
   }
 
   /** All favorites (scheduler input / listing). */
@@ -293,6 +360,26 @@ export class FavoritesEngine {
   public storeView(): FavoritesEngineDeps['store'] {
     return this.deps.store;
   }
+}
+
+/** Field-wise favorite equality (import idempotency: 'unchanged' verdict). */
+function favoriteRowsEqual(a: FavoriteRow, b: FavoriteRow): boolean {
+  return (
+    a.mangaKey === b.mangaKey &&
+    a.moduleId === b.moduleId &&
+    a.url === b.url &&
+    a.title === b.title &&
+    a.status === b.status &&
+    a.currentChapter === b.currentChapter &&
+    a.lastCheck === b.lastCheck &&
+    a.lastUpdated === b.lastUpdated &&
+    a.autoDownload === b.autoDownload &&
+    a.newChapterCount === b.newChapterCount &&
+    (a.downloadedChapterList ?? '') === (b.downloadedChapterList ?? '') &&
+    (a.saveTo ?? '') === (b.saveTo ?? '') &&
+    a.enabled === b.enabled &&
+    a.dateAdded === b.dateAdded
+  );
 }
 
 /** The scheduler identity input for one favorite row. */

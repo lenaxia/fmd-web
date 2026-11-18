@@ -230,13 +230,26 @@ export class SqliteFavoritesService implements FavoriteService {
     return { favorite: toFavoriteWire(row), reloadedFromServer: target.clearDownloadedList };
   }
 
-  async import(input: FavoriteCreateRequestT): Promise<FavoriteT> {
+  async import(
+    input: FavoriteCreateRequestT & {
+      /** FMD2 file-import seed (offline, MD_ImportToFavorites parity). */
+      seed?: {
+        status?: string;
+        currentChapter?: number | null;
+        downloadedChapterList?: string;
+        enabled?: boolean;
+        dateAdded?: number;
+        ledgerChapters?: string;
+      };
+    },
+  ): Promise<{ favorite: FavoriteT; importOutcome: 'created' | 'updated' | 'unchanged' }> {
     const result = await this.engine.importFavorite({
       moduleId: input.moduleId,
       url: input.url,
       ...(input.title !== undefined ? { title: input.title } : {}),
       ...(input.autoDownload !== undefined ? { autoDownload: input.autoDownload } : {}),
+      ...(input.seed !== undefined ? { seed: input.seed } : {}),
     });
-    return toFavoriteWire(result.favorite);
+    return { favorite: toFavoriteWire(result.favorite), importOutcome: result.importOutcome };
   }
 }

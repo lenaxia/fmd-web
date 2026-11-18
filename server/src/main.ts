@@ -116,17 +116,18 @@ export function createApp(services: ApiServices = createDefaultServices()): Retu
 interface BufferedRequest {
   readonly method: string;
   readonly url: string;
-  readonly body?: string;
+  /** Raw request bytes — binary-exact (multipart/sqlite/zip uploads). */
+  readonly body?: Buffer;
 }
 
-function readBody(req: IncomingMessage): Promise<string | undefined> {
+function readBody(req: IncomingMessage): Promise<Buffer | undefined> {
   return new Promise((resolveBody): void => {
     const chunks: Buffer[] = [];
     req.on('data', (chunk: Buffer): void => {
       chunks.push(chunk);
     });
     req.on('end', (): void => {
-      resolveBody(chunks.length === 0 ? undefined : Buffer.concat(chunks).toString('utf8'));
+      resolveBody(chunks.length === 0 ? undefined : Buffer.concat(chunks));
     });
     req.on('error', (): void => {
       resolveBody(undefined);
@@ -136,10 +137,12 @@ function readBody(req: IncomingMessage): Promise<string | undefined> {
 
 /**
  * Raw-http → Fastify bridge: every request (healthcheck included) runs
- * through the same app the inject tests cover.
+ * through the same app the inject tests cover. The body stays BYTES:
+ * a UTF-8 string round-trip corrupts binary uploads (sqlite/zip), and
+ * light-my-request decodes by content-type from the Buffer itself.
  */
 export async function respondAsync(app: ReturnType<typeof buildApp>, req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const body: string | undefined = req.method === 'GET' || req.method === 'HEAD' ? undefined : await readBody(req);
+  const body: Buffer | undefined = req.method === 'GET' || req.method === 'HEAD' ? undefined : await readBody(req);
   const injected: BufferedRequest = {
     method: req.method ?? 'GET',
     url: req.url ?? '/',
