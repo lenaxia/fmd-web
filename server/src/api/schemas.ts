@@ -954,7 +954,121 @@ export type FavoriteUpdateRequestT = z.infer<typeof FavoriteUpdateRequestSchema>
 
 /** POST /api/favorites/import — the tag-100 transfer-favorite path (D4). */
 export const FavoriteImportRequestSchema = FavoriteCreateRequestSchema;
-export type FavoriteImportRequestT = FavoriteCreateRequestT;
+export type FavoriteImportRequestT = z.infer<typeof FavoriteImportRequestSchema>;
+
+// ── import from FMD2 (two-phase API: analyze → apply) ────────────────
+
+/** One file the upload contained but nothing imports from (report row). */
+export const Fmd2NotImportableSchema = z.object({
+  source: z.string(),
+  reason: z.string(),
+});
+export type Fmd2NotImportableT = z.infer<typeof Fmd2NotImportableSchema>;
+
+/**
+ * POST /api/import/fmd2/analyze response — the preview (parses WITHOUT
+ * writing anything). Credential fields are NAMES ONLY; secret values
+ * are never echoed in any response.
+ */
+export const Fmd2ImportPreviewSchema = z.object({
+  /** Recognized + consumed file names (favorites.db, settings.json, …). */
+  files: z.array(z.string()),
+  ignored: z.array(Fmd2NotImportableSchema),
+  favorites: z.object({
+    total: z.number().int().nonnegative(),
+    importable: z.number().int().nonnegative(),
+    bySite: z.array(
+      z.object({
+        moduleId: z.string(),
+        siteName: z.string(),
+        count: z.number().int().nonnegative(),
+        mapped: z.boolean(),
+      }),
+    ),
+    /** Dead/renamed/typo'd catalog ids — surfaced, import proceeds without. */
+    unmappedSiteIds: z.array(
+      z.object({ id: z.string(), count: z.number().int().nonnegative() }),
+    ),
+  }),
+  downloadedLedger: z.object({
+    rows: z.number().int().nonnegative(),
+    matched: z.number().int().nonnegative(),
+  }),
+  settings: z.object({
+    mappable: z.array(
+      z.object({
+        key: z.string(),
+        label: z.string(),
+        source: z.string(),
+        /** Sanitized target value (never a secret). */
+        preview: z.string(),
+        /** Applying needs the explicit credential opt-in. */
+        requiresCredentials: z.boolean(),
+      }),
+    ),
+    notImportable: z.array(Fmd2NotImportableSchema),
+  }),
+  credentials: z.object({
+    sites: z.array(
+      z.object({
+        moduleId: z.string(),
+        siteName: z.string(),
+        fields: z.array(z.string()),
+      }),
+    ),
+    globalProxyAuth: z.boolean(),
+  }),
+  /** Server-held staging handle — apply may re-upload OR present this. */
+  analyzeToken: z.string(),
+});
+export type Fmd2ImportPreviewT = z.infer<typeof Fmd2ImportPreviewSchema>;
+
+/**
+ * POST /api/import/fmd2/apply request (JSON mode): the analyze token
+ * for the staged upload + the user's confirmed selections. The same
+ * route accepts multipart (files + a `selections` JSON field) instead.
+ * Credential import is OPT-IN (`credentials`, off by default).
+ */
+export const Fmd2ImportApplyRequestSchema = z.object({
+  token: z.string().min(1).optional(),
+  favorites: z.boolean().optional(),
+  settings: z.array(z.string()).optional(),
+  credentials: z.array(z.string()).optional(),
+});
+export type Fmd2ImportApplyRequestT = z.infer<typeof Fmd2ImportApplyRequestSchema>;
+
+/** POST /api/import/fmd2/apply response — the import report. */
+export const Fmd2ImportApplyReportSchema = z.object({
+  favorites: z.object({
+    created: z.number().int().nonnegative(),
+    updated: z.number().int().nonnegative(),
+    unchanged: z.number().int().nonnegative(),
+    skipped: z.array(
+      z.object({ label: z.string(), reason: z.string() }),
+    ),
+    unmappedSiteIds: z.array(
+      z.object({ id: z.string(), count: z.number().int().nonnegative() }),
+    ),
+    /** Desktop save-to paths deliberately not carried (server paths differ). */
+    saveToPathsDropped: z.number().int().nonnegative(),
+  }),
+  downloadedLedgerRowsApplied: z.number().int().nonnegative(),
+  credentials: z.object({
+    imported: z.array(
+      z.object({ moduleId: z.string(), fields: z.array(z.string()) }),
+    ),
+    skipped: z.array(
+      z.object({ moduleId: z.string(), reason: z.string() }),
+    ),
+  }),
+  settings: z.object({
+    applied: z.array(
+      z.object({ key: z.string(), detail: z.string() }),
+    ),
+    notImportable: z.array(Fmd2NotImportableSchema),
+  }),
+});
+export type Fmd2ImportApplyReportT = z.infer<typeof Fmd2ImportApplyReportSchema>;
 
 export const FavoriteNewChapterSchema = z.object({
   position: z.number().int().nonnegative(),

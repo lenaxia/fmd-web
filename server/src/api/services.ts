@@ -1645,6 +1645,7 @@ export class InMemoryFavoriteService implements FavoriteService {
       // Existing row keeps its shape (dates, saveTo…); file values win
       // where present (MD_ImportToFavorites parity).
       ...(before ?? {
+        title: null,
         status: behavior.status ?? null,
         currentChapter: behavior.currentChapter ?? null,
         newChapterCount: behavior.newChapterCount ?? 0,

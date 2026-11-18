@@ -36,8 +36,8 @@ function DragDropZone(props: {
 }): ReactElement {
   const input = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
-  const take = (list: FileList | undefined): void => {
-    const files = list === undefined ? [] : [...list];
+  const take = (list: FileList | null | undefined): void => {
+    const files = list === undefined || list === null ? [] : [...list];
     if (files.length > 0) {
       props.onFiles(files);
     }
