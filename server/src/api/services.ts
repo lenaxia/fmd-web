@@ -11,7 +11,7 @@
  * over the create body minus the key itself.
  */
 import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
+import { existsSync, rmSync, statSync } from 'node:fs';
 import type { RegistrationRecord } from '../engine/facade.js';
 import { isValidCatalogId } from '../sync/db/catalog-store.js';
 import type {
@@ -1147,6 +1147,11 @@ export interface LibraryService {
    * `downloaded` array — MangaPage tinting/hide-downloaded parity).
    */
   downloadedChapters(moduleId: string, url: string): string[];
+  /**
+   * [UX-AUDIT L-2] remove one library artifact: the row AND the file
+   * on disk. Returns false when the id is unknown (the route 404s).
+   */
+  remove(id: string): boolean;
 }
 
 /** In-memory library store (dev/test stand-in for `library_files`). */
@@ -1163,6 +1168,23 @@ export class InMemoryLibraryService implements LibraryService {
 
   downloadedChapters(moduleId: string, url: string): string[] {
     return [...(this.downloaded.get(downloadedChaptersKey(moduleId, url)) ?? [])];
+  }
+
+  remove(id: string): boolean {
+    // Same safety contract as deleteLibraryFileByPath: remove the
+    // artifact only when it is still a regular file on disk.
+    const row = this.rows.get(id);
+    if (row === undefined) {
+      return false;
+    }
+    try {
+      if (statSync(row.path).isFile()) {
+        rmSync(row.path);
+      }
+    } catch {
+      // Missing/unreachable file — the row removal still stands.
+    }
+    return this.rows.delete(id);
   }
 
   /** Insert-or-replace by absolute path (a re-download swaps the entry). */
@@ -1439,8 +1461,25 @@ export interface FavoriteService {
     id: string,
     target: { moduleId: string; url: string; clearDownloadedList: boolean },
   ): Promise<{ favorite: FavoriteT; reloadedFromServer: boolean }>;
-  /** D4 import path: the tag-100 transfer-favorite bulk-ingest. */
-  import(input: FavoriteCreateRequestT): Promise<FavoriteT>;
+  /**
+   * D4 import path: the tag-100 transfer-favorite bulk-ingest. The
+   * optional `seed` switches to the FMD2 favorites.db offline import
+   * (MD_ImportToFavorites parity — no live fetch; file fields seed the
+   * row, the ledger text merges into downloaded_chapters). Returns the
+   * favorite plus the idempotency verdict for the import report.
+   */
+  import(
+    input: FavoriteCreateRequestT & {
+      seed?: {
+        status?: string;
+        currentChapter?: number | null;
+        downloadedChapterList?: string;
+        enabled?: boolean;
+        dateAdded?: number;
+        ledgerChapters?: string;
+      };
+    },
+  ): Promise<{ favorite: FavoriteT; importOutcome: 'created' | 'updated' | 'unchanged' }>;
 }
 
 /** Create-check behavior for the in-memory double: what a fresh
@@ -1451,6 +1490,28 @@ export interface InMemoryFavoriteCheckBehavior {
   readonly status?: string;
   readonly queuedDownloads?: number;
   readonly newChapters?: FavoriteCheckResponseT['newChapters'];
+}
+
+/** Wire-shape favorite equality (in-memory import verdict). */
+function favoriteWireEqual(a: FavoriteT | undefined, b: FavoriteT | undefined): boolean {
+  if (a === undefined || b === undefined) {
+    return a === b;
+  }
+  return (
+    a.id === b.id &&
+    a.moduleId === b.moduleId &&
+    a.url === b.url &&
+    a.title === b.title &&
+    a.status === b.status &&
+    a.currentChapter === b.currentChapter &&
+    a.newChapterCount === b.newChapterCount &&
+    a.autoDownload === b.autoDownload &&
+    a.lastCheck === b.lastCheck &&
+    a.lastUpdated === b.lastUpdated &&
+    a.saveTo === b.saveTo &&
+    a.enabled === b.enabled &&
+    a.dateAdded === b.dateAdded
+  );
 }
 
 /**
@@ -1559,10 +1620,63 @@ export class InMemoryFavoriteService implements FavoriteService {
     };
   }
 
-  async import(input: FavoriteCreateRequestT): Promise<FavoriteT> {
+  async import(
+    input: FavoriteCreateRequestT & {
+      seed?: {
+        status?: string;
+        currentChapter?: number | null;
+        downloadedChapterList?: string;
+        enabled?: boolean;
+        dateAdded?: number;
+        ledgerChapters?: string;
+      };
+    },
+  ): Promise<{ favorite: FavoriteT; importOutcome: 'created' | 'updated' | 'unchanged' }> {
     this.counter += 1;
     void this.counter;
-    return this.create(input);
+    // Idempotent seed semantics (both entry modes): the row is built
+    // DIRECTLY — seeds apply on create AND on re-import; a pre-existing
+    // key upserts (never a 409) and the verdict compares before/after.
+    const id = `${input.moduleId}${input.url}`.toLowerCase();
+    const before = this.rows.get(id);
+    const behavior = this.checkBehavior(id);
+    const seed = input.seed;
+    const favorite: FavoriteT = {
+      // Existing row keeps its shape (dates, saveTo…); file values win
+      // where present (MD_ImportToFavorites parity).
+      ...(before ?? {
+        status: behavior.status ?? null,
+        currentChapter: behavior.currentChapter ?? null,
+        newChapterCount: behavior.newChapterCount ?? 0,
+        autoDownload: false,
+        lastCheck: '2026-01-01T00:00:00Z',
+        lastUpdated: null,
+        saveTo: null,
+        enabled: true,
+        dateAdded: '2026-01-01T00:00:00Z',
+      }),
+      id,
+      moduleId: input.moduleId,
+      url: input.url,
+      ...(input.title !== undefined && input.title !== '' ? { title: input.title } : {}),
+      autoDownload: input.autoDownload ?? before?.autoDownload ?? false,
+      ...(seed !== undefined
+        ? {
+            ...(seed.status !== '' ? { status: seed.status } : {}),
+            ...(seed.currentChapter !== null && seed.currentChapter !== undefined
+              ? { currentChapter: seed.currentChapter }
+              : {}),
+            ...(seed.enabled !== undefined ? { enabled: seed.enabled } : {}),
+          }
+        : {}),
+    };
+    this.rows.set(id, favorite);
+    if (before === undefined) {
+      this.order.push(id);
+    }
+    const importOutcome: 'created' | 'updated' | 'unchanged' =
+      before === undefined ? 'created' : favoriteWireEqual(before, favorite) ? 'unchanged' : 'updated';
+    return { favorite, importOutcome };
   }
 
   async checkBatch(scope: FavoriteCheckScopeT): Promise<FavoriteCheckBatchResponseT> {

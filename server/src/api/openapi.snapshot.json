@@ -3926,6 +3926,88 @@
         ]
       }
     },
+    "/api/library/{id}": {
+      "delete": {
+        "operationId": "deleteLibraryFile",
+        "summary": "Delete one library artifact (file + row)",
+        "description": "Removes the packed chapter file from disk and its library row. The originating download job (if still present) is not touched; the downloaded_chapters ledger keeps its links.",
+        "tags": [
+          "library"
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Library file not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "description": "Module/catalog id (32-hex, §5)"
+          }
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/favorites": {
       "get": {
         "operationId": "listFavorites",
@@ -5034,6 +5116,539 @@
                 "required": [
                   "targetModuleId"
                 ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/import/fmd2/analyze": {
+      "post": {
+        "operationId": "analyzeFmd2Import",
+        "summary": "Import-from-FMD2 phase 1: parse + preview (writes nothing)",
+        "description": "multipart/form-data with the FMD2 data files (favorites.db and/or downloadedchapters.db and/or settings.json and/or modules.json and/or config.json, or a zip of the FMD2 data directory; per-file cap 100 MB). SQLite opens READ-ONLY. The response previews the import: favorites by site (mapped + unmapped catalog ids surfaced), the downloaded-chapters ledger match count, settings that map onto the server surface (with sanitized value previews), detected credential FIELDS (names only — secret values are never echoed), and an analyzeToken the apply call may present instead of re-uploading. Corrupt or oversize uploads are a typed 400.",
+        "tags": [
+          "favorites"
+        ],
+        "responses": {
+          "200": {
+            "description": "The import preview (nothing written)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "ignored": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AnalyzeFmd2Import200Response0"
+                      }
+                    },
+                    "favorites": {
+                      "type": "object",
+                      "properties": {
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "importable": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "bySite": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "moduleId": {
+                                "type": "string"
+                              },
+                              "siteName": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "mapped": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "moduleId",
+                              "siteName",
+                              "count",
+                              "mapped"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "unmappedSiteIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "count"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "total",
+                        "importable",
+                        "bySite",
+                        "unmappedSiteIds"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "downloadedLedger": {
+                      "type": "object",
+                      "properties": {
+                        "rows": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "matched": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "rows",
+                        "matched"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "settings": {
+                      "type": "object",
+                      "properties": {
+                        "mappable": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "source": {
+                                "type": "string"
+                              },
+                              "preview": {
+                                "type": "string"
+                              },
+                              "requiresCredentials": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "label",
+                              "source",
+                              "preview",
+                              "requiresCredentials"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "notImportable": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/AnalyzeFmd2Import200Response0"
+                          }
+                        }
+                      },
+                      "required": [
+                        "mappable",
+                        "notImportable"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "credentials": {
+                      "type": "object",
+                      "properties": {
+                        "sites": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "moduleId": {
+                                "type": "string"
+                              },
+                              "siteName": {
+                                "type": "string"
+                              },
+                              "fields": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "moduleId",
+                              "siteName",
+                              "fields"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "globalProxyAuth": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "sites",
+                        "globalProxyAuth"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "analyzeToken": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "files",
+                    "ignored",
+                    "favorites",
+                    "downloadedLedger",
+                    "settings",
+                    "credentials",
+                    "analyzeToken"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not multipart, no recognizable FMD2 file, corrupt archive/database, or over the 100 MB cap",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
+    "/api/import/fmd2/apply": {
+      "post": {
+        "operationId": "applyFmd2Import",
+        "summary": "Import-from-FMD2 phase 2: perform the confirmed import",
+        "description": "Either multipart/form-data (the same upload + an optional `selections` JSON field) or application/json { token } for the server-held analyze staging. Selections: favorites (default true), settings keys from the preview, and credential opt-ins (module ids + `proxy` for the global proxy login — OFF by default). Favorites upsert idempotently keyed by module id + RootURL-canonicalized mangaUrl through the ONE favorites import path (offline seed: statuses, current chapter, downloaded lists, ledger rows merge — re-importing the same file creates no duplicates). Unmapped site ids are listed and skipped, never fatal. The report enumerates created/updated/unchanged/skipped with reasons and every setting not imported.",
+        "tags": [
+          "favorites"
+        ],
+        "responses": {
+          "200": {
+            "description": "The import report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "favorites": {
+                      "type": "object",
+                      "properties": {
+                        "created": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "updated": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "unchanged": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "skipped": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "label": {
+                                "type": "string"
+                              },
+                              "reason": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "label",
+                              "reason"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "unmappedSiteIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "count"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "saveToPathsDropped": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "created",
+                        "updated",
+                        "unchanged",
+                        "skipped",
+                        "unmappedSiteIds",
+                        "saveToPathsDropped"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "downloadedLedgerRowsApplied": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "credentials": {
+                      "type": "object",
+                      "properties": {
+                        "imported": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "moduleId": {
+                                "type": "string"
+                              },
+                              "fields": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "required": [
+                              "moduleId",
+                              "fields"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "skipped": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "moduleId": {
+                                "type": "string"
+                              },
+                              "reason": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "moduleId",
+                              "reason"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "imported",
+                        "skipped"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "settings": {
+                      "type": "object",
+                      "properties": {
+                        "applied": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "key": {
+                                "type": "string"
+                              },
+                              "detail": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "detail"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "notImportable": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "source": {
+                                "type": "string"
+                              },
+                              "reason": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "source",
+                              "reason"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "applied",
+                        "notImportable"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "favorites",
+                    "downloadedLedgerRowsApplied",
+                    "credentials",
+                    "settings"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No upload or token, oversize, or corrupt file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Analyze token not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "favorites": {
+                    "type": "boolean"
+                  },
+                  "settings": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "credentials": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
               }
             }
           }
@@ -6665,6 +7280,22 @@
       "CreateDownloadJobsBatchBody0": {
         "type": "string",
         "minLength": 1
+      },
+      "AnalyzeFmd2Import200Response0": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "reason"
+        ],
+        "additionalProperties": false
       }
     },
     "securitySchemes": {

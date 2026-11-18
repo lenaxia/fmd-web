@@ -373,7 +373,13 @@ export function SettingsPage(): ReactElement {
     document
       .getElementById(settingsSectionAnchor(activeSection))
       ?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
-  }, [activeSection]);
+    // `modules.isPending` is a REQUIRED dep: on a cold deep link the
+    // first run lands while the module-list loading stub is mounted
+    // (the section anchors do not exist yet — the scroll no-ops), and
+    // re-firing on the pending→ready flip is what performs the scroll
+    // once the real sections render. Without it the deep link lands
+    // at scroll-0 (review-blocker reproduction).
+  }, [activeSection, modules.isPending]);
 
   const list = modules.data?.modules ?? [];
   const bootstrapRunning = syncModules.isPending || syncCatalogs.isPending;

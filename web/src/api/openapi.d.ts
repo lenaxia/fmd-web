@@ -652,6 +652,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/library/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete one library artifact (file + row)
+         * @description Removes the packed chapter file from disk and its library row. The originating download job (if still present) is not touched; the downloaded_chapters ledger keeps its links.
+         */
+        delete: operations["deleteLibraryFile"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/favorites": {
         parameters: {
             query?: never;
@@ -818,6 +838,46 @@ export interface paths {
          * @description Remaps the favorite onto the target module+link under a new id (title/status/currentChapter/saveTo carry over); the old row is deleted (its downloaded_chapters ledger row is NOT touched). `clearDownloadedList: true` runs the tag-100 reload — the stored list resets and the live target-site chapter list is re-ingested as downloaded. A mapping is validated first (transfer/preview semantics); invalid targets are a 409.
          */
         post: operations["transferFavorite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/import/fmd2/analyze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import-from-FMD2 phase 1: parse + preview (writes nothing)
+         * @description multipart/form-data with the FMD2 data files (favorites.db and/or downloadedchapters.db and/or settings.json and/or modules.json and/or config.json, or a zip of the FMD2 data directory; per-file cap 100 MB). SQLite opens READ-ONLY. The response previews the import: favorites by site (mapped + unmapped catalog ids surfaced), the downloaded-chapters ledger match count, settings that map onto the server surface (with sanitized value previews), detected credential FIELDS (names only — secret values are never echoed), and an analyzeToken the apply call may present instead of re-uploading. Corrupt or oversize uploads are a typed 400.
+         */
+        post: operations["analyzeFmd2Import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/import/fmd2/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import-from-FMD2 phase 2: perform the confirmed import
+         * @description Either multipart/form-data (the same upload + an optional `selections` JSON field) or application/json { token } for the server-held analyze staging. Selections: favorites (default true), settings keys from the preview, and credential opt-ins (module ids + `proxy` for the global proxy login — OFF by default). Favorites upsert idempotently keyed by module id + RootURL-canonicalized mangaUrl through the ONE favorites import path (offline seed: statuses, current chapter, downloaded lists, ledger rows merge — re-importing the same file creates no duplicates). Unmapped site ids are listed and skipped, never fatal. The report enumerates created/updated/unchanged/skipped with reasons and every setting not imported.
+         */
+        post: operations["applyFmd2Import"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1264,6 +1324,10 @@ export interface components {
         LiveInfoBody0: string;
         LiveInfoBody1: string;
         CreateDownloadJobsBatchBody0: string;
+        AnalyzeFmd2Import200Response0: {
+            source: string;
+            reason: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -3466,6 +3530,59 @@ export interface operations {
             };
         };
     };
+    deleteLibraryFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Module/catalog id (32-hex, §5) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        ok: true;
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Library file not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
     listFavorites: {
         parameters: {
             query?: {
@@ -4087,6 +4204,176 @@ export interface operations {
             };
             /** @description Transfer target invalid */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    analyzeFmd2Import: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The import preview (nothing written) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        files: string[];
+                        ignored: components["schemas"]["AnalyzeFmd2Import200Response0"][];
+                        favorites: {
+                            total: number;
+                            importable: number;
+                            bySite: {
+                                moduleId: string;
+                                siteName: string;
+                                count: number;
+                                mapped: boolean;
+                            }[];
+                            unmappedSiteIds: {
+                                id: string;
+                                count: number;
+                            }[];
+                        };
+                        downloadedLedger: {
+                            rows: number;
+                            matched: number;
+                        };
+                        settings: {
+                            mappable: {
+                                key: string;
+                                label: string;
+                                source: string;
+                                preview: string;
+                                requiresCredentials: boolean;
+                            }[];
+                            notImportable: components["schemas"]["AnalyzeFmd2Import200Response0"][];
+                        };
+                        credentials: {
+                            sites: {
+                                moduleId: string;
+                                siteName: string;
+                                fields: string[];
+                            }[];
+                            globalProxyAuth: boolean;
+                        };
+                        analyzeToken: string;
+                    };
+                };
+            };
+            /** @description Not multipart, no recognizable FMD2 file, corrupt archive/database, or over the 100 MB cap */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    applyFmd2Import: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    token?: string;
+                    favorites?: boolean;
+                    settings?: string[];
+                    credentials?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description The import report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        favorites: {
+                            created: number;
+                            updated: number;
+                            unchanged: number;
+                            skipped: {
+                                label: string;
+                                reason: string;
+                            }[];
+                            unmappedSiteIds: {
+                                id: string;
+                                count: number;
+                            }[];
+                            saveToPathsDropped: number;
+                        };
+                        downloadedLedgerRowsApplied: number;
+                        credentials: {
+                            imported: {
+                                moduleId: string;
+                                fields: string[];
+                            }[];
+                            skipped: {
+                                moduleId: string;
+                                reason: string;
+                            }[];
+                        };
+                        settings: {
+                            applied: {
+                                key: string;
+                                detail: string;
+                            }[];
+                            notImportable: {
+                                source: string;
+                                reason: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description No upload or token, oversize, or corrupt file */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Analyze token not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

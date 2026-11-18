@@ -33,6 +33,9 @@ import {
   FavoriteTransferRequestSchema,
   FavoriteTransferResponseSchema,
   FavoriteUpdateRequestSchema,
+  Fmd2ImportApplyReportSchema,
+  Fmd2ImportApplyRequestSchema,
+  Fmd2ImportPreviewSchema,
   JobCreateRequestSchema,
   JobCreatedResponseSchema,
   JobBatchCreateRequestSchema,
@@ -778,6 +781,20 @@ const OPERATIONS: readonly RouteOperation[] = [
     },
   },
   {
+    method: 'delete',
+    path: '/api/library/{id}',
+    operationId: 'deleteLibraryFile',
+    summary: 'Delete one library artifact (file + row)',
+    description:
+      'Removes the packed chapter file from disk and its library row. The originating download ' +
+      'job (if still present) is not touched; the downloaded_chapters ledger keeps its links.',
+    tags: ['library'],
+    responses: {
+      200: { description: 'Deleted', schema: z.object({ ok: z.literal(true) }) },
+      ...errors(validation(), notFound('Library file'), internal()),
+    },
+  },
+  {
     method: 'get',
     path: '/api/favorites',
     operationId: 'listFavorites',
@@ -952,6 +969,58 @@ const OPERATIONS: readonly RouteOperation[] = [
     responses: {
       200: { description: 'The transferred favorite', schema: FavoriteTransferResponseSchema },
       ...errors(validation(), notFound('Favorite'), errorResponse(409, 'Transfer target invalid'), internal()),
+    },
+  },
+  {
+    method: 'post',
+    path: '/api/import/fmd2/analyze',
+    operationId: 'analyzeFmd2Import',
+    summary: 'Import-from-FMD2 phase 1: parse + preview (writes nothing)',
+    description:
+      'multipart/form-data with the FMD2 data files (favorites.db and/or ' +
+      'downloadedchapters.db and/or settings.json and/or modules.json and/or config.json, ' +
+      'or a zip of the FMD2 data directory; per-file cap 100 MB). SQLite opens READ-ONLY. ' +
+      'The response previews the import: favorites by site (mapped + unmapped catalog ids ' +
+      'surfaced), the downloaded-chapters ledger match count, settings that map onto the ' +
+      'server surface (with sanitized value previews), detected credential FIELDS (names ' +
+      'only — secret values are never echoed), and an analyzeToken the apply call may ' +
+      'present instead of re-uploading. Corrupt or oversize uploads are a typed 400.',
+    tags: ['favorites'],
+    responses: {
+      200: { description: 'The import preview (nothing written)', schema: Fmd2ImportPreviewSchema },
+      ...errors(
+        validation(),
+        errorResponse(400, 'Not multipart, no recognizable FMD2 file, corrupt archive/database, or over the 100 MB cap'),
+        internal(),
+      ),
+    },
+  },
+  {
+    method: 'post',
+    path: '/api/import/fmd2/apply',
+    operationId: 'applyFmd2Import',
+    summary: 'Import-from-FMD2 phase 2: perform the confirmed import',
+    description:
+      'Either multipart/form-data (the same upload + an optional `selections` JSON field) ' +
+      'or application/json { token } for the server-held analyze staging. Selections: ' +
+      'favorites (default true), settings keys from the preview, and credential opt-ins ' +
+      '(module ids + `proxy` for the global proxy login — OFF by default). Favorites upsert ' +
+      'idempotently keyed by module id + RootURL-canonicalized mangaUrl through the ONE ' +
+      'favorites import path (offline seed: statuses, current chapter, downloaded lists, ' +
+      'ledger rows merge — re-importing the same file creates no duplicates). Unmapped ' +
+      'site ids are listed and skipped, never fatal. The report enumerates ' +
+      'created/updated/unchanged/skipped with reasons and every setting not imported.',
+    tags: ['favorites'],
+    body: Fmd2ImportApplyRequestSchema,
+    bodyRequired: false,
+    responses: {
+      200: { description: 'The import report', schema: Fmd2ImportApplyReportSchema },
+      ...errors(
+        validation(),
+        notFound('Analyze token'),
+        errorResponse(400, 'No upload or token, oversize, or corrupt file'),
+        internal(),
+      ),
     },
   },
   {
