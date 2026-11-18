@@ -16,8 +16,8 @@ import { moduleFixture } from './fixtures';
 
 autoCleanup();
 
-describe('ProxySettingsSection (collapsed drawer + sidecar badge)', (): void => {
-  it('renders collapsed: summary + sidecar badge; the editor fields are hidden until Configure', async (): Promise<void> => {
+describe('ProxySettingsSection (inline expandable box + sidecar badge)', (): void => {
+  it('renders collapsed: summary + sidecar badge; the editor fields are hidden until the header expands', async (): Promise<void> => {
     const routes: MockRoute[] = [
       {
         method: 'GET',
@@ -33,12 +33,15 @@ describe('ProxySettingsSection (collapsed drawer + sidecar badge)', (): void => 
     // Collapsed by default: a one-line summary, NOT the editor.
     expect(screen.getByTestId('proxy-summary')).toHaveTextContent('none');
     expect(screen.queryByLabelText('Host')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByTestId('proxy-drawer-open'));
-    const drawer = await screen.findByTestId('proxy-drawer');
-    expect(within(drawer).getByLabelText('Type')).toHaveValue('');
-    expect(within(drawer).getByLabelText('Host')).toBeDisabled();
-    expect(within(drawer).getByLabelText('Port')).toBeDisabled();
-    expect(within(drawer).getByRole('button', { name: 'Save proxy' })).toBeDisabled(); // nothing drafted yet
+    const toggle = screen.getByTestId('proxy-toggle');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const editor = screen.getByTestId('proxy-editor');
+    expect(within(editor).getByLabelText('Type')).toHaveValue('');
+    expect(within(editor).getByLabelText('Host')).toBeDisabled();
+    expect(within(editor).getByLabelText('Port')).toBeDisabled();
+    expect(within(editor).getByRole('button', { name: 'Save proxy' })).toBeDisabled(); // nothing drafted yet
   });
 
   it('renders the enabled sidecar badge when the profile is active', async (): Promise<void> => {
@@ -59,7 +62,7 @@ describe('ProxySettingsSection (collapsed drawer + sidecar badge)', (): void => 
     expect(await screen.findByTitle(/profile active/i)).toHaveTextContent('browser sidecar: enabled');
   });
 
-  it('edits a SOCKS5 config inside the drawer and PUTs the five-string body on Save', async (): Promise<void> => {
+  it('edits a SOCKS5 config inside the expanded box and PUTs the five-string body on Save', async (): Promise<void> => {
     const putBodies: unknown[] = [];
     const routes: MockRoute[] = [
       {
@@ -83,14 +86,14 @@ describe('ProxySettingsSection (collapsed drawer + sidecar badge)', (): void => 
 
     await screen.findByTitle(/not active/i);
     const user = userEvent.setup();
-    await user.click(screen.getByTestId('proxy-drawer-open'));
-    const drawer = await screen.findByTestId('proxy-drawer');
-    await user.selectOptions(within(drawer).getByLabelText('Type'), 'SOCKS5');
-    await user.type(within(drawer).getByLabelText('Host'), 'proxy.example');
-    await user.type(within(drawer).getByLabelText('Port'), '1080');
-    await user.type(within(drawer).getByLabelText('User'), 'u');
-    await user.type(within(drawer).getByLabelText('Password'), 'pw');
-    await user.click(within(drawer).getByRole('button', { name: 'Save proxy' }));
+    await user.click(screen.getByTestId('proxy-toggle'));
+    const editor = screen.getByTestId('proxy-editor');
+    await user.selectOptions(within(editor).getByLabelText('Type'), 'SOCKS5');
+    await user.type(within(editor).getByLabelText('Host'), 'proxy.example');
+    await user.type(within(editor).getByLabelText('Port'), '1080');
+    await user.type(within(editor).getByLabelText('User'), 'u');
+    await user.type(within(editor).getByLabelText('Password'), 'pw');
+    await user.click(within(editor).getByRole('button', { name: 'Save proxy' }));
     await waitFor((): void => {
       expect(putBodies).toHaveLength(1);
     });
@@ -154,8 +157,8 @@ describe('Settings page: proxy section + module capability badges + override', (
     expect(screen.getByRole('region', { name: 'Proxy settings' })).toBeInTheDocument();
 
     // open the module editor and save an override (scoped to the
-    // module list — the collapsed proxy drawer also carries a
-    // "Configure" trigger)
+    // module list — the collapsed global proxy box header carries no
+    // "Configure" trigger, but scoping keeps the query unambiguous)
     const user = userEvent.setup();
     const moduleList = await screen.findByLabelText('Site modules');
     await user.click(within(moduleList).getByRole('button', { name: 'Configure' }));

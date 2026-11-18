@@ -93,8 +93,7 @@ describe('Settings page module list (badges over the API)', (): void => {
     expect(screen.queryByText('subprocess')).not.toBeInTheDocument();
 
     // The editor honors the module's option descriptors (combobox index seeds).
-    // (scoped to the module list — the collapsed proxy drawer also
-    // carries a "Configure" trigger)
+    // (scoped to the module list — keeps the Configure query unambiguous)
     const moduleList = screen.getByLabelText('Site modules');
     await userEvent.click(within(moduleList).getByRole('button', { name: 'Configure' }));
     expect(screen.getByLabelText(`Options for BrowserSite`)).toBeInTheDocument();

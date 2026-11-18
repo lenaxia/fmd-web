@@ -317,7 +317,7 @@ test('favorites: batch check opens the sheet; queue decision enqueues PAUSED; dr
 
 // ── Flow 4: settings Websites facets + bulk on the touch surface ────
 
-test('settings: facets + module search narrow; bulk toggles fire scoped writes; proxy drawer opens via tap', async ({
+test('settings: facets + module search narrow; bulk toggles fire scoped writes; proxy box expands via header tap', async ({
   page,
 }: {
   page: Page;
@@ -373,13 +373,15 @@ test('settings: facets + module search narrow; bulk toggles fire scoped writes; 
     .toBeGreaterThanOrEqual(1);
   expect(bulkWrites[0]).toMatchObject({ enabled: false, category: 'Fixtures' });
 
-  // The collapsed proxy drawer opens via its single tap affordance and
-  // the SetProxy editor inside is usable.
+  // The collapsed global proxy box expands IN PLACE via its header
+  // tap (accordion — no bottom sheet) and the SetProxy editor
+  // inside is usable; a second tap collapses it again.
   const section = page.getByTestId('proxy-section');
-  await section.getByTestId('proxy-drawer-open').tap();
-  const drawer = page.getByTestId('proxy-drawer');
-  await expect(drawer).toBeVisible();
-  await expect(drawer.getByLabel('Type')).toBeVisible();
-  await drawer.getByRole('button', { name: 'Close' }).tap();
-  await expect(drawer).toBeHidden();
+  const toggle = section.getByTestId('proxy-toggle');
+  await toggle.tap();
+  const editor = section.getByTestId('proxy-editor');
+  await expect(editor).toBeVisible();
+  await expect(editor.getByLabel('Type')).toBeVisible();
+  await toggle.tap();
+  await expect(editor).toBeHidden();
 });

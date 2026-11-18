@@ -15,8 +15,8 @@
  * split languages into "English (1)" shards — the "only 1 english
  * site" misread). Global Enable/Disable-all bulk controls scope to
  * the CURRENT filtered selection (ids[] write) with a confirm on the
- * destructive direction; the global proxy editor collapsed into a
- * drawer (ProxySettings).
+ * destructive direction; the global proxy editor lives in an
+ * inline-expandable box (ProxySettings).
  *
  * Design-system retrofit: PageHeader + toolbar Buttons (with sonner
  * progress toasts — additive, distinct from the pinned inline status

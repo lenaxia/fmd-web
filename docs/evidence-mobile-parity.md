@@ -107,8 +107,8 @@ the Chromium engine — single-engine gate). All green:
   SETUP "No setup needed" hides credential sites, module search
   AND-composes; per-category bulk Disable fires exactly
   `{ enabled: false, category }` on POST /api/modules/bulk; the
-  collapsed proxy drawer opens via its single tap affordance (SetProxy
-  editor usable inside, drag-safe Close).
+  collapsed global proxy box expands IN PLACE via its header tap
+  (SetProxy editor usable inside; a second tap collapses it).
 
 ## 5. Visual matrix + mobile perf (AC4)
 

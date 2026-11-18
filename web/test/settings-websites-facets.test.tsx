@@ -4,7 +4,8 @@
  * registry view over a production-shaped fixture (registration-order
  * rows with INTERLEAVED categories — the "only 1 english site" repro),
  * URL-synced facet state (?q=&lang=&h=&setup=), filter-scoped global
- * bulk with the disable-all confirm, and the collapsed proxy drawer.
+ * bulk with the disable-all confirm, and the inline-expand global
+ * proxy box.
  */
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
@@ -204,19 +205,21 @@ describe('Settings → Websites: filter-scoped global bulk', (): void => {
   });
 });
 
-describe('Settings → Websites: proxy drawer', (): void => {
-  it('the editor is HIDDEN by default; the summary + one Configure affordance render', async (): Promise<void> => {
+describe('Settings → Websites: global proxy inline-expand box', (): void => {
+  it('the editor is HIDDEN by default; the collapsed header renders the summary + toggle', async (): Promise<void> => {
     const { fetch } = mockFetch(routes());
     renderWithProviders(<SettingsPage />, { fetch });
     const section = await screen.findByTestId('proxy-section');
     expect(within(section).getByTestId('proxy-summary')).toHaveTextContent('none');
-    expect(within(section).getByRole('button', { name: /Configure/ })).toBeVisible();
-    // The five-string editor is NOT on the page until the drawer opens.
+    const toggle = within(section).getByTestId('proxy-toggle');
+    expect(toggle).toBeVisible();
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    // The five-string editor is NOT on the page until the box expands.
     expect(screen.queryByLabelText('Host')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
   });
 
-  it('Configure opens the drawer with the SetProxy editor; Save PUTs the body', async (): Promise<void> => {
+  it('expanding the box reveals the SetProxy editor; Save PUTs the body', async (): Promise<void> => {
     const puts: unknown[] = [];
     const { fetch } = mockFetch(
       routes([
@@ -232,12 +235,14 @@ describe('Settings → Websites: proxy drawer', (): void => {
     );
     renderWithProviders(<SettingsPage />, { fetch });
     const section = await screen.findByTestId('proxy-section');
-    await userEvent.click(within(section).getByTestId('proxy-drawer-open'));
-    const drawer = await screen.findByTestId('proxy-drawer');
-    await userEvent.selectOptions(within(drawer).getByLabelText('Type'), 'SOCKS5');
-    await userEvent.type(within(drawer).getByLabelText('Host'), 'proxy.example');
-    await userEvent.type(within(drawer).getByLabelText('Port'), '1080');
-    await userEvent.click(within(drawer).getByRole('button', { name: 'Save proxy' }));
+    const toggle = within(section).getByTestId('proxy-toggle');
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const editor = await screen.findByTestId('proxy-editor');
+    await userEvent.selectOptions(within(editor).getByLabelText('Type'), 'SOCKS5');
+    await userEvent.type(within(editor).getByLabelText('Host'), 'proxy.example');
+    await userEvent.type(within(editor).getByLabelText('Port'), '1080');
+    await userEvent.click(within(editor).getByRole('button', { name: 'Save proxy' }));
     await waitFor((): void => {
       expect(puts).toHaveLength(1);
     });

@@ -7,7 +7,7 @@
  * category grouping (ONE header per category over interleaved
  * registration order — the "only 1 english site" fix), bulk controls
  * scoped to the CURRENT filtered selection with a disable-all
- * confirm, and the collapsed proxy drawer.
+ * confirm, and the inline-expand global proxy box.
  * Fixture-driven like every smoke spec: the SPA runs against the real
  * Vite dev server, the §10 API is interception only.
  */
@@ -409,7 +409,7 @@ test('Settings: bulk category Disable all rewrites module_state; the site picker
   expect(bulkWrites[1]).toMatchObject({ enabled: true });
 });
 
-test('Settings → Websites: the proxy editor lives in a collapsed drawer (hidden by default)', async ({
+test('Settings → Websites: the proxy editor lives in a collapsed inline-expand box (hidden by default)', async ({
   page,
 }: {
   page: Page;
@@ -424,13 +424,22 @@ test('Settings → Websites: the proxy editor lives in a collapsed drawer (hidde
   await expect(page.getByLabel('Host', { exact: true })).toHaveCount(0);
   await expect(page.getByLabel('Password', { exact: true })).toHaveCount(0);
 
-  // One affordance opens the drawer (Save stays disabled: nothing
-  // drafted — the editor is intact inside).
-  await section.getByTestId('proxy-drawer-open').click();
-  const drawer = page.getByTestId('proxy-drawer');
-  await expect(drawer).toBeVisible();
-  await expect(drawer.getByLabel('Type')).toHaveValue('');
-  await expect(drawer.getByRole('button', { name: 'Save proxy' })).toBeDisabled();
+  // The header toggle expands the box IN PLACE (accordion — no
+  // overlay; Save stays disabled: nothing drafted — the editor is
+  // intact inside).
+  const toggle = section.getByTestId('proxy-toggle');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  const editor = section.getByTestId('proxy-editor');
+  await expect(editor).toBeVisible();
+  await expect(editor.getByLabel('Type')).toHaveValue('');
+  await expect(editor.getByRole('button', { name: 'Save proxy' })).toBeDisabled();
+
+  // Collapsing re-hides the editor (same toggle, no close button).
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByLabel('Host', { exact: true })).toHaveCount(0);
 });
 
 test('Settings: module search narrows by name and category', async ({ page }: { page: Page }): Promise<void> => {
