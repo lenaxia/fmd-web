@@ -156,6 +156,10 @@ describe('reconcileLibrary', (): void => {
     // Recorded with a saveTo override OUTSIDE the convention; the file
     // sits at the app's own output slot (`<manga>/<file>`, flat).
     put(root, 'mangam/ch-009.cbz', 40);
+    // A same-name distractor elsewhere: with it, the exact-filename
+    // rule alone would be AMBIGUOUS — only the CONVENTION rule can
+    // produce a re-link (the test discriminates rule 1 from rule 2).
+    put(root, 'elsewhere/ch-009.cbz', 6);
     const result = reconcileLibrary({
       root,
       rows: [
@@ -170,6 +174,10 @@ describe('reconcileLibrary', (): void => {
     expect(result.relinked).toHaveLength(1);
     expect(result.relinked[0]?.toPath).toBe('mangam/ch-009.cbz');
     expect(result.relinked[0]?.fromPath).toBe('custom-dir/ch-009.cbz');
+    // The distractor stays unclaimed → orphan (not swallowed by the
+    // re-link, not an ambiguity blocker).
+    expect(result.orphans.map((o) => o.relPath)).toEqual(['elsewhere/ch-009.cbz']);
+    expect(result.missing).toEqual([]);
   });
 
   it('[library-layout] the convention slot is the flat effective folder — suffixed duplicate rows re-link onto the suffixed slot', (): void => {
@@ -178,6 +186,11 @@ describe('reconcileLibrary', (): void => {
     // manga segment (`mangam [moduleb]`); the module is not a path
     // segment anywhere.
     put(root, 'mangam [moduleb]/ch-010.cbz', 21);
+    // Same-name distractor: exact-filename alone would be AMBIGUOUS —
+    // only the flat CONVENTION slot (`<row.manga>/<file>`) re-links.
+    // Under the old 3-segment `<module>/<manga>/<file>` convention
+    // this row would stay missing with BOTH files orphaned.
+    put(root, 'imported/stray/ch-010.cbz', 5);
     const result = reconcileLibrary({
       root,
       rows: [
@@ -194,6 +207,8 @@ describe('reconcileLibrary', (): void => {
     expect(result.relinked).toHaveLength(1);
     expect(result.relinked[0]?.toPath).toBe('mangam [moduleb]/ch-010.cbz');
     expect(result.relinked[0]?.fromPath).toBe('imported/moduleb/ch-010.cbz');
+    expect(result.missing).toEqual([]);
+    expect(result.orphans.map((o) => o.relPath)).toEqual(['imported/stray/ch-010.cbz']);
   });
 
   it('ambiguous same-name candidates → orphan+missing PAIR, never auto-linked', (): void => {

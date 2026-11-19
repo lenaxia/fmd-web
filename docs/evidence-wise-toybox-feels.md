@@ -182,3 +182,49 @@ Landed behind the parallel [auth] session (same worktree, coordinated:
 each staged its own files; the openapi snapshot + web client were
 regenerated over the MERGED surface as the final pre-commit step of
 whichever lane landed last).
+
+## Review-bounce remediation (tsk-wise-toybox-feels, verdict e21960ed)
+The in_review verdict failed the story on two criterion-3/4 findings —
+both real, both now fixed with discrimination-proof regressions:
+
+- BLOCKER reconcile.ts:140 — the c7ee640 diff updated the rule-1 doc
+  comment but NOT the computation: the CONVENTION slot was still the
+  dead 3-segment `${moduleId}/${manga}/${fileName}` form, so the
+  convention rule could never match on the flat tree and every
+  confident re-link silently degraded to the exact-filename fallback
+  (ambiguity cases that rule 1 exists to disambiguate landed as
+  orphan+missing pairs instead of re-links). Fix: the slot is
+  `${row.manga}/${row.fileName}` — the recorded manga segment IS the
+  effective folder (clean or module-suffixed), matching the module
+  doc, the openapi wording, and titleConventionDirs.
+- MAJOR file-state-reconcile.test.ts:175 — the new [library-layout]
+  suffixed-slot case passed FOR THE WRONG RULE: with a single
+  same-name file on disk the exact-filename fallback produced the
+  asserted toPath even against the dead convention slot, so the suite
+  was green while the blocker shipped. Fix: BOTH convention tests
+  (the saveTo move-back case at :154 and the suffixed-slot case) now
+  seed a same-name DISTRACTOR file — exact-filename alone is
+  ambiguous, only rule 1 can re-link — and assert the re-link, the
+  distractor's orphan surfacing, and no missing row.
+
+DISCRIMINATION PROOF (A/B, sed-flip of the one convention line): the
+two strengthened tests FAIL (2 failed | 10 passed) against the
+3-segment slot and PASS (12/12) against the flat one — the regression
+now actually pins the rule it names.
+
+Post-fix gates on this working tree:
+- file-state-reconcile.test.ts 12/12; full vitest tree 233 files /
+  2317 passed | 3 skipped | 5 failed — the 5 (web pagination /
+  loading-skeletons / bootstrap-banner) are the PARALLEL session's
+  uncommitted search-scope WIP pages, A/B-proven identical WITHOUT
+  this change (stash of the two story files re-run: same 5 failed,
+  same 19 tsc errors) — not this story's regression; every
+  library-layout/file-state suite green.
+- tsc -b: server project CLEAN (all 19 errors live in the parallel
+  WIP's web files, byte-identical set without this change).
+- eslint on both touched files: CLEAN.
+- web e2e library-file-state.spec.ts (desktop, the rescan/Files/
+  copy-path runtime path over the fixed convention): 3/3 green.
+Staged: ONLY reconcile.ts + file-state-reconcile.test.ts + this
+evidence addendum (same-worktree precedent — the parallel lane's
+files stay unstaged for their commit).

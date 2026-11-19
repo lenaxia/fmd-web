@@ -135,9 +135,10 @@ export function reconcileLibrary(input: ReconcileInput): ReconcileResult {
   // recorded path (deterministic: ascending id).
   const byId = [...pending].sort((a, b): number => a.id - b.id);
   for (const row of byId) {
-    // Rule 1 — CONVENTION: <module>/<manga>/<fileName> (the recorded
-    // segments ARE the sanitized layout components).
-    const conventionRel = `${row.moduleId}/${row.manga}/${row.fileName}`;
+    // Rule 1 — CONVENTION: <manga>/<fileName> — the recorded manga
+    // segment IS the effective folder (clean, or the module-suffixed
+    // duplicate form); the module is not a path segment.
+    const conventionRel = `${row.manga}/${row.fileName}`;
     const convention = diskByRel.get(conventionRel);
     if (convention !== undefined && !claimed.has(conventionRel)) {
       claimed.add(conventionRel);
