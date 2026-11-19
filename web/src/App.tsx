@@ -10,7 +10,7 @@
  * this file knows names, not colors.
  */
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
-import { BookOpenText, Compass, Download as DownloadIcon, Heart, LibraryBig, Moon, Search, Settings as SettingsIcon, Sun } from 'lucide-react';
+import { BookOpenText, Compass, Download as DownloadIcon, Heart, LibraryBig, Moon, Search, Settings as SettingsIcon, Sun, TriangleAlert } from 'lucide-react';
 import { useBootstrapStatus } from './api/hooks';
 import { navigate, parseHash, ROUTE_NAMES, type Route, type RouteName } from './router';
 import { useTheme } from './state/theme';
@@ -24,6 +24,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { cn } from 'cn';
 import { BrowsePage } from './pages/BrowsePage';
 import { MangaPage } from './pages/MangaPage';
+import { AttentionPage } from './pages/AttentionPage';
 import { DownloadsPage } from './pages/DownloadsPage';
 import { FavoritesPage } from './pages/FavoritesPage';
 import { LibraryPage } from './pages/LibraryPage';
@@ -35,6 +36,7 @@ const NAV_TABS: readonly { readonly name: RouteName; readonly label: string }[] 
   { name: 'browse', label: 'Browse' },
   { name: 'favorites', label: 'Favorites' },
   { name: 'downloads', label: 'Downloads' },
+  { name: 'attention', label: 'Attention' },
   { name: 'library', label: 'Library' },
   { name: 'settings', label: 'Settings' },
 ];
@@ -58,6 +60,7 @@ const BOTTOM_NAV_DESTINATIONS: readonly BottomTabDestination[] = NAV_TABS.map(
       tab.name === 'browse' ? <Compass aria-hidden="true" /> :
       tab.name === 'favorites' ? <Heart aria-hidden="true" /> :
       tab.name === 'downloads' ? <DownloadIcon aria-hidden="true" /> :
+      tab.name === 'attention' ? <TriangleAlert aria-hidden="true" /> :
       tab.name === 'library' ? <LibraryBig aria-hidden="true" /> :
       <SettingsIcon aria-hidden="true" />,
   }),
@@ -310,6 +313,7 @@ function AppShell(): ReactElement {
       <main className="mx-auto w-full max-w-page flex-1 px-4 py-6 max-md:pb-[calc(var(--spacing-bottom-nav)+var(--spacing-safe-bottom)+1.5rem)]">
         {route.name === 'browse' ? <BrowsePage route={route} /> : null}
         {route.name === 'manga' ? <MangaPage route={route} /> : null}
+        {route.name === 'attention' ? <AttentionPage /> : null}
         {route.name === 'downloads' ? <DownloadsPage /> : null}
         {route.name === 'favorites' ? <FavoritesPage /> : null}
         {route.name === 'library' ? <LibraryPage /> : null}

@@ -80,6 +80,10 @@ export function toJobWire(job: QueueJob, idempotencyKey?: string): JobT {
     ...(job.error !== undefined ? { error: job.error } : {}),
     ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
     ...(job.paused ? { paused: true } : {}),
+    // §4/§7.3 typed failure classification — failed rows only (the
+    // state machine requires it on `→ failed`); the triage surface
+    // groups on it without re-deriving cause from text alone.
+    ...(job.state === 'failed' && job.failureKind !== undefined ? { failureKind: job.failureKind } : {}),
     createdAt: new Date(job.createdAt).toISOString(),
     updatedAt: new Date(job.updatedAt).toISOString(),
   };
@@ -98,6 +102,7 @@ function toJobRecord(job: QueueJob, idempotencyKey?: string): JobRecord {
     ...(wire.error !== undefined ? { error: wire.error } : {}),
     ...(wire.idempotencyKey !== undefined ? { idempotencyKey: wire.idempotencyKey } : {}),
     ...(wire.paused !== undefined ? { paused: wire.paused } : {}),
+    ...(wire.failureKind !== undefined ? { failureKind: wire.failureKind } : {}),
     createdAt: wire.createdAt,
     updatedAt: wire.updatedAt,
   };

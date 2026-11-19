@@ -25,6 +25,31 @@ semver (0.x = pre-1.0 development line).
   business; a grep gate keeps per-channel adapter code out of the
   tree.
 
+- **Triage surface: one Attention screen** ([granite-crown-orders]):
+  the D1 §2 TRIAGE answer to "what needs me" — failed downloads
+  GROUPED BY CAUSE, never per-chapter noise. Four groups (fixed
+  order, stable shape): site down (the [site-availability] record
+  join — exactly "the pipe already observed origin trouble";
+  cross-links into the Settings registry availability column),
+  anti-bot / bypass-unavailable (failure-text vocabulary — HTTP 4xx
+  writes no availability verdict), rate limited (HTTP 429; wire
+  token `throttled` — the quoted `'rate_limited'` string is banned
+  by the auth-removal grep gate), and other (pack/engine faults,
+  worker stalls, unclassified net). Each group carries a paced
+  Retry all that funnels every row through the SAME per-job retry
+  path the downloads tab uses, so per-host pacing applies to
+  retries exactly as to fresh work (same-host retries space at
+  least the pacing interval apart — never a burst; pinned by test
+  over the real download lane). Availability NEVER gates an action:
+  a dead site dims its rows and explains itself while every retry
+  stays clickable. Failed rows superseded by a live retry-chain
+  successor drop out of the surface (back in the pipe). Healthy
+  state is an explicit empty state that celebrates doing nothing.
+  Reachable from primary nav on desktop AND mobile (the `Attention`
+  tab). `GET /api/triage` + `POST /api/triage/retry`; failed job
+  rows now carry the typed §4/§7.3 `failureKind` on the wire
+  (additive); OpenAPI snapshot + web client types regenerated.
+
 ## [0.3.1] — 2026-11-18
 
 Hotfix plus websites-registry polish on top of 0.3.0. Two stories:

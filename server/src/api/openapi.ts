@@ -74,6 +74,12 @@ import {
   ModuleBulkUpdateRequestSchema,
   ModuleBulkUpdateResponseSchema,
   ModuleCheckResponseSchema,
+  TriageSnapshotResponseSchema,
+  TriageRetryRequestSchema,
+  TriageRetryResponseSchema,
+  TriageGroupSchema,
+  TriageSiteSchema,
+  TriageJobSchema,
   OutputDefaultsSchema,
   OutputDefaultsUpdateRequestSchema,
   PerformanceSettingsUpdateRequestSchema,
@@ -108,6 +114,9 @@ const REGISTRY: readonly [z.ZodType, string][] = [
   [ModuleCapabilitiesSchema, 'ModuleCapabilities'],
   [ModuleAvailabilitySchema, 'ModuleAvailability'],
   [ModuleSummarySchema, 'ModuleSummary'],
+  [TriageJobSchema, 'TriageJob'],
+  [TriageSiteSchema, 'TriageSite'],
+  [TriageGroupSchema, 'TriageGroup'],
   [ProxySettingsSchema, 'ProxySettings'],
   [OutputDefaultsSchema, 'OutputDefaults'],
   [SettingsResponseSchema, 'SettingsResponse'],
@@ -907,6 +916,53 @@ const OPERATIONS: readonly RouteOperation[] = [
     responses: {
       200: { description: 'Bulk outcome: count + touched snapshots', schema: JobBulkActionResponseSchema },
       ...errors(validation(), errorResponse(400, 'Scope does not apply to this action'), internal()),
+    },
+  },
+  {
+    method: 'get',
+    path: '/api/triage',
+    operationId: 'getTriageSnapshot',
+    summary: 'The attention snapshot: failed downloads grouped by cause (D1 §2 TRIAGE)',
+    description:
+      '[triage] The one attention surface\'s data — a READ-SIDE aggregation over state that ' +
+      'already exists (no new state machine): the §7.1 `failed` job rows, their typed failure ' +
+      'kinds + error text, joined with the [site-availability] record. Groups (fixed order, all ' +
+      'four ALWAYS present so the shape is stable): `site_dead` — the module\'s availability ' +
+      'record says unreachable (the record is written by the ONE shared classifier from ' +
+      'transport-class failures and 5xx answers, so this group is exactly "the pipe already ' +
+      'observed origin trouble"; rows dim and cross-link to the registry availability column ' +
+      'but NEVER gate their own retry — hints dim and explain, an explicit user action wins); ' +
+      '`antibot` — anti-bot / bypass-unavailable vocabulary in the failure text (HTTP 4xx ' +
+      'deliberately writes no availability verdict, so text is the only signal); `throttled` ' +
+      '— HTTP 429 vocabulary; `other` — everything else (pack/engine faults, worker stalls, ' +
+      'unclassified net failures). Failed rows superseded by a LIVE retry-chain successor ' +
+      '(`<key>#<n>`) drop out — they are back in the pipe, not awaiting attention. ' +
+      '`failedTotal: 0` is the healthy state the UI celebrates.',
+    tags: ['jobs'],
+    responses: {
+      200: { description: 'All four cause groups with counts, per-site buckets and availability joins', schema: TriageSnapshotResponseSchema },
+      ...errors(internal()),
+    },
+  },
+  {
+    method: 'post',
+    path: '/api/triage/retry',
+    operationId: 'retryTriageGroup',
+    summary: 'Paced retry-all for ONE cause group (never an instant fan-out)',
+    description:
+      '[triage] Re-enqueues EVERY failed job in the named cause group through the SAME per-job ' +
+      'retry path the downloads tab uses (fresh chained attempt, markers resume). Per-host ' +
+      'pacing applies to these retries exactly as to fresh work (D1 §2 PIPE): the re-enqueued ' +
+      'rows re-enter the download lane, which awaits the shared per-host pacer before a job\'s ' +
+      'first module hop — same-host retries space at least the pacing interval apart, never a ' +
+      'burst. Availability is NEVER consulted on this path: a `site_dead` group retries like ' +
+      'any other (no availability-gated blocking of a manual action, D1 §3). Best-effort like ' +
+      'bulk-action: rows that raced away between snapshot and retry are skipped, not fatal.',
+    tags: ['jobs'],
+    body: TriageRetryRequestSchema,
+    responses: {
+      200: { description: 'The group\'s retry outcome: count + the re-enqueued snapshots', schema: TriageRetryResponseSchema },
+      ...errors(validation(), internal()),
     },
   },
   {

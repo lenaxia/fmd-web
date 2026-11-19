@@ -716,6 +716,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/triage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The attention snapshot: failed downloads grouped by cause (D1 §2 TRIAGE)
+         * @description [triage] The one attention surface's data — a READ-SIDE aggregation over state that already exists (no new state machine): the §7.1 `failed` job rows, their typed failure kinds + error text, joined with the [site-availability] record. Groups (fixed order, all four ALWAYS present so the shape is stable): `site_dead` — the module's availability record says unreachable (the record is written by the ONE shared classifier from transport-class failures and 5xx answers, so this group is exactly "the pipe already observed origin trouble"; rows dim and cross-link to the registry availability column but NEVER gate their own retry — hints dim and explain, an explicit user action wins); `antibot` — anti-bot / bypass-unavailable vocabulary in the failure text (HTTP 4xx deliberately writes no availability verdict, so text is the only signal); `throttled` — HTTP 429 vocabulary; `other` — everything else (pack/engine faults, worker stalls, unclassified net failures). Failed rows superseded by a LIVE retry-chain successor (`<key>#<n>`) drop out — they are back in the pipe, not awaiting attention. `failedTotal: 0` is the healthy state the UI celebrates.
+         */
+        get: operations["getTriageSnapshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/triage/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Paced retry-all for ONE cause group (never an instant fan-out)
+         * @description [triage] Re-enqueues EVERY failed job in the named cause group through the SAME per-job retry path the downloads tab uses (fresh chained attempt, markers resume). Per-host pacing applies to these retries exactly as to fresh work (D1 §2 PIPE): the re-enqueued rows re-enter the download lane, which awaits the shared per-host pacer before a job's first module hop — same-host retries space at least the pacing interval apart, never a burst. Availability is NEVER consulted on this path: a `site_dead` group retries like any other (no availability-gated blocking of a manual action, D1 §3). Best-effort like bulk-action: rows that raced away between snapshot and retry are skipped, not fatal.
+         */
+        post: operations["retryTriageGroup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/library": {
         parameters: {
             query?: never;
@@ -1216,6 +1256,29 @@ export interface components {
         ModuleSummary2: string;
         ModuleSummary3: string;
         ModuleSummary4: string;
+        TriageJob: {
+            id: string;
+            mangaTitle: string | null;
+            chapterName: string | null;
+            error: string | null;
+            /** @enum {string} */
+            failureKind: "worker_stalled" | "engine_oom" | "net" | "pack";
+            updatedAt: components["schemas"]["Timestamp"];
+        };
+        /** Format: date-time */
+        Timestamp: string;
+        TriageSite: {
+            moduleId: string;
+            siteName: string | null;
+            availability: components["schemas"]["ModuleAvailability"];
+            jobs: components["schemas"]["TriageJob"][];
+        };
+        TriageGroup: {
+            /** @enum {string} */
+            cause: "site_dead" | "antibot" | "throttled" | "other";
+            count: number;
+            sites: components["schemas"]["TriageSite"][];
+        };
         OutputDefaults: {
             /**
              * @default cbz
@@ -1322,8 +1385,6 @@ export interface components {
             coverLink: string | null;
             newsSince?: boolean;
         };
-        /** Format: date-time */
-        Timestamp: string;
         AccountView: {
             moduleId: string;
             username: string;
@@ -1371,6 +1432,8 @@ export interface components {
             error?: string;
             idempotencyKey?: string;
             paused?: boolean;
+            /** @enum {string} */
+            failureKind?: "worker_stalled" | "engine_oom" | "net" | "pack";
             createdAt: components["schemas"]["Timestamp"];
             updatedAt: components["schemas"]["Timestamp"];
         };
@@ -3763,6 +3826,89 @@ export interface operations {
                 };
             };
             /** @description Scope does not apply to this action */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    getTriageSnapshot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description All four cause groups with counts, per-site buckets and availability joins */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        groups: components["schemas"]["TriageGroup"][];
+                        failedTotal: number;
+                        generatedAt: components["schemas"]["Timestamp"];
+                    };
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    retryTriageGroup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    cause: "site_dead" | "antibot" | "throttled" | "other";
+                };
+            };
+        };
+        responses: {
+            /** @description The group's retry outcome: count + the re-enqueued snapshots */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        cause: "site_dead" | "antibot" | "throttled" | "other";
+                        affected: number;
+                        jobs: components["schemas"]["Job"][];
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
             400: {
                 headers: {
                     [name: string]: unknown;

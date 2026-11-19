@@ -1,13 +1,29 @@
 /**
  * Minimal hash router (§11 SPA): `#/browse?…`, `#/manga?…`,
- * `#/downloads`, `#/favorites`, `#/settings`. No router dependency — the
- * pages and their query params are the entire surface; `navigate()` and
- * the `useRoute()` hook keep the URL shareable.
+ * `#/attention`, `#/downloads`, `#/favorites`, `#/settings`. No router
+ * dependency — the pages and their query params are the entire
+ * surface; `navigate()` and the `useRoute()` hook keep the URL
+ * shareable.
  */
 
-export type RouteName = 'browse' | 'manga' | 'downloads' | 'favorites' | 'library' | 'settings';
+export type RouteName =
+  | 'browse'
+  | 'manga'
+  | 'attention'
+  | 'downloads'
+  | 'favorites'
+  | 'library'
+  | 'settings';
 
-export const ROUTE_NAMES: readonly RouteName[] = ['browse', 'manga', 'downloads', 'favorites', 'library', 'settings'];
+export const ROUTE_NAMES: readonly RouteName[] = [
+  'browse',
+  'manga',
+  'attention',
+  'downloads',
+  'favorites',
+  'library',
+  'settings',
+];
 
 export interface Route {
   readonly name: RouteName;

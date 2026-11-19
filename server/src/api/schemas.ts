@@ -24,13 +24,14 @@ import { ApiError } from './errors.js';
 
 // Import for local composition + re-export for existing import paths:
 // ONE definition, both surfaces.
-import { JobSchema, JobStateSchema, TimestampSchema } from '@fmd/contract';
+import { JobSchema, JobStateSchema, TimestampSchema, JobFailureKindSchema } from '@fmd/contract';
 import type { TimestampT, JobStateT, JobT } from '@fmd/contract';
 import { DEFAULT_CHAPTER_NAME_TEMPLATE } from '../jobs/library/filenames.js';
 export {
   TimestampSchema,
   JobStateSchema,
   JobSchema,
+  JobFailureKindSchema,
   type TimestampT,
   type JobStateT,
   type JobT,
@@ -1063,6 +1064,106 @@ export const JobDeletedResponseSchema = z.object({
   dataDeleted: z.boolean(),
 });
 export type JobDeletedResponseT = z.infer<typeof JobDeletedResponseSchema>;
+
+// ── triage (D1 §2 TRIAGE — the one attention surface) ────────────────
+
+/**
+ * Failure causes the attention surface groups by (D1 §2 TRIAGE:
+ * "failures arrive grouped by cause — not per-chapter noise"). The
+ * grouping is a READ-SIDE aggregation over existing state: the §7.1
+ * `failed` rows, their typed failure kinds + error text, and the
+ * site-availability record ([site-availability]) — no new state
+ * machine anywhere.
+ *
+ * - `site_dead` — the module's availability record says `unreachable`
+ *   (the [site-availability] join; the record is written by the ONE
+ *   shared classifier from transport-class failures and 5xx answers,
+ *   so this group is exactly "the pipe already observed origin
+ *   trouble"). Never gates anything: rows dim and explain, retry
+ *   stays clickable.
+ * - `antibot` — anti-bot / bypass-unavailable signals in the failure
+ *   text (403 answers, challenge/bypass vocabulary). Availability
+ *   deliberately stays `unknown`/`reachable` for these (4xx writes
+ *   nothing), so text is the only signal.
+ * - `throttled` — HTTP 429 vocabulary in the failure text.
+ * - `other` — everything else (pack/engine faults, worker stalls,
+ *   unclassified net failures).
+ */
+export const TriageCauseSchema = z.enum(['site_dead', 'antibot', 'throttled', 'other']);
+export type TriageCauseT = z.infer<typeof TriageCauseSchema>;
+
+/** All causes, the fixed presentation order of the attention surface. */
+export const TRIAGE_CAUSES: readonly TriageCauseT[] = ['site_dead', 'antibot', 'throttled', 'other'];
+
+/** One failed job as the attention surface lists it (aggregate, not queue row). */
+export const TriageJobSchema = z.object({
+  id: JobIdSchema,
+  /** Payload provenance (null when the create carried none). */
+  mangaTitle: z.string().nullable(),
+  chapterName: z.string().nullable(),
+  /** Last failure text (null when the row recorded none). */
+  error: z.string().nullable(),
+  /** The typed §4/§7.3 classification of the `→ failed` transition. */
+  failureKind: JobFailureKindSchema,
+  updatedAt: TimestampSchema,
+});
+export type TriageJobT = z.infer<typeof TriageJobSchema>;
+
+/**
+ * One site's failed jobs inside a cause group. `availability` is the
+ * LIVE [site-availability] record joined per module (`unknown` when
+ * the deployment has no availability service) — a hint that dims and
+ * explains, never a gate on the retry actions beside it.
+ */
+export const TriageSiteSchema = z.object({
+  moduleId: z.string().min(1),
+  /** Registry name join (null when the module is no longer installed). */
+  siteName: z.string().nullable(),
+  availability: ModuleAvailabilitySchema,
+  jobs: z.array(TriageJobSchema),
+});
+export type TriageSiteT = z.infer<typeof TriageSiteSchema>;
+
+export const TriageGroupSchema = z.object({
+  cause: TriageCauseSchema,
+  /** Jobs in the group across all sites. */
+  count: z.number().int().nonnegative(),
+  sites: z.array(TriageSiteSchema),
+});
+export type TriageGroupT = z.infer<typeof TriageGroupSchema>;
+
+/**
+ * GET /api/triage — the attention snapshot. ALL FOUR groups are always
+ * present (empty ones carry count 0 + no sites) so the surface's shape
+ * is stable; `failedTotal: 0` is the healthy state the UI celebrates.
+ */
+export const TriageSnapshotResponseSchema = z.object({
+  groups: z.array(TriageGroupSchema),
+  failedTotal: z.number().int().nonnegative(),
+  generatedAt: TimestampSchema,
+});
+export type TriageSnapshotResponseT = z.infer<typeof TriageSnapshotResponseSchema>;
+
+export const TriageRetryRequestSchema = z.object({ cause: TriageCauseSchema });
+export type TriageRetryRequestT = z.infer<typeof TriageRetryRequestSchema>;
+
+/**
+ * POST /api/triage/retry — the paced retry-all for ONE cause group.
+ * Each failed job in the group goes through the SAME per-job retry
+ * path as the downloads tab (fresh chained attempt, markers resume);
+ * because the re-enqueued rows re-enter the download lane, per-host
+ * pacing applies to retries exactly as to fresh work (D1 §2 PIPE) —
+ * same-host retries space ≥ the pacing interval apart, never a burst.
+ * Availability NEVER gates this: a `site_dead` group retries the same
+ * as any other (the operator's explicit action wins, D1 §3).
+ */
+export const TriageRetryResponseSchema = z.object({
+  cause: TriageCauseSchema,
+  affected: z.number().int().nonnegative(),
+  jobs: z.array(JobSchema),
+});
+export type TriageRetryResponseT = z.infer<typeof TriageRetryResponseSchema>;
+
 
 // ── library (§7.1 listing/download) ──────────────────────────────────
 

@@ -73,6 +73,11 @@ import {
   ModuleBulkUpdateResponseSchema,
   ModuleCheckResponseSchema,
   type ModuleCheckResponseT,
+  TriageSnapshotResponseSchema,
+  TriageRetryRequestSchema,
+  TriageRetryResponseSchema,
+  type TriageSnapshotResponseT,
+  type TriageRetryResponseT,
   OutputDefaultsUpdateRequestSchema,
   PerformanceSettingsUpdateRequestSchema,
   RetentionSettingsUpdateRequestSchema,
@@ -150,6 +155,7 @@ import type { WsHub } from './ws/hub.js';
 import { CoverProxyService } from './cover-proxy.js';
 import type { SqliteLibraryFileStateService } from '../runtime/library-file-state.js';
 import type { SiteAvailabilityService } from '../runtime/site-availability.js';
+import { TriageService } from '../runtime/triage.js';
 import type { PreferredSitesService } from '../runtime/preferred-sites.js';
 import { InMemoryAccountService, type AccountService } from '../accounts/account-service.js';
 import { Fmd2ImportService, FMD2_IMPORT_MAX_BYTES, type UploadedPart } from '../import/fmd2/service.js';
@@ -320,6 +326,8 @@ function toJobWire(job: JobRecord): JobT {
     ...(job.error !== undefined ? { error: job.error } : {}),
     ...(job.idempotencyKey !== undefined ? { idempotencyKey: job.idempotencyKey } : {}),
     ...(job.paused === true ? { paused: true } : {}),
+    // §4/§7.3 typed classification — failed rows only (additive).
+    ...(job.state === 'failed' && job.failureKind !== undefined ? { failureKind: job.failureKind } : {}),
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
   };
@@ -1358,6 +1366,40 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
       scope: result.scope,
       affected: result.affected,
       jobs: result.jobs,
+    });
+  });
+
+  // ── triage (D1 §2 TRIAGE — the one attention surface) ─────────────
+  // Built from seams that already exist in every deployment: the job
+  // service (failed rows + the SAME per-job retry action the downloads
+  // tab uses), the optional availability record (the [site-availability]
+  // join — absent reads `unknown`, never blocks mounting), and the
+  // module registry (site names). Read-side aggregation only: no new
+  // state machine, no writes outside the existing action seams.
+  const moduleNames = new Map<string, string>(
+    services.modules.list().map((m): [string, string] => [m.id, m.name]),
+  );
+  const triage = new TriageService({
+    jobs: services.jobs,
+    ...(services.availability !== undefined ? { availability: services.availability } : {}),
+    moduleName: (id: string): string | undefined => moduleNames.get(id),
+  });
+  app.get('/api/triage', async (): Promise<TriageSnapshotResponseT> =>
+    TriageSnapshotResponseSchema.parse(triage.snapshot()),
+  );
+  // The paced retry-all for ONE cause group: every member re-enters the
+  // download lane through the SAME per-job retry path, so per-host
+  // pacing applies to these retries exactly as to fresh work (D1 §2
+  // PIPE — never an instant fan-out). Availability is NEVER consulted
+  // on the retry path: a site_dead group retries like any other (the
+  // operator's explicit action wins, D1 §3 "hints never block").
+  app.post('/api/triage/retry', async (req): Promise<TriageRetryResponseT> => {
+    const body = parseOr400(TriageRetryRequestSchema, req.body, 'triage retry body');
+    const result = triage.retryGroup(body.cause);
+    return TriageRetryResponseSchema.parse({
+      cause: result.cause,
+      affected: result.affected,
+      jobs: result.jobs.map(toJobWire),
     });
   });
 

@@ -28,6 +28,15 @@ export type TimestampT = z.infer<typeof TimestampSchema>;
 export const JobStateSchema = z.enum(['queued', 'running', 'retry', 'done', 'failed', 'cancelled']);
 export type JobStateT = z.infer<typeof JobStateSchema>;
 
+/**
+ * Failure kinds carried by `state = failed` (§4/§7.3 — the typed
+ * classification a `→ failed` transition REQUIRES, enforced by the
+ * state machine). Surfaced on failed job rows so the triage surface
+ * can group by cause without re-deriving it from error text.
+ */
+export const JobFailureKindSchema = z.enum(['worker_stalled', 'engine_oom', 'net', 'pack']);
+export type JobFailureKindT = z.infer<typeof JobFailureKindSchema>;
+
 /** The §9 `job` row projection shared by REST `/api/jobs*` and every WS event frame. */
 export const JobSchema = z.object({
   id: z.string(),
@@ -45,6 +54,12 @@ export const JobSchema = z.object({
    * stays `queued` and the hold only lifts via the resume endpoint.
    */
   paused: z.boolean().optional(),
+  /**
+   * The typed §4/§7.3 failure classification — present on `failed`
+   * rows only (the state machine requires it on `→ failed`). Additive:
+   * absent on every other state, so older frames/clients keep parsing.
+   */
+  failureKind: JobFailureKindSchema.optional(),
   createdAt: TimestampSchema,
   updatedAt: TimestampSchema,
 });

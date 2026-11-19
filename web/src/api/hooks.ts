@@ -1056,6 +1056,60 @@ export function useJobBulkAction(): UseMutationResult<JobBulkActionResponseT, Ap
   });
 }
 
+// ── triage (D1 §2 TRIAGE — the one attention surface) ───────────────
+
+export type TriageSnapshotT = operations['getTriageSnapshot']['responses'][200]['content']['application/json'];
+export type TriageRetryResponseT = operations['retryTriageGroup']['responses'][200]['content']['application/json'];
+export type TriageCauseT = components['schemas']['TriageGroup']['cause'];
+
+/**
+ * GET /api/triage — the attention snapshot: failed downloads grouped
+ * by cause (site_dead joins the availability record; antibot /
+ * throttled read the failure text; other is the rest). The query
+ * re-subscribes on refocus like every query; the WS feed does not
+ * carry triage frames (the surface is an aggregate), so the page also
+ * invalidates on visit.
+ */
+export function useTriage(): UseQueryResult<TriageSnapshotT, ApiError> {
+  const client = useApiClient();
+  return useQuery<TriageSnapshotT, ApiError>({
+    queryKey: ['triage'],
+    queryFn: (): Promise<TriageSnapshotT> =>
+      unwrap(client.GET('/api/triage')),
+  });
+}
+
+export interface TriageRetryInput {
+  readonly cause: TriageCauseT;
+}
+
+/**
+ * POST /api/triage/retry — the paced retry-all for ONE cause group.
+ * Per-host pacing applies server-side (the re-enqueued rows re-enter
+ * the download lane through the SAME per-job retry path — never a
+ * burst); availability NEVER gates the call. Invalidates the triage
+ * snapshot AND the jobs queries (the group's rows flip to queued
+ * chained attempts).
+ */
+export function useTriageRetry(): UseMutationResult<TriageRetryResponseT, ApiError, TriageRetryInput> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation<TriageRetryResponseT, ApiError, TriageRetryInput>({
+    mutationFn: async (input): Promise<TriageRetryResponseT> =>
+      unwrap(
+        client.POST('/api/triage/retry', {
+          body: { cause: input.cause },
+        }),
+      ),
+    onSuccess: (): void => {
+      void queryClient.invalidateQueries({ queryKey: ['triage'] });
+      // every ['jobs', *] page sees the fresh queued attempts (the WS
+      // feed patches live clients; the invalidation covers the rest).
+      void queryClient.invalidateQueries({ queryKey: ['jobs'] });
+    },
+  });
+}
+
 // ── batch download-all (browse row menu, FMD2 miMangaListDownloadAll) ──
 
 export interface DownloadBatchInput {

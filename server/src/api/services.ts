@@ -21,6 +21,7 @@ import type {
   JobActionTypeT,
   JobBulkActionRequestT,
   JobBulkActionResponseT,
+  JobFailureKind,
   JobStateT,
   NormalizedInfo,
 } from '@fmd/contract';
@@ -735,6 +736,12 @@ export interface JobRecord {
   idempotencyKey?: string;
   /** Add-as-stopped hold (cbAddAsStopped parity): queued but not claimable. */
   paused?: boolean;
+  /**
+   * The typed §4/§7.3 classification — set on `failed` rows (the
+   * state machine requires it on `→ failed`); the triage surface
+   * groups by cause off it. Absent on every other state.
+   */
+  failureKind?: JobFailureKind;
   createdAt: string;
   updatedAt: string;
 }
@@ -863,6 +870,12 @@ export class InMemoryJobService implements JobService {
     state: JobRecord['state'],
     progress?: Record<string, unknown>,
     createdAt?: string,
+    /**
+     * Test seam for the `failed` state (the real queue records these
+     * on the `→ failed` transition; the in-memory double has no lane
+     * to fail rows, so the triage/api suites seed them here).
+     */
+    failure?: { readonly failureKind: JobFailureKind; readonly error?: string },
   ): JobRecord {
     const job = this.jobs.get(id);
     if (job === undefined) {
@@ -873,6 +886,9 @@ export class InMemoryJobService implements JobService {
       state,
       ...(progress !== undefined ? { progress } : {}),
       ...(createdAt !== undefined ? { createdAt } : {}),
+      ...(failure !== undefined
+        ? { failureKind: failure.failureKind, ...(failure.error !== undefined ? { error: failure.error } : {}) }
+        : {}),
       updatedAt: new Date().toISOString(),
     };
     this.jobs.set(id, next);
