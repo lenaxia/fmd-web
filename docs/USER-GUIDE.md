@@ -276,7 +276,7 @@ gone) and a **Copy path** action for the recorded server path.
   media-server of choice. There is deliberately **no in-app reader**:
   consumption belongs to dedicated tools.
 - **Load more** pages through the archive list.
-- The output **format** (ZIP / CBZ / PDF / EBUB) and naming come from
+- The output **format** (ZIP / CBZ / PDF / EPUB) and naming come from
   Settings → Output defaults (see [Settings](#settings)).
 - The **All / Missing / Orphans** filter chips are URL state
   (`#/library?filter=missing` is shareable): *Missing* lists files whose
