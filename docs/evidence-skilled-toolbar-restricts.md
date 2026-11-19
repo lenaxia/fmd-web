@@ -152,7 +152,43 @@ A concurrent [site-availability] session is active in the shared tree
 web facets — with interleaved hunks in the shared api/hooks files).
 Mid-flight snapshots of THEIR web layer (AvailabilityChip/SettingsPage
 tsc errors) came and went during this story's gate runs; every failure
-reproduced outside story files. Their hunks in shared files are left
-for their commit; this story's gates were verified when the shared
-tree was green and on the story files directly otherwise (the
-downloads-parity precedent for disclaiming parallel-session breakage).
+reproduced outside story files. Coordination resolved the sequencing:
+they committed first (b8de66f, staged via update-index — my hunks
+untouched), this story's commit (99c5edd) landed directly behind it as
+exactly the [file-state] diff.
+
+## Final gates on the landed tree (post-commit, 2026-11-19 ~03:50)
+- `vitest run` (full): **226 files, 2232 passed / 6 skipped / 0 failed**
+  (both features' suites green on the merged tree; the earlier
+  drift-check flakes were a scratch-worktree node_modules-symlink
+  artifact — disproven by removing the story's only contract change
+  and re-running, and absent on the real tree).
+- `tsc -b`: 0 errors. `eslint .`: clean (exit 0, zero findings).
+- `playwright test library-file-state --project=desktop`: **3/3**.
+
+## Live verification (restarted preview per the runbook procedure)
+Preview restarted from the landed dist (vite build + runtime-entry,
+readyz 200 in 2 s) over the pre-existing live data dir, then:
+- `GET /api/library` rows carry `state: "downloaded"`, root-relative
+  `path` + `absolutePath`, `mtime`; the verified_at stamp lands on the
+  request AFTER the first stat (the write-on-stale discipline — the
+  first response renders the pre-stamp snapshot by design, the second
+  shows the persisted stamp).
+- Seeded the VERIFY scenario LIVE — one file moved to `imported/`, one
+  deleted, one stray dropped in the title dir — then
+  `POST /api/library/rescan`: counts `scanned 12 / present 10 /
+  relinked 1 / missing 1 / orphans 1`; the report carried the re-link
+  (`fromPath …/Sousou no Frieren/Ch.003.zip` → `toPath imported/
+  Ch.003.zip`), the missing entry with its former path and empty
+  candidates, and the orphan. The re-link PERSISTED (the listing shows
+  Ch.003 `downloaded @ imported/Ch.003.zip`; `filter=missing` serves
+  exactly the deleted Ch.002).
+- `GET /api/library/title-files` live: the ledger-first shape renders
+  chapter links without rows as `missing` (no fileName/path), and the
+  orphan scoping holds (the stray under the OTHER title's dir does not
+  surface for an unrelated title).
+- Restore pass: moved the file BACK to its convention slot + restored
+  the deleted file + removed the stray — the closing rescan re-linked
+  the move-back via the CONVENTION rule (present 11 / relinked 1 /
+  missing 0 / orphans 0) and `filter=missing` serves zero rows: the
+  live library is left clean.
