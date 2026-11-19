@@ -4,6 +4,16 @@ A Dockerized, web-based rebuild of **FMD2 (Free Manga Downloader 2)** that
 reuses FMD2's Lua site-module ecosystem and the FMD2-DB catalogs
 **unchanged** — one ecosystem, one module set, no fork of site adapters.
 
+**Auth (BREAKING, token-only):** the app's only credential is the R4
+single app-wide API key — auto-generated on first run, manageable in
+Settings → API, sent as `Authorization: Bearer`, optionally pinned via
+`FMD_WEB_API_TOKEN`. The optional-password login was REMOVED: the app
+performs no user authentication; every route serves unauthenticated
+(*arr auth-None semantics). For user-facing auth put **Authelia,
+Authentik or PocketID** in front via your reverse proxy — see
+[docs/API.md](docs/API.md) (§ *Upgrading from password auth* for the
+BREAKING migration note).
+
 Authoritative design: [`DESIGN.md`](DESIGN.md) (v5, review-converged —
 revisions driven by `docs/REVIEW-001-design-review.md`,
 `docs/REVIEW-002-design-review.md`, `docs/REVIEW-003-design-review.md`,
@@ -63,7 +73,7 @@ fmd-web/
 │                      SPA) · compose.yml (app; `browser` = commented placeholder)
 │                      · compose.e2e.yml (test profile: mock upstream + app env)
 ├── server/            @fmd/server — API server + module engine + jobs + sync + db
-│   ├── src/api/       Fastify routes, WS hub + backfill, auth, rate limits   (placeholder)
+│   ├── src/api/       Fastify routes, WS hub + backfill, auth (API key)  (placeholder)
 │   ├── src/engine/
 │   │   ├── lua/       worker pool (engine-per-worker), chunk cache, watchdog (placeholder)
 │   │   ├── shims/     http · txquery · strings · crypto · duktape · pb · …   (placeholder)
