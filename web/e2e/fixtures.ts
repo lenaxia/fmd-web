@@ -174,7 +174,13 @@ export async function installMockApi(page: Page): Promise<void> {
       json({
         moduleId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         url: 'https://fixtures.example/manga/alpha',
-        verifiedAt: '2026-11-19T00:00:00.000Z',
+        // [visual-baseline stability] a fixed wall-clock stamp here drifts
+        // the manga page's VISIBLE "Verified N h ago" line (FilesSection
+        // header) past every hour rollover, staling the committed manga
+        // fixtures within the hour they were shot. Serve a FIXED OFFSET
+        // from mock-install time instead: the rendered label is
+        // invariantly "Verified 2 h ago" at any run time.
+        verifiedAt: new Date(Date.now() - 2 * 60 * 60_000).toISOString(),
         files: [],
         orphans: [],
       }),
