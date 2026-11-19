@@ -327,6 +327,22 @@ export const ModuleCapabilitiesSchema = z.object({
 });
 export type ModuleCapabilitiesT = z.infer<typeof ModuleCapabilitiesSchema>;
 
+/**
+ * Per-module site availability (dead-site discovery): the persisted
+ * record joined onto every /api/modules row. `unknown` = never
+ * checked (seeded state, silent — no row exists yet); the record is
+ * written opportunistically by existing traffic paths and by the
+ * manual per-row Check probe, NEVER by background/scheduled probing.
+ */
+export const ModuleAvailabilitySchema = z.object({
+  status: z.enum(['reachable', 'unreachable', 'unknown']),
+  /** ISO timestamp of the last confident write (null while unknown). */
+  checkedAt: z.string().nullable(),
+  /** Short reason carried by the last unreachable write. */
+  reason: z.string().nullable(),
+});
+export type ModuleAvailabilityT = z.infer<typeof ModuleAvailabilitySchema>;
+
 export const ModuleSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -346,6 +362,13 @@ export const ModuleSummarySchema = z.object({
    */
   catalogInstalled: z.boolean(),
   /**
+   * Site availability joined LIVE from the availability store — a
+   * DIFFERENT concern from catalogInstalled (catalog = list readiness,
+   * availability = last observed site reachability). Never gates
+   * anything: a dimmed picker row stays clickable.
+   */
+  availability: ModuleAvailabilitySchema,
+  /**
    * Per-module proxy override (§9/§10 settings). null = inherit the
    * global proxy; a config = EXACT SetProxy semantics for this module's
    * HTTP objects (a module's own SetProxy call still overrides at
@@ -354,6 +377,21 @@ export const ModuleSummarySchema = z.object({
   proxy: ProxySettingsSchema.nullable(),
 });
 export type ModuleSummaryT = z.infer<typeof ModuleSummarySchema>;
+
+/**
+ * POST /api/modules/:id/check — the manual per-row Check (Settings
+ * registry): ONE probe of the module RootURL through the module's own
+ * engine HTTP path. `verdict: none` = ambiguous (HTTP 4xx — origin
+ * alive but possibly blocking): the record is intentionally unchanged.
+ */
+export const ModuleCheckResponseSchema = z.object({
+  moduleId: z.string(),
+  verdict: z.enum(['reachable', 'unreachable', 'none']),
+  /** Human classification note for the UI toast. */
+  detail: z.string(),
+  availability: ModuleAvailabilitySchema,
+});
+export type ModuleCheckResponseT = z.infer<typeof ModuleCheckResponseSchema>;
 
 export const ModuleListResponseSchema = z.object({
   modules: z.array(ModuleSummarySchema),

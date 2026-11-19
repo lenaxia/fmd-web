@@ -119,6 +119,7 @@ describe('URL codec (?q=&lang=&h=&setup=)', (): void => {
       lang: ['English', 'Raw'],
       h: ['safe'] as const,
       setup: ['no-setup'] as const,
+      avail: 'all' as const,
     };
     const query = serializeModuleFilter(state);
     expect(query).toEqual({ q: 'manga', lang: 'English,Raw', h: 'safe', setup: 'no-setup' });
@@ -138,5 +139,66 @@ describe('URL codec (?q=&lang=&h=&setup=)', (): void => {
     expect(parsed.lang).toEqual(['English']);
     expect(parsed.h).toEqual(['h']);
     expect(parsed.setup).toEqual(['no-setup']);
+  });
+});
+
+describe('LAST CHECK facet (site availability, dead-site discovery)', (): void => {
+  const registry = [
+    moduleFixture({
+      id: 'a'.repeat(32),
+      name: 'Alive',
+      availability: { status: 'reachable', checkedAt: '2026-11-19T00:00:00Z', reason: null },
+    }),
+    moduleFixture({
+      id: 'b'.repeat(32),
+      name: 'Dead',
+      availability: { status: 'unreachable', checkedAt: '2026-11-19T00:00:00Z', reason: 'connect ECONNREFUSED' },
+    }),
+    moduleFixture({
+      id: 'c'.repeat(32),
+      name: 'Fresh',
+      availability: { status: 'unknown', checkedAt: null, reason: null },
+    }),
+  ];
+
+  it('filters by status: unreachable / unknown / reachable; all = everything', (): void => {
+    expect(filterModules(registry, { ...EMPTY_MODULE_FILTER, avail: 'unreachable' }).map((m): string => m.name)).toEqual(['Dead']);
+    expect(filterModules(registry, { ...EMPTY_MODULE_FILTER, avail: 'unknown' }).map((m): string => m.name)).toEqual(['Fresh']);
+    expect(filterModules(registry, { ...EMPTY_MODULE_FILTER, avail: 'reachable' }).map((m): string => m.name)).toEqual(['Alive']);
+    expect(filterModules(registry, { ...EMPTY_MODULE_FILTER, avail: 'all' })).toHaveLength(3);
+  });
+
+  it('composes by AND with the other facet groups', (): void => {
+    const narrowed = [
+      ...registry,
+      moduleFixture({
+        id: 'd'.repeat(32),
+        name: 'DeadH',
+        category: 'H-Sites',
+        availability: { status: 'unreachable', checkedAt: '2026-11-19T00:00:00Z', reason: 'timeout' },
+      }),
+    ];
+    const out = filterModules(narrowed, { ...EMPTY_MODULE_FILTER, avail: 'unreachable', h: ['h'] });
+    expect(out.map((m): string => m.name)).toEqual(['DeadH']);
+  });
+
+  it('LIVE counts: the avail group counts over the OTHER groups\' constraints', (): void => {
+    const counts = facetCounts(registry, EMPTY_MODULE_FILTER);
+    const byValue = new Map(counts.avail.map((f): [string, number] => [f.value, f.count]));
+    expect(byValue.get('reachable')).toBe(1);
+    expect(byValue.get('unreachable')).toBe(1);
+    expect(byValue.get('unknown')).toBe(1);
+  });
+
+  it('the ?filter= codec round-trips a single-select value; all stays omitted', (): void => {
+    expect(serializeModuleFilter({ ...EMPTY_MODULE_FILTER, avail: 'unreachable' })).toEqual({ filter: 'unreachable' });
+    const parsed = parseModuleFilter({ filter: 'unreachable' }, []);
+    expect(parsed.avail).toBe('unreachable');
+    expect(serializeModuleFilter(parsed)).toEqual({ filter: 'unreachable' });
+  });
+
+  it('unknown ?filter= values drop to all (shared URLs never over-filter)', (): void => {
+    expect(parseModuleFilter({ filter: 'banana' }, []).avail).toBe('all');
+    expect(parseModuleFilter({}, []).avail).toBe('all');
   });
 });

@@ -49,6 +49,7 @@ export const module: ModuleSummaryT = {
   enabled: true,
   proxy: null,
   catalogInstalled: true,
+  availability: { status: 'unknown', checkedAt: null, reason: null },
   options: [
     { name: 'Auto-skip pages', kind: 'checkbox', defaultValue: false },
     { name: 'Quality', kind: 'combobox', defaultValue: 1, items: ['low', 'medium', 'high'] },

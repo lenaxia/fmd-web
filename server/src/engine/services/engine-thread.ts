@@ -40,6 +40,7 @@ import type { EngineDownloadOptions } from './download-hooks.js';
 import type { TaskWriter } from './download-ports.js';
 import type { ModuleRuntime } from './module-runtime.js';
 import type { ModuleSharedState } from '../state/module-state.js';
+import type { SerializedAvailabilityOutcome } from './availability.js';
 import type {
   SerializedError,
   TaskSnapshot,
@@ -68,6 +69,10 @@ interface ThreadResponse {
   readonly task?: TaskSnapshot;
   readonly cookies?: ReadonlyArray<readonly [string, string]>;
   readonly records?: readonly HostLogRecord[];
+  /** Site-availability outcomes marshaled home from the worker. */
+  readonly availability?: readonly SerializedAvailabilityOutcome[];
+  /** Raw probe outcome (availability.check op). */
+  readonly probe?: { readonly resultCode: number; readonly resultString: string };
 }
 
 /** Worker bootstrap: resolve-shim .js→.ts (source runs), then load the
@@ -266,6 +271,27 @@ async function mergeJarBack(
   await state.persist();
 }
 
+/** Marshal worker-collected availability outcomes into the REAL
+ * main-side sink (fire-and-forget by contract; never throws). */
+function forwardAvailability(
+  sink: ((moduleId: string, outcome: import('./availability.js').SiteAvailabilityOutcome) => void) | undefined,
+  outcomes: readonly SerializedAvailabilityOutcome[] | undefined,
+): void {
+  if (sink === undefined || outcomes === undefined) {
+    return;
+  }
+  for (const outcome of outcomes) {
+    try {
+      sink(outcome.moduleId, {
+        verdict: outcome.verdict,
+        ...(outcome.reason !== undefined ? { reason: outcome.reason } : {}),
+      });
+    } catch {
+      // fire-and-forget by contract
+    }
+  }
+}
+
 /** The §5.8 info port, executed on the engine thread. */
 export class OffloadedInfoService implements ModuleInfoPort {
   public constructor(
@@ -306,6 +332,7 @@ export class OffloadedInfoService implements ModuleInfoPort {
       } satisfies EngineThreadRequestDeps,
     });
     forwardRecords(this.options.logSink, response.records);
+    forwardAvailability(this.options.availabilitySink, response.availability);
     await mergeJarBack(this.options.moduleState, moduleId, response.cookies);
     if (!response.ok) {
       throw rehydrateError(
@@ -387,6 +414,7 @@ class OffloadedDownloadHooks implements ModuleDownloadHooks {
       } satisfies EngineThreadRequestDeps,
     });
     forwardRecords(options.logSink, response.records);
+    forwardAvailability(options.availabilitySink, response.availability);
     await mergeJarBack(options.moduleState, moduleId, response.cookies);
     if (!response.ok) {
       throw rehydrateError(
@@ -453,6 +481,7 @@ class OffloadedDownloadHooks implements ModuleDownloadHooks {
       applyWriter(task, response.task);
     }
     forwardRecords(this.options.logSink, response.records);
+    forwardAvailability(this.options.availabilitySink, response.availability);
     await mergeJarBack(this.options.moduleState, this.moduleId, response.cookies);
     if (!response.ok) {
       throw rehydrateError(
@@ -461,6 +490,34 @@ class OffloadedDownloadHooks implements ModuleDownloadHooks {
     }
     return response.value;
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Manual site-availability probe (Settings registry Check)
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Run the module RootURL probe ON the engine thread (the worker's
+ * `availability.check` op): the worker's cached §5.4 transport does the
+ * blocking hop, so a dead origin (15 s budget) never stalls the main
+ * event loop. Returns the RAW outcome — classification + record write
+ * stay in the main-side SiteAvailabilityService (one seam).
+ */
+export async function probeOnEngineThread(
+  thread: EngineThread,
+  deps: EngineThreadRequestDeps,
+  moduleId: string,
+): Promise<{ readonly resultCode: number; readonly resultString: string }> {
+  const response = await thread.call('availability.check', { moduleId, deps });
+  if (!response.ok) {
+    throw rehydrateError(
+      response.error ?? { message: 'engine thread: availability.check failed without an error envelope' },
+    );
+  }
+  if (response.probe === undefined) {
+    throw new Error('engine thread: availability.check returned no probe outcome');
+  }
+  return response.probe;
 }
 
 /**

@@ -41,6 +41,12 @@ import type { ProxyConfig } from '../shims/http-proxy.js';
 import { FlareSolverrBypassExecutor } from '../sidecar/bypass-adapter.js';
 import { EngineInfoService } from './module-info.js';
 import { EngineDownloadHooks, type ModuleDownloadHooks } from './download-hooks.js';
+import {
+  runRootUrlProbe,
+  serializeOutcome,
+  type AvailabilitySink,
+  type SerializedAvailabilityOutcome,
+} from './availability.js';
 import type { RegistrationRecord } from '../registry/capabilities.js';
 import type { ModuleSharedState } from '../state/module-state.js';
 import type { TaskWriter } from './download-ports.js';
@@ -64,6 +70,15 @@ interface ChapterSession {
   readonly hooks: ModuleDownloadHooks;
   readonly jar: CookieJar;
   readonly records: HostLogRecord[];
+  /** Site-availability outcomes collected across the session's dispatches. */
+  readonly availability: SerializedAvailabilityOutcome[];
+}
+
+/** The availability sink shape used worker-side (collect, then marshal). */
+function collectingSink(into: SerializedAvailabilityOutcome[]): AvailabilitySink {
+  return (moduleId, outcome): void => {
+    into.push(serializeOutcome(moduleId, outcome));
+  };
 }
 
 /** Serialized error envelope ({@link rehydrateError} main side). */
@@ -82,6 +97,10 @@ interface WorkerResponse {
   readonly task?: TaskSnapshot;
   readonly cookies?: ReadonlyArray<readonly [string, string]>;
   readonly records?: readonly HostLogRecord[];
+  /** Site-availability outcomes (dead-site discovery) riding every op. */
+  readonly availability?: readonly SerializedAvailabilityOutcome[];
+  /** The raw probe outcome (availability.check op only). */
+  readonly probe?: { readonly resultCode: number; readonly resultString: string };
 }
 
 /** The TaskWriter fields that cross the thread boundary. */
@@ -223,6 +242,7 @@ const workerSubstrate = createModuleRuntime();
 
 async function runInfo(deps: EngineThreadDeps, moduleId: string, url: string): Promise<Partial<WorkerResponse>> {
   const records: HostLogRecord[] = [];
+  const availability: SerializedAvailabilityOutcome[] = [];
   const jar = jarFrom(deps.cookies);
   const transport = transportFor(deps);
   const bypass = bypassFor(deps);
@@ -235,6 +255,7 @@ async function runInfo(deps: EngineThreadDeps, moduleId: string, url: string): P
     logSink: (record): void => {
       records.push(record);
     },
+    availabilitySink: collectingSink(availability),
     ...(deps.proxy !== undefined ? { proxyFor: (): ProxyConfig | undefined => deps.proxy } : {}),
     ...(bypass !== undefined ? { bypass } : {}),
     moduleState: (): Promise<ModuleSharedState> => Promise.resolve(fakeSharedState(moduleId, jar)),
@@ -242,7 +263,11 @@ async function runInfo(deps: EngineThreadDeps, moduleId: string, url: string): P
   });
   try {
     const info = await service.getInfo(moduleId, url);
-    return { info, cookies: jarPairs(jar), records };
+    return { info, cookies: jarPairs(jar), records, availability };
+  } catch (cause: unknown) {
+    // The availability outcome (an unreachable verdict usually lands on
+    // exactly this error path) must survive the error envelope.
+    return { error: serializeError(cause), cookies: jarPairs(jar), records, availability };
   } finally {
     await service.dispose();
   }
@@ -250,6 +275,7 @@ async function runInfo(deps: EngineThreadDeps, moduleId: string, url: string): P
 
 async function createChapterSession(deps: EngineThreadDeps, moduleId: string): Promise<Partial<WorkerResponse>> {
   const records: HostLogRecord[] = [];
+  const availability: SerializedAvailabilityOutcome[] = [];
   const jar = jarFrom(deps.cookies);
   const transport = transportFor(deps);
   const bypass = bypassFor(deps);
@@ -262,6 +288,7 @@ async function createChapterSession(deps: EngineThreadDeps, moduleId: string): P
     logSink: (record): void => {
       records.push(record);
     },
+    availabilitySink: collectingSink(availability),
     ...(deps.proxy !== undefined ? { proxyFor: (): ProxyConfig | undefined => deps.proxy } : {}),
     ...(bypass !== undefined ? { bypass } : {}),
     moduleState: (): Promise<ModuleSharedState> => Promise.resolve(fakeSharedState(moduleId, jar)),
@@ -269,8 +296,8 @@ async function createChapterSession(deps: EngineThreadDeps, moduleId: string): P
   });
   const sessionId = `s${String(nextSessionId)}`;
   nextSessionId += 1;
-  sessions.set(sessionId, { hooks, jar, records });
-  return { sessionId, cookies: jarPairs(jar), records };
+  sessions.set(sessionId, { hooks, jar, records, availability });
+  return { sessionId, cookies: jarPairs(jar), records, availability };
 }
 
 async function callChapterSession(
@@ -285,20 +312,33 @@ async function callChapterSession(
   }
   const writer = writerFrom(task);
   let value: unknown;
-  if (method === 'taskStart') {
-    value = await session.hooks.taskStart?.(writer) ?? true;
-  } else if (method === 'getPageNumber') {
-    value = await session.hooks.getPageNumber(writer, args.url ?? '');
-  } else if (method === 'getImageURL') {
-    value = await session.hooks.getImageURL(writer, args.workId ?? 0, args.url ?? '');
-  } else {
-    value = await session.hooks.beforeDownloadImage?.(args.workId ?? 0, args.url ?? '');
+  try {
+    if (method === 'taskStart') {
+      value = await session.hooks.taskStart?.(writer) ?? true;
+    } else if (method === 'getPageNumber') {
+      value = await session.hooks.getPageNumber(writer, args.url ?? '');
+    } else if (method === 'getImageURL') {
+      value = await session.hooks.getImageURL(writer, args.workId ?? 0, args.url ?? '');
+    } else {
+      value = await session.hooks.beforeDownloadImage?.(args.workId ?? 0, args.url ?? '');
+    }
+  } catch (cause: unknown) {
+    // A transport-class failure surfaces exactly here — its availability
+    // verdict must ride the error envelope home.
+    return {
+      error: serializeError(cause),
+      task: snapshotOf(writer),
+      cookies: jarPairs(session.jar),
+      records: [...session.records.splice(0, session.records.length)],
+      availability: [...session.availability.splice(0, session.availability.length)],
+    };
   }
   return {
     value,
     task: snapshotOf(writer),
     cookies: jarPairs(session.jar),
     records: [...session.records.splice(0, session.records.length)],
+    availability: [...session.availability.splice(0, session.availability.length)],
   };
 }
 
@@ -342,7 +382,7 @@ export function startEngineWorkerThread(parentPort: MessagePort): void {
             throw new Error('engine thread: malformed info.get request');
           }
           const result = await runInfo(message.deps, message.moduleId, message.url);
-          reply({ ok: true, ...result });
+          reply({ ok: result.error === undefined, ...result });
           return;
         }
         case 'chapter.create': {
@@ -350,7 +390,7 @@ export function startEngineWorkerThread(parentPort: MessagePort): void {
             throw new Error('engine thread: malformed chapter.create request');
           }
           const result = await createChapterSession(message.deps, message.moduleId);
-          reply({ ok: true, ...result });
+          reply({ ok: result.error === undefined, ...result });
           return;
         }
         case 'chapter.call': {
@@ -372,7 +412,26 @@ export function startEngineWorkerThread(parentPort: MessagePort): void {
             },
             message.args ?? {},
           );
-          reply({ ok: true, ...result });
+          reply({ ok: result.error === undefined, ...result });
+          return;
+        }
+        case 'availability.check': {
+          if (message.deps === undefined || message.moduleId === undefined) {
+            throw new Error('engine thread: malformed availability.check request');
+          }
+          // Manual registry Check (dead-site discovery): ONE probe of
+          // the module RootURL through the module's own §5.4 HTTP path
+          // on THIS worker thread (a dead origin takes up to the 15 s
+          // hop budget — the main loop stays free). Classification is
+          // the main-side service's one seam.
+          const probe = runRootUrlProbe({
+            transport: transportFor(message.deps),
+            egress: new EgressPolicy({ allow: [...message.deps.egressAllow] }),
+            modules: message.deps.modules,
+            moduleId: message.moduleId,
+            ...(message.deps.proxy !== undefined ? { proxy: message.deps.proxy } : {}),
+          });
+          reply({ ok: true, probe });
           return;
         }
         case 'chapter.dispose': {

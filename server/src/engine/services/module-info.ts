@@ -18,6 +18,11 @@ import type { SwallowSharedDeduper } from '../shims/txquery-shim.js';
 import { normalizeMangaInfo } from '../normalize/udata.js';
 import type { RegistrationRecord } from '../registry/capabilities.js';
 import type { ModuleSharedState } from '../state/module-state.js';
+import {
+  classifyHttpOutcome,
+  readHttpOutcome,
+  type AvailabilitySink,
+} from './availability.js';
 
 /**
  * Engine-backed live info (§5.8): POST /api/info runs the module's real
@@ -67,6 +72,14 @@ export interface EngineInfoOptions {
    * via module_state at the end of the call.
    */
   readonly moduleState?: (moduleId: string) => Promise<ModuleSharedState>;
+  /**
+   * Site-availability sink (dead-site discovery): after every GetInfo
+   * dispatch the request-scoped HTTP readback (the httpFailureDetail
+   * seam) is classified — transport/5xx → unreachable, 2xx/3xx →
+   * reachable, 4xx/abstain → nothing. Fire-and-forget; never throws
+   * into the traffic path.
+   */
+  readonly availabilitySink?: AvailabilitySink;
   /**
    * Lua host factory (injected by the composition root): constructs the
    * per-call host behind the contract LuaHost interface — substitute
@@ -177,6 +190,10 @@ export class EngineInfoService implements ModuleInfoPort {
           ...(sharedCookies !== undefined ? { moduleCookies: () => sharedCookies } : {}),
         });
         const result = dispatcher.dispatch(descriptor, 'GetInfo', { url });
+        // Site-availability opportunistic write: ONE seam point after
+        // the dispatch — the §5.2 readback classifies the site's HTTP
+        // state on success AND failure paths alike.
+        this.reportAvailability(descriptor.id, engine);
         if (sharedState !== undefined) {
           await sharedState.persist();
         }
@@ -217,15 +234,35 @@ export class EngineInfoService implements ModuleInfoPort {
    * message.
    */
   private httpFailureDetail(engine: { doStringSync: (code: string) => unknown }): string {
-    try {
-      const code = Number(engine.doStringSync('return HTTP.ResultCode'));
-      const text = String(engine.doStringSync('return HTTP.ResultString') ?? '');
-      if (!Number.isFinite(code) || text === '') {
-        return '';
-      }
-      return ` (HTTP ${String(code)}: ${text.slice(0, 200)})`;
-    } catch {
+    const read = readHttpOutcome(engine.doStringSync.bind(engine));
+    if (read === undefined || read.resultString === '') {
       return '';
+    }
+    return ` (HTTP ${String(read.resultCode)}: ${read.resultString.slice(0, 200)})`;
+  }
+
+  /**
+   * Classify the surviving request-scoped HTTP state into the
+   * availability sink (never throws — a broken sink must not take the
+   * info path down with it).
+   */
+  private reportAvailability(moduleId: string, engine: { doStringSync: (code: string) => unknown }): void {
+    const sink = this.options.availabilitySink;
+    if (sink === undefined) {
+      return;
+    }
+    const read = readHttpOutcome(engine.doStringSync.bind(engine));
+    if (read === undefined) {
+      return;
+    }
+    const outcome = classifyHttpOutcome(read.resultCode, read.resultString);
+    if (outcome === undefined) {
+      return;
+    }
+    try {
+      sink(moduleId, outcome);
+    } catch {
+      // fire-and-forget by contract
     }
   }
 

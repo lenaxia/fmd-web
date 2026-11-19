@@ -55,12 +55,14 @@ import {
   LoginResponseSchema,
   LibraryListResponseSchema,
   ModuleCapabilitiesSchema,
+  ModuleAvailabilitySchema,
   ModuleListResponseSchema,
   ModuleOptionDescriptorSchema,
   ModuleSummarySchema,
   ModuleUpdateRequestSchema,
   ModuleBulkUpdateRequestSchema,
   ModuleBulkUpdateResponseSchema,
+  ModuleCheckResponseSchema,
   OutputDefaultsSchema,
   OutputDefaultsUpdateRequestSchema,
   PerformanceSettingsUpdateRequestSchema,
@@ -93,6 +95,7 @@ const REGISTRY: readonly [z.ZodType, string][] = [
   [ApiErrorEnvelopeSchema, 'ApiErrorEnvelope'],
   [ModuleOptionDescriptorSchema, 'ModuleOptionDescriptor'],
   [ModuleCapabilitiesSchema, 'ModuleCapabilities'],
+  [ModuleAvailabilitySchema, 'ModuleAvailability'],
   [ModuleSummarySchema, 'ModuleSummary'],
   [ProxySettingsSchema, 'ProxySettings'],
   [OutputDefaultsSchema, 'OutputDefaults'],
@@ -210,6 +213,29 @@ const OPERATIONS: readonly RouteOperation[] = [
     responses: {
       200: { description: 'The resolved module set after the write + count', schema: ModuleBulkUpdateResponseSchema },
       ...errors(validation(), unauthorized(), internal()),
+    },
+  },
+  {
+    method: 'post',
+    path: '/api/modules/{id}/check',
+    operationId: 'checkModuleAvailability',
+    summary: 'Manually probe one site\'s reachability (per-row Check)',
+    description:
+      '[site-availability] ONE probe of the module RootURL through the module\'s own ' +
+      'engine HTTP path (worker-isolated in production, module-appropriate headers). ' +
+      'Classification matches the opportunistic traffic seam exactly: ' +
+      'transport-class failures (DNS, connect refused, timeout, TLS) and the HTTP ' +
+      '5xx/523 family write `unreachable` + a short reason; 2xx/3xx answers write ' +
+      '`reachable` (a later success flips an unreachable record back — self-healing, ' +
+      'no timers); HTTP 4xx (403/429 anti-bot, rate-limit) writes NOTHING — verdict ' +
+      '`none`, the record stays unchanged (origin alive but possibly blocking). ' +
+      'Deliberately single-site: batch check-all is a documented deferral (anti-bot ' +
+      'risk + low value; revisit when cold-start friction is felt) and nothing is ' +
+      'ever scheduled or re-probed in the background.',
+    tags: ['modules'],
+    responses: {
+      200: { description: 'Probe verdict + the resulting (possibly unchanged) availability record', schema: ModuleCheckResponseSchema },
+      ...errors(validation(), unauthorized(), notFound('Module'), internal()),
     },
   },
   {

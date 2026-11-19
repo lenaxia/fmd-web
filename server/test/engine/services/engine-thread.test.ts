@@ -4,7 +4,9 @@ import {
   EngineThread,
   OffloadedInfoService,
   offloadEngineSubstrate,
+  probeOnEngineThread,
 } from '../../../src/engine/services/engine-thread.js';
+import type { AvailabilitySink, SiteAvailabilityOutcome } from '../../../src/engine/services/availability.js';
 import { createLuaHostFactory } from '../../../src/engine/lua/host.js';
 import { EgressPolicy } from '../../../src/engine/shims/http-egress.js';
 import type { RegistrationRecord } from '../../../src/engine/registry/capabilities.js';
@@ -238,5 +240,92 @@ describe('engine thread offload', (): void => {
     await expect(hooks.beforeDownloadImage?.(0, task.pageLinks[0] ?? '')).resolves.toBeUndefined();
 
     await hooks.dispose();
+  }, 30_000);
+});
+
+describe('engine thread site-availability marshaling (dead-site discovery)', (): void => {
+  it('a successful worker-side GetInfo forwards the reachable verdict home through the sink', async (): Promise<void> => {
+    const outcomes: Array<{ moduleId: string; outcome: SiteAvailabilityOutcome }> = [];
+    const sink: AvailabilitySink = (moduleId, outcome): void => {
+      outcomes.push({ moduleId, outcome });
+    };
+    const service = new OffloadedInfoService(
+      {
+        luaRoot: LUA_ROOT,
+        modules: (): readonly RegistrationRecord[] => [registration()],
+        transport: { send: (): never => { throw new Error('unused'); } },
+        egress: new EgressPolicy({ allow: ['*'] }),
+        availabilitySink: sink,
+        hostFactory: createLuaHostFactory(),
+      },
+      thread,
+      { allowedHosts: [], egressAllow: ['*', '127.0.0.1'] },
+    );
+    const info = await service.getInfo(MODULE_ID, `${originBase}/manga/alpha-quest`);
+    expect(info.title).toBe('Alpha Quest');
+    // worker-side classification → response.availability → main-side sink
+    expect(outcomes).toEqual([{ moduleId: MODULE_ID, outcome: { verdict: 'reachable' } }]);
+  }, 30_000);
+
+  it('a connection-refused origin rides the ERROR envelope home: typed 502 AND the unreachable verdict', async (): Promise<void> => {
+    const outcomes: Array<{ moduleId: string; outcome: SiteAvailabilityOutcome }> = [];
+    const sink: AvailabilitySink = (moduleId, outcome): void => {
+      outcomes.push({ moduleId, outcome });
+    };
+    const service = new OffloadedInfoService(
+      {
+        luaRoot: LUA_ROOT,
+        modules: (): readonly RegistrationRecord[] => [registration()],
+        transport: { send: (): never => { throw new Error('unused'); } },
+        egress: new EgressPolicy({ allow: ['*'] }),
+        availabilitySink: sink,
+        hostFactory: createLuaHostFactory(),
+      },
+      thread,
+      { allowedHosts: [], egressAllow: ['*', '127.0.0.1'] },
+    );
+    // Port 9 (discard) on loopback: nothing listens → connect refused
+    // fast — the dead-site shape the record exists for.
+    await expect(service.getInfo(MODULE_ID, 'http://127.0.0.1:9/manga/x')).rejects.toMatchObject({
+      status: 502,
+      code: 'upstream_error',
+    });
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0]?.moduleId).toBe(MODULE_ID);
+    expect(outcomes[0]?.outcome.verdict).toBe('unreachable');
+    expect(outcomes[0]?.outcome.reason ?? '').toContain('ECONNREFUSED');
+  }, 30_000);
+
+  it('the availability.check op probes the module RootURL on the worker thread', async (): Promise<void> => {
+    const rooted = registration();
+    const withRoot: RegistrationRecord = { ...rooted, rootURL: `${originBase}/` };
+    const raw = await probeOnEngineThread(
+      thread,
+      {
+        luaRoot: LUA_ROOT,
+        modules: [withRoot],
+        allowedHosts: [],
+        egressAllow: ['*', '127.0.0.1'],
+        cookies: [],
+      },
+      MODULE_ID,
+    );
+    expect(raw.resultCode).toBe(200);
+  }, 30_000);
+
+  it('the availability.check op surfaces the typed 404 for an unknown module', async (): Promise<void> => {
+    await expect(
+      probeOnEngineThread(
+        thread,
+        {
+          luaRoot: LUA_ROOT,
+          modules: [registration()],
+          allowedHosts: [],
+          egressAllow: ['*', '127.0.0.1'],
+          cookies: [],
+        },
+        'f'.repeat(32),
+      ),
+    ).rejects.toMatchObject({ status: 404, code: 'not_found' });
   }, 30_000);
 });

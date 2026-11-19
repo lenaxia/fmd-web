@@ -64,6 +64,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/modules/{id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Manually probe one site's reachability (per-row Check)
+         * @description [site-availability] ONE probe of the module RootURL through the module's own engine HTTP path (worker-isolated in production, module-appropriate headers). Classification matches the opportunistic traffic seam exactly: transport-class failures (DNS, connect refused, timeout, TLS) and the HTTP 5xx/523 family write `unreachable` + a short reason; 2xx/3xx answers write `reachable` (a later success flips an unreachable record back — self-healing, no timers); HTTP 4xx (403/429 anti-bot, rate-limit) writes NOTHING — verdict `none`, the record stays unchanged (origin alive but possibly blocking). Deliberately single-site: batch check-all is a documented deferral (anti-bot risk + low value; revisit when cold-start friction is felt) and nothing is ever scheduled or re-probed in the background.
+         */
+        post: operations["checkModuleAvailability"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/accounts": {
         parameters: {
             query?: never;
@@ -1053,6 +1073,12 @@ export interface components {
             known_broken_flags: string[];
             live_scrape_fallback: boolean;
         };
+        ModuleAvailability: {
+            /** @enum {string} */
+            status: "reachable" | "unreachable" | "unknown";
+            checkedAt: string | null;
+            reason: string | null;
+        };
         ModuleSummary: {
             id: string;
             name: string;
@@ -1064,6 +1090,7 @@ export interface components {
             options: components["schemas"]["ModuleOptionDescriptor"][];
             capabilities: components["schemas"]["ModuleCapabilities"];
             catalogInstalled: boolean;
+            availability: components["schemas"]["ModuleAvailability"];
             proxy: components["schemas"]["ProxySettings"] | null;
         };
         ProxySettings: {
@@ -1559,6 +1586,71 @@ export interface operations {
             };
             /** @description Unhandled server failure (typed error envelope) */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    checkModuleAvailability: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Module/catalog id (32-hex, §5) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Probe verdict + the resulting (possibly unchanged) availability record */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        moduleId: string;
+                        /** @enum {string} */
+                        verdict: "reachable" | "unreachable" | "none";
+                        detail: string;
+                        availability: components["schemas"]["ModuleAvailability"];
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Module not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

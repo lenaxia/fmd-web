@@ -25,8 +25,9 @@
  * fixture-sized lists stay plain DOM.
  */
 import { useEffect, useRef, useState, type FormEvent, type ReactElement } from 'react';
-import { RefreshCw, RotateCw, X } from 'lucide-react';
+import { RadioTower, RefreshCw, RotateCw, X } from 'lucide-react';
 import {
+  useCheckModule,
   useModules,
   useProvisionCatalog,
   useSyncAllCatalogs,
@@ -37,6 +38,7 @@ import {
 } from '../api/hooks';
 import { AccountsSection } from '../components/AccountsSection';
 import { ApiTokenSection } from '../components/ApiTokenSection';
+import { AvailabilityChip } from '../components/AvailabilityChip';
 import { CapabilityBadges } from '../components/CapabilityBadges';
 import { GlobalBulkControls, CategoryBulkControls } from '../components/ModuleListControls';
 import { ModuleFacets } from '../components/settings/ModuleFacets';
@@ -282,8 +284,63 @@ function ResyncCatalogButton(props: { module: ModuleSummaryT }): ReactElement | 
   );
 }
 
+/**
+ * Per-row 'Check' (dead-site discovery): ONE probe of the site's
+ * RootURL through the module's own engine HTTP path. Pending state on
+ * the button; the verdict lands as a toast (a 4xx answer is verdict
+ * 'none' — the record intentionally unchanged, surfaced as such).
+ * Deliberately SINGLE-site — no batch check-all (documented deferral).
+ */
+function CheckSiteButton(props: {
+  module: ModuleSummaryT;
+  /** ONE page-level mutation (perf: a per-row useMutation meant 1000
+   * QueryClient observers churning on virtualized mount/unmount — the
+   * Settings scroll budget regressed; the single mutation is keyed by
+   * its `variables` (the module id) for per-row pending state). */
+  check: ReturnType<typeof useCheckModule>;
+}): ReactElement {
+  const { module } = props;
+  const check = props.check;
+  const pending: boolean = check.isPending && check.variables === module.id;
+  const toast = useRef<ProgressToastHandle | null>(null);
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-7"
+        disabled={pending}
+        aria-label={`Check whether ${props.module.name} is reachable`}
+        data-testid={`check-site-${props.module.id}`}
+        onClick={(): void => {
+          toast.current = progressToast.start(`Checking ${module.name}…`);
+          check.mutate(module.id, {
+            onSuccess: (data): void => {
+              if (toast.current !== null) {
+                progressToast.done(toast.current, data.detail);
+              }
+            },
+            onError: (): void => {
+              if (toast.current !== null) {
+                progressToast.fail(toast.current, `${module.name} check failed`);
+              }
+            },
+          });
+        }}
+      >
+        <RadioTower aria-hidden="true" />
+        {pending ? 'Checking…' : 'Check'}
+      </Button>
+      {check.isError && check.variables === module.id ? <ErrorBanner error={check.error} /> : null}
+    </>
+  );
+}
+
 function ModuleRow(props: {
   readonly module: ModuleSummaryT;
+  /** The page-level Check mutation (see CheckSiteButton — perf). */
+  readonly siteCheck: ReturnType<typeof useCheckModule>;
   /** Accounts-section cookies link-out: open + scroll to the editor. */
   readonly forceOpen: boolean;
   readonly onForceOpenHandled: () => void;
@@ -321,8 +378,15 @@ function ModuleRow(props: {
         <span className="module-meta text-xs text-muted-foreground">
           {props.module.category} · {props.module.rootURL}
         </span>
+        {/* Last check (dead-site discovery): icon + tooltip (checked_at +
+         * reason) — visually distinct from the catalog chip concerns. */}
+        <AvailabilityChip
+          availability={props.module.availability}
+          testId={`availability-${props.module.id}`}
+        />
         <CapabilityBadges module={props.module} />
         <ResyncCatalogButton module={props.module} />
+        <CheckSiteButton module={props.module} check={props.siteCheck} />
         <Button
           type="button"
           variant="outline"
@@ -344,6 +408,7 @@ function ModuleRow(props: {
 
 export function SettingsPage(): ReactElement {
   const modules = useModules();
+  const siteCheck = useCheckModule();
   const syncModules = useSyncModules();
   const syncCatalogs = useSyncAllCatalogs();
 
@@ -501,7 +566,13 @@ export function SettingsPage(): ReactElement {
     // Typing carries q only → REPLACE (shareable URL, no history
     // spam); chip toggles are discrete facet changes → PUSH
     // (back/forward restore the selection).
-    if (next.q !== filter.q && arraysEqual(next.lang, filter.lang) && arraysEqual(next.h, filter.h) && arraysEqual(next.setup, filter.setup)) {
+    if (
+      next.q !== filter.q &&
+      arraysEqual(next.lang, filter.lang) &&
+      arraysEqual(next.h, filter.h) &&
+      arraysEqual(next.setup, filter.setup) &&
+      next.avail === filter.avail
+    ) {
       writeFilter(next, 'replace');
       return;
     }
@@ -511,7 +582,7 @@ export function SettingsPage(): ReactElement {
   const counts = facetCounts(list, filter);
   const filtered = filterModules(list, filter);
   const filterActive: boolean =
-    filter.q !== '' || filter.lang.length > 0 || filter.h.length > 0 || filter.setup.length > 0;
+    filter.q !== '' || filter.lang.length > 0 || filter.h.length > 0 || filter.setup.length > 0 || filter.avail !== 'all';
 
   // ONE ListPanel stays virtualized for production-sized registries
   // (perf contract: 1000 modules); the category headers ride along as
@@ -720,6 +791,7 @@ export function SettingsPage(): ReactElement {
               ) : (
                 <ModuleRow
                   module={row.module}
+                  siteCheck={siteCheck}
                   forceOpen={openEditorFor === row.module.id}
                   onForceOpenHandled={(): void => setOpenEditorFor(null)}
                 />

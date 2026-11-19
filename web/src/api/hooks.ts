@@ -23,6 +23,8 @@ import { useApiClient } from './context';
 // ── wire aliases (all GENERATED — never hand-written) ────────────────
 export type ModuleSummaryT = components['schemas']['ModuleSummary'];
 export type ModuleOptionDescriptorT = components['schemas']['ModuleOptionDescriptor'];
+export type ModuleAvailabilityT = components['schemas']['ModuleAvailability'];
+export type ModuleCheckResponseT = operations['checkModuleAvailability']['responses'][200]['content']['application/json'];
 export type OptionValueT = boolean | string | number;
 export type CatalogEntryT = components['schemas']['CatalogEntry'];
 export type InfoResponseT = components['schemas']['InfoResponse'];
@@ -96,6 +98,25 @@ export function useUpdateModule(): UseMutationResult<ModuleSummaryT, ApiError, M
           },
         }),
       ),
+  });
+}
+
+export function useCheckModule(): UseMutationResult<ModuleCheckResponseT, ApiError, string> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation<ModuleCheckResponseT, ApiError, string>({
+    mutationFn: (moduleId): Promise<ModuleCheckResponseT> =>
+      unwrap(
+        client.POST('/api/modules/{id}/check', {
+          params: { path: { id: moduleId } },
+        }),
+      ),
+    onSuccess: (): void => {
+      // The availability record rides /api/modules — refresh the
+      // registry cache so the status column + facet counts pick the
+      // new state up (unknown → reachable/unreachable).
+      void queryClient.invalidateQueries({ queryKey: ['modules'] });
+    },
   });
 }
 

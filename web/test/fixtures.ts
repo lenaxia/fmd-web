@@ -20,6 +20,7 @@ export function moduleFixture(overrides?: Partial<ModuleSummaryT>): ModuleSummar
     options: [],
     proxy: null,
     catalogInstalled: true,
+    availability: { status: 'unknown', checkedAt: null, reason: null },
     capabilities: {
       requires_subprocess: false,
       requires_browser: false,

@@ -70,7 +70,7 @@ import type {
 } from '../api/schemas.js';
 import { openQueueDb, ensureJobSchema } from '../jobs/queue/connection.js';
 import { SqliteJobQueue } from '../jobs/queue/queue.js';
-import { EngineThread, offloadEngineSubstrate } from '../engine/services/engine-thread.js';
+import { EngineThread, offloadEngineSubstrate, probeOnEngineThread } from '../engine/services/engine-thread.js';
 import { SqliteLibraryStore } from '../jobs/library/store.js';
 import {
   ActiveDownloadRegistry,
@@ -81,6 +81,13 @@ import {
 } from './download-lane.js';
 import type { LaneRunner } from '../jobs/queue/queue.js';
 import { SqliteLibraryService } from './library-service.js';
+import {
+  SqliteSiteAvailabilityService,
+  SqliteSiteAvailabilityStore,
+  UNKNOWN_AVAILABILITY,
+  type SiteAvailabilityRecord,
+} from './site-availability.js';
+import { runRootUrlProbe, type AvailabilitySink } from '../engine/services/availability.js';
 import { SqliteFavoritesService } from './favorites-service.js';
 import { FavoritesEngine } from '../jobs/favorites/engine.js';
 import {
@@ -290,12 +297,14 @@ class RefreshableModuleService implements ModuleService {
     rows: readonly RegistrationRecord[],
     private readonly browserProfileEnabled: boolean = false,
     private readonly catalogInstalled: (id: string) => boolean = (): boolean => false,
+    private readonly availability: (id: string) => import('../runtime/site-availability.js').SiteAvailabilityRecord = (): import('../runtime/site-availability.js').SiteAvailabilityRecord =>
+      UNKNOWN_AVAILABILITY,
   ) {
-    this.current = new InMemoryModuleService(rows, browserProfileEnabled, catalogInstalled);
+    this.current = new InMemoryModuleService(rows, browserProfileEnabled, catalogInstalled, availability);
   }
 
   refresh(rows: readonly RegistrationRecord[]): void {
-    this.current = new InMemoryModuleService(rows, this.browserProfileEnabled, this.catalogInstalled);
+    this.current = new InMemoryModuleService(rows, this.browserProfileEnabled, this.catalogInstalled, this.availability);
   }
 
   list(): ModuleSummaryT[] {
@@ -448,6 +457,14 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
   // API projection. Without it the adapter is undefined and the denied
   // stub + known-broken flags stand.
   const browserProfileEnabled = config.browserSidecarUrl !== '';
+  // [site-availability] LATE-BOUND joins: the store opens with app.db
+  // further down, but the module service + the engine services are
+  // constructed before it — until the store exists every site reads
+  // `unknown` (the seeded, silent state) and the sink is a no-op.
+  const lateAvailability: { store?: SqliteSiteAvailabilityStore } = {};
+  const availabilityLookup = (id: string): SiteAvailabilityRecord =>
+    lateAvailability.store === undefined ? UNKNOWN_AVAILABILITY : lateAvailability.store.read(id);
+  let recordAvailability: AvailabilitySink = (): void => undefined;
   // Site-first browse join: /api/modules catalogInstalled is read LIVE
   // from the CatalogStore receipts — a finished provision flips the
   // chip on the next modules read, no cache invalidation needed.
@@ -457,6 +474,9 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     // catalogInstalled join: the InMemoryModuleService constructor wraps
     // this with the non-32-hex id guard (single source, services.ts).
     (id: string): boolean => catalogSync.store.getMeta(id) !== undefined,
+    // availability join (dead-site discovery): read LIVE so an
+    // opportunistic write or a manual Check shows on the next read.
+    availabilityLookup,
   );
   const bypass = browserProfileEnabled
     ? new FlareSolverrBypassExecutor({ baseUrl: config.browserSidecarUrl })
@@ -491,6 +511,9 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
       }
     },
     proxyFor,
+    // [site-availability] opportunistic writes ride the GetInfo path
+    // (browse info, favorites checks, transfer previews).
+    availabilitySink: (moduleId, outcome): void => recordAvailability(moduleId, outcome),
     ...(bypass !== undefined ? { bypass } : {}),
   });
   const infoService: InfoService = {
@@ -523,6 +546,9 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     egress,
     moduleState,
     hostGate: new SyncHostGate({ limit: config.liveScrapeHostLimit }),
+    // [site-availability] the browse fallback walk feeds the record —
+    // a dead mirror fails the walk with its transport error classified.
+    availabilitySink: (moduleId, outcome): void => recordAvailability(moduleId, outcome),
     swallowDeduper: logger.expressionDedup,
     logSink: (record): void => {
       const scoped = logger.forModule(record.moduleId === '' ? '(host)' : record.moduleId);
@@ -572,6 +598,56 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
   const queue = new InstrumentedJobQueue(publishingQueue, metrics);
   const libraryStore = new SqliteLibraryStore({ db, libraryRoot: join(config.dataDir, 'library') });
   const libraryService = new SqliteLibraryService(libraryStore);
+  // ── [site-availability] the persisted record + the Check probe ────
+  // app.db table `site_availability` (one row per module, seeded
+  // absent = unknown). The probe rides the engine worker thread when
+  // the substrate is offloaded (a dead origin's 15 s hop never touches
+  // the main loop); an injected substrate (tests) probes in-process
+  // over the SAME §5.4 pipeline + transport. Classification stays in
+  // the service — one seam for manual and opportunistic writes alike.
+  const availabilityStoreHandle = new SqliteSiteAvailabilityStore(db);
+  lateAvailability.store = availabilityStoreHandle;
+  const probeSite: (moduleId: string) => Promise<{ readonly resultCode: number; readonly resultString: string }> =
+    engineThread === undefined
+      ? (moduleId: string): Promise<{ readonly resultCode: number; readonly resultString: string }> => {
+          const moduleProxy = proxyFor(moduleId);
+          return Promise.resolve(
+            runRootUrlProbe({
+              transport,
+              egress,
+              modules: moduleRows,
+              moduleId,
+              ...(moduleProxy !== undefined ? { proxy: moduleProxy } : {}),
+            }),
+          );
+        }
+      : (moduleId: string): Promise<{ readonly resultCode: number; readonly resultString: string }> => {
+          const moduleProxy = proxyFor(moduleId);
+          return probeOnEngineThread(
+            engineThread,
+            {
+              luaRoot,
+              modules: moduleRows,
+              allowedHosts: engineThread.options.allowedHosts,
+              egressAllow: engineThread.options.egressAllow,
+              ...(engineThread.options.ca !== undefined ? { ca: engineThread.options.ca } : {}),
+              ...(engineThread.options.tlsVerify !== undefined
+                ? { tlsVerify: engineThread.options.tlsVerify }
+                : {}),
+              cookies: [],
+              ...(moduleProxy !== undefined ? { proxy: moduleProxy ?? null } : {}),
+            },
+            moduleId,
+          );
+        };
+  const siteAvailability = new SqliteSiteAvailabilityService(availabilityStoreHandle, probeSite);
+  recordAvailability = (moduleId, outcome): void => {
+    try {
+      siteAvailability.record(moduleId, outcome);
+    } catch {
+      // fire-and-forget by contract — never take a traffic path down
+    }
+  };
   // Downloads parity: the delete(+data) seam — RuntimeJobService hands
   // the recorded artifact path to the store's file+row remover.
   const jobs: JobService = new RuntimeJobService(
@@ -710,6 +786,9 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
       egress,
       moduleState,
       proxyFor,
+      // [site-availability] download dispatches feed the record too —
+      // a dead site's chapter run is the loudest traffic signal there is.
+      availabilitySink: (moduleId, outcome): void => recordAvailability(moduleId, outcome),
       ...(bypass !== undefined ? { bypass } : {}),
       swallowDeduper: logger.expressionDedup,
       logSink: (record): void => {
@@ -917,6 +996,7 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     modules: moduleService,
     settings,
     catalogs: catalogSync.store,
+    availability: siteAvailability,
     catalogFallback,
     // Covers live-defect: the same-origin cover proxy — module-bound
     // url validation, Referer hotlink posture, token-free disk cache

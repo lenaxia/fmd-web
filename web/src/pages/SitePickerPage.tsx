@@ -123,6 +123,11 @@ export function SitePickerPage(props: {
   const modules = useModules();
   const [searchText, setSearchText] = useState('');
   const needle = searchText.trim().toLowerCase();
+  // [dead-site discovery] 'Hide unavailable' is CLIENT-LOCAL view state
+  // (plain useState — no URL param, no server preference machinery):
+  // dimmed rows are hints, and hiding them entirely is a personal
+  // per-visit choice, not shareable filter truth like ?cats=.
+  const [hideUnavailable, setHideUnavailable] = useState(false);
 
   const registry: readonly ModuleSummaryT[] = modules.data?.modules ?? [];
   const facets = useMemo((): readonly CategoryFacet[] => categoryFacets(registry), [registry]);
@@ -131,9 +136,20 @@ export function SitePickerPage(props: {
     [route.query, facets],
   );
 
+  // The toggle only narrows the LIST (facet counts keep mirroring the
+  // registry — the same stance as the search box: chips never offer a
+  // dead end).
+  const pickable: readonly ModuleSummaryT[] = useMemo(
+    (): readonly ModuleSummaryT[] =>
+      hideUnavailable
+        ? registry.filter((m): boolean => m.availability.status !== 'unreachable')
+        : registry,
+    [registry, hideUnavailable],
+  );
+
   const items = useMemo(
-    (): readonly PickerItem[] => buildPickerItems(registry, needle, cats),
-    [registry, needle, cats],
+    (): readonly PickerItem[] => buildPickerItems(pickable, needle, cats),
+    [pickable, needle, cats],
   );
 
   const onCatsChange = (next: readonly string[]): void => {
@@ -181,6 +197,25 @@ export function SitePickerPage(props: {
         </form>
         {/* [parity-sweep] M14 — FMD2 edURL paste-and-go parity */}
         <OpenByUrlInput />
+        {/* [dead-site discovery] client-local view toggle (never URL- or
+         * server-persisted): hide the DIMMED unreachable rows outright.
+         * Unknown renders as a normal row and is never hidden here. */}
+        <label
+          htmlFor="hide-unavailable"
+          className="flex items-center gap-2 text-sm font-medium max-md:min-h-touch-target"
+        >
+          <input
+            id="hide-unavailable"
+            type="checkbox"
+            className="size-4 accent-(--primary)"
+            data-testid="hide-unavailable-toggle"
+            checked={hideUnavailable}
+            onChange={(e): void => {
+              setHideUnavailable(e.target.checked);
+            }}
+          />{' '}
+          Hide unavailable
+        </label>
       </FilterBar>
 
       {modules.data !== undefined ? (

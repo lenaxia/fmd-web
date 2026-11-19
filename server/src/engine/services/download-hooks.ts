@@ -17,6 +17,7 @@ import type { HostLogRecord } from '@fmd/contract';
 import type { EventDispatchResult, EventDispatcher, LuaEngine, LuaHost, LuaHostFactory, LuaModuleDescriptor } from '../contract.js';
 import type { RegistrationRecord } from '../registry/capabilities.js';
 import type { ModuleSharedState } from '../state/module-state.js';
+import { classifyHttpOutcome, type AvailabilitySink } from './availability.js';
 import type { ChapterModuleHooks, TaskWriter } from './download-ports.js';
 
 /**
@@ -70,6 +71,13 @@ export interface EngineDownloadOptions {
    */
   readonly moduleState?: (moduleId: string) => Promise<ModuleSharedState>;
   /**
+   * Site-availability sink (dead-site discovery): after every download
+   * event dispatch the request-scoped HTTP handle state is classified
+   * (transport/5xx → unreachable, 2xx/3xx → reachable, 4xx → nothing).
+   * Fire-and-forget; never throws into the download lane.
+   */
+  readonly availabilitySink?: AvailabilitySink;
+  /**
    * Lua host factory (injected by the composition root): constructs the
    * per-run host behind the contract LuaHost interface — substitute
    * hosts (test doubles) wire in here without touching these hooks.
@@ -101,6 +109,7 @@ export class EngineDownloadHooks implements ModuleDownloadHooks {
     private readonly logger: MemoryLogger,
     private readonly lastHttpHandle: () => HttpShimHandle | undefined,
     private readonly sharedState?: ModuleSharedState,
+    private readonly availabilitySink?: AvailabilitySink,
   ) {
     this.taskStartHandler = descriptor.eventHandlers['TaskStart'];
     this.getPageNumberHandler = descriptor.eventHandlers['GetPageNumber'];
@@ -186,6 +195,7 @@ export class EngineDownloadHooks implements ModuleDownloadHooks {
         logger,
         installed.lastHttpHandle,
         sharedState,
+        options.availabilitySink,
       );
     } catch (error: unknown) {
       await engine.dispose();
@@ -209,14 +219,12 @@ export class EngineDownloadHooks implements ModuleDownloadHooks {
     if (this.taskStartHandler === undefined) {
       return true;
     }
-    return this.toBoolean(
-      this.dispatcher.dispatch(this.descriptor, 'TaskStart', {
-        task: { pageLinks: [...this.pageLinksMirror] },
-      }),
-      'TaskStart',
-    );
+    const result = this.dispatcher.dispatch(this.descriptor, 'TaskStart', {
+      task: { pageLinks: [...this.pageLinksMirror] },
+    });
+    this.reportAvailability();
+    return this.toBoolean(result, 'TaskStart');
   }
-
   /** dispatch result → boolean, failures carrying the engine log tail. */
   private toBoolean(result: DispatchResult, event: string): boolean {
     if (result.kind === 'failed') {
@@ -243,6 +251,7 @@ export class EngineDownloadHooks implements ModuleDownloadHooks {
       url,
       task: { pageLinks: [...this.pageLinksMirror] },
     });
+    this.reportAvailability();
     if (!this.toBoolean(result, 'GetPageNumber')) {
       return false;
     }
@@ -264,6 +273,7 @@ export class EngineDownloadHooks implements ModuleDownloadHooks {
       workId: workId + 1,
       task: { pageLinks: [...this.pageLinksMirror] },
     });
+    this.reportAvailability();
     if (!this.toBoolean(result, 'GetImageURL')) {
       return false;
     }
@@ -295,6 +305,7 @@ export class EngineDownloadHooks implements ModuleDownloadHooks {
       workId: workId + 1,
       task: { pageLinks: [...this.pageLinksMirror] },
     });
+    this.reportAvailability();
     if (!this.toBoolean(result, 'BeforeDownloadImage')) {
       return undefined;
     }
@@ -315,6 +326,31 @@ export class EngineDownloadHooks implements ModuleDownloadHooks {
         : {}),
       ...(Object.keys(headers).length > 0 ? { headers } : {}),
     };
+  }
+
+  /**
+   * Classify the LAST dispatch-scoped HTTP handle into the availability
+   * sink (the same §5.2 readback seam the info path uses, read from
+   * the pipeline the shim exposes). Never throws.
+   */
+  private reportAvailability(): void {
+    const sink = this.availabilitySink;
+    if (sink === undefined) {
+      return;
+    }
+    const handle = this.lastHttpHandle();
+    if (handle === undefined) {
+      return;
+    }
+    const outcome = classifyHttpOutcome(handle.pipeline.resultCode, handle.pipeline.resultString);
+    if (outcome === undefined) {
+      return;
+    }
+    try {
+      sink(this.descriptor.id, outcome);
+    } catch {
+      // fire-and-forget by contract
+    }
   }
 
   /**

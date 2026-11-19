@@ -22,6 +22,13 @@ export type HFacetValue = 'h' | 'safe';
 /** NEEDS SETUP facet values (derived from AccountSupport). */
 export type SetupFacetValue = 'creds' | 'no-setup';
 
+/**
+ * LAST CHECK facet values (site availability): 'all' is the unfiltered
+ * default; the three concrete values are single-select (an availability
+ * status is mutually exclusive by nature). 'unknown' = never checked.
+ */
+export type AvailabilityFacetValue = 'reachable' | 'unreachable' | 'unknown';
+
 export interface ModuleFilterState {
   /** Free-text search over name/id/category (contains, case-insensitive). */
   readonly q: string;
@@ -31,9 +38,11 @@ export interface ModuleFilterState {
   readonly h: readonly HFacetValue[];
   /** Selected NEEDS SETUP values. */
   readonly setup: readonly SetupFacetValue[];
+  /** Selected LAST CHECK value ('all' = no availability constraint). */
+  readonly avail: AvailabilityFacetValue | 'all';
 }
 
-export const EMPTY_MODULE_FILTER: ModuleFilterState = { q: '', lang: [], h: [], setup: [] };
+export const EMPTY_MODULE_FILTER: ModuleFilterState = { q: '', lang: [], h: [], setup: [], avail: 'all' };
 
 /**
  * The LANGUAGE facet value derived from a module category: empty →
@@ -67,6 +76,11 @@ export function setupFacetOf(module: ModuleSummaryT): SetupFacetValue {
   return module.accountSupport ? 'creds' : 'no-setup';
 }
 
+/** LAST CHECK: the module's availability status (unknown = never checked). */
+export function availabilityFacetOf(module: ModuleSummaryT): AvailabilityFacetValue {
+  return module.availability.status;
+}
+
 function matchesText(module: ModuleSummaryT, needle: string): boolean {
   if (needle === '') {
     return true;
@@ -87,7 +101,7 @@ export function moduleMatches(
   module: ModuleSummaryT,
   filter: ModuleFilterState,
   /** Skip one facet group when computing that group's live counts. */
-  skip?: 'lang' | 'h' | 'setup',
+  skip?: 'lang' | 'h' | 'setup' | 'avail',
 ): boolean {
   const needle: string = filter.q.trim().toLowerCase();
   if (!matchesText(module, needle)) {
@@ -100,6 +114,9 @@ export function moduleMatches(
     return false;
   }
   if (skip !== 'setup' && filter.setup.length > 0 && !filter.setup.includes(setupFacetOf(module))) {
+    return false;
+  }
+  if (skip !== 'avail' && filter.avail !== 'all' && availabilityFacetOf(module) !== filter.avail) {
     return false;
   }
   return true;
@@ -122,6 +139,8 @@ export interface FacetGroups {
   readonly lang: readonly FacetValueCount[];
   readonly h: readonly FacetValueCount[];
   readonly setup: readonly FacetValueCount[];
+  /** LAST CHECK values with live counts ('all' = every module). */
+  readonly avail: readonly FacetValueCount[];
 }
 
 /**
@@ -133,6 +152,7 @@ export function facetCounts(modules: readonly ModuleSummaryT[], filter: ModuleFi
   const lang = new Map<string, number>();
   const h = new Map<string, number>();
   const setup = new Map<string, number>();
+  const avail = new Map<string, number>();
   for (const module of modules) {
     if (moduleMatches(module, filter, 'lang')) {
       const key: string = languageOf(module.category);
@@ -146,12 +166,16 @@ export function facetCounts(modules: readonly ModuleSummaryT[], filter: ModuleFi
       const key: SetupFacetValue = setupFacetOf(module);
       setup.set(key, (setup.get(key) ?? 0) + 1);
     }
+    if (moduleMatches(module, filter, 'avail')) {
+      const key: AvailabilityFacetValue = availabilityFacetOf(module);
+      avail.set(key, (avail.get(key) ?? 0) + 1);
+    }
   }
   const byValue = (a: FacetValueCount, b: FacetValueCount): number =>
     a.value < b.value ? -1 : a.value > b.value ? 1 : 0;
   const entries = (map: Map<string, number>): readonly FacetValueCount[] =>
     [...map.entries()].map(([value, count]): FacetValueCount => ({ value, count })).sort(byValue);
-  return { lang: entries(lang), h: entries(h), setup: entries(setup) };
+  return { lang: entries(lang), h: entries(h), setup: entries(setup), avail: entries(avail) };
 }
 
 export const H_FACET_LABELS: Readonly<Record<HFacetValue, string>> = {
@@ -164,10 +188,17 @@ export const SETUP_FACET_LABELS: Readonly<Record<SetupFacetValue, string>> = {
   creds: 'Needs credentials',
 };
 
-// ── URL codec (?q=&lang=&h=&setup= on #/settings) ───────────────────
+export const AVAILABILITY_FACET_LABELS: Readonly<Record<AvailabilityFacetValue, string>> = {
+  reachable: 'Reachable',
+  unreachable: 'Unreachable',
+  unknown: 'Unknown',
+};
+
+// ── URL codec (?q=&lang=&h=&setup=&filter= on #/settings) ────────────
 
 const H_VALUES: readonly HFacetValue[] = ['h', 'safe'];
 const SETUP_VALUES: readonly SetupFacetValue[] = ['creds', 'no-setup'];
+const AVAIL_VALUES: readonly AvailabilityFacetValue[] = ['reachable', 'unreachable', 'unknown'];
 
 function parseCsv(raw: string | undefined, allowed?: readonly string[]): readonly string[] {
   if (raw === undefined || raw === '') {
@@ -184,17 +215,23 @@ function parseCsv(raw: string | undefined, allowed?: readonly string[]): readonl
 /**
  * Decode the query params. Unknown values are dropped (a shared URL
  * never filters to a mismatched registry) — same posture as the site
- * picker's parseCatsParam. `validLang` bounds the language set.
+ * picker's parseCatsParam. `validLang` bounds the language set; the
+ * LAST CHECK facet rides `?filter=` (single-select, 'all' default).
  */
 export function parseModuleFilter(
   query: Record<string, string>,
   validLang: readonly string[],
 ): ModuleFilterState {
+  const rawFilter = query['filter'];
   return {
     q: query['q'] ?? '',
     lang: parseCsv(query['lang'], validLang),
     h: parseCsv(query['h'], H_VALUES) as readonly HFacetValue[],
     setup: parseCsv(query['setup'], SETUP_VALUES) as readonly SetupFacetValue[],
+    avail:
+      rawFilter !== undefined && (AVAIL_VALUES as readonly string[]).includes(rawFilter)
+        ? (rawFilter as AvailabilityFacetValue)
+        : 'all',
   };
 }
 
@@ -213,9 +250,19 @@ export function serializeModuleFilter(filter: ModuleFilterState): Record<string,
   if (filter.setup.length > 0) {
     out['setup'] = [...filter.setup].sort().join(',');
   }
+  if (filter.avail !== 'all') {
+    out['filter'] = filter.avail;
+  }
   return out;
 }
 
 export function isFilterActive(filter: ModuleFilterState, total: number, shown: number): boolean {
-  return filter.q !== '' || filter.lang.length > 0 || filter.h.length > 0 || filter.setup.length > 0 || shown !== total;
+  return (
+    filter.q !== '' ||
+    filter.lang.length > 0 ||
+    filter.h.length > 0 ||
+    filter.setup.length > 0 ||
+    filter.avail !== 'all' ||
+    shown !== total
+  );
 }

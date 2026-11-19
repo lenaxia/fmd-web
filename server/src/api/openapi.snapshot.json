@@ -332,6 +332,114 @@
         ]
       }
     },
+    "/api/modules/{id}/check": {
+      "post": {
+        "operationId": "checkModuleAvailability",
+        "summary": "Manually probe one site's reachability (per-row Check)",
+        "description": "[site-availability] ONE probe of the module RootURL through the module's own engine HTTP path (worker-isolated in production, module-appropriate headers). Classification matches the opportunistic traffic seam exactly: transport-class failures (DNS, connect refused, timeout, TLS) and the HTTP 5xx/523 family write `unreachable` + a short reason; 2xx/3xx answers write `reachable` (a later success flips an unreachable record back — self-healing, no timers); HTTP 4xx (403/429 anti-bot, rate-limit) writes NOTHING — verdict `none`, the record stays unchanged (origin alive but possibly blocking). Deliberately single-site: batch check-all is a documented deferral (anti-bot risk + low value; revisit when cold-start friction is felt) and nothing is ever scheduled or re-probed in the background.",
+        "tags": [
+          "modules"
+        ],
+        "responses": {
+          "200": {
+            "description": "Probe verdict + the resulting (possibly unchanged) availability record",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "moduleId": {
+                      "type": "string"
+                    },
+                    "verdict": {
+                      "type": "string",
+                      "enum": [
+                        "reachable",
+                        "unreachable",
+                        "none"
+                      ]
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "availability": {
+                      "$ref": "#/components/schemas/ModuleAvailability"
+                    }
+                  },
+                  "required": [
+                    "moduleId",
+                    "verdict",
+                    "detail",
+                    "availability"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Module not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "description": "Module/catalog id (32-hex, §5)"
+          }
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
+      }
+    },
     "/api/accounts": {
       "get": {
         "operationId": "listAccounts",
@@ -6213,6 +6321,36 @@
           "live_scrape_fallback"
         ]
       },
+      "ModuleAvailability": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "reachable",
+              "unreachable",
+              "unknown"
+            ]
+          },
+          "checkedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "checkedAt",
+          "reason"
+        ]
+      },
       "ModuleSummary": {
         "type": "object",
         "properties": {
@@ -6249,6 +6387,9 @@
           "catalogInstalled": {
             "type": "boolean"
           },
+          "availability": {
+            "$ref": "#/components/schemas/ModuleAvailability"
+          },
           "proxy": {
             "anyOf": [
               {
@@ -6271,6 +6412,7 @@
           "options",
           "capabilities",
           "catalogInstalled",
+          "availability",
           "proxy"
         ]
       },

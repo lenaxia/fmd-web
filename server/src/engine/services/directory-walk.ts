@@ -19,6 +19,11 @@ import type { SwallowSharedDeduper } from '../shims/txquery-shim.js';
 import type { HostLogRecord } from '@fmd/contract';
 import { normalizeMangaInfo } from '../normalize/udata.js';
 import type { ModuleSharedState } from '../state/module-state.js';
+import {
+  classifyHttpOutcome,
+  readHttpOutcome,
+  type AvailabilitySink,
+} from './availability.js';
 
 /**
  * §6.8 live-scrape directory walk: ONE pass of the FMD2 update-thread
@@ -89,6 +94,13 @@ export interface EngineDirectoryWalkerOptions {
    * via module_state at the end of the walk.
    */
   readonly moduleState?: (moduleId: string) => Promise<ModuleSharedState>;
+  /**
+   * Site-availability sink (dead-site discovery): after the walk (success
+   * OR failure) the surviving request-scoped HTTP readback is classified
+   * — transport/5xx → unreachable, 2xx/3xx → reachable, 4xx → nothing.
+   * Fire-and-forget; never throws into the browse path.
+   */
+  readonly availabilitySink?: AvailabilitySink;
   /**
    * Lua host factory (injected by the composition root): constructs the
    * per-walk host behind the contract LuaHost interface — substitute
@@ -179,16 +191,46 @@ export class EngineDirectoryWalker implements DirectoryWalkPort {
           ...(sharedCookies !== undefined ? { moduleCookies: () => sharedCookies } : {}),
         });
         const runLua = (code: string): unknown => engine.doStringSync(code);
-        const raw = walkDirectory(dispatcher, descriptor, runLua);
-        if (sharedState !== undefined) {
-          await sharedState.persist();
+        // Site-availability opportunistic write: ONE seam point around
+        // the whole walk — the surviving HTTP readback classifies the
+        // site whether the walk succeeded or threw (a dead mirror fails
+        // GetDirectoryPageNumber/GetNameAndLink with the transport error
+        // still on the HTTP object).
+        try {
+          const raw = walkDirectory(dispatcher, descriptor, runLua);
+          if (sharedState !== undefined) {
+            await sharedState.persist();
+          }
+          return normalizeDirectoryEntries(raw);
+        } finally {
+          this.reportAvailability(descriptor.id, runLua);
         }
-        return normalizeDirectoryEntries(raw);
       } finally {
         await engine.dispose();
       }
     } finally {
       await host.dispose();
+    }
+  }
+
+  /** Classify the surviving HTTP readback into the sink (never throws). */
+  private reportAvailability(moduleId: string, runLua: (code: string) => unknown): void {
+    const sink = this.options.availabilitySink;
+    if (sink === undefined) {
+      return;
+    }
+    const read = readHttpOutcome(runLua);
+    if (read === undefined) {
+      return;
+    }
+    const outcome = classifyHttpOutcome(read.resultCode, read.resultString);
+    if (outcome === undefined) {
+      return;
+    }
+    try {
+      sink(moduleId, outcome);
+    } catch {
+      // fire-and-forget by contract
     }
   }
 }

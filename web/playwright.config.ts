@@ -57,7 +57,7 @@ export default defineConfig({
       name: 'desktop',
       use: { ...devices['Desktop Chrome'] },
       testMatch:
-        /(smoke|a11y|perf|search|search-home|manga-parity|browse-list-polish|settings-parity|favorites-parity|downloads-parity|parity-sweep|arrival-experience|fmd2-import|cover-proxy)\.spec\.ts/,
+        /(smoke|a11y|perf|search|search-home|manga-parity|browse-list-polish|settings-parity|favorites-parity|downloads-parity|parity-sweep|arrival-experience|fmd2-import|cover-proxy|library-file-state|site-availability)\.spec\.ts/,
     },
     {
       name: 'mobile',

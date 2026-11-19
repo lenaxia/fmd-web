@@ -64,6 +64,8 @@ import {
   ModuleUpdateRequestSchema,
   ModuleBulkUpdateRequestSchema,
   ModuleBulkUpdateResponseSchema,
+  ModuleCheckResponseSchema,
+  type ModuleCheckResponseT,
   OutputDefaultsUpdateRequestSchema,
   PerformanceSettingsUpdateRequestSchema,
   RetentionSettingsUpdateRequestSchema,
@@ -130,6 +132,7 @@ import { registerAuth, AuthService, type AuthConfig } from './auth.js';
 import { attachWebSocketHub, type WsAttachment } from './ws/attach.js';
 import type { WsHub } from './ws/hub.js';
 import { CoverProxyService } from './cover-proxy.js';
+import type { SiteAvailabilityService } from '../runtime/site-availability.js';
 import { InMemoryAccountService, type AccountService } from '../accounts/account-service.js';
 import { Fmd2ImportService, FMD2_IMPORT_MAX_BYTES, type UploadedPart } from '../import/fmd2/service.js';
 import {
@@ -189,6 +192,15 @@ export interface ApiServices {
    * wires the real one under FMD_WEB_DATA_DIR/covers.
    */
   readonly covers?: CoverProxyService;
+  /**
+   * Site availability (dead-site discovery): the persisted per-module
+   * reachability record + the manual per-row Check probe. Optional
+   * with the covers posture — absent → POST /api/modules/:id/check is
+   * not mounted and /api/modules rows read availability: unknown; the
+   * runtime assembly always wires the real one (app.db + the engine
+   * thread probe).
+   */
+  readonly availability?: SiteAvailabilityService;
   /** Readiness probe input (default: always ready). */
   readonly readiness?: () => ReadinessStatus;
 }
@@ -493,6 +505,23 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     );
     return ModuleBulkUpdateResponseSchema.parse({ modules: updated, updated: updated.length });
   });
+
+  // ── site availability (dead-site discovery) ───────────────────────
+  // Manual per-row Check (Settings registry): ONE probe of the module
+  // RootURL through the module's own engine HTTP path (worker-isolated
+  // in production). Deliberately SINGLE-site — batch check-all is a
+  // documented deferral (anti-bot risk + low value; revisit when
+  // cold-start friction is felt). Typed errors only, never a 500 from
+  // the probe's own failure classification; a 4xx origin answer is NOT
+  // an error — verdict 'none' reports the intentional no-write.
+  if (services.availability !== undefined) {
+    const availability = services.availability;
+    app.post('/api/modules/:id/check', async (req): Promise<ModuleCheckResponseT> => {
+      const id = parseOr400(ModuleIdSchema, (req.params as Record<string, unknown>)['id'], 'module id');
+      const result = await availability.check(id);
+      return ModuleCheckResponseSchema.parse(result);
+    });
+  }
 
   // ── accounts (§8.6/D4 CRUD + login) ───────────────────────────────
   app.get('/api/accounts', async (): Promise<AccountListResponseT> => {

@@ -126,6 +126,12 @@ grouped by language/category.
   a title: the server resolves the site by its URL host. `Ctrl+Shift+V`
   pastes-and-goes from the clipboard in one stroke. Unknown hosts and
   ambiguous hosts are reported inline.
+- **Dead-site hints** (last check): sites whose last observed contact failed
+  (DNS gone, connection refused, timeout, Cloudflare 5xx) render **dimmed
+  with the reason on the row** — a hint, never a gate, because the site may
+  be back; picking it still works. The **Hide unavailable** checkbox folds
+  those rows away for this visit (plain view state — it is not saved and
+  never touches the URL). Never-checked sites render as normal rows.
 
 ### Browse one site's list
 
@@ -413,6 +419,16 @@ manager.
   - **Search** by name or category; **Select all / None** global bulk
     toggles; each **category header** carries per-category bulk
     enable/disable.
+  - **Last check** — each row carries a small reachability marker (hover
+    for when it was checked and the failure reason); the **Last check**
+    facet chips (All / Reachable / Unreachable / Unknown, in the URL as
+    `?filter=`) filter the registry by it, and the per-row **Check**
+    button probes that one site's address through the module's own HTTP
+    path and records the verdict. The record also updates itself as a
+    byproduct of normal use (browsing, favorites checks, downloads), and
+    a later success flips an unreachable site back automatically — no
+    background re-checking exists, and there is deliberately no
+    check-all button.
   - Each module row: the **enabled** checkbox, category and root URL,
     capability badges, and **Re-sync catalog** (offered when a catalog is
     installed — refreshes it with a progress toast).

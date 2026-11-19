@@ -16,6 +16,7 @@ import { cn } from 'cn';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
+  AVAILABILITY_FACET_LABELS,
   H_FACET_LABELS,
   SETUP_FACET_LABELS,
   type FacetGroups,
@@ -214,6 +215,42 @@ export function ModuleFacets(props: {
               }
               onClick={(): void => {
                 toggleSetup(value);
+              }}
+            />
+          ),
+        )}
+      </FacetGroup>
+      <FacetGroup
+        label="Last check"
+        active={props.filter.avail !== 'all'}
+        onClear={(): void => {
+          props.onChange({ ...props.filter, avail: 'all' });
+        }}
+      >
+        {/* Single-select by nature (statuses are mutually exclusive):
+         * pressing the active chip returns to All. The All count is the
+         * sum of the three (modules under the OTHER groups' constraints). */}
+        {(['all', 'reachable', 'unreachable', 'unknown'] as const).map(
+          (value): ReactElement => (
+            <FacetChip
+              key={value}
+              label={value === 'all' ? 'All' : AVAILABILITY_FACET_LABELS[value]}
+              count={
+                value === 'all'
+                  ? props.counts.avail.reduce((sum, facet): number => sum + facet.count, 0)
+                  : props.counts.avail.find((f): boolean => f.value === value)?.count ?? 0
+              }
+              pressed={props.filter.avail === value}
+              disabled={
+                value !== 'all' &&
+                (props.counts.avail.find((f): boolean => f.value === value)?.count ?? 0) === 0 &&
+                props.filter.avail !== value
+              }
+              onClick={(): void => {
+                props.onChange({
+                  ...props.filter,
+                  avail: props.filter.avail === value ? 'all' : value,
+                });
               }}
             />
           ),

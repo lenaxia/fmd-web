@@ -52,6 +52,7 @@ import type {
 import { ApiError } from './errors.js';
 import { decodeCursor, encodeCursor } from './cursor.js';
 import { downloadedChaptersKey } from '../jobs/library/merge.js';
+import { UNKNOWN_AVAILABILITY, type SiteAvailabilityRecord } from '../runtime/site-availability.js';
 
 // ── modules ──────────────────────────────────────────────────────────
 
@@ -107,6 +108,7 @@ function toSummary(
   proxy: ProxySettingsT | null,
   browserProfileEnabled: boolean,
   catalogInstalled: (id: string) => boolean,
+  availability: (id: string) => SiteAvailabilityRecord,
 ): ModuleSummaryT {
   return {
     id: row.id,
@@ -123,6 +125,7 @@ function toSummary(
     ),
     proxy,
     catalogInstalled: catalogInstalled(row.id),
+    availability: availability(row.id),
     capabilities: applyBrowserProfile(
       {
         requires_subprocess: row.capabilities.requires_subprocess,
@@ -198,6 +201,13 @@ export class InMemoryModuleService implements ModuleService {
      * cache invalidation. Default: nothing installed.
      */
     catalogInstalled: (id: string) => boolean = (): boolean => false,
+    /**
+     * Site-availability lookup (dead-site discovery): evaluated per
+     * list()/get() call so an opportunistic write or a manual Check is
+     * reflected on the next /api/modules read. Default: unknown for
+     * every site (the seeded, silent state).
+     */
+    availability: (id: string) => SiteAvailabilityRecord = (): SiteAvailabilityRecord => UNKNOWN_AVAILABILITY,
   ) {
     // Non-32-hex module ids (upstream typos exist — ColorcitoScan.lua
     // ships '5450026642ecrrd48apotd81e57f8e40') can never have an
@@ -206,10 +216,13 @@ export class InMemoryModuleService implements ModuleService {
     // can never take down /api/modules with a 500.
     this.catalogInstalled = (id: string): boolean =>
       isValidCatalogId(id) && catalogInstalled(id);
+    this.availability = availability;
     for (const row of rows) {
       this.enabled.set(row.id, true);
     }
   }
+
+  private readonly availability: (id: string) => SiteAvailabilityRecord;
 
   list(): ModuleSummaryT[] {
     return this.rows.map((row) =>
@@ -219,6 +232,7 @@ export class InMemoryModuleService implements ModuleService {
         this.proxy.get(row.id) ?? null,
         this.browserProfileEnabled,
         this.catalogInstalled,
+        this.availability,
       ),
     );
   }
@@ -234,6 +248,7 @@ export class InMemoryModuleService implements ModuleService {
       this.proxy.get(id) ?? null,
       this.browserProfileEnabled,
       this.catalogInstalled,
+      this.availability,
     );
   }
 
