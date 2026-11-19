@@ -916,20 +916,149 @@ export const LibraryFileSchema = z.object({
   fileName: z.string().min(1),
   bytes: z.number().int().nonnegative(),
   createdAt: TimestampSchema,
+  /**
+   * [file-state] stat-verified truth ('downloaded' | 'missing') —
+   * additive; absent when the deployment has no file-state service.
+   */
+  state: z.enum(['downloaded', 'missing']).optional(),
+  /** [file-state] verification stamp (null = never verified). */
+  verifiedAt: TimestampSchema.nullable().optional(),
+  /** [file-state] root-relative display path (clamped; omitted when
+   * the recorded path resolves outside the library root). */
+  path: z.string().min(1).optional(),
+  /** [file-state] the recorded absolute path (copy-path target). */
+  absolutePath: z.string().min(1).optional(),
+  /** [file-state] disk mtime (verified snapshot of a present file). */
+  mtime: TimestampSchema.optional(),
 });
 export type LibraryFileT = z.infer<typeof LibraryFileSchema>;
 
 export const LibraryListQuerySchema = z.object({
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
+  /**
+   * [file-state] Library page filter chips (URL-as-truth): all (default),
+   * missing (stat-verified missing rows), orphans (the LAST RESCAN's
+   * persisted orphan list — orphan truth is rescan truth, never a
+   * live walk per listing).
+   */
+  filter: z.enum(['all', 'missing', 'orphans']).optional(),
 });
 export type LibraryListQueryT = z.infer<typeof LibraryListQuerySchema>;
+
+/** [file-state] one orphan file (rescan truth; root-relative path). */
+export const LibraryOrphanFileSchema = z.object({
+  path: z.string().min(1),
+  absolutePath: z.string().min(1),
+  bytes: z.number().int().nonnegative(),
+  mtime: TimestampSchema,
+});
+export type LibraryOrphanFileT = z.infer<typeof LibraryOrphanFileSchema>;
 
 export const LibraryListResponseSchema = z.object({
   files: z.array(LibraryFileSchema),
   nextCursor: z.string().optional(),
+  /** [file-state] filter=orphans serves the persisted rescan orphans here. */
+  orphans: z.array(LibraryOrphanFileSchema).optional(),
 });
 export type LibraryListResponseT = z.infer<typeof LibraryListResponseSchema>;
+
+// ── library file-state (title files, rescan) ─────────────────────────
+
+/** [file-state] GET /api/library/title-files query. */
+export const TitleFilesQuerySchema = z.object({
+  moduleId: z.string().min(1),
+  url: z.string().min(1),
+  /** Manga title (legacy row matching by sanitized layout segment). */
+  manga: z.string().optional(),
+  /** Explicit refresh: force re-verification regardless of staleness. */
+  refresh: z.coerce.boolean().optional(),
+});
+export type TitleFilesQueryT = z.infer<typeof TitleFilesQuerySchema>;
+
+/**
+ * [file-state] one chapter file on a title's Files section.
+ * state 'not_downloaded' is chapter-side (web merges against the live
+ * chapter list); entries here are the tracked (ledger) side.
+ */
+export const TitleFileEntrySchema = z.object({
+  id: JobIdSchema.optional(),
+  chapterLink: z.string().optional(),
+  fileName: z.string().optional(),
+  path: z.string().min(1).optional(),
+  absolutePath: z.string().min(1).optional(),
+  bytes: z.number().int().nonnegative().optional(),
+  mtime: TimestampSchema.optional(),
+  state: z.enum(['downloaded', 'missing']),
+  verifiedAt: TimestampSchema.optional(),
+});
+export type TitleFileEntryT = z.infer<typeof TitleFileEntrySchema>;
+
+export const TitleFilesResponseSchema = z.object({
+  moduleId: z.string().min(1),
+  url: z.string().min(1),
+  /** The verification pass stamp (the age anchor for UI tooltips). */
+  verifiedAt: TimestampSchema,
+  files: z.array(TitleFileEntrySchema),
+  orphans: z.array(LibraryOrphanFileSchema),
+});
+export type TitleFilesResponseT = z.infer<typeof TitleFilesResponseSchema>;
+
+/** [file-state] POST /api/library/rescan query (omit = whole library). */
+export const RescanQuerySchema = z.object({
+  moduleId: z.string().min(1).optional(),
+  url: z.string().min(1).optional(),
+  manga: z.string().optional(),
+});
+export type RescanQueryT = z.infer<typeof RescanQuerySchema>;
+
+/** [file-state] the persisted rescan diff report. */
+export const RescanReportSchema = z.object({
+  startedAt: TimestampSchema,
+  finishedAt: TimestampSchema,
+  durationMs: z.number().int().nonnegative(),
+  scope: z.union([
+    z.literal('library'),
+    z.object({
+      kind: z.literal('title'),
+      moduleId: z.string().min(1),
+      url: z.string().min(1),
+    }),
+  ]),
+  counts: z.object({
+    scanned: z.number().int().nonnegative(),
+    present: z.number().int().nonnegative(),
+    relinked: z.number().int().nonnegative(),
+    missing: z.number().int().nonnegative(),
+    orphans: z.number().int().nonnegative(),
+    outsideRoot: z.number().int().nonnegative(),
+  }),
+  relinked: z.array(z.object({
+    id: JobIdSchema,
+    fromPath: z.string().min(1),
+    toPath: z.string().min(1),
+  })),
+  missing: z.array(z.object({
+    id: JobIdSchema,
+    manga: z.string().min(1),
+    fileName: z.string().min(1),
+    path: z.string().min(1).optional(),
+    /** Ambiguous same-name candidates (the orphan side of the pair). */
+    candidates: z.array(z.string().min(1)),
+  })),
+  orphans: z.array(LibraryOrphanFileSchema),
+});
+export type RescanReportT = z.infer<typeof RescanReportSchema>;
+
+export const RescanResponseSchema = z.object({
+  report: RescanReportSchema,
+});
+export type RescanResponseT = z.infer<typeof RescanResponseSchema>;
+
+export const LastRescanResponseSchema = z.object({
+  report: RescanReportSchema.nullable(),
+});
+export type LastRescanResponseT = z.infer<typeof LastRescanResponseSchema>;
 
 // ── favorites (§7.2 DoCheck engine + scheduler) ──────────────────────
 

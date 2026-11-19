@@ -1,5 +1,6 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { join, posix } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { walkTree } from '../../fs-walk.js';
 import type { HostLogger, ToleranceRefusalReason } from '@fmd/contract';
 import { TolerancePolicy, SYNC_FAILURE_TOLERANCE } from '@fmd/contract';
 import type { LuaHostFactory } from '../contract.js';
@@ -201,14 +202,9 @@ function comparePosix(a: string, b: string): number {
 }
 
 function walk(root: string, prefix = ''): string[] {
-  const files: string[] = [];
-  for (const entry of readdirSync(join(root, prefix), { withFileTypes: true })) {
-    const rel = prefix === '' ? entry.name : posix.join(prefix, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...walk(root, rel));
-    } else if (entry.isFile()) {
-      files.push(posix.normalize(rel));
-    }
-  }
-  return files;
+  // Shared walker seam (jobs/library/root-walk): the inventory walk
+  // keeps its exact historical shape — dotfiles included, plain
+  // isFile dirents only, posix-normalized relative paths, readdir
+  // order. Delegating keeps ONE tree-walk implementation server-side.
+  return walkTree(join(root, prefix)).map((file): string => file.relPath);
 }

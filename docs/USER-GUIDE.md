@@ -266,15 +266,50 @@ defaults). Retrieve them from the [Library](#library) page.
 ## Library
 
 The Library page (`#/library`) lists finalized chapter archives, newest
-first: manga, file name, size and date.
+first: manga, file name, size and date — every row also carries its
+**verified state** (`downloaded` = the file was stat-checked at its
+recorded path; `missing` = the ledger says downloaded but the file is
+gone) and a **Copy path** action for the recorded server path.
 
 - **Download** on each row streams the packed file
   (`/api/library/<id>/file`) to your machine — feed it to your reader or
   media-server of choice. There is deliberately **no in-app reader**:
   consumption belongs to dedicated tools.
 - **Load more** pages through the archive list.
-- The output **format** (ZIP / CBZ / PDF / EPUB) and naming come from
+- The output **format** (ZIP / CBZ / PDF / EBUB) and naming come from
   Settings → Output defaults (see [Settings](#settings)).
+- The **All / Missing / Orphans** filter chips are URL state
+  (`#/library?filter=missing` is shareable): *Missing* lists files whose
+  recorded path no longer resolves; *Orphans* lists files on disk under
+  the downloads root that no library row claims (that list updates when
+  you run a rescan).
+- **Rescan library** walks the server's downloads root and reconciles
+  the ledger against what is actually on disk. Files that MOVED within
+  the root are re-linked automatically when the match is confident
+  (same file name at a different directory, or exactly the app's own
+  `<site>/<title>/<file>` output slot); ambiguous cases are never
+  auto-linked — they surface as a missing entry listing its same-name
+  candidates plus those files as orphans, and you decide by deleting
+  the library row (the **Delete file…** action on the row, or ignoring
+  the orphan). The report (re-links with former paths, missing,
+  orphans, counts) stays on the page until the next rescan.
+- The manga page's **Files** section lists every tracked chapter file
+  for that title — chapter label, file name, size, date, state badge,
+  copy-path — plus any orphans inside that title's directory, a
+  per-title **Rescan**, and an explicit **Refresh** (states re-verify
+  automatically when older than ~15 minutes; Refresh forces it).
+
+### Deliberately not built (v1)
+
+- **Renaming** library files/titles from the UI.
+- **Downloading or zipping files from the Files/orphan listings** —
+  the metadata surface never serves file bytes (the packed-artifact
+  download link above is the sanctioned boundary).
+- **Watching the filesystem continuously** — verified state refreshes
+  lazily on view (with the 15-minute staleness window) and on rescan.
+- **Interactive orphan adoption** (picking which missing entry an
+  orphan belongs to) — v1 resolves by deleting the row or ignoring
+  the orphan.
 
 ## Favorites lifecycle
 

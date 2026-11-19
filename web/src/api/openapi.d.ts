@@ -661,11 +661,55 @@ export interface paths {
         };
         /**
          * Finalized chapter artifacts (§7.1 library listing)
-         * @description Newest-first page over the library rows (one per packed chapter file, `library/<module>/<manga>/<file>`). `cursor` is the keyset boundary like /api/jobs.
+         * @description Newest-first page over the library rows (one per packed chapter file, `library/<module>/<manga>/<file>`). `cursor` is the keyset boundary like /api/jobs. [file-state] Rows carry additive stat-verified fields (`state` downloaded|missing, `verifiedAt`, root-relative `path` + `absolutePath`, `mtime`) and the Library page chips ride `filter`: `all` (default), `missing` (stat-verified missing rows, keyset-paginated) or `orphans` (serves the LAST RESCAN's persisted orphan list — orphan truth is rescan truth, never a live walk per listing).
          */
         get: operations["listLibrary"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/library/title-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Per-title chapter file listing (Files section — metadata only)
+         * @description [file-state] The server-storage window for one title: every tracked chapter file keyed off the ONE downloaded-chapters ledger (ledger links without rows surface as missing — e.g. an FMD2 import mapped the ledger without files on this machine), each carrying its recorded path (root-relative display form; the absolute path rides alongside for copy-path), size, mtime, and the verified_at stamp. Verification is LAZY: entries stale >15 min are re-stat-verified on open; `?refresh=1` forces re-verification. Orphans (files under the title's convention directory no ledger row claims) close the listing. METADATA ONLY — no endpoint on this surface serves file bytes; every path is realpath-clamped to the downloads root and dotfiles are skipped.
+         */
+        get: operations["listTitleFiles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/library/rescan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The last persisted rescan diff report
+         * @description Re-serves the report the last POST /api/library/rescan persisted (the Library page's orphan filter and report surface read here). `report` is null until the first rescan runs.
+         */
+        get: operations["lastRescanReport"];
+        put?: never;
+        /**
+         * Rescan library — reconcile the ledger against disk (persisted diff report)
+         * @description Walks the configured downloads root via the shared directory-walker seam (dotfiles skipped, symlink escapes clamped out) and reconciles the `library_files` ledger against what is actually on disk. CONSERVATIVE re-linking for moved-within-root files only: an exact-filename match at a different directory, or the app's own output naming convention (`<module>/<manga>/<file>`) hitting exactly one candidate. Ambiguous matches (two+ same-name candidates) are NEVER auto-linked — they surface as an orphan+missing pair for the operator to resolve (v1: delete the ledger entry or ignore the orphan; interactive adoption is deferred). The diff report (re-linked with former paths, missing with former paths + candidates, orphans with path/size/mtime, counts) is persisted and re-served by GET /api/library/rescan. Optional `moduleId`+`url` scope the reconcile to one title (the per-title variant on the manga detail Files section).
+         */
+        post: operations["rescanLibrary"];
         delete?: never;
         options?: never;
         head?: never;
@@ -681,7 +725,7 @@ export interface paths {
         };
         /**
          * Download one packed chapter artifact
-         * @description Streams the artifact bytes (application/octet-stream, attachment Content-Disposition). The ZIP/CBZ structure is client-validatable (central directory walk).
+         * @description Streams the artifact bytes (application/octet-stream, attachment Content-Disposition). The ZIP/CBZ structure is client-validatable (central directory walk). [file-state guardrail] the recorded path is realpath-clamped to the downloads root — a path resolving outside it (tampered row, relocated symlink) is a typed 403 `path_outside_library_root`, dotfiles are never served; missing files stay the 404.
          */
         get: operations["downloadLibraryFile"];
         put?: never;
@@ -1252,7 +1296,64 @@ export interface components {
             fileName: string;
             bytes: number;
             createdAt: components["schemas"]["Timestamp"];
+            /** @enum {string} */
+            state?: "downloaded" | "missing";
+            verifiedAt?: components["schemas"]["Timestamp"] | null;
+            path?: string;
+            absolutePath?: string;
+            mtime?: components["schemas"]["Timestamp"];
         };
+        LibraryOrphanFile: {
+            path: string;
+            absolutePath: string;
+            bytes: number;
+            mtime: components["schemas"]["Timestamp"];
+        };
+        TitleFileEntry: {
+            id?: string;
+            chapterLink?: string;
+            fileName?: string;
+            path?: string;
+            absolutePath?: string;
+            bytes?: number;
+            mtime?: components["schemas"]["Timestamp"];
+            /** @enum {string} */
+            state: "downloaded" | "missing";
+            verifiedAt?: components["schemas"]["Timestamp"];
+        };
+        RescanReport: {
+            startedAt: components["schemas"]["Timestamp"];
+            finishedAt: components["schemas"]["Timestamp"];
+            durationMs: number;
+            scope: "library" | {
+                /** @constant */
+                kind: "title";
+                moduleId: string;
+                url: string;
+            };
+            counts: {
+                scanned: number;
+                present: number;
+                relinked: number;
+                missing: number;
+                orphans: number;
+                outsideRoot: number;
+            };
+            relinked: {
+                id: components["schemas"]["RescanReport0"];
+                fromPath: string;
+                toPath: string;
+            }[];
+            missing: {
+                id: components["schemas"]["RescanReport0"];
+                manga: string;
+                fileName: string;
+                path?: string;
+                candidates: string[];
+            }[];
+            orphans: components["schemas"]["LibraryOrphanFile"][];
+        };
+        RescanReport0: string;
         /** @enum {string} */
         ListModules200Response0: "" | "HTTP" | "SOCKS4" | "SOCKS5";
         ListModules200Response1: string;
@@ -1372,6 +1473,8 @@ export interface components {
         LiveInfoBody0: string;
         LiveInfoBody1: string;
         CreateDownloadJobsBatchBody0: string;
+        RescanLibrary200Response0: string;
+        LastRescanReport200Response0: string;
         AnalyzeFmd2Import200Response0: {
             source: string;
             reason: string;
@@ -1554,56 +1657,6 @@ export interface operations {
             };
         };
     };
-    listAccounts: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Account list */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        accounts: components["schemas"]["AccountView"][];
-                        count: number;
-                    };
-                };
-            };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Unhandled server failure (typed error envelope) */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Unhandled server failure (typed error envelope) */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-        };
-    };
     checkModuleAvailability: {
         parameters: {
             query?: never;
@@ -1651,6 +1704,56 @@ export interface operations {
             };
             /** @description Module not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    listAccounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Account list */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        accounts: components["schemas"]["AccountView"][];
+                        count: number;
+                    };
+                };
+            };
+            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3604,6 +3707,7 @@ export interface operations {
             query?: {
                 cursor?: string;
                 limit?: number;
+                filter?: "all" | "missing" | "orphans";
             };
             header?: never;
             path?: never;
@@ -3620,10 +3724,135 @@ export interface operations {
                     "application/json": {
                         files: components["schemas"]["LibraryFile"][];
                         nextCursor?: string;
+                        orphans?: components["schemas"]["LibraryOrphanFile"][];
                     };
                 };
             };
             /** @description Malformed cursor */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    listTitleFiles: {
+        parameters: {
+            query: {
+                moduleId: string;
+                url: string;
+                manga?: string;
+                refresh?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Title file entries + scoped orphans */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        moduleId: string;
+                        url: string;
+                        verifiedAt: components["schemas"]["Timestamp"];
+                        files: components["schemas"]["TitleFileEntry"][];
+                        orphans: components["schemas"]["LibraryOrphanFile"][];
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    lastRescanReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The persisted report (nullable) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        report: components["schemas"]["RescanReport"] | null;
+                    };
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    rescanLibrary: {
+        parameters: {
+            query?: {
+                moduleId?: string;
+                url?: string;
+                manga?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The persisted diff report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        report: components["schemas"]["RescanReport"];
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
             400: {
                 headers: {
                     [name: string]: unknown;

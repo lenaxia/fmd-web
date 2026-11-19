@@ -320,7 +320,8 @@ export type ApiErrorCode =
   | 'upstream_error'
   | 'internal_error'
   | 'no_site_match'
-  | 'ambiguous_site';
+  | 'ambiguous_site'
+  | 'path_outside_library_root';
 
 /** The §10 wire envelope: `{ error: { code, message, details? } }`. */
 export interface ApiErrorBody {

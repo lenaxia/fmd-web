@@ -152,6 +152,23 @@ export async function installMockApi(page: Page): Promise<void> {
       }),
     );
   });
+  // [file-state] neutral library file-state defaults: the manga page's
+  // Files section + the Library page's rescan state stay quiet (empty)
+  // unless a spec overrides them with its own routes.
+  await page.route(API('library/title-files'), (route): void => {
+    void route.fulfill(
+      json({
+        moduleId: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        url: 'https://fixtures.example/manga/alpha',
+        verifiedAt: '2026-11-19T00:00:00.000Z',
+        files: [],
+        orphans: [],
+      }),
+    );
+  });
+  await page.route(API('library/rescan'), (route): void => {
+    void route.fulfill(json({ report: null }));
+  });
   // R4 API-token state: the SettingsPage fetches this on every render
   // (ApiTokenSection). Deterministic answer — a real deployment ALWAYS
   // carries a token now (*arr semantics: generated on first boot, auth

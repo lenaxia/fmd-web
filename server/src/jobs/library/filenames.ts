@@ -290,3 +290,22 @@ export function normalizeChapterExtension(ext: string): string {
   }
   return normalized;
 }
+
+/**
+ * Deterministic work-dir/library segment for a URL's tail (path-safe):
+ * the §7.1 layout derivation shared by the download lane (work dir +
+ * finalize segments) and the library file-state service (expected
+ * convention directory, legacy segment matching). ONE derivation —
+ * never a second opinion about where a title's files live.
+ */
+export function urlSegment(url: string, fallback: string): string {
+  const tail = url.split('?')[0]?.split('#')[0]?.split('/').filter((s) => s !== '').at(-1);
+  let decoded = tail ?? '';
+  try {
+    decoded = decodeURIComponent(decoded);
+  } catch {
+    // keep the raw tail (malformed escape)
+  }
+  const sanitized = sanitizeFileName(decoded);
+  return sanitized === '' ? fallback : truncateKeepTail(sanitized, 80);
+}

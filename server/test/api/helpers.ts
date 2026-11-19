@@ -411,10 +411,19 @@ export function buildHarness(
     /** Downloads parity: job service override (action-matrix tests wire
      * an artifact deleter through it). */
     jobs?: import('../../src/api/services.js').InMemoryJobService;
+    /** [file-state] library service override (the clamp tests wire the
+     * REAL SqliteLibraryService over a temp root). */
+    library?: import('../../src/api/services.js').LibraryService;
+    /** [file-state] the file-state seam (title-files/rescan routes +
+     * library filter enrichment; absent keeps the pre-shape). */
+    fileState?: import('../../src/runtime/library-file-state.js').SqliteLibraryFileStateService;
   } = {},
 ): Harness {
   const jobs = opts.jobs ?? new InMemoryJobService();
+  // The handle stays the in-memory double (its put/setDownloadedChapters
+  // test seams); a REAL override wires into buildApp only.
   const library = new InMemoryLibraryService();
+  const wiredLibrary = opts.library ?? library;
   const favorites = opts.favorites ?? new InMemoryFavoriteService();
   const accounts = opts.accounts ?? new InMemoryAccountService();
   const catalogs = opts.catalogStore ?? new InMemoryCatalogStore(catalogFixtures(), [CATALOG_ID]);
@@ -450,8 +459,9 @@ export function buildHarness(
       info,
       jobs,
       sync,
-      library,
+      library: wiredLibrary,
       favorites,
+      ...(opts.fileState !== undefined ? { fileState: opts.fileState } : {}),
       ...(opts.readiness !== undefined ? { readiness: opts.readiness } : {}),
     },
     options,

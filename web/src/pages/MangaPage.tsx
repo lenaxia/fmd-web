@@ -11,9 +11,9 @@
  * invert/select-new/tinting) and the enqueue extras row
  * (cbAddAsStopped :1110 + edSaveTo, pas:5613).
  */
-import { useEffect, useState, type ChangeEvent, type ReactElement } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent, type ReactElement } from 'react';
 import { ArrowLeft, ExternalLink, Heart, HeartOff, ListPlus } from 'lucide-react';
-import { useCreateDownloadJob, useDownloadedSet, useFavoriteState, useLiveInfo } from '../api/hooks';
+import { useCreateDownloadJob, useDownloadedSet, useFavoriteState, useLiveInfo, useTitleFiles } from '../api/hooks';
 import { dryRunJson } from '../api/dry-run';
 import {
   DEFAULT_CHAPTER_VIEW_OPTIONS,
@@ -24,6 +24,7 @@ import {
   type ChapterViewOptions,
 } from '../state/chapter-view-state';
 import { coverSrc } from '../api/cover';
+import { FilesSection } from '@/components/library/FilesSection';
 import { CoverImage } from '@/components/manga/CoverImage';
 import { ChapterToolbar } from '@/components/manga/ChapterToolbar';
 import { EnqueueOptions, loadSaveTo, type EnqueueExtras } from '@/components/manga/EnqueueOptions';
@@ -47,6 +48,22 @@ export function MangaPage(props: { route: Route }): ReactElement {
 
   const info = useLiveInfo(moduleId === '' ? undefined : moduleId, url === '' ? undefined : url);
   const downloaded = useDownloadedSet(info);
+  // [file-state] verified truth per chapter link (lazy stat-verification
+  // server-side; missing = ledger entry whose file is gone).
+  const titleFiles = useTitleFiles(
+    moduleId === '' ? undefined : moduleId,
+    url === '' ? undefined : url,
+    title !== '' ? { manga: title } : {},
+  );
+  const fileStates = useMemo((): Map<string, 'downloaded' | 'missing'> => {
+    const map = new Map<string, 'downloaded' | 'missing'>();
+    for (const entry of titleFiles.data?.files ?? []) {
+      if (entry.chapterLink !== undefined) {
+        map.set(entry.chapterLink, entry.state);
+      }
+    }
+    return map;
+  }, [titleFiles.data]);
   const favorite = useFavoriteState(moduleId, url);
   const [selected, setSelected] = useState<readonly number[]>([]);
   const [view, setView] = useState<ChapterViewOptions>(DEFAULT_CHAPTER_VIEW_OPTIONS);
@@ -90,6 +107,17 @@ export function MangaPage(props: { route: Route }): ReactElement {
   const chapters = info.data?.chapterNames ?? [];
   const chapterLinks = info.data?.chapterLinks ?? [];
   const count = Math.min(chapters.length, chapterLinks.length);
+  // [file-state] the Files section + verified chapter badges: live
+  // chapter labels keyed by link (the lazy-verified server truth rides
+  // the same query the section consumes).
+  const chapterLabels = new Map<string, string>();
+  for (let i = 0; i < count; i += 1) {
+    const link = chapterLinks[i];
+    const name = chapters[i];
+    if (link !== undefined && name !== undefined) {
+      chapterLabels.set(link, name);
+    }
+  }
   const visible = visibleChapterIndices({ chapterNames: chapters, chapterLinks, downloaded, options: view });
   const enqueueExtras = {
     ...(extras.paused ? { paused: true as const } : {}),
@@ -320,10 +348,22 @@ export function MangaPage(props: { route: Route }): ReactElement {
             itemKey={(i): string => chapterLinks[i] ?? String(i)}
             rowClassName="py-0.5"
             renderItem={(i): ReactElement => {
-              const isDownloaded = isDownloadedChapter(chapterLinks[i] ?? '', downloaded);
+              const link = chapterLinks[i] ?? '';
+              const isDownloaded = isDownloadedChapter(link, downloaded);
+              // [file-state] the verified truth wins when loaded: a
+              // ledger chapter whose file is gone shows 'missing'; a
+              // chapter with no ledger entry stays badge-less
+              // (not_downloaded — FMD2 parity, the muted row).
+              const verifiedState = fileStates.get(link);
+              const badgeState: 'downloaded' | 'missing' | null = titleFiles.isSuccess
+                ? (verifiedState ?? (isDownloaded ? 'downloaded' : null))
+                : isDownloaded
+                  ? 'downloaded'
+                  : null;
               return (
                 <div
                   data-downloaded={isDownloaded ? 'true' : undefined}
+                  data-file-state={badgeState ?? undefined}
                   className={cn(
                     'flex min-h-row items-center gap-2.5 rounded-md px-2 text-sm transition-colors hover:bg-surface-hover',
                     isDownloaded && 'bg-primary/5',
@@ -346,14 +386,32 @@ export function MangaPage(props: { route: Route }): ReactElement {
                       {chapters[i] ?? chapterLinks[i]}
                     </span>
                   </label>
-                  {isDownloaded ? (
-                    <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                      downloaded
+                  {badgeState !== null ? (
+                    <span
+                      data-state={badgeState}
+                      title={
+                        badgeState === 'missing'
+                          ? 'Marked downloaded in the ledger, but the file is not at its recorded path (see Files)'
+                          : undefined
+                      }
+                      className={cn(
+                        'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium',
+                        badgeState === 'downloaded' ? 'bg-primary/10 text-primary' : 'bg-destructive/15 text-destructive',
+                      )}
+                    >
+                      {badgeState}
                     </span>
                   ) : null}
                 </div>
               );
             }}
+          />
+
+          <FilesSection
+            moduleId={moduleId}
+            url={url}
+            mangaTitle={title || info.data.title}
+            chapterLabels={chapterLabels}
           />
 
           <Separator className="my-6" />

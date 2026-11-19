@@ -57,6 +57,11 @@ import {
   JobBulkActionRequestSchema,
   JobBulkActionResponseSchema,
   LibraryListQuerySchema,
+  LastRescanResponseSchema,
+  RescanQuerySchema,
+  RescanResponseSchema,
+  TitleFilesQuerySchema,
+  TitleFilesResponseSchema,
   LibraryListResponseSchema,
   ModuleIdSchema,
   ModuleListResponseSchema,
@@ -122,6 +127,9 @@ import {
   type JobT,
   type JobsListResponseT,
   type LibraryListResponseT,
+  type LastRescanResponseT,
+  type RescanResponseT,
+  type TitleFilesResponseT,
   type ModuleBulkUpdateResponseT,
   type ModuleListResponseT,
   type SettingsResponseT,
@@ -132,6 +140,7 @@ import { registerAuth, AuthService, type AuthConfig } from './auth.js';
 import { attachWebSocketHub, type WsAttachment } from './ws/attach.js';
 import type { WsHub } from './ws/hub.js';
 import { CoverProxyService } from './cover-proxy.js';
+import type { SqliteLibraryFileStateService } from '../runtime/library-file-state.js';
 import type { SiteAvailabilityService } from '../runtime/site-availability.js';
 import { InMemoryAccountService, type AccountService } from '../accounts/account-service.js';
 import { Fmd2ImportService, FMD2_IMPORT_MAX_BYTES, type UploadedPart } from '../import/fmd2/service.js';
@@ -201,6 +210,16 @@ export interface ApiServices {
    * thread probe).
    */
   readonly availability?: SiteAvailabilityService;
+  /**
+   * Library file-state (file-state story): the web window onto server
+   * storage — lazy stat-verification, per-title file listings, manual
+   * rescan with the persisted diff report, library-list enrichment.
+   * Optional with the metrics-route posture: absent → the file-state
+   * routes are not mounted and GET /api/library keeps its pre-shape
+   * (filter param refused with a typed 400); the runtime assembly
+   * always wires the real one.
+   */
+  readonly fileState?: SqliteLibraryFileStateService;
   /** Readiness probe input (default: always ready). */
   readonly readiness?: () => ReadinessStatus;
 }
@@ -1169,8 +1188,26 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
   });
 
   // ── library (§7.1 listing/download) ───────────────────────────────
+  // [file-state] filter chips + stat-verified row enrichment ride the
+  // optional fileState seam; without it the listing keeps its exact
+  // pre-shape (filter= is refused — never silently ignored).
   app.get('/api/library', async (req): Promise<LibraryListResponseT> => {
     const query = parseOr400(LibraryListQuerySchema, req.query, 'library query');
+    if (services.fileState !== undefined) {
+      const page = services.fileState.listWithState({
+        ...(query.cursor !== undefined ? { cursor: query.cursor } : {}),
+        limit: query.limit,
+        ...(query.filter !== undefined ? { filter: query.filter } : {}),
+      });
+      return LibraryListResponseSchema.parse({
+        files: page.files,
+        ...(page.nextCursor !== undefined ? { nextCursor: page.nextCursor } : {}),
+        ...(page.orphans !== undefined ? { orphans: page.orphans } : {}),
+      });
+    }
+    if (query.filter !== undefined) {
+      throw new ApiError(400, 'bad_request', 'library filter requires the file-state service (not mounted)');
+    }
     const page = services.library.list({
       ...(query.cursor !== undefined ? { cursor: query.cursor } : {}),
       limit: query.limit,
@@ -1180,6 +1217,47 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
       ...(page.nextCursor !== undefined ? { nextCursor: page.nextCursor } : {}),
     });
   });
+
+  // ── library file-state (metadata only — NO file bytes; every path
+  // realpath-clamped to the library root, dotfiles skipped) ──────────
+  if (services.fileState !== undefined) {
+    const fileState = services.fileState;
+
+    // Per-title Files section (manga detail + library drill-in): lazy
+    // stat-verification (stale >15 min re-verified; ?refresh=1 forces),
+    // ledger-first chapter files, scoped orphans under the title's
+    // convention directory.
+    app.get('/api/library/title-files', async (req): Promise<TitleFilesResponseT> => {
+      const query = parseOr400(TitleFilesQuerySchema, req.query, 'title files query');
+      const result = fileState.titleFiles({
+        moduleId: query.moduleId,
+        url: query.url,
+        ...(query.manga !== undefined ? { manga: query.manga } : {}),
+        ...(query.refresh === true ? { refresh: true } : {}),
+      });
+      return TitleFilesResponseSchema.parse(result);
+    });
+
+    // 'Rescan library' (Library page toolbar) + the per-title variant:
+    // walks the root via the shared walker seam, reconciles ledger vs
+    // disk, persists confident re-links + the diff report. Ambiguous
+    // matches stay orphan+missing pairs (never auto-linked).
+    app.post('/api/library/rescan', async (req): Promise<RescanResponseT> => {
+      const query = parseOr400(RescanQuerySchema, req.query, 'rescan query');
+      const report = fileState.rescan({
+        ...(query.moduleId !== undefined ? { moduleId: query.moduleId } : {}),
+        ...(query.url !== undefined ? { url: query.url } : {}),
+        ...(query.manga !== undefined ? { manga: query.manga } : {}),
+      });
+      return RescanResponseSchema.parse({ report });
+    });
+
+    // The last persisted rescan report (null = none yet).
+    app.get('/api/library/rescan', async (): Promise<LastRescanResponseT> => {
+      const report = fileState.lastRescan();
+      return LastRescanResponseSchema.parse({ report: report ?? null });
+    });
+  }
 
   app.get('/api/library/:id/file', async (req, reply): Promise<unknown> => {
     const id = parseOr400(JobIdSchema, (req.params as Record<string, unknown>)['id'], 'library file id');

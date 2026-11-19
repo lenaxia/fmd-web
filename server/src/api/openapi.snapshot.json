@@ -3968,7 +3968,7 @@
       "get": {
         "operationId": "listLibrary",
         "summary": "Finalized chapter artifacts (§7.1 library listing)",
-        "description": "Newest-first page over the library rows (one per packed chapter file, `library/<module>/<manga>/<file>`). `cursor` is the keyset boundary like /api/jobs.",
+        "description": "Newest-first page over the library rows (one per packed chapter file, `library/<module>/<manga>/<file>`). `cursor` is the keyset boundary like /api/jobs. [file-state] Rows carry additive stat-verified fields (`state` downloaded|missing, `verifiedAt`, root-relative `path` + `absolutePath`, `mtime`) and the Library page chips ride `filter`: `all` (default), `missing` (stat-verified missing rows, keyset-paginated) or `orphans` (serves the LAST RESCAN's persisted orphan list — orphan truth is rescan truth, never a live walk per listing).",
         "tags": [
           "library"
         ],
@@ -3988,6 +3988,12 @@
                     },
                     "nextCursor": {
                       "type": "string"
+                    },
+                    "orphans": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LibraryOrphanFile"
+                      }
                     }
                   },
                   "required": [
@@ -4040,15 +4046,280 @@
               "maximum": 100,
               "description": "string-coerced on the wire"
             }
+          },
+          {
+            "name": "filter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "missing",
+                "orphans"
+              ],
+              "description": "string-coerced on the wire"
+            }
           }
         ]
+      }
+    },
+    "/api/library/title-files": {
+      "get": {
+        "operationId": "listTitleFiles",
+        "summary": "Per-title chapter file listing (Files section — metadata only)",
+        "description": "[file-state] The server-storage window for one title: every tracked chapter file keyed off the ONE downloaded-chapters ledger (ledger links without rows surface as missing — e.g. an FMD2 import mapped the ledger without files on this machine), each carrying its recorded path (root-relative display form; the absolute path rides alongside for copy-path), size, mtime, and the verified_at stamp. Verification is LAZY: entries stale >15 min are re-stat-verified on open; `?refresh=1` forces re-verification. Orphans (files under the title's convention directory no ledger row claims) close the listing. METADATA ONLY — no endpoint on this surface serves file bytes; every path is realpath-clamped to the downloads root and dotfiles are skipped.",
+        "tags": [
+          "library"
+        ],
+        "responses": {
+          "200": {
+            "description": "Title file entries + scoped orphans",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "moduleId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "url": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "verifiedAt": {
+                      "$ref": "#/components/schemas/Timestamp"
+                    },
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/TitleFileEntry"
+                      }
+                    },
+                    "orphans": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LibraryOrphanFile"
+                      }
+                    }
+                  },
+                  "required": [
+                    "moduleId",
+                    "url",
+                    "verifiedAt",
+                    "files",
+                    "orphans"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "moduleId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "url",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "manga",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "refresh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "string-coerced on the wire"
+            }
+          }
+        ]
+      }
+    },
+    "/api/library/rescan": {
+      "post": {
+        "operationId": "rescanLibrary",
+        "summary": "Rescan library — reconcile the ledger against disk (persisted diff report)",
+        "description": "Walks the configured downloads root via the shared directory-walker seam (dotfiles skipped, symlink escapes clamped out) and reconciles the `library_files` ledger against what is actually on disk. CONSERVATIVE re-linking for moved-within-root files only: an exact-filename match at a different directory, or the app's own output naming convention (`<module>/<manga>/<file>`) hitting exactly one candidate. Ambiguous matches (two+ same-name candidates) are NEVER auto-linked — they surface as an orphan+missing pair for the operator to resolve (v1: delete the ledger entry or ignore the orphan; interactive adoption is deferred). The diff report (re-linked with former paths, missing with former paths + candidates, orphans with path/size/mtime, counts) is persisted and re-served by GET /api/library/rescan. Optional `moduleId`+`url` scope the reconcile to one title (the per-title variant on the manga detail Files section).",
+        "tags": [
+          "library"
+        ],
+        "responses": {
+          "200": {
+            "description": "The persisted diff report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "report": {
+                      "$ref": "#/components/schemas/RescanReport"
+                    }
+                  },
+                  "required": [
+                    "report"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "moduleId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "url",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "string-coerced on the wire"
+            }
+          },
+          {
+            "name": "manga",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "string-coerced on the wire"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerToken": []
+          },
+          {
+            "sessionCookie": []
+          }
+        ]
+      },
+      "get": {
+        "operationId": "lastRescanReport",
+        "summary": "The last persisted rescan diff report",
+        "description": "Re-serves the report the last POST /api/library/rescan persisted (the Library page's orphan filter and report surface read here). `report` is null until the first rescan runs.",
+        "tags": [
+          "library"
+        ],
+        "responses": {
+          "200": {
+            "description": "The persisted report (nullable)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "report": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/RescanReport"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "report"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/library/{id}/file": {
       "get": {
         "operationId": "downloadLibraryFile",
         "summary": "Download one packed chapter artifact",
-        "description": "Streams the artifact bytes (application/octet-stream, attachment Content-Disposition). The ZIP/CBZ structure is client-validatable (central directory walk).",
+        "description": "Streams the artifact bytes (application/octet-stream, attachment Content-Disposition). The ZIP/CBZ structure is client-validatable (central directory walk). [file-state guardrail] the recorded path is realpath-clamped to the downloads root — a path resolving outside it (tampered row, relocated symlink) is a typed 403 `path_outside_library_root`, dotfiles are never served; missing files stay the 404.",
         "tags": [
           "library"
         ],
@@ -7078,6 +7349,34 @@
           },
           "createdAt": {
             "$ref": "#/components/schemas/Timestamp"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "downloaded",
+              "missing"
+            ]
+          },
+          "verifiedAt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "absolutePath": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mtime": {
+            "$ref": "#/components/schemas/Timestamp"
           }
         },
         "required": [
@@ -7088,6 +7387,246 @@
           "bytes",
           "createdAt"
         ]
+      },
+      "LibraryOrphanFile": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "absolutePath": {
+            "type": "string",
+            "minLength": 1
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "mtime": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "required": [
+          "path",
+          "absolutePath",
+          "bytes",
+          "mtime"
+        ]
+      },
+      "TitleFileEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^\\d+$"
+          },
+          "chapterLink": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "absolutePath": {
+            "type": "string",
+            "minLength": 1
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "mtime": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "downloaded",
+              "missing"
+            ]
+          },
+          "verifiedAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "RescanReport": {
+        "type": "object",
+        "properties": {
+          "startedAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "finishedAt": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "durationMs": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "library"
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "title"
+                  },
+                  "moduleId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "url": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "kind",
+                  "moduleId",
+                  "url"
+                ]
+              }
+            ]
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "scanned": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "present": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "relinked": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "missing": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "orphans": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "outsideRoot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "scanned",
+              "present",
+              "relinked",
+              "missing",
+              "orphans",
+              "outsideRoot"
+            ]
+          },
+          "relinked": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/RescanReport0"
+                },
+                "fromPath": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "toPath": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "id",
+                "fromPath",
+                "toPath"
+              ]
+            }
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "#/components/schemas/RescanReport0"
+                },
+                "manga": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "fileName": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "candidates": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "manga",
+                "fileName",
+                "candidates"
+              ]
+            }
+          },
+          "orphans": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LibraryOrphanFile"
+            }
+          }
+        },
+        "required": [
+          "startedAt",
+          "finishedAt",
+          "durationMs",
+          "scope",
+          "counts",
+          "relinked",
+          "missing",
+          "orphans"
+        ]
+      },
+      "RescanReport0": {
+        "type": "string",
+        "pattern": "^\\d+$"
       },
       "ListModules200Response0": {
         "type": "string",
@@ -7515,6 +8054,14 @@
       "CreateDownloadJobsBatchBody0": {
         "type": "string",
         "minLength": 1
+      },
+      "RescanLibrary200Response0": {
+        "type": "string",
+        "pattern": "^\\d+$"
+      },
+      "LastRescanReport200Response0": {
+        "type": "string",
+        "pattern": "^\\d+$"
       },
       "AnalyzeFmd2Import200Response0": {
         "type": "object",

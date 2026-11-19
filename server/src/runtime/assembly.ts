@@ -81,6 +81,7 @@ import {
 } from './download-lane.js';
 import type { LaneRunner } from '../jobs/queue/queue.js';
 import { SqliteLibraryService } from './library-service.js';
+import { SqliteLibraryFileStateService } from './library-file-state.js';
 import {
   SqliteSiteAvailabilityService,
   SqliteSiteAvailabilityStore,
@@ -596,8 +597,13 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
   // publisher so every mutation (WS-mirrored or not) feeds the series,
   // and the depth/state gauges snapshot the LIVE queue at scrape.
   const queue = new InstrumentedJobQueue(publishingQueue, metrics);
-  const libraryStore = new SqliteLibraryStore({ db, libraryRoot: join(config.dataDir, 'library') });
-  const libraryService = new SqliteLibraryService(libraryStore);
+  const libraryRoot = join(config.dataDir, 'library');
+  const libraryStore = new SqliteLibraryStore({ db, libraryRoot });
+  // [file-state] the download-route path resolver carries the realpath
+  // clamp (out-of-root recorded paths 403, dotfiles never served); the
+  // file-state service owns lazy verify, per-title listings, rescan.
+  const libraryService = new SqliteLibraryService(libraryStore, libraryRoot);
+  const libraryFileState = new SqliteLibraryFileStateService({ store: libraryStore, root: libraryRoot });
   // ── [site-availability] the persisted record + the Check probe ────
   // app.db table `site_availability` (one row per module, seeded
   // absent = unknown). The probe rides the engine worker thread when
@@ -1010,6 +1016,7 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     accounts,
     jobs,
     library: libraryService,
+    fileState: libraryFileState,
     favorites: favoritesService,
     // Site-first browse: catalog provisions stream WS `sync` frames
     // (progress toast) keyed `catalog-sync:<moduleId>`; REST contract

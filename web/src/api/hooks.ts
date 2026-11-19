@@ -34,6 +34,11 @@ export type CatalogPageT = operations['catalogLatest']['responses'][200]['conten
 export type JobsPageT = operations['listJobs']['responses'][200]['content']['application/json'];
 export type LibraryPageT = operations['listLibrary']['responses'][200]['content']['application/json'];
 export type LibraryFileT = components['schemas']['LibraryFile'];
+export type TitleFilesResponseT = operations['listTitleFiles']['responses'][200]['content']['application/json'];
+export type TitleFileEntryT = components['schemas']['TitleFileEntry'];
+export type LibraryOrphanFileT = components['schemas']['LibraryOrphanFile'];
+export type RescanReportT = components['schemas']['RescanReport'];
+export type LibraryFilterT = 'all' | 'missing' | 'orphans';
 export type ModuleListT = operations['listModules']['responses'][200]['content']['application/json'];
 export type SettingsT = operations['getSettings']['responses'][200]['content']['application/json'];
 export type ProxySettingsT = components['schemas']['ProxySettings'];
@@ -906,10 +911,12 @@ export function useCreateDownloadBatch(): UseMutationResult<
 
 // ── library (§7.1 listing) ───────────────────────────────────────────
 
-export function useLibrary(): UseInfiniteQueryResult<InfiniteData<LibraryPageT, { cursor?: string }>, ApiError> {
+export function useLibrary(
+  filter: LibraryFilterT = 'all',
+): UseInfiniteQueryResult<InfiniteData<LibraryPageT, { cursor?: string }>, ApiError> {
   const client = useApiClient();
   return useInfiniteQuery<LibraryPageT, ApiError, InfiniteData<LibraryPageT, { cursor?: string }>, QueryKey, { cursor?: string }>({
-    queryKey: ['library'],
+    queryKey: ['library', filter],
     initialPageParam: {},
     queryFn: async ({ pageParam }): Promise<LibraryPageT> =>
       unwrap(
@@ -917,6 +924,7 @@ export function useLibrary(): UseInfiniteQueryResult<InfiniteData<LibraryPageT, 
           params: {
             query: {
               limit: 50,
+              ...(filter !== 'all' ? { filter } : {}),
               ...(pageParam.cursor !== undefined ? { cursor: pageParam.cursor } : {}),
             },
           },
@@ -924,6 +932,86 @@ export function useLibrary(): UseInfiniteQueryResult<InfiniteData<LibraryPageT, 
       ),
     getNextPageParam: (lastPage): { cursor?: string } | undefined =>
       lastPage.nextCursor !== undefined ? { cursor: lastPage.nextCursor } : undefined,
+  });
+}
+
+// ── library file-state (title files, rescan) ────────────────────────
+
+/**
+ * [file-state] Per-title Files section data (lazy-verified server
+ * truth): chapter file entries + scoped orphans. `refresh` forces the
+ * server-side re-verification (?refresh=1 — the explicit-refresh leg
+ * of the staleness contract).
+ */
+export function useTitleFiles(
+  moduleId: string | undefined,
+  url: string | undefined,
+  opts?: { manga?: string; refresh?: boolean },
+): UseQueryResult<TitleFilesResponseT, ApiError> {
+  const client = useApiClient();
+  return useQuery<TitleFilesResponseT, ApiError, TitleFilesResponseT, QueryKey>({
+    queryKey: ['title-files', moduleId ?? '', url ?? '', opts?.manga ?? '', opts?.refresh === true],
+    enabled: moduleId !== undefined && moduleId !== '' && url !== undefined && url !== '',
+    queryFn: async (): Promise<TitleFilesResponseT> =>
+      unwrap(
+        client.GET('/api/library/title-files', {
+          params: {
+            query: {
+              moduleId: moduleId ?? '',
+              url: url ?? '',
+              ...(opts?.manga !== undefined && opts.manga !== '' ? { manga: opts.manga } : {}),
+              ...(opts?.refresh === true ? { refresh: true } : {}),
+            },
+          },
+        }),
+      ),
+  });
+}
+
+export interface RescanInput {
+  readonly moduleId?: string;
+  readonly url?: string;
+  readonly manga?: string;
+}
+
+/**
+ * [file-state] 'Rescan library' (omit input) or the per-title variant
+ * (moduleId+url): reconciles ledger vs disk server-side and returns
+ * the persisted diff report; every file-state cache invalidates.
+ */
+export function useRescanLibrary(): UseMutationResult<RescanReportT, ApiError, RescanInput | undefined> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation<RescanReportT, ApiError, RescanInput | undefined>({
+    mutationFn: async (input): Promise<RescanReportT> => {
+      const result = await unwrap(
+        client.POST('/api/library/rescan', {
+          params: {
+            query: {
+              ...(input?.moduleId !== undefined ? { moduleId: input.moduleId } : {}),
+              ...(input?.url !== undefined ? { url: input.url } : {}),
+              ...(input?.manga !== undefined ? { manga: input.manga } : {}),
+            },
+          },
+        }),
+      );
+      return result.report;
+    },
+    onSuccess: (): void => {
+      void queryClient.invalidateQueries({ queryKey: ['library'] });
+      void queryClient.invalidateQueries({ queryKey: ['title-files'] });
+      void queryClient.invalidateQueries({ queryKey: ['rescan'] });
+    },
+  });
+}
+
+/** [file-state] the last persisted rescan diff report (null = none). */
+export function useLastRescan(): UseQueryResult<RescanReportT | null, ApiError> {
+  const client = useApiClient();
+  return useQuery<RescanReportT | null, ApiError, RescanReportT | null, QueryKey>({
+    queryKey: ['rescan', 'last'],
+    queryFn: async (): Promise<RescanReportT | null> =>
+      (await unwrap(client.GET('/api/library/rescan'))).report,
   });
 }
 

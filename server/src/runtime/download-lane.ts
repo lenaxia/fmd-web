@@ -31,7 +31,7 @@ import { PerHostSiteLimiter } from '../jobs/download/site-limiter.js';
 import { indexFileName } from '../jobs/download/filenames.js';
 import { readMarkers, writeMarkers } from '../jobs/download/marker-store.js';
 import { createPacker } from '../jobs/packers/index.js';
-import { applyOutputRenameOptions, resolveChapterFileName, sanitizeFileName, truncateKeepTail } from '../jobs/library/filenames.js';
+import { applyOutputRenameOptions, resolveChapterFileName, sanitizeFileName, truncateKeepTail, urlSegment } from '../jobs/library/filenames.js';
 import { SqliteLibraryStore } from '../jobs/library/store.js';
 import type { OutputDefaultsT, PerformanceSettingsT } from '../api/schemas.js';
 import type { FileNamePolicyMode } from '@fmd/contract';
@@ -621,18 +621,8 @@ export interface DownloadLaneDeps {
   readonly parallelChapters?: number;
 }
 
-/** Deterministic work-dir segment for a URL's tail (path-safe). */
-function urlSegment(url: string, fallback: string): string {
-  const tail = url.split('?')[0]?.split('#')[0]?.split('/').filter((s) => s !== '').at(-1);
-  let decoded = tail ?? '';
-  try {
-    decoded = decodeURIComponent(decoded);
-  } catch {
-    // keep the raw tail (malformed escape)
-  }
-  const sanitized = sanitizeFileName(decoded);
-  return sanitized === '' ? fallback : truncateKeepTail(sanitized, 80);
-}
+/** Deterministic work-dir segment for a URL's tail (path-safe) — the
+ * shared derivation now lives in jobs/library/filenames.ts (urlSegment). */
 
 const DOWNLOAD_STAGE = 'download';
 
@@ -849,6 +839,11 @@ export function downloadLane(deps: DownloadLaneDeps): LaneRunnerLaneOptions {
         fileName: `${fileName}.${output.format}`,
         path: finalized.path,
         bytes: finalized.bytes,
+        // File-state provenance (one ledger truth): the row keys onto
+        // the downloaded-chapters ledger identity (manga url + chapter
+        // link) so per-title file listings never guess by path layout.
+        mangaUrl: payload.mangaUrl,
+        chapterLink: payload.chapterLink,
       });
       // §7.2 ledger dual-write (global row; favorite-side when the job
       // carries the favorites provenance key).

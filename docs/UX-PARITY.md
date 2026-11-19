@@ -107,10 +107,10 @@ decisions recorded here.
 | UI language (12 locales) | SKIP for v0.3 — web i18n is its own epic (framework + extraction); not a parity bolt-on | note |
 | Tray icon / Drop Box / shutdown-counter / hibernate | SKIP — desktop concepts; web equivalents: toasts, drag-onto-page (v0.4 candidate), server keeps running | note |
 | External program opening / open-folder | ADAPT — Library download links (exists); folder semantics differ server-side | note |
+| Open-folder server-storage truth (web is the only window onto disk) | ADAPT [file-state]: verified file states (downloaded/missing/not_downloaded/orphan) with lazy stat-verification (>15 min stale or explicit refresh — no fs.watch), 'Rescan library' + per-title variant with CONSERVATIVE moved-within-root re-linking (exact filename or unique convention match; ambiguous = orphan+missing pair), per-title Files section + library All/Missing/Orphans chips (URL-as-truth ?filter=), copy-path; metadata only (no new byte-serving endpoint; the packed-artifact download link stays the R1 boundary), realpath-clamped paths + dotfiles skipped. DEFERRED (documented in USER-GUIDE): rename, file-content download/zip from the listings, fs.watch, interactive orphan adoption | [file-state] |
 | Split download | SKIP — superseded by chapter selection + paused enqueue | note |
 | Custom colors | SKIP — design tokens own theming (light/dark) | note |
 | Check-Modules integrity UI | SKIP for v0.3 — it LIVE-EXERCISES each module (info/chapter probes, frmCheckModules.pas:16-21); badges are static flags and sync reports are file-transfer results, neither covers it. Live module smoke on demand = v0.4 candidate (live-smoke harness is the backend) | note [audit fix: prior justification was wrong] |
-| Batch "check all sites" availability probing | DEFERRED — anti-bot risk (a synchronized fan-out across 454 sites is exactly the traffic shape that gets an IP challenged) + low value (the opportunistic record populates from real use). Revisit trigger: cold-start friction is felt (owner decision, tsk-amber-pivot-refrains) | [site-availability] note |
 | Self-updater dialogs | SKIP — container/image updates (runbook) | note |
 | Import from Domdomsoft | SKIP — FMD2-list import covers the real cases | note |
 | Merge completed tasks | SKIP for v0.3 (one-job-per-chapter model) | note |

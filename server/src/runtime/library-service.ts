@@ -1,5 +1,7 @@
-import { existsSync } from 'node:fs';
+import { statSync } from 'node:fs';
+import { basename } from 'node:path';
 import { ApiError } from '../api/errors.js';
+import { isUnderRoot, rootAnchor } from '../fs-walk.js';
 import type { LibraryFileRecord, LibraryPage, LibraryService } from '../api/services.js';
 import type { SqliteLibraryStore } from '../jobs/library/store.js';
 import { splitTextLines } from '../jobs/library/merge.js';
@@ -9,9 +11,35 @@ import { splitTextLines } from '../jobs/library/merge.js';
  * keyset pages (id cursor), the download-route path resolution, and the
  * job lane's `recordLibraryFile` write-through. Routes never touch the
  * fs — this adapter is the one fs boundary.
+ *
+ * [file-state guardrail] `resolveFile` clamps: the recorded path must
+ * realpath UNDER the library root (symlink escapes are a typed 403 —
+ * never an arbitrary-file server) and must not be a dotfile (the
+ * finalizer never writes one; a tampered row is refused, not served).
  */
 export class SqliteLibraryService implements LibraryService {
-  constructor(private readonly store: SqliteLibraryStore) {}
+  /**
+   * The root's realpath anchor, resolved LAZILY: a fresh deployment
+   * boots before any finalize creates `<dataDir>/library` — the
+   * constructor must never throw on a not-yet-existing root (the
+   * finalizer owns its creation). Re-resolved per use so a root
+   * created (or removed) later in the process lifetime is honored.
+   */
+  private anchor(): string | undefined {
+    if (this.root === undefined) {
+      return undefined;
+    }
+    try {
+      return rootAnchor(this.root);
+    } catch {
+      return undefined;
+    }
+  }
+
+  public constructor(
+    private readonly store: SqliteLibraryStore,
+    private readonly root?: string,
+  ) {}
 
   list(opts: { cursor?: string; limit: number }): LibraryPage {
     let beforeId: number | undefined;
@@ -56,8 +84,31 @@ export class SqliteLibraryService implements LibraryService {
 
   resolveFile(id: string): string | undefined {
     const row = this.store.getLibraryFile(id);
-    if (row === undefined || !existsSync(row.path)) {
+    if (row === undefined) {
       return undefined;
+    }
+    // Guardrail: dotfiles are never served (the walker skips them too).
+    if (basename(row.path).startsWith('.')) {
+      return undefined;
+    }
+    // Existence first (follows symlinks): missing/non-file → the route's
+    // 404/410 path, never a clamp verdict about a gone file.
+    let st;
+    try {
+      st = statSync(row.path);
+    } catch {
+      return undefined;
+    }
+    if (!st.isFile()) {
+      return undefined;
+    }
+    // Guardrail: realpath clamp — a recorded path resolving OUTSIDE the
+    // library root (tampered row, relocated symlink) is a typed 403,
+    // never a stream. A missing/unresolvable ROOT clamps everything
+    // out silently (no root → no servable library files).
+    const anchor = this.anchor();
+    if (anchor !== undefined && !isUnderRoot(anchor, row.path)) {
+      throw new ApiError(403, 'path_outside_library_root', 'library file path resolves outside the downloads root');
     }
     return row.path;
   }

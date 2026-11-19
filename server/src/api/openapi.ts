@@ -51,9 +51,17 @@ import {
   JobBulkActionResponseSchema,
   LibraryFileSchema,
   LibraryListQuerySchema,
+  LibraryOrphanFileSchema,
+  LastRescanResponseSchema,
   LoginRequestSchema,
   LoginResponseSchema,
   LibraryListResponseSchema,
+  RescanQuerySchema,
+  RescanResponseSchema,
+  RescanReportSchema,
+  TitleFileEntrySchema,
+  TitleFilesQuerySchema,
+  TitleFilesResponseSchema,
   ModuleCapabilitiesSchema,
   ModuleAvailabilitySchema,
   ModuleListResponseSchema,
@@ -108,6 +116,9 @@ const REGISTRY: readonly [z.ZodType, string][] = [
   [InfoResponseSchema, 'InfoResponse'],
   [JobSchema, 'Job'],
   [LibraryFileSchema, 'LibraryFile'],
+  [LibraryOrphanFileSchema, 'LibraryOrphanFile'],
+  [TitleFileEntrySchema, 'TitleFileEntry'],
+  [RescanReportSchema, 'RescanReport'],
   // The SAME instance schemas.ts uses — registering it here keeps
   // zod's internal datetime dedup from leaking a version-specific
   // anonymous name (`__schema0`) into the snapshot.
@@ -810,7 +821,11 @@ const OPERATIONS: readonly RouteOperation[] = [
     summary: 'Finalized chapter artifacts (§7.1 library listing)',
     description:
       'Newest-first page over the library rows (one per packed chapter file, `library/<module>/<manga>/<file>`). ' +
-      '`cursor` is the keyset boundary like /api/jobs.',
+      '`cursor` is the keyset boundary like /api/jobs. [file-state] Rows carry additive stat-verified fields ' +
+      "(`state` downloaded|missing, `verifiedAt`, root-relative `path` + `absolutePath`, `mtime`) and the Library " +
+      'page chips ride `filter`: `all` (default), `missing` (stat-verified missing rows, keyset-paginated) or ' +
+      '`orphans` (serves the LAST RESCAN\'s persisted orphan list — orphan truth is rescan truth, never a live ' +
+      'walk per listing).',
     tags: ['library'],
     query: LibraryListQuerySchema,
     responses: {
@@ -820,12 +835,70 @@ const OPERATIONS: readonly RouteOperation[] = [
   },
   {
     method: 'get',
+    path: '/api/library/title-files',
+    operationId: 'listTitleFiles',
+    summary: 'Per-title chapter file listing (Files section — metadata only)',
+    description:
+      '[file-state] The server-storage window for one title: every tracked chapter file keyed off the ONE ' +
+      'downloaded-chapters ledger (ledger links without rows surface as missing — e.g. an FMD2 import mapped the ' +
+      'ledger without files on this machine), each carrying its recorded path (root-relative display form; the ' +
+      'absolute path rides alongside for copy-path), size, mtime, and the verified_at stamp. Verification is LAZY: ' +
+      'entries stale >15 min are re-stat-verified on open; `?refresh=1` forces re-verification. Orphans (files under ' +
+      "the title's convention directory no ledger row claims) close the listing. METADATA ONLY — no endpoint on this " +
+      'surface serves file bytes; every path is realpath-clamped to the downloads root and dotfiles are skipped.',
+    tags: ['library'],
+    query: TitleFilesQuerySchema,
+    responses: {
+      200: { description: 'Title file entries + scoped orphans', schema: TitleFilesResponseSchema },
+      ...errors(validation(), internal()),
+    },
+  },
+  {
+    method: 'post',
+    path: '/api/library/rescan',
+    operationId: 'rescanLibrary',
+    summary: 'Rescan library — reconcile the ledger against disk (persisted diff report)',
+    description:
+      'Walks the configured downloads root via the shared directory-walker seam (dotfiles skipped, symlink ' +
+      'escapes clamped out) and reconciles the `library_files` ledger against what is actually on disk. ' +
+      'CONSERVATIVE re-linking for moved-within-root files only: an exact-filename match at a different directory, ' +
+      'or the app\'s own output naming convention (`<module>/<manga>/<file>`) hitting exactly one candidate. ' +
+      'Ambiguous matches (two+ same-name candidates) are NEVER auto-linked — they surface as an orphan+missing ' +
+      'pair for the operator to resolve (v1: delete the ledger entry or ignore the orphan; interactive adoption is ' +
+      'deferred). The diff report (re-linked with former paths, missing with former paths + candidates, orphans with ' +
+      'path/size/mtime, counts) is persisted and re-served by GET /api/library/rescan. Optional `moduleId`+`url` ' +
+      'scope the reconcile to one title (the per-title variant on the manga detail Files section).',
+    tags: ['library'],
+    query: RescanQuerySchema,
+    responses: {
+      200: { description: 'The persisted diff report', schema: RescanResponseSchema },
+      ...errors(validation(), internal()),
+    },
+  },
+  {
+    method: 'get',
+    path: '/api/library/rescan',
+    operationId: 'lastRescanReport',
+    summary: 'The last persisted rescan diff report',
+    description:
+      "Re-serves the report the last POST /api/library/rescan persisted (the Library page's orphan filter and " +
+      'report surface read here). `report` is null until the first rescan runs.',
+    tags: ['library'],
+    responses: {
+      200: { description: 'The persisted report (nullable)', schema: LastRescanResponseSchema },
+      ...errors(internal()),
+    },
+  },
+  {
+    method: 'get',
     path: '/api/library/{id}/file',
     operationId: 'downloadLibraryFile',
     summary: 'Download one packed chapter artifact',
     description:
       'Streams the artifact bytes (application/octet-stream, attachment Content-Disposition). ' +
-      'The ZIP/CBZ structure is client-validatable (central directory walk).',
+      'The ZIP/CBZ structure is client-validatable (central directory walk). [file-state guardrail] the recorded ' +
+      'path is realpath-clamped to the downloads root — a path resolving outside it (tampered row, relocated ' +
+      'symlink) is a typed 403 `path_outside_library_root`, dotfiles are never served; missing files stay the 404.',
     tags: ['library'],
     responses: {
       200: { description: 'The artifact bytes', schema: z.object({}) },

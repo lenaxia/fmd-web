@@ -26,6 +26,8 @@
 import { rmSync, statSync } from 'node:fs';
 import type Database from 'better-sqlite3';
 import { downloadedChaptersKey, linesToText, mergeCaseInsensitive } from './merge.js';
+import { sanitizeFileName } from './filenames.js';
+import type { LibraryLedgerRow } from './reconcile.js';
 import type { FinalizeRequest, FinalizeResult } from './finalize.js';
 import { LibraryFinalizer } from './finalize.js';
 
@@ -117,9 +119,40 @@ export interface LibraryStore extends DownloadedChaptersAccess {
     path: string;
     bytes: number;
     createdAt?: number;
+    /** Download-lane provenance (file-state story): the manga URL key. */
+    mangaUrl?: string;
+    /** Download-lane provenance (file-state story): the chapter link. */
+    chapterLink?: string;
   }): LibraryFileRow;
   /** Listing rows newest-first, `beforeId` exclusive (keyset cursor). */
   listLibraryFiles(opts?: { limit?: number; beforeId?: number }): LibraryFileRow[];
+  /**
+   * Full ledger rows (path + provenance + verified stamps) newest-first
+   * — the file-state service projection (reconcile + lazy verify).
+   */
+  listLibraryLedgerRows(opts?: { limit?: number; beforeId?: number }): LibraryLedgerRow[];
+  /**
+   * Ledger rows for ONE title: provenance-keyed rows (module + manga
+   * url) plus legacy rows matching any of the sanitized segment
+   * fallbacks (pre-provenance rows recorded only the layout segment).
+   */
+  listLibraryRowsForTitle(moduleId: string, url: string, legacySegments: readonly string[]): LibraryLedgerRow[];
+  /** Every ledger row (rescan reconcile input), ascending id. */
+  allLibraryLedgerRows(): LibraryLedgerRow[];
+  /**
+   * Persist a verification batch (lazy verify / rescan outcome): per
+   * row the verdict, the stamp, and (when present on disk) fresh
+   * bytes/mtime metadata. One transaction.
+   */
+  applyVerification(rows: readonly {
+    id: number;
+    at: number;
+    state: 'downloaded' | 'missing';
+    bytes?: number;
+    mtimeMs?: number;
+  }[]): void;
+  /** Persist a rescan re-link: row re-points at the moved file. */
+  relinkLibraryFile(id: number, path: string, bytes: number, verifiedAt: number, mtimeMs: number): void;
   /** One listing row (with its absolute path for the download route). */
   getLibraryFile(id: string): (LibraryFileRow & { readonly path: string }) | undefined;
   /**
@@ -207,6 +240,30 @@ export function ensureLibrarySchema(db: Database.Database): void {
   }
   if (!favoriteColumns.has('cover_link')) {
     db.exec('ALTER TABLE favorite ADD COLUMN cover_link TEXT');
+  }
+  // Library file-state story (additive, same guarded-ALTER pattern):
+  // verified_at = the stat-verified truth stamp (lazy verify); manga_url
+  // + chapter_link = the download-lane provenance that keys per-title
+  // file listings to the ONE downloaded-chapters ledger truth.
+  const libraryColumns = new Set(
+    (db.prepare('PRAGMA table_info(library_files)').all() as Array<{ name: string }>).map(
+      (column): string => column.name,
+    ),
+  );
+  if (!libraryColumns.has('verified_at')) {
+    db.exec('ALTER TABLE library_files ADD COLUMN verified_at INTEGER');
+  }
+  if (!libraryColumns.has('manga_url')) {
+    db.exec('ALTER TABLE library_files ADD COLUMN manga_url TEXT');
+  }
+  if (!libraryColumns.has('chapter_link')) {
+    db.exec('ALTER TABLE library_files ADD COLUMN chapter_link TEXT');
+  }
+  if (!libraryColumns.has('state')) {
+    db.exec("ALTER TABLE library_files ADD COLUMN state TEXT");
+  }
+  if (!libraryColumns.has('mtime')) {
+    db.exec('ALTER TABLE library_files ADD COLUMN mtime INTEGER');
   }
 }
 
@@ -400,20 +457,41 @@ export class SqliteLibraryStore implements LibraryStore {
     path: string;
     bytes: number;
     createdAt?: number;
+    mangaUrl?: string;
+    chapterLink?: string;
   }): LibraryFileRow {
     const now = entry.createdAt ?? Date.now();
+    // A recorded artifact was just committed by finalize — it is
+    // stat-verified truth on arrival (state/verified_at/mtime seeded,
+    // so lazy verification starts warm rather than null).
     this.options.db
       .prepare(
-        `INSERT INTO library_files (module_id, manga, file, path, bytes, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)
+        `INSERT INTO library_files (module_id, manga, file, path, bytes, created_at, manga_url, chapter_link, verified_at, state, mtime)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'downloaded', ?)
          ON CONFLICT(path) DO UPDATE SET
            module_id = excluded.module_id,
            manga = excluded.manga,
            file = excluded.file,
            bytes = excluded.bytes,
-           created_at = excluded.created_at`,
+           created_at = excluded.created_at,
+           manga_url = COALESCE(excluded.manga_url, library_files.manga_url),
+           chapter_link = COALESCE(excluded.chapter_link, library_files.chapter_link),
+           verified_at = excluded.verified_at,
+           state = excluded.state,
+           mtime = excluded.mtime`,
       )
-      .run(entry.moduleId, entry.manga, entry.fileName, entry.path, entry.bytes, now);
+      .run(
+        entry.moduleId,
+        entry.manga,
+        entry.fileName,
+        entry.path,
+        entry.bytes,
+        now,
+        entry.mangaUrl ?? null,
+        entry.chapterLink ?? null,
+        now,
+        now,
+      );
     const row = this.options.db
       .prepare('SELECT id, module_id, manga, file, bytes, created_at FROM library_files WHERE path = ?')
       .get(entry.path) as {
@@ -425,6 +503,90 @@ export class SqliteLibraryStore implements LibraryStore {
       created_at: number;
     };
     return toLibraryFileRow(row);
+  }
+
+  /** The full ledger-row projection shared by every query below. */
+  private ledgerRows(where: string, ...params: readonly unknown[]): LibraryLedgerRow[] {
+    return (
+      this.options.db
+        .prepare(
+          `SELECT id, module_id, manga, file, path, bytes, created_at, verified_at, manga_url, chapter_link, state, mtime
+             FROM library_files ${where}`,
+        )
+        .all(...params) as LibraryLedgerDbRow[]
+    ).map(toLibraryLedgerRow);
+  }
+
+  public listLibraryLedgerRows(opts?: { limit?: number; beforeId?: number }): LibraryLedgerRow[] {
+    const limit = Math.max(1, Math.trunc(opts?.limit ?? 50));
+    const beforeId = opts?.beforeId;
+    return beforeId === undefined
+      ? this.ledgerRows('ORDER BY id DESC LIMIT ?', limit)
+      : this.ledgerRows('WHERE id < ? ORDER BY id DESC LIMIT ?', beforeId, limit);
+  }
+
+  public listLibraryRowsForTitle(
+    moduleId: string,
+    url: string,
+    legacySegments: readonly string[],
+  ): LibraryLedgerRow[] {
+    // library_files.module_id stores the SANITIZED layout segment (the
+    // finalize component) — match BOTH spellings so hex ids (identity
+    // under sanitization) and separator-bearing ids resolve alike.
+    const moduleKeys = [moduleId, sanitizeFileName(moduleId)];
+    const modulePlaceholders = moduleKeys.map((): string => '?').join(', ');
+    // Provenance rows first (module + manga url — the ONE ledger key);
+    // legacy rows join on the module segment + any of the candidate
+    // manga segments (title- or url-derived).
+    const provenance = this.ledgerRows(
+      `WHERE module_id IN (${modulePlaceholders}) AND manga_url = ? ORDER BY id ASC`,
+      ...moduleKeys,
+      url,
+    );
+    const segments = new Set(legacySegments.filter((segment): boolean => segment !== ''));
+    if (segments.size === 0) {
+      return provenance;
+    }
+    const placeholders = [...segments].map((): string => '?').join(', ');
+    const legacy = this.ledgerRows(
+      `WHERE manga_url IS NULL AND module_id IN (${modulePlaceholders}) AND manga IN (${placeholders}) ORDER BY id ASC`,
+      ...moduleKeys,
+      ...segments,
+    );
+    return [...provenance, ...legacy];
+  }
+
+  public allLibraryLedgerRows(): LibraryLedgerRow[] {
+    return this.ledgerRows('ORDER BY id ASC');
+  }
+
+  public applyVerification(rows: readonly {
+    id: number;
+    at: number;
+    state: 'downloaded' | 'missing';
+    bytes?: number;
+    mtimeMs?: number;
+  }[]): void {
+    if (rows.length === 0) {
+      return;
+    }
+    const write = this.options.db.transaction((): void => {
+      const update = this.options.db.prepare(
+        'UPDATE library_files SET verified_at = ?, state = ?, bytes = COALESCE(?, bytes), mtime = COALESCE(?, mtime) WHERE id = ?',
+      );
+      for (const row of rows) {
+        update.run(row.at, row.state, row.bytes ?? null, row.mtimeMs ?? null, row.id);
+      }
+    });
+    write();
+  }
+
+  public relinkLibraryFile(id: number, path: string, bytes: number, verifiedAt: number, mtimeMs: number): void {
+    this.options.db
+      .prepare(
+        "UPDATE library_files SET path = ?, bytes = ?, verified_at = ?, state = 'downloaded', mtime = ? WHERE id = ?",
+      )
+      .run(path, bytes, verifiedAt, mtimeMs, id);
   }
 
   public listLibraryFiles(opts?: { limit?: number; beforeId?: number }): LibraryFileRow[] {
@@ -501,6 +663,38 @@ interface LibraryFileDbRow {
   readonly file: string;
   readonly bytes: number;
   readonly created_at: number;
+}
+
+interface LibraryLedgerDbRow {
+  readonly id: number;
+  readonly module_id: string;
+  readonly manga: string;
+  readonly file: string;
+  readonly path: string;
+  readonly bytes: number;
+  readonly created_at: number;
+  readonly verified_at: number | null;
+  readonly manga_url: string | null;
+  readonly chapter_link: string | null;
+  readonly state: string | null;
+  readonly mtime: number | null;
+}
+
+function toLibraryLedgerRow(row: LibraryLedgerDbRow): LibraryLedgerRow {
+  return {
+    id: row.id,
+    moduleId: row.module_id,
+    manga: row.manga,
+    fileName: row.file,
+    path: row.path,
+    bytes: row.bytes,
+    createdAt: row.created_at,
+    verifiedAt: row.verified_at,
+    mangaUrl: row.manga_url,
+    chapterLink: row.chapter_link,
+    state: row.state === 'downloaded' || row.state === 'missing' ? row.state : null,
+    mtimeMs: row.mtime,
+  };
 }
 
 interface FavoriteDbRow {
