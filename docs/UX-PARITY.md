@@ -7,6 +7,12 @@ matrix: PARITY (replicate), ADAPT (web-native equivalent), SKIP (obsolete or
 desktop-only, justified). The v0.3.0 stories implement the PARITY/ADAPT rows;
 this file records the SKIPs and deferrals so nothing is silently dropped.
 
+Post-v0.3.2 product direction (the "pipe with an inbox" batch — identity,
+five stages, invariants, killed-ideas ledger, parity rule, numbering,
+standing constraints) is recorded in
+[DESIGN-NORTHSTAR.md](DESIGN-NORTHSTAR.md); its rulings extend the R1–R5
+below.
+
 ## Product rulings (owner, permanent — never relitigate)
 
 - **R1 — No in-browser reader. EVER.** fmd-web is the *acquisition layer*; consumption belongs to dedicated servers (Kavita/Komga/...) fed by the library output. This is an architectural line, not a backlog item: any proposal containing a page-turner, double-tap zoom, or reading mode is rejected on principle. (Library file download links are the boundary; an OPDS/feed *export* for consumption tools is the only sanctioned direction if ever requested.)

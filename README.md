@@ -35,9 +35,12 @@ PORT=3000 FMD_STATIC_DIR=web/dist-web FMD_WEB_DATA_DIR=./data \
   node server/dist/src/runtime-entry.js
 ```
 
-Docs: operations → `docs/runbook.md`; compatibility →
-`docs/COMPAT.md`; release details (decision status, known-broken
-modules, hardening verification) → `docs/RELEASE-NOTES.md`.
+Docs: product direction for the post-v0.3.2 batch ("pipe with an
+inbox" — the decision record every batch story is chartered by) →
+[`docs/DESIGN-NORTHSTAR.md`](docs/DESIGN-NORTHSTAR.md); operations →
+`docs/runbook.md`; compatibility → `docs/COMPAT.md`; release details
+(decision status, known-broken modules, hardening verification) →
+`docs/RELEASE-NOTES.md`.
 
 ### Screenshots
 
