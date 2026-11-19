@@ -374,3 +374,97 @@ describe('FavoriteScheduler.setDefaultIntervalMs — runtime interval (Settings 
     scheduler.stop();
   });
 });
+
+describe('FavoriteScheduler — onSweepIdle (the favorites.digest boundary)', (): void => {
+  /** Immediate checks (no gates): every claimed check settles at once. */
+  function immediateScheduler(
+    opts: { keys: string[]; onSweepIdle: () => void },
+  ): { scheduler: FavoriteScheduler; clock: FakeClock } {
+    const clock = new FakeClock();
+    const scheduler = new FavoriteScheduler({
+      list: (): SchedulerFavorite[] => favorites(...opts.keys),
+      check: (): Promise<void> => Promise.resolve(),
+      onSweepIdle: opts.onSweepIdle,
+      clock,
+      maxConcurrent: 1,
+      intervalMs: 60 * 60_000,
+      jitterMs: 0,
+    });
+    return { scheduler, clock };
+  }
+
+  it('ONE sweep of many back-to-back checks fires onSweepIdle exactly once', async (): Promise<void> => {
+    let sweeps = 0;
+    const { scheduler, clock } = immediateScheduler({
+      keys: ['a', 'b', 'c', 'd', 'e'],
+      onSweepIdle: (): void => {
+        sweeps += 1;
+      },
+    });
+    scheduler.start();
+    await settle();
+    expect(sweeps).toBe(1);
+    // Nothing further until the next interval — still one sweep.
+    await clock.advance(30 * 60_000);
+    expect(sweeps).toBe(1);
+    scheduler.stop();
+  });
+
+  it('the next interval is a NEW sweep (a second firing)', async (): Promise<void> => {
+    let sweeps = 0;
+    const { scheduler, clock } = immediateScheduler({
+      keys: ['a', 'b'],
+      onSweepIdle: (): void => {
+        sweeps += 1;
+      },
+    });
+    scheduler.start();
+    await settle();
+    expect(sweeps).toBe(1);
+    await clock.advance(60 * 60_000);
+    await settle();
+    expect(sweeps).toBe(2);
+    scheduler.stop();
+  });
+
+  it('a zero-favorite scheduler never fires (nothing due, nothing ran)', async (): Promise<void> => {
+    let sweeps = 0;
+    const { scheduler, clock } = immediateScheduler({
+      keys: [],
+      onSweepIdle: (): void => {
+        sweeps += 1;
+      },
+    });
+    scheduler.start();
+    await clock.advance(120 * 60_000);
+    expect(sweeps).toBe(0);
+    scheduler.stop();
+  });
+
+  it('a throwing onSweepIdle consumer never breaks the loop', async (): Promise<void> => {
+    const started: string[] = [];
+    const clock = new FakeClock();
+    const scheduler = new FavoriteScheduler({
+      list: (): SchedulerFavorite[] => favorites('a', 'b'),
+      check: (favorite): Promise<void> => {
+        started.push(favorite.mangaKey);
+        return Promise.resolve();
+      },
+      onSweepIdle: (): void => {
+        throw new Error('digest consumer exploded');
+      },
+      clock,
+      maxConcurrent: 1,
+      intervalMs: 60_000,
+      jitterMs: 0,
+    });
+    scheduler.start();
+    await settle();
+    expect(started.sort()).toEqual(['a', 'b']);
+    // And the next sweep still runs — the loop survived the throw.
+    await clock.advance(60_000);
+    await settle();
+    expect(started.length).toBe(4);
+    scheduler.stop();
+  });
+});

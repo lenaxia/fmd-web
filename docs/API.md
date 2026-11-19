@@ -309,6 +309,44 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" "$BASE/api/sync/catalog/$MOD" 
 curl -s -X POST -H "Authorization: Bearer $TOKEN" "$BASE/api/sync/catalog/all" | jq .
 ```
 
+### Webhook — the ONE outbound notification surface
+
+One generic JSON POST destination, zero per-channel adapters: if you
+want pings in a chat or push app, run a small receiver that bridges
+from this webhook — that translation is yours, not this app's.
+
+```bash
+# Configure (url + optional secret + per-event-class toggles)
+curl -s -X PUT -H "Authorization: Bearer $TOKEN" "$BASE/api/settings/webhook" \
+  -H 'content-type: application/json' \
+  -d '{"url":"https://receiver.example/hook","secret":"signing-secret",
+       "events":{"chapterDownloaded":true,"favoritesDigest":true,"failureDigest":true}}' \
+  | jq .settings.webhook   # (the response is the settings snapshot)
+
+# Test-send (one awaited delivery, honest report back)
+curl -s -X POST -H "Authorization: Bearer $TOKEN" "$BASE/api/settings/webhook/test" | jq .
+# {"delivered":true,"attempts":1,"status":204}
+```
+
+Event classes (the `event` field every envelope carries):
+
+- `chapter.downloaded` — fires **individually** per finalized chapter
+  (manga, chapter link, file path/bytes/format, job id).
+- `favorites.digest` — ONE summary per completed check sweep
+  (`favoritesChecked`, `newChaptersFound`, `downloadsQueued`,
+  `checkFailures`).
+- `failure.digest` — per-SITE coalesced check failures: a dead site
+  with 50 favorites produces ONE entry per 15-minute window (with
+  `failureCount`, affected-favorite count + sample, first/last error),
+  never 50 notifications.
+
+Delivery contract: fire-and-forget POST, `content-type:
+application/json`, 2 retries then drop (logged, never queued — the
+inbox remains the source of truth). With a `secret` set, every attempt
+carries `X-FMD-Signature: sha256=<hex>` — the HMAC-SHA256 of the raw
+request body under that secret (verify by recomputing over exactly the
+bytes you received). `url: ""` is the off state.
+
 ## Reverse-proxy / scripts-first recipe
 
 Headless/compose deployment where scripts (and/or a reverse proxy's

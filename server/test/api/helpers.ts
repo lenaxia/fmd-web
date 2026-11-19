@@ -417,6 +417,9 @@ export function buildHarness(
     /** [file-state] the file-state seam (title-files/rescan routes +
      * library filter enrichment; absent keeps the pre-shape). */
     fileState?: import('../../src/runtime/library-file-state.js').SqliteLibraryFileStateService;
+    /** Webhook story: the test-send notifier seam (absent → the
+     * POST /api/settings/webhook/test route is not mounted). */
+    webhookTestSend?: import('../../src/api/app.js').ApiServices['webhookTestSend'];
   } = {},
 ): Harness {
   const jobs = opts.jobs ?? new InMemoryJobService();
@@ -462,6 +465,7 @@ export function buildHarness(
       library: wiredLibrary,
       favorites,
       ...(opts.fileState !== undefined ? { fileState: opts.fileState } : {}),
+      ...(opts.webhookTestSend !== undefined ? { webhookTestSend: opts.webhookTestSend } : {}),
       ...(opts.readiness !== undefined ? { readiness: opts.readiness } : {}),
     },
     options,

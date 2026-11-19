@@ -1170,6 +1170,145 @@
         }
       }
     },
+    "/api/settings/webhook": {
+      "put": {
+        "operationId": "updateWebhookSettings",
+        "summary": "Replace the outbound webhook config (url + secret + event toggles)",
+        "description": "THE outbound webhook (DESIGN-NORTHSTAR §3 Pipeline: \"at most one webhook, zero channel adapters\") — one generic JSON POST destination; translating events into any chat/push service is the receiving operator's business, never adapter code in this app. `url` is the OFF state when empty (default); a non-empty url must be http(s) (typed 400 otherwise). A non-empty `secret` HMAC-SHA256-signs every delivery: X-FMD-Signature: sha256=<hex> over the exact request body. `events` toggles the three runtime classes independently: chapter.downloaded (individual, per finalized chapter), favorites.digest (ONE summary per completed check sweep) and failure.digest (per-SITE coalesced check failures — a dead site with 50 favorites produces ONE entry per 15-minute digest window, never 50). Delivery is fire-and-forget with 2 retries then drop (logged) — advisory and lossy-tolerated; the inbox remains the source of truth. Persisted in app.db (app_settings `webhook.config`).",
+        "tags": [
+          "settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "Settings snapshot after the update",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "$ref": "#/components/schemas/UpdateWebhookSettingsBody0"
+                  },
+                  "secret": {
+                    "$ref": "#/components/schemas/UpdateWebhookSettingsBody1"
+                  },
+                  "events": {
+                    "$ref": "#/components/schemas/UpdateWebhookSettingsBody2"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/webhook/test": {
+      "post": {
+        "operationId": "testSendWebhook",
+        "summary": "Deliver a webhook.test sample event through the real signer + transport",
+        "description": "The test-send action: ONE awaited full delivery cycle (initial attempt + up to 2 retries) of a `webhook.test` sample envelope — the only place webhook delivery is awaited (real events stay fire-and-forget). Returns the honest report: `delivered`, the POST `attempts` count, and the last HTTP `status` / `error` when not delivered. 409 when no url is configured. Mounted only when the notifier seam is bound (the runtime always binds it).",
+        "tags": [
+          "settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "Delivery report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "delivered": {
+                      "type": "boolean"
+                    },
+                    "attempts": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "delivered",
+                    "attempts"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No webhook url configured — set one via PUT /api/settings/webhook first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sync/modules": {
       "post": {
         "operationId": "syncModules",
@@ -6470,6 +6609,43 @@
               "logLevel"
             ]
           },
+          "webhook": {
+            "type": "object",
+            "properties": {
+              "url": {
+                "default": "",
+                "type": "string",
+                "maxLength": 2000
+              },
+              "secret": {
+                "default": "",
+                "type": "string",
+                "maxLength": 500
+              },
+              "events": {
+                "default": {
+                  "chapterDownloaded": true,
+                  "favoritesDigest": true,
+                  "failureDigest": true
+                },
+                "type": "object",
+                "properties": {
+                  "chapterDownloaded": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "favoritesDigest": {
+                    "default": true,
+                    "type": "boolean"
+                  },
+                  "failureDigest": {
+                    "default": true,
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          },
           "browser": {
             "type": "object",
             "properties": {
@@ -6494,6 +6670,7 @@
           "retention",
           "filenamePolicy",
           "diagnostics",
+          "webhook",
           "browser"
         ]
       },
@@ -7487,6 +7664,59 @@
       },
       "UpdateFavoritesSettings200Response4": {
         "type": "string"
+      },
+      "UpdateWebhookSettings200Response0": {
+        "type": "string",
+        "enum": [
+          "",
+          "HTTP",
+          "SOCKS4",
+          "SOCKS5"
+        ]
+      },
+      "UpdateWebhookSettings200Response1": {
+        "type": "string"
+      },
+      "UpdateWebhookSettings200Response2": {
+        "type": "string"
+      },
+      "UpdateWebhookSettings200Response3": {
+        "type": "string"
+      },
+      "UpdateWebhookSettings200Response4": {
+        "type": "string"
+      },
+      "UpdateWebhookSettingsBody0": {
+        "default": "",
+        "type": "string",
+        "maxLength": 2000
+      },
+      "UpdateWebhookSettingsBody1": {
+        "default": "",
+        "type": "string",
+        "maxLength": 500
+      },
+      "UpdateWebhookSettingsBody2": {
+        "default": {
+          "chapterDownloaded": true,
+          "favoritesDigest": true,
+          "failureDigest": true
+        },
+        "type": "object",
+        "properties": {
+          "chapterDownloaded": {
+            "default": true,
+            "type": "boolean"
+          },
+          "favoritesDigest": {
+            "default": true,
+            "type": "boolean"
+          },
+          "failureDigest": {
+            "default": true,
+            "type": "boolean"
+          }
+        }
       },
       "CatalogSearchQuery0": {
         "type": "string",

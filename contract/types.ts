@@ -282,6 +282,117 @@ export interface RouteSpec {
 }
 
 // ---------------------------------------------------------------------------
+// Outbound webhook events (DESIGN-NORTHSTAR §3 Pipeline: "at most one
+// webhook, zero channel adapters") — the JSON contract an external
+// receiver sees on the wire. ONE generic POST destination; bridging to
+// any chat/push service is the OPERATOR's business, never adapter code
+// in this tree (the no-channel-adapters grep gate enforces it).
+// ---------------------------------------------------------------------------
+
+/**
+ * The event-class discriminator riding every envelope's `event` field.
+ * `webhook.test` is the POST /api/settings/webhook/test sample — it is
+ * an explicit user action and therefore bypasses the event toggles.
+ */
+export type WebhookEventClass = 'chapter.downloaded' | 'favorites.digest' | 'failure.digest' | 'webhook.test';
+
+/**
+ * The header carrying the delivery signature: `sha256=<hex>` — the
+ * HMAC-SHA256 of the raw request body bytes under the configured
+ * secret. Absent when no secret is configured (unsigned deliveries).
+ */
+export const WEBHOOK_SIGNATURE_HEADER = 'X-FMD-Signature';
+
+/** The envelope every delivery POSTs as its JSON body. */
+export interface WebhookEnvelope<D> {
+  /** The event-class discriminator (consumers switch on this). */
+  readonly event: WebhookEventClass;
+  /** RFC 3339 UTC stamp of when the envelope was built. */
+  readonly sentAt: string;
+  /** The event-class-specific payload. */
+  readonly data: D;
+}
+
+/**
+ * `chapter.downloaded` payload — fires INDIVIDUALLY per finalized
+ * chapter (scheduler → download → library → webhook, D1 §1): the
+ * arrival feed's push half. The inbox remains the source of truth.
+ */
+export interface ChapterDownloadedData {
+  readonly moduleId: ModuleId;
+  /** Series title (or the derived segment when the job carried none). */
+  readonly mangaTitle: string;
+  /** The favorite-identity canonical URL of the series. */
+  readonly mangaUrl: string;
+  /** The chapter link — identity per D1 §3 (a chapter IS its link). */
+  readonly chapterLink: string;
+  /** Chapter label when the job carried one (never a parsed number). */
+  readonly chapterName?: string;
+  /** 1-based list-ordinal position when the job carried one (D1 §7). */
+  readonly chapterPosition?: number;
+  /** Finalized artifact file name (basename at the final path). */
+  readonly fileName: string;
+  /** Absolute library path of the finalized artifact. */
+  readonly path: string;
+  /** Artifact size in bytes. */
+  readonly bytes: number;
+  /** Archive format extension (zip/cbz/pdf/epub). */
+  readonly format: string;
+  /** The download job that produced the artifact. */
+  readonly jobId: string;
+}
+
+/**
+ * `favorites.digest` payload — ONE per completed check sweep (the
+ * scheduler's contiguous busy period; a sweep ends when no favorite is
+ * due at the current clock time and none is in flight).
+ */
+export interface FavoritesDigestData {
+  /** RFC 3339 stamp of the sweep's first completed check. */
+  readonly startedAt: string;
+  /** RFC 3339 stamp of the sweep's last completed check. */
+  readonly endedAt: string;
+  /** Favorites the sweep checked (skips excluded). */
+  readonly favoritesChecked: number;
+  /** New chapters the sweep found across all favorites. */
+  readonly newChaptersFound: number;
+  /** Chapters the sweep enqueued for auto-download. */
+  readonly downloadsQueued: number;
+  /** Checks that failed in this sweep (count only — the per-site
+   * coalesced detail rides `failure.digest`). */
+  readonly checkFailures: number;
+}
+
+/**
+ * `failure.digest` payload — per-SITE coalesced check failures: a dead
+ * site with 50 favorites produces ONE entry per digest window, never
+ * 50. The digest window is 15 minutes per site, keyed on the FIRST
+ * failure; the entry is emitted when the window closes.
+ */
+export interface FailureDigestData {
+  readonly moduleId: ModuleId;
+  /** RFC 3339 stamp of the window's first failure. */
+  readonly windowStartedAt: string;
+  /** RFC 3339 stamp of the window close (digest emission). */
+  readonly windowEndedAt: string;
+  /** Total coalesced check failures in the window. */
+  readonly failureCount: number;
+  /** Distinct favorites that failed in the window. */
+  readonly affectedFavoritesCount: number;
+  /** Capped sample of affected favorite keys (identity aid, ≤ 5). */
+  readonly affectedFavoritesSample: readonly string[];
+  /** The window's first failure message. */
+  readonly firstError: string;
+  /** The window's most recent failure message. */
+  readonly lastError: string;
+}
+
+/** `webhook.test` payload — the sample event the test-send action ships. */
+export interface WebhookTestData {
+  readonly note: string;
+}
+
+// ---------------------------------------------------------------------------
 // Lua host boundary (DESIGN.md §5.1, §5.2, §5.12, §11 engine/lua + events)
 // ---------------------------------------------------------------------------
 

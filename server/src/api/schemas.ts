@@ -217,6 +217,90 @@ export const DiagnosticsSettingsSchema = z.object({
 });
 export type DiagnosticsSettingsT = z.infer<typeof DiagnosticsSettingsSchema>;
 
+// ── outbound webhook settings (D1 §3: at most one, zero adapters) ────
+
+/**
+ * Per-event-class delivery toggles. All three default ON — the pipe's
+ * push half ships whole; an operator who only wants arrival pings can
+ * mute the digests without turning the webhook off.
+ */
+export const WebhookEventTogglesSchema = z.object({
+  /** `chapter.downloaded` fires individually per finalized chapter. */
+  chapterDownloaded: z.boolean().default(true),
+  /** `favorites.digest` — one summary per completed check sweep. */
+  favoritesDigest: z.boolean().default(true),
+  /** `failure.digest` — per-site coalesced failures (15-min window). */
+  failureDigest: z.boolean().default(true),
+});
+export type WebhookEventTogglesT = z.infer<typeof WebhookEventTogglesSchema>;
+
+/** All classes ON — the toggles default (single source for the schema). */
+export const DEFAULT_WEBHOOK_EVENT_TOGGLES: WebhookEventTogglesT = {
+  chapterDownloaded: true,
+  favoritesDigest: true,
+  failureDigest: true,
+};
+
+/**
+ * THE webhook configuration (D1 §3 Pipeline: "at most one webhook,
+ * zero channel adapters"). `url: ''` is the OFF state (default —
+ * nothing is delivered until configured); a non-empty url must be a
+ * valid http(s) URL. `secret: ''` = unsigned deliveries; any other
+ * value HMAC-SHA256-signs every body (X-FMD-Signature: sha256=<hex>).
+ */
+export const WebhookSettingsSchema = z.object({
+  /** Delivery destination; '' = webhook off. */
+  url: z.string().max(2000).default(''),
+  /** HMAC-SHA256 signing secret; '' = unsigned. */
+  secret: z.string().max(500).default(''),
+  events: WebhookEventTogglesSchema.default(DEFAULT_WEBHOOK_EVENT_TOGGLES),
+});
+export type WebhookSettingsT = z.infer<typeof WebhookSettingsSchema>;
+
+/**
+ * PUT /api/settings/webhook request — full replacement of the webhook
+ * group. A non-empty url must parse as http(s) with a host (the typed
+ * 400 otherwise); the OFF state is the empty url, never an invalid one.
+ */
+export const WebhookSettingsUpdateRequestSchema = WebhookSettingsSchema.superRefine(
+  (value, ctx): void => {
+    if (value.url === '') {
+      return;
+    }
+    let parsed: URL;
+    try {
+      parsed = new URL(value.url);
+    } catch {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `webhook url is not a valid URL: ${value.url}`,
+      });
+      return;
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `webhook url must be http(s), got protocol ${parsed.protocol}`,
+      });
+    }
+  },
+);
+export type WebhookSettingsUpdateRequestT = z.infer<typeof WebhookSettingsUpdateRequestSchema>;
+
+/**
+ * POST /api/settings/webhook/test — the test-send action's honest
+ * report: ONE awaited full delivery cycle (initial + up to 2 retries)
+ * of a `webhook.test` sample event. `attempts` counts POSTs made;
+ * `error` carries the last failure when not delivered.
+ */
+export const WebhookTestSendResponseSchema = z.object({
+  delivered: z.boolean(),
+  attempts: z.number().int().min(0),
+  status: z.number().int().optional(),
+  error: z.string().optional(),
+});
+export type WebhookTestSendResponseT = z.infer<typeof WebhookTestSendResponseSchema>;
+
 /**
  * R4 single app-wide API token state (GET /api/settings/api-token +
  * POST /api/settings/api-token/regenerate). ONE token value ever
@@ -244,6 +328,8 @@ export const SettingsResponseSchema = z.object({
   filenamePolicy: FilenamePolicySettingsSchema,
   /** [parity-sweep] M13: diagnostics log enable + level. */
   diagnostics: DiagnosticsSettingsSchema,
+  /** The ONE outbound webhook (D1 §3): url + secret + event toggles. */
+  webhook: WebhookSettingsSchema,
   browser: z.object({
     /** The compose `browser` profile is active (§5.11 sidecar wired). */
     enabled: z.boolean(),
@@ -252,6 +338,10 @@ export const SettingsResponseSchema = z.object({
   }),
 });
 export type SettingsResponseT = z.infer<typeof SettingsResponseSchema>;
+
+/** PUT /api/settings/webhook — replaces the webhook group (additive). */
+export const WebhookSettingsUpdateResponseSchema = SettingsResponseSchema;
+export type WebhookSettingsUpdateResponseT = z.infer<typeof WebhookSettingsUpdateResponseSchema>;
 
 /** PUT /api/settings/proxy — replaces the global proxy config. */
 export const ProxyUpdateRequestSchema = ProxySettingsSchema;

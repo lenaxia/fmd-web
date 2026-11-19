@@ -4,6 +4,27 @@ All notable changes to fmd-web are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions are
 semver (0.x = pre-1.0 development line).
 
+## [Unreleased]
+
+- **Outbound webhook notifications — ONE, generic, zero adapters**
+  ([azure-moonlight-plumbs]): the pipe's push half lands per D1 §3
+  ("at most one webhook, zero channel adapters"). Configure one JSON
+  POST destination (`PUT /api/settings/webhook`: url + optional
+  secret + per-event-class toggles; `''` = off) and verify it with
+  the test-send action (`POST /api/settings/webhook/test` — one
+  awaited delivery with an honest report). Event classes:
+  `chapter.downloaded` (individual, per finalized chapter),
+  `favorites.digest` (one summary per completed check sweep) and
+  `failure.digest` (per-site coalesced check failures — a dead site
+  with 50 favorites produces ONE entry per 15-minute window, never
+  50). With a secret, every attempt carries
+  `X-FMD-Signature: sha256=<hex>` (HMAC-SHA256 over the exact body).
+  Delivery is fire-and-forget with 2 retries then drop (logged);
+  advisory and lossy-tolerated — the inbox remains the source of
+  truth. Bridging to chat/push services is the receiving operator's
+  business; a grep gate keeps per-channel adapter code out of the
+  tree.
+
 ## [0.3.1] — 2026-11-18
 
 Hotfix plus websites-registry polish on top of 0.3.0. Two stories:

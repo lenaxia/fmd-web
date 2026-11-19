@@ -53,6 +53,7 @@ import {
   type BootResult,
 } from '../engine/facade.js';
 import type { ModuleSummaryT, OptionValueT } from '../api/schemas.js';
+import { DEFAULT_WEBHOOK_EVENT_TOGGLES } from '../api/schemas.js';
 import { createModuleSyncService } from '../sync/modules/service.js';
 import { loadModuleSyncConfig, type ModuleSyncConfig } from '../sync/modules/config.js';
 import { CatalogSync } from '../sync/db/sync-service.js';
@@ -67,7 +68,11 @@ import type {
   OutputDefaultsT,
   PerformanceSettingsT,
   RetentionSettingsT,
+  WebhookSettingsT,
 } from '../api/schemas.js';
+import { WebhookNotifier } from '../webhook/delivery.js';
+import { SiteFailureCoalescer } from '../webhook/digest.js';
+import { SweepAccumulator } from '../webhook/sweep.js';
 import { openQueueDb, ensureJobSchema } from '../jobs/queue/connection.js';
 import { SqliteJobQueue } from '../jobs/queue/queue.js';
 import { EngineThread, offloadEngineSubstrate, probeOnEngineThread } from '../engine/services/engine-thread.js';
@@ -818,6 +823,41 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
       moduleRows.find((module): boolean => module.id === moduleId)?.rootURL,
   });
 
+  // ── the ONE outbound webhook (D1 §3: at most one, zero adapters) ──
+  // app_settings `webhook.config` seeds the in-memory settings group;
+  // every PUT writes back. The notifier reads the LIVE config per
+  // event (a PUT applies to the very next delivery), signs with the
+  // configured secret (HMAC-SHA256 over the exact body) and delivers
+  // fire-and-forget with the 2-retries-then-drop budget. Failures
+  // coalesce per site in 15-minute windows (SiteFailureCoalescer) and
+  // sweeps summarize (SweepAccumulator) — both feed the notifier's
+  // digest event classes; chapter.downloaded fires individually from
+  // the download lane's finalize.
+  const webhookSettingsSeedRaw = readJsonSetting(libraryStore, 'webhook.config');
+  settings.setWebhookSettingsLive(
+    isObject(webhookSettingsSeedRaw)
+      ? coerceWebhook(webhookSettingsSeedRaw)
+      : { url: '', secret: '', events: { ...DEFAULT_WEBHOOK_EVENT_TOGGLES } },
+    (next): void => {
+      libraryStore.setSetting('webhook.config', JSON.stringify(next));
+    },
+  );
+  const webhookNotifier = new WebhookNotifier({
+    settings: (): WebhookSettingsT => settings.getWebhookSettings(),
+    onDrop: (line): void => {
+      logger.warn(
+        `webhook: dropped ${line.event} after ${String(line.attempts)} attempt(s): ${line.error}`,
+        { event: 'webhook_drop', webhookEvent: line.event, attempts: line.attempts },
+      );
+    },
+  });
+  const failureCoalescer = new SiteFailureCoalescer({
+    onDigest: (entry): void => {
+      webhookNotifier.emit('failure.digest', entry);
+    },
+  });
+  const sweepTally = new SweepAccumulator();
+
   const lane = startDownloadLane(queue, {
     wsHub,
     library: libraryStore,
@@ -863,6 +903,11 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     // [parity-sweep] M4: env > setting > parity default, resolved here.
     fileNamePolicy: (): FileNamePolicyMode | undefined =>
       envNormalize ?? (settings.filenamePolicySettings().normalizePaths ? 'linux-normalized' : 'windows-parity'),
+    // Outbound webhook (D1 §3 pipeline): the individual
+    // chapter.downloaded event — one per finalized chapter.
+    onChapterDownloaded: (chapter): void => {
+      webhookNotifier.emit('chapter.downloaded', chapter);
+    },
     log,
   });
 
@@ -893,10 +938,30 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     list: (): readonly { mangaKey: string }[] =>
       favoritesEngine.listFavorites().filter((row): boolean => row.enabled !== false),
     check: async (favorite): Promise<void> => {
-      await favoritesEngine.checkFavorite(favorite.mangaKey);
+      const result = await favoritesEngine.checkFavorite(favorite.mangaKey);
+      // favorites.digest tally (webhook story): per-check outcomes
+      // accumulate; onSweepIdle hands back the ONE sweep summary.
+      sweepTally.recordCheck(result);
     },
     onError: (favorite, error): void => {
       log(`favorites: check failed for ${favorite.mangaKey}: ${error instanceof Error ? error.message : String(error)}`);
+      // failure.digest tally (webhook story): coalesce per SITE —
+      // one entry per 15-minute window, never one per favorite.
+      sweepTally.recordFailure();
+      const row = favoritesEngine
+        .listFavorites()
+        .find((r): boolean => r.mangaKey === favorite.mangaKey);
+      if (row !== undefined) {
+        failureCoalescer.record(row.moduleId, favorite.mangaKey, error);
+      }
+    },
+    // Sweep boundary (webhook story): the contiguous busy period ends —
+    // ONE favorites.digest per completed check sweep.
+    onSweepIdle: (): void => {
+      const digest = sweepTally.take();
+      if (digest !== null) {
+        webhookNotifier.emit('favorites.digest', digest);
+      }
     },
     maxConcurrent: config.favoriteMaxConcurrent,
     intervalMs: favoritesSettingsSeed.intervalMinutes * 60_000,
@@ -1051,6 +1116,21 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     catalogs: catalogSync.store,
     availability: siteAvailability,
     preferredSites,
+    // The test-send action's awaited path (webhook story): ONE full
+    // delivery cycle of the webhook.test sample through the REAL
+    // signer + transport — the only awaited delivery (real events
+    // stay fire-and-forget).
+    webhookTestSend: {
+      sendTestEvent: (): Promise<{
+        readonly delivered: boolean;
+        readonly attempts: number;
+        readonly status?: number;
+        readonly error?: string;
+      }> =>
+        webhookNotifier.sendNow('webhook.test', {
+          note: 'fmd-web webhook test event — if you can read this, the pipe is wired',
+        }),
+    },
     catalogFallback,
     // Covers live-defect: the same-origin cover proxy — module-bound
     // url validation, Referer hotlink posture, token-free disk cache
@@ -1108,6 +1188,9 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     auth: authService,    dispose: async (): Promise<void> => {
       favoritesScheduler.stop();
       await favoritesScheduler.drain();
+      // Webhook story: pending digest windows drop WITHOUT emitting —
+      // lossy-tolerated by contract (the inbox stays the truth).
+      failureCoalescer.dispose();
       await lane.stop();
       wsHub.close();
       await info.dispose();
@@ -1242,4 +1325,19 @@ function coerceOutput(row: Record<string, unknown>): Partial<OutputDefaultsT> {
     out.removeMangaName = row.removeMangaName;
   }
   return out;
+}
+
+/** Webhook story: defensive decode of a stored `webhook.config` row. */
+function coerceWebhook(row: Record<string, unknown>): WebhookSettingsT {
+  const events = isObject(row.events) ? row.events : {};
+  return {
+    url: typeof row.url === 'string' ? row.url : '',
+    secret: typeof row.secret === 'string' ? row.secret : '',
+    events: {
+      ...DEFAULT_WEBHOOK_EVENT_TOGGLES,
+      ...(typeof events.chapterDownloaded === 'boolean' ? { chapterDownloaded: events.chapterDownloaded } : {}),
+      ...(typeof events.favoritesDigest === 'boolean' ? { favoritesDigest: events.favoritesDigest } : {}),
+      ...(typeof events.failureDigest === 'boolean' ? { failureDigest: events.failureDigest } : {}),
+    },
+  };
 }

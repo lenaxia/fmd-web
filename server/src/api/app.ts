@@ -94,6 +94,8 @@ import {
   FavoriteListResponseSchema,
   FavoriteResponseSchema,
   FavoriteSchedulerSettingsUpdateRequestSchema,
+  WebhookSettingsUpdateRequestSchema,
+  WebhookTestSendResponseSchema,
   FavoriteTransferPreviewRequestSchema,
   FavoriteTransferPreviewResponseSchema,
   FavoriteTransferRequestSchema,
@@ -111,6 +113,7 @@ import {
   type AllSitesSearchResponseT,
   type PreferredSitesResponseT,
   type ApiTokenResponseT,
+  type WebhookTestSendResponseT,
   type FavoriteCheckBatchCancelResponseT,
   type FavoriteCheckBatchResponseT,
   type FavoriteCheckResponseT,
@@ -227,6 +230,23 @@ export interface ApiServices {
    * the runtime assembly always wires the real one (app_settings kv).
    */
   readonly preferredSites?: PreferredSitesService;
+  /**
+   * The ONE outbound webhook's test-send action (D1 §3 pipeline —
+   * webhook story): awaiting sender of the `webhook.test` sample
+   * event through the notifier's FULL retry cycle. Optional with the
+   * covers posture: absent → POST /api/settings/webhook/test is not
+   * mounted; the runtime assembly always wires the real notifier
+   * (PUT/GET of the webhook SETTINGS ride the SettingsService like
+   * every other group — this seam is only the action).
+   */
+  readonly webhookTestSend?: {
+    sendTestEvent(): Promise<{
+      readonly delivered: boolean;
+      readonly attempts: number;
+      readonly status?: number;
+      readonly error?: string;
+    }>;
+  };
   /**
    * Library file-state (file-state story): the web window onto server
    * storage — lazy stat-verification, per-title file listings, manual
@@ -665,6 +685,38 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     );
     return SettingsResponseSchema.parse(settings.setFavoritesSettings(body));
   });
+
+  // ── the ONE outbound webhook (D1 §3: at most one, zero adapters) ──
+  // Full-group replacement like every settings PUT: url ('' = off) +
+  // secret ('' = unsigned) + the per-event-class toggles. The url must
+  // be http(s) when non-empty (typed 400 below). Delivery is
+  // fire-and-forget, HMAC-SHA256-signed when a secret is set, 2
+  // retries then drop — advisory by contract; the inbox stays the
+  // source of truth.
+  app.put('/api/settings/webhook', async (req): Promise<SettingsResponseT> => {
+    const body = parseOr400(WebhookSettingsUpdateRequestSchema, req.body, 'webhook settings body');
+    return SettingsResponseSchema.parse(settings.setWebhookSettings(body));
+  });
+
+  // Test-send action: ONE awaited full delivery cycle (initial + up to
+  // 2 retries) of a webhook.test sample event — the honest report back
+  // (delivered/attempts/last error), the only place delivery is
+  // awaited. Mounted only when the notifier seam is bound (the covers
+  // posture; the runtime always binds it).
+  if (services.webhookTestSend !== undefined) {
+    const webhookTestSend = services.webhookTestSend;
+    app.post('/api/settings/webhook/test', async (): Promise<WebhookTestSendResponseT> => {
+      if (settings.getWebhookSettings().url === '') {
+        throw new ApiError(
+          409,
+          'conflict',
+          'webhook is not configured — set a url via PUT /api/settings/webhook first',
+        );
+      }
+      const report = await webhookTestSend.sendTestEvent();
+      return WebhookTestSendResponseSchema.parse(report);
+    });
+  }
 
   // ── R4 single app-wide API token (Settings → API) ─────────────────
   // The app is OPEN (*arr auth-None semantics: the SPA reads its own

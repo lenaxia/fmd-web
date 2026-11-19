@@ -56,6 +56,15 @@ export interface FavoriteSchedulerOptions {
   readonly clock?: FavoriteClock;
   /** Failure sink — a failed check must never break the loop. */
   readonly onError?: (favorite: SchedulerFavorite, error: unknown) => void;
+  /**
+   * Sweep-idle seam (webhook story, D1 §3 pipeline): fires when a
+   * check sweep ENDS — the running set just drained AND no favorite is
+   * due at the current clock time (a completion that immediately
+   * re-claims the next due favorite does NOT end the sweep; the
+   * contiguous busy period is the sweep). The favorites.digest
+   * consumer hangs off this; absent = no sweep boundary observed.
+   */
+  readonly onSweepIdle?: () => void;
 }
 
 export interface SchedulerStats {
@@ -79,6 +88,7 @@ export class FavoriteScheduler {
   private readonly jitterMs: number;
   private readonly jitter: () => number;
   private readonly onError: (favorite: SchedulerFavorite, error: unknown) => void;
+  private readonly onSweepIdle: () => void;
 
   private readonly nextDue = new Map<string, number>();
   private readonly running = new Set<string>();
@@ -101,6 +111,7 @@ export class FavoriteScheduler {
     this.jitterMs = Math.max(0, deps.jitterMs ?? DEFAULT_JITTER_MS);
     this.jitter = deps.jitter ?? Math.random;
     this.onError = deps.onError ?? ((): void => {});
+    this.onSweepIdle = deps.onSweepIdle ?? ((): void => {});
   }
 
   /**
@@ -218,6 +229,17 @@ export class FavoriteScheduler {
     return favorite.intervalMs ?? this.defaultIntervalMsField;
   }
 
+  /** True when no idle favorite is due at the current clock time. */
+  private nothingDueNow(): boolean {
+    const now = this.clock.now();
+    for (const at of this.nextDue.values()) {
+      if (at <= now) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   /** interval + jitter — the next check lands in `[I, I+J)` after this one. */
   private nextDelayMs(favorite: SchedulerFavorite): number {
     const base = this.intervalFor(favorite);
@@ -269,8 +291,21 @@ export class FavoriteScheduler {
           this.nextDue.delete(key);
         }
         const resolveDrain = this.drained;
-        if (this.running.size === 0 && resolveDrain !== undefined) {
-          resolveDrain();
+        if (this.running.size === 0) {
+          // Sweep boundary (webhook story, D1 §3): the contiguous busy
+          // period ends here — nothing in flight AND nothing due at the
+          // clock (a completion with the next favorite still due does
+          // NOT end the sweep; the re-dispatch below claims it).
+          if (this.nothingDueNow()) {
+            try {
+              this.onSweepIdle();
+            } catch {
+              // a digest seam must never break the loop
+            }
+          }
+          if (resolveDrain !== undefined) {
+            resolveDrain();
+          }
         }
         this.dispatch();
       });

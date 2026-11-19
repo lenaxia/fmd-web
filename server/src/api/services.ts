@@ -25,7 +25,7 @@ import type {
   NormalizedInfo,
 } from '@fmd/contract';
 import { catalogSyncJobId } from '@fmd/contract';
-import { OutputDefaultsSchema } from './schemas.js';
+import { OutputDefaultsSchema, DEFAULT_WEBHOOK_EVENT_TOGGLES } from './schemas.js';
 import type {
   FavoriteCheckBatchItemT,
   FavoriteCheckBatchResponseT,
@@ -49,6 +49,7 @@ import type {
   DiagnosticsSettingsT,
   ProxySettingsT,
   SettingsResponseT,
+  WebhookSettingsT,
 } from './schemas.js';
 import { ApiError } from './errors.js';
 import { decodeCursor, encodeCursor } from './cursor.js';
@@ -354,6 +355,14 @@ export interface SettingsService {
    * the credential-gated token route exposes it.
    */
   setApiToken(token: string): void;
+  /**
+   * The ONE outbound webhook's live config (D1 §3): url + secret +
+   * event toggles. Read on every emit (the notifier's toggle gate) —
+   * a PUT applies to the very next event.
+   */
+  getWebhookSettings(): WebhookSettingsT;
+  /** Replace the webhook group (PUT /api/settings/webhook). */
+  setWebhookSettings(settings: WebhookSettingsT): SettingsResponseT;
 }
 
 export class InMemorySettingsService implements SettingsService {
@@ -377,6 +386,13 @@ export class InMemorySettingsService implements SettingsService {
   /** R4: the stored single API token (env pin hides it; null = none). */
   private apiToken: string | null = null;
   private apiTokenSink: ((token: string) => void) | undefined;
+  /**
+   * The ONE outbound webhook's config (D1 §3). Defaults = off ('' url).
+   * Live-apply sink (assembly: app_settings write-back) — the seed
+   * does NOT fire it (the row already reflects persisted state).
+   */
+  private webhook: WebhookSettingsT = { url: '', secret: '', events: { ...DEFAULT_WEBHOOK_EVENT_TOGGLES } };
+  private webhookSink: ((settings: WebhookSettingsT) => void) | undefined;
   /** Live-apply sinks (assembly: app_settings persistence + runtime apply). */
   private performanceSink: ((p: PerformanceSettingsT) => void) | undefined;
   private retentionSink: ((r: RetentionSettingsT) => void) | undefined;
@@ -411,6 +427,7 @@ export class InMemorySettingsService implements SettingsService {
       retention: { ...this.retention },
       filenamePolicy: { ...this.filenamePolicy },
       diagnostics: { ...this.diagnostics },
+      webhook: { url: this.webhook.url, secret: this.webhook.secret, events: { ...this.webhook.events } },
       browser: {
         enabled: this.browserUrl !== '',
         url: this.browserUrl,
@@ -563,6 +580,29 @@ export class InMemorySettingsService implements SettingsService {
   bindApiTokenPersistence(seed: string | null, sink?: (token: string) => void): void {
     this.apiToken = seed;
     this.apiTokenSink = sink;
+  }
+
+  // ── the ONE outbound webhook (D1 §3) ─────────────────────────────
+
+  getWebhookSettings(): WebhookSettingsT {
+    return { url: this.webhook.url, secret: this.webhook.secret, events: { ...this.webhook.events } };
+  }
+
+  setWebhookSettings(webhook: WebhookSettingsT): SettingsResponseT {
+    this.webhook = { url: webhook.url, secret: webhook.secret, events: { ...webhook.events } };
+    this.webhookSink?.(this.webhook);
+    return this.get();
+  }
+
+  /**
+   * Assembly seam (the favorites posture): the persisted app_settings
+   * seed (`webhook.config`) lands after construction; the sink
+   * write-backs app.db on every PUT. The seed does NOT fire the sink
+   * (it already reflects persisted state).
+   */
+  setWebhookSettingsLive(seed: WebhookSettingsT, sink?: (settings: WebhookSettingsT) => void): void {
+    this.webhook = { url: seed.url, secret: seed.secret, events: { ...seed.events } };
+    this.webhookSink = sink;
   }
 
   /** Output defaults read seam (download lane pack/filename resolution). */

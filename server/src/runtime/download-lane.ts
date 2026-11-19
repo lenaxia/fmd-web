@@ -43,7 +43,7 @@ import {
 } from '../jobs/library/filenames.js';
 import { SqliteLibraryStore } from '../jobs/library/store.js';
 import type { OutputDefaultsT, PerformanceSettingsT } from '../api/schemas.js';
-import type { FileNamePolicyMode } from '@fmd/contract';
+import type { FileNamePolicyMode, ChapterDownloadedData } from '@fmd/contract';
 import type { WsHub } from '../api/ws/hub.js';
 import type {
   EngineDownloadOptions,
@@ -637,6 +637,16 @@ export interface DownloadLaneDeps {
    * unpaced (hermetic tests; the pacing unit tests pin the spacing).
    */
   readonly pacer?: HostPacerPort;
+  /**
+   * Outbound-webhook seam (D1 §3 pipeline: scheduler → download →
+   * library → webhook): invoked ONCE per finalized chapter with the
+   * `chapter.downloaded` payload (individual — never coalesced). The
+   * notifier's emit is fire-and-forget and never throws by contract;
+   * the lane guards the call anyway (a notification must never take
+   * the download path down). Absent = no webhook wired (hermetic
+   * lane tests).
+   */
+  readonly onChapterDownloaded?: (data: ChapterDownloadedData) => void;
 }
 
 /** Deterministic work-dir segment for a URL's tail (path-safe) — the
@@ -951,6 +961,31 @@ export function downloadLane(deps: DownloadLaneDeps): LaneRunnerLaneOptions {
         total: result.total,
         libraryPath: finalized.path,
       });
+      // Outbound webhook (D1 §3): the individual chapter.downloaded
+      // event — one per finalized chapter, fire-and-forget.
+      if (deps.onChapterDownloaded !== undefined) {
+        try {
+          deps.onChapterDownloaded({
+            moduleId: payload.moduleId,
+            mangaTitle: payload.mangaTitle ?? mangaSegment,
+            mangaUrl: payload.mangaUrl,
+            chapterLink: payload.chapterLink,
+            ...(payload.chapterName !== undefined && payload.chapterName !== ''
+              ? { chapterName: payload.chapterName }
+              : {}),
+            ...(payload.chapterPosition !== undefined
+              ? { chapterPosition: payload.chapterPosition }
+              : {}),
+            fileName: `${fileName}.${output.format}`,
+            path: finalized.path,
+            bytes: finalized.bytes,
+            format: output.format,
+            jobId: job.id,
+          });
+        } catch {
+          // fire-and-forget by contract — never the download path's problem
+        }
+      }
       return { type: 'done' };
     } catch (error: unknown) {
       return {

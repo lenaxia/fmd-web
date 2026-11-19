@@ -32,6 +32,8 @@ import {
   FavoriteResponseSchema,
   FavoriteSchema,
   FavoriteSchedulerSettingsUpdateRequestSchema,
+  WebhookSettingsUpdateRequestSchema,
+  WebhookTestSendResponseSchema,
   FavoriteTransferPreviewRequestSchema,
   FavoriteTransferPreviewResponseSchema,
   FavoriteTransferRequestSchema,
@@ -457,6 +459,49 @@ const OPERATIONS: readonly RouteOperation[] = [
     responses: {
       200: { description: 'Settings snapshot after the update', schema: SettingsResponseSchema },
       ...errors(validation(), internal()),
+    },
+  },
+  {
+    method: 'put',
+    path: '/api/settings/webhook',
+    operationId: 'updateWebhookSettings',
+    summary: 'Replace the outbound webhook config (url + secret + event toggles)',
+    description:
+      'THE outbound webhook (DESIGN-NORTHSTAR §3 Pipeline: "at most one webhook, zero channel ' +
+      'adapters") — one generic JSON POST destination; translating events into any chat/push ' +
+      'service is the receiving operator\'s business, never adapter code in this app. `url` is ' +
+      'the OFF state when empty (default); a non-empty url must be http(s) (typed 400 otherwise). ' +
+      'A non-empty `secret` HMAC-SHA256-signs every delivery: X-FMD-Signature: sha256=<hex> over ' +
+      'the exact request body. `events` toggles the three runtime classes independently: ' +
+      'chapter.downloaded (individual, per finalized chapter), favorites.digest (ONE summary per ' +
+      'completed check sweep) and failure.digest (per-SITE coalesced check failures — a dead site ' +
+      'with 50 favorites produces ONE entry per 15-minute digest window, never 50). Delivery is ' +
+      'fire-and-forget with 2 retries then drop (logged) — advisory and lossy-tolerated; the ' +
+      'inbox remains the source of truth. Persisted in app.db (app_settings `webhook.config`).',
+    tags: ['settings'],
+    body: WebhookSettingsUpdateRequestSchema,
+    responses: {
+      200: { description: 'Settings snapshot after the update', schema: SettingsResponseSchema },
+      ...errors(validation(), internal()),
+    },
+  },
+  {
+    method: 'post',
+    path: '/api/settings/webhook/test',
+    operationId: 'testSendWebhook',
+    summary: 'Deliver a webhook.test sample event through the real signer + transport',
+    description:
+      'The test-send action: ONE awaited full delivery cycle (initial attempt + up to 2 retries) ' +
+      'of a `webhook.test` sample envelope — the only place webhook delivery is awaited (real ' +
+      'events stay fire-and-forget). Returns the honest report: `delivered`, the POST `attempts` ' +
+      'count, and the last HTTP `status` / `error` when not delivered. 409 when no url is ' +
+      'configured. Mounted only when the notifier seam is bound (the runtime always binds it).',
+    tags: ['settings'],
+    body: z.object({}),
+    bodyRequired: false,
+    responses: {
+      200: { description: 'Delivery report', schema: WebhookTestSendResponseSchema },
+      ...errors(errorResponse(409, 'No webhook url configured — set one via PUT /api/settings/webhook first'), internal()),
     },
   },
   {

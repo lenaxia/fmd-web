@@ -308,6 +308,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Replace the outbound webhook config (url + secret + event toggles)
+         * @description THE outbound webhook (DESIGN-NORTHSTAR §3 Pipeline: "at most one webhook, zero channel adapters") — one generic JSON POST destination; translating events into any chat/push service is the receiving operator's business, never adapter code in this app. `url` is the OFF state when empty (default); a non-empty url must be http(s) (typed 400 otherwise). A non-empty `secret` HMAC-SHA256-signs every delivery: X-FMD-Signature: sha256=<hex> over the exact request body. `events` toggles the three runtime classes independently: chapter.downloaded (individual, per finalized chapter), favorites.digest (ONE summary per completed check sweep) and failure.digest (per-SITE coalesced check failures — a dead site with 50 favorites produces ONE entry per 15-minute digest window, never 50). Delivery is fire-and-forget with 2 retries then drop (logged) — advisory and lossy-tolerated; the inbox remains the source of truth. Persisted in app.db (app_settings `webhook.config`).
+         */
+        put: operations["updateWebhookSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/webhook/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deliver a webhook.test sample event through the real signer + transport
+         * @description The test-send action: ONE awaited full delivery cycle (initial attempt + up to 2 retries) of a `webhook.test` sample envelope — the only place webhook delivery is awaited (real events stay fire-and-forget). Returns the honest report: `delivered`, the POST `attempts` count, and the last HTTP `status` / `error` when not delivered. 409 when no url is configured. Mounted only when the notifier seam is bound (the runtime always binds it).
+         */
+        post: operations["testSendWebhook"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sync/modules": {
         parameters: {
             query?: never;
@@ -1217,6 +1257,27 @@ export interface components {
                 /** @enum {string} */
                 logLevel: "debug" | "info" | "warn" | "error";
             };
+            webhook: {
+                /** @default  */
+                url: string;
+                /** @default  */
+                secret: string;
+                /**
+                 * @default {
+                 *       "chapterDownloaded": true,
+                 *       "favoritesDigest": true,
+                 *       "failureDigest": true
+                 *     }
+                 */
+                events: {
+                    /** @default true */
+                    chapterDownloaded: boolean;
+                    /** @default true */
+                    favoritesDigest: boolean;
+                    /** @default true */
+                    failureDigest: boolean;
+                };
+            };
             browser: {
                 enabled: boolean;
                 url: string;
@@ -1457,6 +1518,31 @@ export interface components {
         UpdateFavoritesSettings200Response2: string;
         UpdateFavoritesSettings200Response3: string;
         UpdateFavoritesSettings200Response4: string;
+        /** @enum {string} */
+        UpdateWebhookSettings200Response0: "" | "HTTP" | "SOCKS4" | "SOCKS5";
+        UpdateWebhookSettings200Response1: string;
+        UpdateWebhookSettings200Response2: string;
+        UpdateWebhookSettings200Response3: string;
+        UpdateWebhookSettings200Response4: string;
+        /** @default  */
+        UpdateWebhookSettingsBody0: string;
+        /** @default  */
+        UpdateWebhookSettingsBody1: string;
+        /**
+         * @default {
+         *       "chapterDownloaded": true,
+         *       "favoritesDigest": true,
+         *       "failureDigest": true
+         *     }
+         */
+        UpdateWebhookSettingsBody2: {
+            /** @default true */
+            chapterDownloaded: boolean;
+            /** @default true */
+            favoritesDigest: boolean;
+            /** @default true */
+            failureDigest: boolean;
+        };
         CatalogSearchQuery0: string;
         CatalogSearchQuery1: string;
         CatalogSearchQuery2: string;
@@ -2256,6 +2342,99 @@ export interface operations {
             };
             /** @description Request failed schema validation (typed error envelope) */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    updateWebhookSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    url?: components["schemas"]["UpdateWebhookSettingsBody0"];
+                    secret?: components["schemas"]["UpdateWebhookSettingsBody1"];
+                    events?: components["schemas"]["UpdateWebhookSettingsBody2"];
+                };
+            };
+        };
+        responses: {
+            /** @description Settings snapshot after the update */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsResponse"];
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    testSendWebhook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Delivery report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        delivered: boolean;
+                        attempts: number;
+                        status?: number;
+                        error?: string;
+                    };
+                };
+            };
+            /** @description No webhook url configured — set one via PUT /api/settings/webhook first */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
