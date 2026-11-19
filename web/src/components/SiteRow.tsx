@@ -137,7 +137,7 @@ export function SiteRow(props: {
           aria-pressed={props.isPreferred === true}
           data-testid={`prefer-toggle-${module.id}`}
           className={cn(
-            'flex w-9 shrink-0 items-center justify-center rounded-md',
+            'flex w-11 shrink-0 items-center justify-center rounded-md',
             'transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
             props.isPreferred === true ? 'text-amber-500' : 'text-muted-foreground',
           )}
