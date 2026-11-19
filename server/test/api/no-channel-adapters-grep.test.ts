@@ -9,15 +9,26 @@
  * suspects — a hit means an adapter (or adapter-shaped naming) landed
  * and CI fails.
  *
+ * Pattern shape — case-insensitive SUBSTRINGS, deliberately UNANCHORED:
+ * a `\b` whole-word form was shipped first and the review bounce
+ * (merry-woodland-refrains) proved it green under this codebase's own
+ * naming idiom — `telegramAdapter`, `sendDiscordMessage`, `ntfyClient`,
+ * `slackWebhookUrl` all evaded word boundaries. Substring matching
+ * catches every casing/compound shape; the mutation proof lives in
+ * scripts/no-channel-adapters-mutate.sh (the engine-boundary-mutate
+ * discipline: adapter-shaped fixtures planted in BOTH roots must make
+ * this gate FAIL).
+ *
  * Scope notes (the auth-removal-gate discipline):
  *   - docs/ are DELIBERATELY outside the scan: design records may NAME
  *     the services when ruling them out (this repo's north star does).
- *   - The OpenAPI snapshot under server/src/api is INSIDE the scan, so
- *     route descriptions stay brand-free by construction — the ruling
- *     is expressed as "chat/push services", never as brand names.
- *   - `slack` is scanned as a WHOLE WORD: the timing-slack local in
- *     engine/sidecar/bypass-adapter.ts was renamed (timingSlack) when
- *     this gate landed so the word can be banned outright.
+ *   - .json IS scanned — the committed OpenAPI snapshot under
+ *     server/src/api is inside the tree it pins, so route descriptions
+ *     stay brand-free by construction ("chat/push services", never
+ *     brand names).
+ *   - engine/sidecar/bypass-adapter.ts's timing constant is named
+ *     `timingMargin` precisely because a brand-shaped substring (any
+ *     casing) would trip this gate.
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -27,15 +38,19 @@ import { describe, expect, it } from 'vitest';
 const SERVER_ROOT = fileURLToPath(new URL('../../src', import.meta.url));
 const WEB_ROOT = fileURLToPath(new URL('../../../../web/src', import.meta.url));
 
-/** Per-channel adapter vocabulary that must never appear in source. */
+/**
+ * Per-channel adapter vocabulary that must never appear in source —
+ * case-insensitive SUBSTRINGS (see the header: word anchors let
+ * camelCase identifiers through; the mutation script pins this).
+ */
 const FORBIDDEN: readonly { readonly pattern: RegExp; readonly what: string }[] = [
-  { pattern: /\btelegram\b/i, what: 'Telegram adapter code' },
-  { pattern: /\bdiscord\b/i, what: 'Discord adapter code' },
-  { pattern: /\bntfy\b/i, what: 'ntfy adapter code' },
-  { pattern: /\bslack\b/i, what: 'Slack adapter code' },
+  { pattern: /telegram/i, what: 'Telegram adapter code' },
+  { pattern: /discord/i, what: 'Discord adapter code' },
+  { pattern: /ntfy/i, what: 'ntfy adapter code' },
+  { pattern: /slack/i, what: 'Slack adapter code' },
 ];
 
-const ALLOWED_SUFFIXES = new Set(['.ts', '.tsx']);
+const ALLOWED_SUFFIXES = new Set(['.ts', '.tsx', '.json']);
 
 function* walk(root: string): Generator<string> {
   let entries: fs.Dirent[];

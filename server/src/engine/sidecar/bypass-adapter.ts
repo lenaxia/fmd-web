@@ -349,10 +349,11 @@ export class FlareSolverrBypassExecutor implements BypassExecutorPort {
       const channel: SyncChannel = { control: this.syncControl.buffer as SharedArrayBuffer, resBuf: this.syncRes };
       this.worker.postMessage({ id, payload: toSolvePayload(request), sync: channel });
       // client-side safety net above the worker-side per-call budget
-      // (renamed when the no-channel-adapters grep gate landed so the
-      // brand-shaped word could be banned from the tree outright)
-      const timingSlack = 5_000;
-      const deadline = Date.now() + this.timeoutMs + timingSlack;
+      // (twice renamed for the no-channel-adapters grep gate: the
+      // substring-tightened ban matches ANY casing, so even a
+      // camelCase brand echo would trip it — keep this brand-free)
+      const timingMargin = 5_000;
+      const deadline = Date.now() + this.timeoutMs + timingMargin;
       let observed = 0;
       while (Atomics.load(this.syncControl, 1) !== id) {
         const remaining = deadline - Date.now();

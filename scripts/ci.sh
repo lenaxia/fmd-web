@@ -58,6 +58,9 @@ bash scripts/design-gate.sh
 echo "==> no-chapter-number-parsing gate (D1 §5/§7: numbering is the list ordinal, never a title parse)"
 bash scripts/no-chapter-number-parsing-gate.sh
 
+echo "==> no-channel-adapters mutation tests (D1 §3: the webhook adapter ban must FIRE on planted adapters)"
+bash scripts/no-channel-adapters-mutate.sh
+
 echo "==> web e2e: smoke + keyboard-nav + virtualization perf (vite dev server, mock API)"
 npm run e2e -w @fmd/web
 

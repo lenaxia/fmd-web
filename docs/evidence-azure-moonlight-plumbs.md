@@ -155,3 +155,45 @@ touched) and are not run here.
       story's verification).
 - [x] Long-form commit (see `git log`).
 - [x] No release tag.
+
+## Review-bounce remediation (merry-woodland-refrains verdict)
+
+The review FAILED the gate on one blocker + one minor (full transcript
+in the review evidence file), both in the no-channel-adapters gate —
+remediated in the follow-up commit, A/B-proven:
+
+- **BLOCKER — `\b`-anchored whole words let adapter-shaped camelCase
+  identifiers pass GREEN.** The review planted
+  `telegramAdapter`/`discordBridge` (both roots),
+  `sendDiscordMessage` + `ntfyClient`, and only the bare word tripped
+  the gate. Remediation, exactly as prescribed:
+  1. Patterns are now case-insensitive **substrings**
+     (`/telegram/i` etc., unanchored) — every casing/compound shape
+     matches; the gate-file header documents WHY (the bounce) and
+     points at the mutation proof.
+  2. `bypass-adapter.ts`'s timing constant renamed AGAIN
+     (`timingSlack` → `timingMargin`) — the shipped rename only
+     satisfied the word-boundary form; the substring "Slack" (any
+     casing) would now trip. Zero behavior change, disclosed.
+  3. **`scripts/no-channel-adapters-mutate.sh`** (the
+     engine-boundary-mutate discipline, wired into `scripts/ci.sh`
+     after the chapter-number gate): plants adapter-shaped fixtures
+     and requires the REAL gate test to FAIL naming the offender —
+     M1 camelCase identifiers in server/src (the review's exact
+     evading shapes, all four brands), M2 dotted-API-URL-only in
+     server/src (`api.telegram.org` endpoint string), M3 camelCase +
+     URL in web/src — then the clean-tree control (gate GREEN with
+     every plant removed, trap-guarded cleanup). Run output:
+     all mutations fired, clean-tree control green.
+- **MINOR — the header claimed the OpenAPI snapshot was inside the
+  scan while `.json` was excluded.** Resolved the STRONG way: `.json`
+  is now in `ALLOWED_SUFFIXES`, so the committed snapshot under
+  `server/src/api` is genuinely scanned (route descriptions stay
+  brand-free by construction — verified: the tightened substring
+  sweep over server/src + web/src (.ts/.tsx/.json) is clean).
+
+Post-remediation gates (all via node_modules/.bin): substring sweep
+clean · `tsc -b` clean · `eslint .` clean · story suites 40/40 ·
+`bash scripts/no-channel-adapters-mutate.sh` all-shapes-fire +
+clean-tree control · FULL `npm test` — 258 files, 2486 passed /
+3 pre-existing skips (the reviewer's post-sibling-landing baseline).
