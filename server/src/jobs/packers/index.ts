@@ -35,6 +35,8 @@ export {
   DEFAULT_MEMORY_BUDGET_BYTES,
   MemoryBudget,
 } from './budget.js';
+export { buildComicInfoXml, COMIC_INFO_ENTRY_NAME } from './comic-info.js';
+export type { ComicInfoInput } from './comic-info.js';
 export {
   DEFAULT_WATCHDOG_MS,
   PackWatchdog,

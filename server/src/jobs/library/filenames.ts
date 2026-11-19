@@ -91,6 +91,48 @@ export const CR = {
 } as const;
 
 /**
+ * The FROZEN default chapter filename template (D1 §7 — the
+ * `<numbering> <chapter>` decision): `%NUMBERING% %CHAPTER%`, a single
+ * space between the parts (the exact fix of FMD2's numbering-prepend
+ * default, uBaseUnit.pas:1823-1825). This default is FROZEN after the
+ * scan-target story — changing it later requires a migration event
+ * (existing libraries already carry the old names; the app never
+ * renames user files, D1 §3).
+ */
+export const DEFAULT_CHAPTER_NAME_TEMPLATE = '%NUMBERING% %CHAPTER%';
+
+/**
+ * FMD2's own numbering width: `Format('%.4d', [i + 1])` in
+ * uSilentThread.pas:338 — a MINIMUM of 4 digits, widened by the
+ * existing digit-padding setting when it exceeds it (D1 §7: "the
+ * existing digit-padding setting governs the minimum width").
+ */
+const NUMBERING_MIN_WIDTH = 4;
+
+/**
+ * `<numbering>` for the template: the chapter's 1-based ordinal
+ * position in the site's chapter list, zero-padded to FMD2's own
+ * minimum width (`%.4d`, uSilentThread.pas:338) or the digit-padding
+ * setting's width when larger. NEVER a number parsed out of the
+ * chapter title (D1 §5 killed-ideas; the no-chapter-number-parsing
+ * gate enforces it) — the position rides the job payload from the
+ * enqueue-time chapter list. An absent position yields '' (the
+ * template's literal text around it survives; the final trim removes
+ * the gap — a download whose list position is unknown simply names by
+ * chapter alone).
+ */
+export function formatChapterNumbering(
+  position: number | undefined,
+  digitPadding: number | undefined,
+): string {
+  if (position === undefined) {
+    return '';
+  }
+  const width = Math.max(NUMBERING_MIN_WIDTH, Math.trunc(digitPadding ?? 0));
+  return String(Math.trunc(position)).padStart(width, '0');
+}
+
+/**
  * FPC `Trim` parity (:2123): strips leading/trailing units ≤ #32 only —
  * deliberately NOT JS `.trim()`, which additionally strips Unicode
  * whitespace (U+00A0, U+2028, ...) Pascal leaves alone.

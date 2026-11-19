@@ -31,7 +31,15 @@ import { PerHostSiteLimiter } from '../jobs/download/site-limiter.js';
 import { indexFileName } from '../jobs/download/filenames.js';
 import { readMarkers, writeMarkers } from '../jobs/download/marker-store.js';
 import { createPacker } from '../jobs/packers/index.js';
-import { applyOutputRenameOptions, resolveChapterFileName, sanitizeFileName, truncateKeepTail, urlSegment } from '../jobs/library/filenames.js';
+import {
+  applyOutputRenameOptions,
+  DEFAULT_CHAPTER_NAME_TEMPLATE,
+  formatChapterNumbering,
+  resolveChapterFileName,
+  sanitizeFileName,
+  truncateKeepTail,
+  urlSegment,
+} from '../jobs/library/filenames.js';
 import { SqliteLibraryStore } from '../jobs/library/store.js';
 import type { OutputDefaultsT, PerformanceSettingsT } from '../api/schemas.js';
 import type { FileNamePolicyMode } from '@fmd/contract';
@@ -238,6 +246,7 @@ export class RuntimeJobService implements JobService {
       ...(input.mangaTitle !== undefined ? { mangaTitle: input.mangaTitle } : {}),
       chapterLink: input.chapterLink,
       ...(input.chapterName !== undefined ? { chapterName: input.chapterName } : {}),
+      ...(input.chapterPosition !== undefined ? { chapterPosition: input.chapterPosition } : {}),
       ...(input.saveTo !== undefined ? { saveTo: input.saveTo } : {}),
     } as const;
     try {
@@ -767,13 +776,15 @@ export function downloadLane(deps: DownloadLaneDeps): LaneRunnerLaneOptions {
       // Format comes from the output defaults (FMD2 Save-to parity,
       // PUT /api/settings/output): the §7.3 packer set zip/cbz/pdf/epub,
       // read per-job so a settings change applies to NEW jobs only.
+      // The seam-absent fallback carries the FROZEN scan-target
+      // defaults (D1 §2 EXIT): cbz + '%NUMBERING% %CHAPTER%'.
       // Downloads parity: the progress stage carries the FMD2 status
       // palette names — COMPRESS for the zip/cbz packers, CONVERT for
       // pdf/epub (uBaseUnit task states).
       const output: OutputDefaultsT =
         deps.outputDefaults?.() ?? {
-          format: 'zip',
-          chapterNameTemplate: '',
+          format: 'cbz',
+          chapterNameTemplate: DEFAULT_CHAPTER_NAME_TEMPLATE,
           unicodeReplacement: false,
           unicodeReplacementChar: '_',
           digitPadding: 0,
@@ -798,9 +809,12 @@ export function downloadLane(deps: DownloadLaneDeps): LaneRunnerLaneOptions {
           };
         })
         .filter((page): page is { workId: number; filePath: string; fileName: string } => page !== undefined);
-      const packed = await createPacker(output.format).pack(pages, { outputDir: workDir });
 
-      // ── finalize (§7.1 step 5): atomic move + ledger + listing row ──
+      // ── filename + folder BEFORE the pack (D1 §2 EXIT): ComicInfo
+      // Series must equal the FINAL series folder, so the effective
+      // folder resolves before the archive is built and rides the pack
+      // as metadata — the archive and its eventual library path can
+      // never disagree about the series.
       // [library-layout] the module is NOT a path segment: the default
       // target is `<libraryRoot>/<effective manga folder>/<file>` where
       // the effective folder is the clean sanitized title, or the
@@ -810,25 +824,32 @@ export function downloadLane(deps: DownloadLaneDeps): LaneRunnerLaneOptions {
       // still REPLACES the computed prefix entirely, and no effective
       // folder is derived for an overridden download.
       // Filename: the FMD2 custom-rename template when the output
-      // defaults carry one (edOptionMangaCustomRename parity; '' keeps
-      // the chapter-name fallback — the previous behavior).
+      // defaults carry one (edOptionMangaCustomRename parity — the
+      // FROZEN default is '%NUMBERING% %CHAPTER%', D1 §7; '' keeps the
+      // chapter-name fallback — the previous behavior). `<numbering>`
+      // is the payload's 1-based list ordinal zero-padded FMD2-style
+      // (uSilentThread.pas:338) — NEVER a number parsed from the
+      // chapter title (D1 §5).
+      const chapterLabel: string = payload.chapterName ?? chapterSegment;
+      const websiteLabel: string =
+        deps.engine.modules().find((m): boolean => m.id === payload.moduleId)?.name ?? '';
       const rawFileName: string =
         output.chapterNameTemplate !== ''
           ? resolveChapterFileName({
               template: output.chapterNameTemplate,
-              chapterName: payload.chapterName ?? chapterSegment,
-              website: deps.engine.modules().find((m): boolean => m.id === payload.moduleId)?.name ?? '',
+              chapterName: chapterLabel,
+              website: websiteLabel,
               manga: payload.mangaTitle ?? mangaSegment,
-              numbering: '',
+              numbering: formatChapterNumbering(payload.chapterPosition, output.digitPadding),
               // [parity-sweep] M4: assembly-resolved policy mode
               // (env > setting > parity default).
               ...(deps.fileNamePolicy !== undefined && deps.fileNamePolicy() !== undefined
                 ? { mode: deps.fileNamePolicy() }
                 : {}),
             })
-          : sanitizeFileName(payload.chapterName ?? chapterSegment) === ''
+          : sanitizeFileName(chapterLabel) === ''
             ? chapterSegment
-            : sanitizeFileName(payload.chapterName ?? chapterSegment);
+            : sanitizeFileName(chapterLabel);
       const fileName = truncateKeepTail(
         applyOutputRenameOptions(rawFileName, output, payload.mangaTitle ?? mangaSegment),
         120,
@@ -845,6 +866,29 @@ export function downloadLane(deps: DownloadLaneDeps): LaneRunnerLaneOptions {
               mangaUrl: payload.mangaUrl,
               segment: mangaSegment,
             });
+      // ComicInfo Series = the containing folder's name (D1 §3
+      // "folder name = ComicInfo Series"): the effective folder for
+      // default-layout downloads, the saveTo target's last path
+      // segment for an overridden one.
+      const seriesName: string =
+        payload.saveTo !== undefined
+          ? (payload.saveTo.split(/[\\/]/).filter((s) => s !== '').at(-1) ?? payload.saveTo)
+          : effectiveManga;
+      const packed = await createPacker(output.format).pack(pages, {
+        outputDir: workDir,
+        ...(output.format === 'zip' || output.format === 'cbz'
+          ? {
+              comicInfo: {
+                series: seriesName,
+                title: chapterLabel,
+                web: payload.mangaUrl,
+                notes: websiteLabel,
+              },
+            }
+          : {}),
+      });
+
+      // ── finalize (§7.1 step 5): atomic move + ledger + listing row ──
       const finalized = deps.library.finalize({
         manga: effectiveManga,
         fileName,

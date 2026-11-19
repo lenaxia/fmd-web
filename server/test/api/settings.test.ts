@@ -188,13 +188,13 @@ describe('§5.11 browser profile capability flip (config-driven)', (): void => {
 });
 
 describe('output defaults (FMD2 Save-to parity subset, settings-parity)', (): void => {
-  it('GET /api/settings defaults: zip + no rename template (+ the merged rename-toggle defaults)', async (): Promise<void> => {
+  it('GET /api/settings defaults: cbz + the FROZEN scan-target template (+ the merged rename-toggle defaults)', async (): Promise<void> => {
     const h = buildHarness();
     const res = await h.app.inject({ method: 'GET', url: '/api/settings' });
     expect(res.statusCode).toBe(200);
     expect(res.json().output).toEqual({
-      format: 'zip',
-      chapterNameTemplate: '',
+      format: 'cbz',
+      chapterNameTemplate: '%NUMBERING% %CHAPTER%',
       unicodeReplacement: false,
       unicodeReplacementChar: '_',
       digitPadding: 0,
@@ -221,7 +221,9 @@ describe('output defaults (FMD2 Save-to parity subset, settings-parity)', (): vo
       format: 'cbz',
       chapterNameTemplate: '%MANGA% - %CHAPTER%',
     });
-    // Back to defaults (zip, template off).
+    // Back to the pre-scan-target values EXPLICITLY (the frozen
+    // defaults are cbz + '%NUMBERING% %CHAPTER%' — this PUT is a user
+    // choice now, not a defaults reset).
     const reset = await h.app.inject({
       method: 'PUT',
       url: '/api/settings/output',
@@ -240,7 +242,8 @@ describe('output defaults (FMD2 Save-to parity subset, settings-parity)', (): vo
       });
       expect(res.statusCode, format).toBe(200);
       expect(res.json().output.format).toBe(format);
-      expect(res.json().output.chapterNameTemplate).toBe('');
+      // Omitted template falls back to the FROZEN default (D1 §7).
+      expect(res.json().output.chapterNameTemplate).toBe('%NUMBERING% %CHAPTER%');
     }
   });
 

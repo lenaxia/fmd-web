@@ -246,13 +246,17 @@ describe('GET /api/metrics (§4/§15 scripted workload)', (): void => {
       // Labels render in sorted order (kind < lane).
       expect(valueOf(exposition, 'fmd_job_failures_total{kind="net",lane="download"}')).toBe(1);
 
-      // Per-module request latency + error counts (§15).
-      expect(valueOf(exposition, `fmd_module_requests_total{module="${MODULE_A_ID}",outcome="ok"}`)).toBe(2);
+      // Per-module request latency + error counts (§15). 3 ok = the
+      // /api/info hit below + the D1 §7 chapterPosition resolution on
+      // the FIRST download create (cache miss → one GetInfo; the
+      // second create hits the info cache and never reaches the
+      // engine).
+      expect(valueOf(exposition, `fmd_module_requests_total{module="${MODULE_A_ID}",outcome="ok"}`)).toBe(3);
       expect(valueOf(exposition, `fmd_module_requests_total{module="${'d'.repeat(32)}",outcome="error"}`)).toBe(1);
-      expect(valueOf(exposition, `fmd_module_request_latency_seconds_count{module="${MODULE_A_ID}"}`)).toBe(2);
+      expect(valueOf(exposition, `fmd_module_request_latency_seconds_count{module="${MODULE_A_ID}"}`)).toBe(3);
       // Immediate fake resolves inside the smallest latency bucket.
-      expect(valueOf(exposition, `fmd_module_request_latency_seconds_bucket{module="${MODULE_A_ID}",le="0.005"}`)).toBe(2);
-      expect(hasLine(exposition, `fmd_module_request_latency_seconds_bucket{module="${MODULE_A_ID}",le="+Inf"} 2`)).toBe(true);
+      expect(valueOf(exposition, `fmd_module_request_latency_seconds_bucket{module="${MODULE_A_ID}",le="0.005"}`)).toBe(3);
+      expect(hasLine(exposition, `fmd_module_request_latency_seconds_bucket{module="${MODULE_A_ID}",le="+Inf"} 3`)).toBe(true);
 
       // Sync progress series (§6).
       expect(valueOf(exposition, 'fmd_sync_operations_total{kind="modules",outcome="ok"}')).toBe(1);

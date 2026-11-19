@@ -1082,15 +1082,49 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     return url;
   };
 
+  // ── D1 §7 `<numbering>` source ───────────────────────────────────
+  // The chapter's 1-based ordinal position in the site's chapter list,
+  // resolved through the SAME cached §5.8 info path /api/info and the
+  // batch endpoint use — the list IS the numbering authority (FMD2
+  // assigns `Format('%.4d', [i + 1])` from MangaInfo at task-build
+  // time, uSilentThread.pas:338). Best effort by contract: a fetch
+  // failure or a link the live list does not carry leaves the position
+  // absent and the filename degrades to the chapter name alone — the
+  // enqueue itself is NEVER blocked or failed by numbering. NEVER
+  // parsed from the chapter title (D1 §5 killed-ideas; the
+  // no-chapter-number-parsing gate enforces it).
+  const resolveChapterPosition = async (
+    moduleId: string,
+    mangaUrl: string,
+    chapterLink: string,
+  ): Promise<number | undefined> => {
+    const key = infoCache.key(moduleId, mangaUrl);
+    let info: NormalizedInfo | undefined = infoCache.get(key, Date.now());
+    if (info === undefined) {
+      try {
+        info = await instrumentInfo(moduleId, () => services.info.getInfo(moduleId, mangaUrl));
+      } catch {
+        return undefined;
+      }
+      infoCache.set(key, info, Date.now());
+    }
+    const index = info.chapterLinks.indexOf(chapterLink);
+    return index === -1 ? undefined : index + 1;
+  };
+
   app.post('/api/jobs/download', async (req, reply): Promise<JobCreatedResponseT> => {
     const body = parseOr400(JobCreateRequestSchema, req.body, 'download job body');
+    const mangaUrl = canonicalMangaUrl(body.moduleId, body.mangaUrl);
+    const chapterPosition =
+      body.chapterPosition ?? (await resolveChapterPosition(body.moduleId, mangaUrl, body.chapterLink));
     const { job, replayed } = services.jobs.createDownload(
       {
         moduleId: body.moduleId,
-        mangaUrl: canonicalMangaUrl(body.moduleId, body.mangaUrl),
+        mangaUrl,
         ...(body.mangaTitle !== undefined ? { mangaTitle: body.mangaTitle } : {}),
         chapterLink: body.chapterLink,
         ...(body.chapterName !== undefined ? { chapterName: body.chapterName } : {}),
+        ...(chapterPosition !== undefined ? { chapterPosition } : {}),
         ...(body.paused !== undefined ? { paused: body.paused } : {}),
         ...(body.saveTo !== undefined ? { saveTo: body.saveTo } : {}),
       },
@@ -1159,6 +1193,9 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
           ...(body.mangaTitle !== undefined ? { mangaTitle: body.mangaTitle } : {}),
           chapterLink,
           ...(chapterName !== undefined ? { chapterName } : {}),
+          // D1 §7: the resolved/selected list IS the numbering
+          // authority — 1-based list ordinal, assigned at enqueue.
+          chapterPosition: index + 1,
           ...(body.paused !== undefined ? { paused: body.paused } : {}),
           ...(body.saveTo !== undefined ? { saveTo: body.saveTo } : {}),
         },

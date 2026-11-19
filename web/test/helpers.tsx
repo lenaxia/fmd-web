@@ -179,8 +179,8 @@ export function autoCleanup(): void {
 export const FULL_SETTINGS = {
   proxy: { type: '', host: '', port: '', user: '', pass: '' },
   output: {
-    format: 'zip',
-    chapterNameTemplate: '',
+    format: 'cbz',
+    chapterNameTemplate: '%NUMBERING% %CHAPTER%',
     unicodeReplacement: false,
     unicodeReplacementChar: '_',
     digitPadding: 0,

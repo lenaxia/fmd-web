@@ -499,10 +499,17 @@ manager.
   live); links to Prometheus **/metrics** and the operations runbook.
 - **About** — server version, **Install app** (when the browser offers
   install), links to Releases / Changelog / Repository.
-- **Output defaults** — archive format (ZIP / CBZ / PDF / EPUB), the chapter
-  name template (`%MANGA% %CHAPTER%`, empty = chapter name), digit padding,
-  remove-manga-name, and unicode replacement (with its replacement
-  character).
+- **Output defaults** — archive format (ZIP / CBZ / PDF / EPUB; the
+  default is CBZ — the comic-reader library convention), the chapter
+  filename template with the placeholder vocabulary `%NUMBERING%`
+  (the chapter's zero-padded position in the site's chapter list)
+  `%CHAPTER%` `%WEBSITE%` `%MANGA%` `%AUTHOR%` `%ARTIST%` `%FILENAME%`
+  (the shipped default is `%NUMBERING% %CHAPTER%` — a frozen
+  convention scanners sort on; empty = chapter name), digit padding
+  (also the numbering width), remove-manga-name, and unicode
+  replacement (with its replacement character). New chapters also
+  carry an embedded `ComicInfo.xml` (series, title, source) inside
+  CBZ/ZIP archives for Komga/Kavita to read.
 - **Favorites checks** — the scheduler settings described in
   [Favorites lifecycle](#favorites-lifecycle).
 - **Accounts** — see [Accounts](#accounts).

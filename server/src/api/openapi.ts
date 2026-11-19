@@ -354,11 +354,18 @@ const OPERATIONS: readonly RouteOperation[] = [
     description:
       'FMD2 Save-to options parity (additive, the server-supported subset): `format` picks ' +
       'the §7.3 packer for NEW download jobs (zip/cbz/pdf/epub — FMD2\'s None loose-images mode ' +
-      'is deferred; the §7.1 library model is one packed artifact). `chapterNameTemplate` is the ' +
-      'FMD2 custom rename (edOptionMangaCustomRename) with the %WEBSITE%/%MANGA%/%AUTHOR%/' +
-      '%ARTIST%/%CHAPTER%/%NUMBERING%/%FILENAME% placeholders; \'\' keeps the chapter-name ' +
-      'fallback. PDF quality and the digit-padding/unicode rename options are deferred (D16 ' +
-      'streaming packer is DCT passthrough — see docs/UX-PARITY.md).',
+      'is deferred; the §7.1 library model is one packed artifact); its default is cbz — the ' +
+      'Komga/Kavita scan-target convention (DESIGN-NORTHSTAR §2 EXIT/§3). `chapterNameTemplate` ' +
+      'is the FMD2 custom rename (edOptionMangaCustomRename) with the %NUMBERING%/%CHAPTER%/' +
+      '%WEBSITE%/%MANGA%/%AUTHOR%/%ARTIST%/%FILENAME% placeholder vocabulary — a pure settings ' +
+      'change, no code edit; \'\' keeps the chapter-name fallback. The default template is the ' +
+      'FROZEN `<numbering> <chapter>` decision (DESIGN-NORTHSTAR §7): `%NUMBERING% %CHAPTER%` — ' +
+      'the zero-padded 1-based list ordinal plus the site\'s chapter label; the defaults are ' +
+      'frozen after the scan-target story (later changes need a migration event). ' +
+      '%NUMBERING% is NEVER a number parsed from the chapter title (the §5 killed-ideas ' +
+      'ruling; the no-chapter-number-parsing gate enforces it). PDF quality and the ' +
+      'unicode rename option details are deferred (D16 streaming packer is DCT passthrough ' +
+      '— see docs/UX-PARITY.md).',
     tags: ['settings'],
     body: OutputDefaultsUpdateRequestSchema,
     responses: {

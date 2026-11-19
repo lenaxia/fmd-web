@@ -130,6 +130,12 @@ export class FavoritesEngine {
           ...(favorite.title !== undefined ? { mangaTitle: favorite.title } : {}),
           chapterLink: chapter.link,
           ...(chapter.name !== '' ? { chapterName: chapter.name } : {}),
+          // D1 §7: <numbering> = the 1-based ordinal in the live
+          // chapter list — the diff already carries the position (the
+          // live-list index), assigned at enqueue exactly like FMD2's
+          // silent thread (uSilentThread.pas:338). Never parsed from
+          // the chapter name.
+          chapterPosition: chapter.position + 1,
           mangaKey: favorite.mangaKey,
         });
       }

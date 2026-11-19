@@ -48,6 +48,10 @@ describe('POST /api/jobs/download/batch', (): void => {
     expect(payload0.chapterLink).toBe('https://ex.org/ch/1');
     expect(payload0.chapterName).toBe('Ch. 1'); // names resolved from info
     expect(payload0.mangaTitle).toBe('Fixture Manga');
+    // D1 §7: the resolved list IS the numbering authority — each job
+    // carries its 1-based list ordinal for the %NUMBERING% filename.
+    expect(payload0.chapterPosition).toBe(1);
+    expect((jobs[1]?.payload as Record<string, unknown>).chapterPosition).toBe(2);
     // Every derived per-chapter key rides the row (§10 traceability).
     expect(jobs[0]?.idempotencyKey).toBe('batch-1:0');
     expect(jobs[1]?.idempotencyKey).toBe('batch-1:1');

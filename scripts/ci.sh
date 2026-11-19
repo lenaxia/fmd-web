@@ -55,6 +55,9 @@ npm test
 echo "==> design-system gate (tokens-only styling; tsk-fuzzy-titanium-folds)"
 bash scripts/design-gate.sh
 
+echo "==> no-chapter-number-parsing gate (D1 §5/§7: numbering is the list ordinal, never a title parse)"
+bash scripts/no-chapter-number-parsing-gate.sh
+
 echo "==> web e2e: smoke + keyboard-nav + virtualization perf (vite dev server, mock API)"
 npm run e2e -w @fmd/web
 

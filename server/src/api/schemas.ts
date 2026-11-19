@@ -26,6 +26,7 @@ import { ApiError } from './errors.js';
 // ONE definition, both surfaces.
 import { JobSchema, JobStateSchema, TimestampSchema } from '@fmd/contract';
 import type { TimestampT, JobStateT, JobT } from '@fmd/contract';
+import { DEFAULT_CHAPTER_NAME_TEMPLATE } from '../jobs/library/filenames.js';
 export {
   TimestampSchema,
   JobStateSchema,
@@ -115,12 +116,21 @@ export type ProxySettingsT = z.infer<typeof ProxySettingsSchema>;
  * Output defaults (FMD2 Save-to options parity, additive — the
  * server-supported subset). `format` maps onto the §7.3 packers
  * (zip/cbz/pdf/epub; FMD2's `None` loose-images mode is DEFERRED — the
- * §7.1 library model is one packed artifact per chapter).
- * `chapterNameTemplate` is FMD2's custom rename (edOptionMangaCustomRename,
- * frmMain.lfm:3983; %WEBSITE%/%MANGA%/%AUTHOR%/%ARTIST%/%CHAPTER%/
- * %NUMBERING%/%FILENAME% via resolveChapterFileName) — '' disables it
- * (chapter-name fallback, the previous behavior). The itemized rename
- * subset ([parity-sweep] M5/M6/M8): `unicodeReplacement` +
+ * §7.1 library model is one packed artifact per chapter); the default
+ * is `cbz` — the Komga/Kavita scan-target convention (D1 §2 EXIT/§3).
+ * `chapterNameTemplate` is FMD2's custom rename
+ * (edOptionMangaCustomRename, frmMain.lfm:3983) with the token
+ * vocabulary %NUMBERING% %CHAPTER% %WEBSITE% %MANGA% %AUTHOR% %ARTIST%
+ * %FILENAME% (uBaseUnit.pas:251-257) — a pure settings change, no code
+ * edit needed to re-template filenames. Its default is the FROZEN
+ * `<numbering> <chapter>` decision (D1 §7): `%NUMBERING% %CHAPTER%` —
+ * the zero-padded 1-based list ordinal plus the site's chapter label.
+ * The default template/format are FROZEN after the scan-target story:
+ * changing either later requires a migration event (the library tree
+ * already carries the old names and fmd-web never renames user
+ * files). `''` disables the template (chapter-name fallback, the
+ * pre-scan-target behavior). The itemized rename subset
+ * ([parity-sweep] M5/M6/M8): `unicodeReplacement` +
  * `unicodeReplacementChar` (FMD2 lfm:3947/4183 — non-ASCII filename
  * chars replaced; off = byte-parity default), `digitPadding`
  * (lfm:4026 chapter-numbering digits — minimum page-name width inside
@@ -130,8 +140,8 @@ export type ProxySettingsT = z.infer<typeof ProxySettingsSchema>;
  * — no re-encode knob; see docs/UX-PARITY.md).
  */
 export const OutputDefaultsSchema = z.object({
-  format: z.enum(['zip', 'cbz', 'pdf', 'epub']).default('zip'),
-  chapterNameTemplate: z.string().max(500).default(''),
+  format: z.enum(['zip', 'cbz', 'pdf', 'epub']).default('cbz'),
+  chapterNameTemplate: z.string().max(500).default(DEFAULT_CHAPTER_NAME_TEMPLATE),
   /** FMD2 lfm:3947/4183: replace non-ASCII filename chars (off = parity). */
   unicodeReplacement: z.boolean().default(false),
   /** The replacement char (exactly one; '_' FMD2-style default). */
@@ -825,6 +835,15 @@ export const JobCreateRequestSchema = z.object({
   mangaTitle: z.string().min(1).optional(),
   chapterLink: z.string().min(1),
   chapterName: z.string().min(1).optional(),
+  /**
+   * 1-based ordinal position of the chapter in the site's chapter
+   * list (D1 §7) — the `<numbering>` filename source, zero-padded
+   * FMD2-style (uSilentThread.pas:338). Optional: the server resolves
+   * it through the cached chapter list when absent (best effort); a
+   * download whose position stays unknown names the file by chapter
+   * alone. NEVER parsed from the chapter title (D1 §5).
+   */
+  chapterPosition: z.number().int().min(1).optional(),
   /**
    * Idempotency key (§10): identical-key replay → the ORIGINAL job with
    * 200; key reuse with a DIFFERENT payload → 409.

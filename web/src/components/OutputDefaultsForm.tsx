@@ -28,8 +28,8 @@ const FORMAT_OPTIONS: readonly { value: OutputFormatT; label: string }[] = [
 
 /** The persisted shape's defaults (mirror of the zod schema defaults). */
 const DEFAULTS = {
-  format: 'zip' as OutputFormatT,
-  chapterNameTemplate: '',
+  format: 'cbz' as OutputFormatT,
+  chapterNameTemplate: '%NUMBERING% %CHAPTER%',
   digitPadding: 0,
   removeMangaName: false,
   unicodeReplacement: false,
@@ -109,14 +109,15 @@ export function OutputDefaultsForm(): ReactElement {
           <Input
             id="output-template"
             className="w-80"
-            placeholder="%MANGA% %CHAPTER% (empty = chapter name)"
+            placeholder="%NUMBERING% %CHAPTER% (frozen default; empty = chapter name)"
             value={draft.chapterNameTemplate}
             onChange={(e): void => {
               setDraft({ ...draft, chapterNameTemplate: e.target.value });
             }}
           />
           <p className="text-xs text-muted-foreground">
-            Placeholders: %WEBSITE% %MANGA% %AUTHOR% %ARTIST% %CHAPTER% %NUMBERING% %FILENAME%
+            Placeholders: %NUMBERING% %CHAPTER% %WEBSITE% %MANGA% %AUTHOR% %ARTIST% %FILENAME%
+            (%NUMBERING% = zero-padded chapter list position)
           </p>
         </div>
 

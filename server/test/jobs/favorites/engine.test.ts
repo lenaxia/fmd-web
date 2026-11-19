@@ -238,6 +238,10 @@ describe('FavoritesEngine — DoCheck orchestration (§7.2)', (): void => {
       mangaUrl: MANGA_URL,
       chapterLink: 'https://site.example/ch/1',
       chapterName: 'Ch. 1',
+      // D1 §7: the payload carries the 1-based live-list ordinal —
+      // the <numbering> source, assigned at enqueue (never a title
+      // parse; the gate enforces it).
+      chapterPosition: 1,
       mangaKey: downloadedChaptersKey(MODULE, MANGA_URL),
     });
   });

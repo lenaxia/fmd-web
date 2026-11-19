@@ -704,6 +704,12 @@ export interface JobCreateInput {
   mangaTitle?: string;
   chapterLink: string;
   chapterName?: string;
+  /**
+   * 1-based ordinal position in the site's chapter list (D1 §7 — the
+   * `<numbering>` source; enqueue-time assignment, never parsed from
+   * the chapter title). Absent = position unknown.
+   */
+  chapterPosition?: number;
   /** §7.2 favorites provenance (per-chapter completion dual-writes the favorite side). */
   mangaKey?: string;
   /** Add-as-stopped hold: the lane skips the row until resumed. */
@@ -882,6 +888,7 @@ export class InMemoryJobService implements JobService {
         ...(input.mangaTitle !== undefined ? { mangaTitle: input.mangaTitle } : {}),
         chapterLink: input.chapterLink,
         ...(input.chapterName !== undefined ? { chapterName: input.chapterName } : {}),
+        ...(input.chapterPosition !== undefined ? { chapterPosition: input.chapterPosition } : {}),
         ...(input.saveTo !== undefined ? { saveTo: input.saveTo } : {}),
       },
       state: 'queued',
@@ -1465,6 +1472,13 @@ export interface FavoriteService {
   remove(id: string): void;
   /** Manual check-now: the immediate DoCheck cycle for one favorite. */
   checkNow(id: string): Promise<FavoriteCheckResponseT>;
+  /**
+   * [pipe-health] Manual missing-chapter check (FCheckMissing parity,
+   * web-adapted): live info → reverse link-diff → the per-favorite
+   * report of chapters REMOVED from the site's list since recorded.
+   * REPORT ONLY — never rewrites the downloaded list, never enqueues.
+   */
+  checkMissing(id: string): Promise<FavoriteMissingCheckResponseT>;
   /**
    * Batch check (btFavoritesCheckNewChapter parity): every favorite in
    * scope gets one DoCheck cycle, sequentially; a {@link cancelBatch}

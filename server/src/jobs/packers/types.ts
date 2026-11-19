@@ -1,4 +1,5 @@
 import type { Readable } from 'node:stream';
+import type { ComicInfoInput } from './comic-info.js';
 
 /**
  * Packer boundary types (DESIGN.md §7.3, D16) — the streaming pack stage
@@ -46,6 +47,13 @@ export interface PackOptions {
   readonly outputDir: string;
   /** Human title (EPUB metadata / PDF outline-adjacent Info subject). */
   readonly title?: string;
+  /**
+   * ComicInfo.xml metadata (D1 §2 EXIT): embedded as the FIRST entry
+   * of zip/cbz outputs for the Komga/Kavita scanner. The epub/pdf
+   * packers carry their own native metadata and ignore it (documented
+   * divergence — the scan-target convention is the cbz library).
+   */
+  readonly comicInfo?: ComicInfoInput;
   /** D16 per-job memory budget in bytes (default 512 MiB). */
   readonly memoryBudgetBytes?: number;
   /** Pack watchdog deadline in ms (default 120 000). */

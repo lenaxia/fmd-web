@@ -20,6 +20,7 @@ import { WsHub } from '../../src/api/ws/hub.js';
 import { ActiveDownloadRegistry, downloadLane } from '../../src/runtime/download-lane.js';
 import type { DownloadLaneDeps } from '../../src/runtime/download-lane.js';
 import { SqliteLibraryStore } from '../../src/jobs/library/store.js';
+import { readZipEntry, walkZipCentralDirectory } from '../../src/jobs/packers/index.js';
 import type { OutputDefaultsT } from '../../src/api/schemas.js';
 import type { ChapterModuleHooks, TaskWriter } from '../../src/jobs/download/types.js';
 import type { EngineDownloadOptions, ModuleDownloadHooks } from '../../src/engine/facade.js';
@@ -85,7 +86,7 @@ describe('download lane honors the output defaults on NEW jobs (PUT /api/setting
   });
 
   /** Build the lane deps + a job runner against the fixture site. */
-  const setup = (output: OutputDefaultsT): { run: (chapterName: string) => Promise<{ stages: string[]; outcome: { type: string } }> } => {
+  const setup = (output: OutputDefaultsT): { run: (chapterName: string, chapterPosition?: number) => Promise<{ stages: string[]; outcome: { type: string } }> } => {
     current = output;
     const harness = openHarness(dir);
     queue = harness.queue;
@@ -105,7 +106,10 @@ describe('download lane honors the output defaults on NEW jobs (PUT /api/setting
     };
     const lane = downloadLane(deps);
     return {
-      run: (chapterName: string): Promise<{ stages: string[]; outcome: { type: string } }> => {
+      run: (
+        chapterName: string,
+        chapterPosition?: number,
+      ): Promise<{ stages: string[]; outcome: { type: string } }> => {
         const { job } = queue.enqueue({
           type: 'download',
           moduleId: MODULE_ID,
@@ -113,6 +117,7 @@ describe('download lane honors the output defaults on NEW jobs (PUT /api/setting
           mangaTitle: 'Fixture Manga',
           chapterLink: `${base}${CHAPTER_PATH}`,
           chapterName,
+          ...(chapterPosition !== undefined ? { chapterPosition } : {}),
         } as never);
         const stages: string[] = [];
         const outcomePromise = lane.handler(job as never, {
@@ -155,6 +160,42 @@ describe('download lane honors the output defaults on NEW jobs (PUT /api/setting
     expect(fs.existsSync(row?.path ?? '')).toBe(true);
     // §7.2 ledger dual-write: the chapter is recorded as downloaded.
     expect(library.getDownloadedChapters(MODULE_ID, `${base}/`)).toContain(CHAPTER_PATH);
+  });
+
+  it('frozen scan-target defaults end-to-end: %NUMBERING% %CHAPTER% name, .cbz, ComicInfo.xml with Series = folder', async (): Promise<void> => {
+    base = await site.start();
+    engineStub.create = async (): Promise<ModuleDownloadHooks> => fixtureSiteHooks(base) as ModuleDownloadHooks;
+    const { run } = setup({
+      format: 'cbz',
+      chapterNameTemplate: '%NUMBERING% %CHAPTER%',
+      unicodeReplacement: false,
+      unicodeReplacementChar: '_',
+      digitPadding: 0,
+      removeMangaName: false,
+    });
+
+    const { outcome } = await run('The Beginning', 1);
+    expect(outcome.type).toBe('done');
+
+    const rows = library.listLibraryFiles();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.fileName).toBe('0001 The Beginning.cbz');
+    const row = library.getLibraryFile(String(rows[0]?.id ?? ''));
+    expect(row).toBeDefined();
+    // The Komga/Kavita convention over the whole artifact:
+    const finalPath = row?.path ?? '';
+    expect(finalPath.endsWith('.cbz')).toBe(true);
+    expect(path.basename(path.dirname(finalPath))).toBe('Fixture Manga');
+    const walk = await walkZipCentralDirectory(finalPath);
+    expect(walk.entries[0]?.name).toBe('ComicInfo.xml');
+    const xml = (await readZipEntry(finalPath, 'ComicInfo.xml')).toString('utf8');
+    expect(xml).toContain('<Series>Fixture Manga</Series>');
+    expect(xml).toContain('<Title>The Beginning</Title>');
+    expect(xml).toContain(`<Web>${`${base}/`}</Web>`);
+    expect(xml).toContain('<Notes>FixtureSite</Notes>');
+    expect(xml).not.toMatch(/<(Number|Volume)>/);
+    // No dotfiles or stage residue in the series folder.
+    expect(fs.readdirSync(path.dirname(finalPath)).every((name): boolean => !name.startsWith('.'))).toBe(true);
   });
 
   it('a settings CHANGE applies to the NEXT job only (per-job read): epub + the chapter-name fallback', async (): Promise<void> => {

@@ -21,6 +21,17 @@ export const DownloadChapterJobSchema = z.object({
   mangaTitle: z.string().min(1).optional(),
   chapterLink: z.string().min(1),
   chapterName: z.string().min(1).optional(),
+  /**
+   * The chapter's 1-based ordinal position in the site's chapter list
+   * (D1 §7 — the `<numbering>` source). Assigned at ENQUEUE time from
+   * the same live chapter list the link-keyed diff / batch resolve
+   * uses (FMD2 parity: uSilentThread.pas:338 assigns
+   * `Format('%.4d', [i + 1])` while building the task from
+   * MangaInfo). NEVER derived by parsing the chapter title; absent =
+   * position unknown (the filename template degrades to the chapter
+   * name alone).
+   */
+  chapterPosition: z.number().int().min(1).optional(),
   /** §7.2 favorites provenance: the per-chapter completion dual-writes
    * the favorite-side ledger when this key is present. */
   mangaKey: z.string().min(1).optional(),

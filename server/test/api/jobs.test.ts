@@ -4,7 +4,7 @@
  * → 409), job listing with state filter + keyset cursor.
  */
 import { describe, expect, it } from 'vitest';
-import { buildHarness, expectEnvelope, MODULE_A_ID } from './helpers.js';
+import { buildHarness, expectEnvelope, FakeInfoService, MODULE_A_ID } from './helpers.js';
 
 function downloadBody(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
@@ -16,6 +16,85 @@ function downloadBody(overrides: Record<string, unknown> = {}): Record<string, u
     ...overrides,
   };
 }
+
+/** An info seam that always fails like a dead origin (plain error). */
+function failingInfo(): FakeInfoService {
+  return new (class extends FakeInfoService {
+    public override async getInfo(): Promise<never> {
+      await Promise.resolve();
+      throw new Error('origin unreachable');
+    }
+  })([MODULE_A_ID]);
+}
+
+describe('POST /api/jobs/download — chapterPosition (D1 §7 numbering source)', (): void => {
+  it('an omitted position resolves through the cached info seam: 1-based list ordinal rides the payload', async (): Promise<void> => {
+    const h = buildHarness();
+    const res = await h.app.inject({
+      method: 'POST',
+      url: '/api/jobs/download',
+      // FakeInfoService lists https://ex.org/ch/1 then /ch/2 — the
+      // second entry is ordinal 2.
+      payload: downloadBody({
+        idempotencyKey: 'pos-replay',
+        chapterLink: 'https://ex.org/ch/2',
+        chapterName: 'Ch. 2',
+      }),
+    });
+    expect(res.statusCode).toBe(201);
+    expect((res.json().job.payload as Record<string, unknown>).chapterPosition).toBe(2);
+    // the info seam was consulted for the canonical manga url
+    expect(h.info.calls.some((call): boolean => call.url === 'https://ex.org/manga/x')).toBe(true);
+    // an identical keyed replay resolves the SAME position
+    // (cache-consistent) → the ORIGINAL job with 200, no fingerprint
+    // drift.
+    const replay = await h.app.inject({
+      method: 'POST',
+      url: '/api/jobs/download',
+      payload: downloadBody({
+        idempotencyKey: 'pos-replay',
+        chapterLink: 'https://ex.org/ch/2',
+        chapterName: 'Ch. 2',
+      }),
+    });
+    expect(replay.statusCode).toBe(200);
+    expect(replay.json().job).toEqual(res.json().job);
+  });
+
+  it('an explicit chapterPosition is honored verbatim and skips the info seam entirely', async (): Promise<void> => {
+    const h = buildHarness();
+    const res = await h.app.inject({
+      method: 'POST',
+      url: '/api/jobs/download',
+      payload: downloadBody({ chapterPosition: 7 }),
+    });
+    expect(res.statusCode).toBe(201);
+    expect((res.json().job.payload as Record<string, unknown>).chapterPosition).toBe(7);
+    expect(h.info.calls).toEqual([]);
+  });
+
+  it('a link the live list does not carry enqueues WITHOUT a position (201, never blocked)', async (): Promise<void> => {
+    const h = buildHarness();
+    const res = await h.app.inject({
+      method: 'POST',
+      url: '/api/jobs/download',
+      payload: downloadBody({ chapterLink: 'https://ex.org/manga/x/9' }),
+    });
+    expect(res.statusCode).toBe(201);
+    expect((res.json().job.payload as Record<string, unknown>).chapterPosition).toBeUndefined();
+  });
+
+  it('an info-seam failure is swallowed: the enqueue still lands (numbering is best effort)', async (): Promise<void> => {
+    const h = buildHarness({ info: failingInfo() });
+    const res = await h.app.inject({
+      method: 'POST',
+      url: '/api/jobs/download',
+      payload: downloadBody(),
+    });
+    expect(res.statusCode).toBe(201);
+    expect((res.json().job.payload as Record<string, unknown>).chapterPosition).toBeUndefined();
+  });
+});
 
 describe('POST /api/jobs/download — idempotency semantics (§10)', (): void => {
   it('happy path: fresh create returns 201 with the queued job', async (): Promise<void> => {
