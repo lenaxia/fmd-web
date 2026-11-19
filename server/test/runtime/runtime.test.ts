@@ -60,8 +60,8 @@ function runtimeConfig(dataDir: string, mockBase: string, bootstrapDisabled = fa
     dataDir,
     port: 0,
     staticDir: undefined,
-    // R4 auth env surface: unset in tests (auth off).
-    password: undefined,
+    // R4 auth env surface: unset in tests (open deployment — the only
+    // kind there is; the token still self-generates on first boot).
     apiTokenEnv: undefined,
     moduleSync: {
       repo: e2e.repo,
@@ -359,16 +359,15 @@ describe('D20 auto-bootstrap (offline, real pipelines, real mock script)', (): v
       },
       version: '0.1.0-test',
     });
-    // First boot GENERATED (unconditional — no password configured).
+    // First boot GENERATED (unconditional — the *arr script key).
     expect(logs).toContainEqual(expect.stringContaining('auth: api token generated on first run'));
-    expect(logs).toContainEqual(expect.stringContaining('auth: api-token (password off, api token on)'));
-    // The token read is OPEN (password off = open deployment).
+    expect(logs).toContainEqual(expect.stringContaining('auth: api key only (api token on'));
+    // The token read is OPEN (token-only world: the app is ungated).
     const t1 = await first.app.inject({ method: 'GET', url: '/api/settings/api-token' });
     expect(t1.statusCode).toBe(200);
-    const body1 = t1.json() as { token: string | null; envManaged: boolean; mode: string };
+    const body1 = t1.json() as { token: string | null; envManaged: boolean };
     expect(body1.token).toMatch(/^[0-9a-f]{64}$/);
     expect(body1.envManaged).toBe(false);
-    expect(body1.mode).toBe('api-token');
     await first.dispose();
 
     // Second boot on the SAME data dir → the SAME token (persisted in

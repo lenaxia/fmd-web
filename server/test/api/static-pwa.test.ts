@@ -1,14 +1,16 @@
 /**
- * PWA static-asset contract (R5 arrival + §10 auth ordering): the
- * manifest, its icons and the SPA shell are PLAIN GETs — they must
- * serve 200 UNAUTHENTICATED whether password auth is off (open
- * deployment) or on (the pre-login SPA still has to render so the
- * login page can appear — §10 "plain GETs stay open"), while the
- * auth gate keeps holding the state-changing API set. The manifest
- * additionally MUST carry `application/manifest+json` — browsers
- * refuse to parse it otherwise and PWA installability silently dies
- * (the regression this file pins: the static map missed the
- * extension and served `application/octet-stream`).
+ * PWA static-asset contract (R5 arrival + §10 auth ordering, updated
+ * for the token-only world — owner decision 2026-11): the manifest,
+ * its icons and the SPA shell are PLAIN GETs and serve 200
+ * UNAUTHENTICATED, and with the optional-password mode REMOVED no
+ * route credential-walls anything — the *arr gate ordering invariant
+ * holds vacuously (GETs never gated; there is no state-changing wall
+ * either; the R4 API key is accepted wherever presented, never
+ * demanded). The manifest additionally MUST carry
+ * `application/manifest+json` — browsers refuse to parse it otherwise
+ * and PWA installability silently dies (the regression this file
+ * pins: the static map missed the extension and served
+ * `application/octet-stream`).
  */
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -18,7 +20,6 @@ import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../src/api/app.js';
 import { registerStatic } from '../../src/runtime/static.js';
 import { createDefaultServices, type ApiServices } from '../../src/main.js';
-import { expectEnvelope } from './helpers.js';
 
 const MANIFEST_BODY = JSON.stringify({
   name: 'FMD Web',
@@ -26,7 +27,7 @@ const MANIFEST_BODY = JSON.stringify({
   icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }],
 });
 
-function staticApp(auth?: { password: string }): { app: FastifyInstance; dist: string } {
+function staticApp(auth?: { apiToken: string }): { app: FastifyInstance; dist: string } {
   const services: ApiServices = createDefaultServices();
   const app = buildApp(services, {
     version: '0.1.0-test',
@@ -47,8 +48,8 @@ afterAll((): void => {
   }
 });
 
-describe('PWA static assets + auth gate ordering', (): void => {
-  it('manifest + icons + SPA shell serve 200 unauthenticated with auth OFF; manifest is application/manifest+json', async (): Promise<void> => {
+describe('PWA static assets + token-only auth ordering', (): void => {
+  it('manifest + icons + SPA shell serve 200 unauthenticated; manifest is application/manifest+json', async (): Promise<void> => {
     const { app, dist } = staticApp();
     dists.push(dist);
 
@@ -66,8 +67,9 @@ describe('PWA static assets + auth gate ordering', (): void => {
     expect(shell.headers['content-type']).toContain('text/html');
   });
 
-  it('with password auth ON the same static GETs stay open for the pre-login SPA while state-changing routes are gated', async (): Promise<void> => {
-    const { app, dist } = staticApp({ password: 'sekrit' });
+  it('with the API key CONFIGURED (every real deployment) the same static GETs stay open and NO route is credential-walled: state-changing routes serve unauthenticated, the key is merely accepted', async (): Promise<void> => {
+    const TOKEN = 'a'.repeat(64);
+    const { app, dist } = staticApp({ apiToken: TOKEN });
     dists.push(dist);
 
     const manifest = await app.inject({ method: 'GET', url: '/manifest.webmanifest' });
@@ -80,30 +82,33 @@ describe('PWA static assets + auth gate ordering', (): void => {
     const shell = await app.inject({ method: 'GET', url: '/' });
     expect(shell.statusCode).toBe(200);
 
-    // The gate itself is intact: a state-changing route without a
-    // session is the typed 401, and the password flow still grants it.
-    const gated = await app.inject({
+    // The password-mode gate is gone: a state-changing route WITHOUT
+    // any credential serves (the browser SPA contract — *arr
+    // auth-None; user-facing auth belongs to a reverse proxy in
+    // front).
+    const anonymous = await app.inject({
       method: 'POST',
       url: '/api/favorites',
       payload: { moduleId: 'a'.repeat(32), url: '/title/x' },
     });
-    expect(gated.statusCode).toBe(401);
-    expectEnvelope(gated.body, 'unauthorized');
+    expect(anonymous.statusCode).toBe(201);
 
-    const login = await app.inject({
-      method: 'POST',
-      url: '/api/auth/login',
-      payload: { password: 'sekrit' },
-    });
-    expect(login.statusCode).toBe(200);
-    const cookie = login.headers['set-cookie'] as string | string[] | undefined;
-    const cookieHeader = (Array.isArray(cookie) ? cookie[0] : cookie) ?? '';
+    // The R4 API key is ACCEPTED wherever presented (it authenticates
+    // the script, it never gates the browser).
     const authed = await app.inject({
       method: 'POST',
       url: '/api/favorites',
-      headers: { cookie: cookieHeader.split(';')[0] ?? '' },
-      payload: { moduleId: 'a'.repeat(32), url: '/title/x' },
+      headers: { authorization: `Bearer ${TOKEN}` },
+      payload: { moduleId: 'a'.repeat(32), url: '/title/y' },
     });
     expect(authed.statusCode).toBe(201);
+
+    // The removed login endpoint must stay removed.
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { password: 'anything' },
+    });
+    expect(login.statusCode).toBe(404);
   });
 });

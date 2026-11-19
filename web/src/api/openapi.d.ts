@@ -499,7 +499,7 @@ export interface paths {
         put?: never;
         /**
          * Create a download job (idempotent, §10)
-         * @description With `idempotencyKey`: an identical-key replay returns the ORIGINAL job with 200 while it is live (queued/running/retry); key reuse with a DIFFERENT payload returns 409. Re-enqueueing a TERMINAL original (done/failed/cancelled) starts a FRESH job chained under the same key (`<key>#<n>`, 201) — the re-download semantic; the fresh attempt resumes from the persisted chapter markers ('D' slots skip their images). Fresh creates return 201. MangaPage parity options (additive): `paused` (FMD2 cbAddAsStopped, frmMain.lfm:1110) creates the job queued-but-held — the download lane will not claim it until POST /api/jobs/{id}/resume; `saveTo` (FMD2 edSaveTo, frmMain.pas:5613) is a custom save directory that REPLACES the `library/<module>/<manga>` prefix at finalize (relative paths resolve against the library root).
+         * @description With `idempotencyKey`: an identical-key replay returns the ORIGINAL job with 200 while it is live (queued/running/retry); key reuse with a DIFFERENT payload returns 409. Re-enqueueing a TERMINAL original (done/failed/cancelled) starts a FRESH job chained under the same key (`<key>#<n>`, 201) — the re-download semantic; the fresh attempt resumes from the persisted chapter markers ('D' slots skip their images). Fresh creates return 201. MangaPage parity options (additive): `paused` (FMD2 cbAddAsStopped, frmMain.lfm:1110) creates the job queued-but-held — the download lane will not claim it until POST /api/jobs/{id}/resume; `saveTo` (FMD2 edSaveTo, frmMain.pas:5613) is a custom save directory that REPLACES the `library/<manga>` prefix at finalize (relative paths resolve against the library root).
          */
         post: operations["createDownloadJob"];
         delete?: never;
@@ -968,26 +968,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/auth/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Password login → session cookie (rate-limited 10/min)
-         * @description Only mounted/meaningful with FMD_WEB_PASSWORD set (otherwise 400 auth_disabled). Sets an HttpOnly, SameSite=Strict session cookie; the 11th attempt within a minute is 429.
-         */
-        post: operations["login"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/settings/api-token": {
         parameters: {
             query?: never;
@@ -997,7 +977,7 @@ export interface paths {
         };
         /**
          * R4 single app-wide API token state (Settings → API)
-         * @description The ONE deployment-wide token (Sonarr/Radarr model — never lists, never per-user). Returns the stored value (`null` when the FMD_WEB_API_TOKEN env pin owns the secret — read it from the deployment environment instead), the envManaged flag (UI shows 'Managed via environment', hides Regenerate) and the active auth mode (none|password|api-token|password+api-token). Credential-gated in EVERY authed mode — the token secret never rides an open read.
+         * @description The ONE deployment-wide token (Sonarr/Radarr model — never lists, never per-user); the app's ONLY credential since the optional-password mode was removed. Returns the stored value (`null` when the FMD_WEB_API_TOKEN env pin owns the secret — read it from the deployment environment instead) and the envManaged flag (UI shows 'Managed via environment', hides Regenerate). The app is open (*arr auth-None semantics): this read is anonymous — front the app with a reverse proxy (Authelia/Authentik/PocketID) when it must not be.
          */
         get: operations["getApiToken"];
         put?: never;
@@ -1019,7 +999,7 @@ export interface paths {
         put?: never;
         /**
          * Rotate the single API token in place (audit-logged)
-         * @description Generates a new 32-byte-hex value and replaces the old one IMMEDIATELY — the old key is rejected on the next request, so update your scripts right after rotating (docs/API.md key-rotation runbook). Audit-logged as a settings change (the log never carries the value). 409 when FMD_WEB_API_TOKEN pins the token (rotate the env instead). Rotation needs NO password auth (*arr semantics: the token is a script key independent of the login gate; a token never gates the deployment — runbook §API token).
+         * @description Generates a new 32-byte-hex value and replaces the old one IMMEDIATELY — the old key is rejected on the next request, so update your scripts right after rotating (docs/API.md key-rotation runbook). Audit-logged as a settings change (the log never carries the value). 409 when FMD_WEB_API_TOKEN pins the token (rotate the env instead). Reachable unauthenticated (*arr semantics: the token is a script key on an open deployment — runbook §API token).
          */
         post: operations["regenerateApiToken"];
         delete?: never;
@@ -1095,7 +1075,7 @@ export interface components {
         ApiErrorEnvelope: {
             error: {
                 /** @enum {string} */
-                code: "validation_error" | "unauthorized" | "not_found" | "conflict" | "rate_limited" | "bad_request" | "upstream_error" | "internal_error" | "no_site_match" | "ambiguous_site";
+                code: "validation_error" | "not_found" | "conflict" | "bad_request" | "upstream_error" | "internal_error" | "no_site_match" | "ambiguous_site";
                 message: string;
                 details?: unknown;
             };
@@ -1205,8 +1185,6 @@ export interface components {
         ApiTokenResponse: {
             token: string | null;
             envManaged: boolean;
-            /** @enum {string} */
-            mode: "none" | "password" | "api-token" | "password+api-token";
         };
         CatalogEntry: {
             link: string;
@@ -1570,15 +1548,6 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
             /** @description Module not found */
             404: {
                 headers: {
@@ -1637,15 +1606,6 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
             /** @description Unhandled server failure (typed error envelope) */
             500: {
                 headers: {
@@ -1693,15 +1653,6 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
             /** @description Module not found */
             404: {
                 headers: {
@@ -1741,15 +1692,6 @@ export interface operations {
                         accounts: components["schemas"]["AccountView"][];
                         count: number;
                     };
-                };
-            };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
             /** @description Unhandled server failure (typed error envelope) */
@@ -1804,15 +1746,6 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
             /** @description Unhandled server failure (typed error envelope) */
             500: {
                 headers: {
@@ -1850,15 +1783,6 @@ export interface operations {
             };
             /** @description Request failed schema validation (typed error envelope) */
             400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1912,15 +1836,6 @@ export interface operations {
             };
             /** @description Request failed schema validation (typed error envelope) */
             400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1984,15 +1899,6 @@ export interface operations {
                     "application/json": components["schemas"]["SettingsResponse"];
                 };
             };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
             /** @description Unhandled server failure (typed error envelope) */
             500: {
                 headers: {
@@ -2035,15 +1941,6 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
             /** @description Unhandled server failure (typed error envelope) */
             500: {
                 headers: {
@@ -2079,15 +1976,6 @@ export interface operations {
             };
             /** @description Request failed schema validation (typed error envelope) */
             400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2142,15 +2030,6 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
             /** @description Unhandled server failure (typed error envelope) */
             500: {
                 headers: {
@@ -2195,15 +2074,6 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
             /** @description Unhandled server failure (typed error envelope) */
             500: {
                 headers: {
@@ -2241,15 +2111,6 @@ export interface operations {
             };
             /** @description Request failed schema validation (typed error envelope) */
             400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2303,15 +2164,6 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
             /** @description Unhandled server failure (typed error envelope) */
             500: {
                 headers: {
@@ -2350,15 +2202,6 @@ export interface operations {
             };
             /** @description Request failed schema validation (typed error envelope) */
             400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2421,15 +2264,6 @@ export interface operations {
             };
             /** @description Request failed schema validation (typed error envelope) */
             400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2502,15 +2336,6 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
             /** @description Catalog not found */
             404: {
                 headers: {
@@ -2575,15 +2400,6 @@ export interface operations {
             };
             /** @description Request failed schema validation (typed error envelope) */
             400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2965,15 +2781,6 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
             /** @description Module not found */
             404: {
                 headers: {
@@ -3115,15 +2922,6 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
             /** @description Idempotency key reused with a different payload */
             409: {
                 headers: {
@@ -3191,15 +2989,6 @@ export interface operations {
             };
             /** @description Request failed schema validation (typed error envelope) */
             400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3382,15 +3171,6 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
             /** @description Job not found */
             404: {
                 headers: {
@@ -3440,15 +3220,6 @@ export interface operations {
             };
             /** @description Request failed schema validation (typed error envelope) */
             400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3514,15 +3285,6 @@ export interface operations {
             };
             /** @description Request failed schema validation (typed error envelope) */
             400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3598,15 +3360,6 @@ export interface operations {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
             /** @description Job not found */
             404: {
                 headers: {
@@ -3675,15 +3428,6 @@ export interface operations {
             };
             /** @description Scope does not apply to this action */
             400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4793,71 +4537,6 @@ export interface operations {
             };
         };
     };
-    login: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    password: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Session established */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        /** @constant */
-                        ok: true;
-                    };
-                };
-            };
-            /** @description Auth disabled (no FMD_WEB_PASSWORD) */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Invalid credentials */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Login rate limit exceeded (valid Bearer api-token requests bypass it) */
-            429: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-            /** @description Unhandled server failure (typed error envelope) */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
-                };
-            };
-        };
-    };
     getApiToken: {
         parameters: {
             query?: never;
@@ -4874,15 +4553,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiTokenResponse"];
-                };
-            };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
             /** @description Unhandled server failure (typed error envelope) */
@@ -4912,15 +4582,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiTokenResponse"];
-                };
-            };
-            /** @description Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set) */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiErrorEnvelope"];
                 };
             };
             /** @description Env-pinned (FMD_WEB_API_TOKEN) — rotate the secret in the deployment environment */

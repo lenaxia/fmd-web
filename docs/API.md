@@ -13,21 +13,25 @@ Reference material:
 - **Typed client** — the SPA's client (`web/src/api/openapi.d.ts`) is generated from
   the same snapshot (`npm run gen:api -w @fmd/web`); scripts in TypeScript can do the
   same with `openapi-typescript`.
-- **Runbook** — token lifecycle, env pinning and the auth-modes matrix:
+- **Runbook** — token lifecycle, env pinning and the token-only contract:
   [docs/runbook.md](runbook.md) § *API token (R4)*.
 
-## Authentication — the single app-wide token
+## Authentication — API key only
 
 ONE token per deployment, Sonarr/Radarr-style: 32-byte hex, auto-generated on
-the first start of EVERY unpinned deployment (with or without a password —
-it is an *arr-style script key, not a password companion), manageable in
-**Settings → API** (masked key, reveal, copy, Regenerate), optionally pinned
-via the `FMD_WEB_API_TOKEN` environment variable for headless deployments.
-There are never multiple tokens, token lists, per-user or per-scope tokens —
-if a future need sounds like "another token", the answer is a regenerate of
-the single key.
+the first start of EVERY unpinned deployment (an *arr-style script key),
+manageable in **Settings → API** (masked key, reveal, copy, Regenerate),
+optionally pinned via the `FMD_WEB_API_TOKEN` environment variable for
+headless deployments. There are never multiple tokens, token lists, per-user
+or per-scope tokens — if a future need sounds like "another token", the
+answer is a regenerate of the single key.
 
-Send it on every request:
+The token is the app's ONLY credential (the optional-password mode was
+REMOVED — owner decision 2026-11): the app performs no user authentication.
+For user-facing auth, put **Authelia, Authentik or PocketID** in front via
+your reverse proxy — that is the documented and supported pattern.
+
+Send the key on every request:
 
 ```bash
 TOKEN=e2e00000000000000000000000000000000000000000000000000000000cafe
@@ -36,32 +40,34 @@ BASE=http://localhost:3000
 curl -H "Authorization: Bearer $TOKEN" "$BASE/api/modules"
 ```
 
-### Auth-modes matrix
+### The one auth mode: open + API key (*arr auth-None semantics)
 
-| password | API token | Effective behavior |
-| --- | --- | --- |
-| set | set | Either credential grants the gated set: session cookie (login) **or** Bearer token. Reads stay open for the pre-login SPA. |
-| unset | set | **Open deployment** — the token never gates: the SPA works login-free (front the app with a reverse proxy when you need a human gate); scripts send the Bearer token, which is accepted everywhere and also bypasses the login rate limit. |
-| set | unset | Today's cookie flow unchanged (writes need the session; reads open). |
-| unset | unset | Auth off — everything open; a token is still generated (script key). |
+| API token | Effective behavior |
+| --- | --- |
+| active (always, once generated) | **Open deployment** — every `/api` route, state-changing POSTs included, and `/ws` answer without a credential (the SPA works login-free; front the app with a reverse proxy when you need a human gate). Scripts send the Bearer key, which is accepted everywhere. |
 
 Facts that matter to scripts:
 
 - `Authorization: Bearer <token>` is accepted on **every** `/api` route and the
   `/ws` upgrade (`?token=` query param works for browser WS clients that cannot
   set headers).
-- Wrong/missing token when required (password-authed deployments) → `401`
-  with the typed envelope `{"error":{"code":"unauthorized","message":"session
-  required (POST /api/auth/login) or Bearer api token"}}`.
+- A wrong key never locks you out (open is open) — it simply does not
+  authenticate: the request is served as anonymous and labeled `auth="none"`.
 - Verification is constant-time; the token never appears in logs, metrics or
-  `GET /api/settings` (it lives only on `GET /api/settings/api-token` —
-  credential-gated when a password is set; on an open deployment it is
-  readable by whoever can reach the app, exactly *arr's auth-None semantics).
-- Token requests **bypass the login rate limit** (10 logins/min) — a browser's
-  exhausted login window never throttles your scripts.
-- `/healthz` and `/readyz` are never gated (Docker healthchecks).
-- `fmd_http_requests_total{auth="none|cookie|token",…}` in `/api/metrics`
+  `GET /api/settings` (it lives only on `GET /api/settings/api-token`,
+  readable by whoever can reach the app, exactly *arr's auth-None semantics —
+  your reverse proxy owns that read in gated deployments).
+- `/healthz` and `/readyz` are plain reads (Docker healthchecks).
+- `fmd_http_requests_total{auth="none|token",…}` in `/api/metrics`
   counts every request by how it authenticated.
+
+### Upgrading from password auth (BREAKING)
+
+Instances that had a password set upgrade to token-only auth:
+`FMD_WEB_PASSWORD` is no longer read, `POST /api/auth/login` is gone
+(404), and old session cookies are ignored. The API token continues to
+work unchanged — same value, same Bearer spelling. Humans who relied on
+the password gate should front the app with a reverse proxy (see above).
 
 ## Cookbook
 
@@ -272,47 +278,46 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" "$BASE/api/sync/catalog/$MOD" 
 curl -s -X POST -H "Authorization: Bearer $TOKEN" "$BASE/api/sync/catalog/all" | jq .
 ```
 
-## Reverse-proxy / scripts-first recipe (password unset)
+## Reverse-proxy / scripts-first recipe
 
 Headless/compose deployment where scripts (and/or a reverse proxy's
-auth) are the consumer:
+auth) are the consumer — this is now the ONLY deployment shape:
 
 ```yaml
 # compose (env pin — the token NEVER enters the settings store)
 environment:
-  FMD_WEB_API_TOKEN: ${FMD_WEB_API_TOKEN}   # no FMD_WEB_PASSWORD
+  FMD_WEB_API_TOKEN: ${FMD_WEB_API_TOKEN}
 ```
 
-- With no password the deployment is **open**: every `/api` route,
-  state-changing POSTs included, and `/ws` answer without a
-  credential (`/healthz` + `/readyz` were always open). Scripts send
-  the Bearer token anyway — it is accepted everywhere and bypasses the
-  login rate limit.
-- `GET /api/settings/api-token` reports `{"token":null,"envManaged":true,"mode":"api-token"}`
+- The deployment is **open**: every `/api` route, state-changing POSTs
+  included, and `/ws` answer without a credential (`/healthz` +
+  `/readyz` are plain reads). Scripts send the Bearer key anyway — it
+  is accepted everywhere.
+- `GET /api/settings/api-token` reports `{"token":null,"envManaged":true}`
   — the UI shows "Managed via environment" and hides Regenerate.
-- Without the env pin a token is still generated on first run (open
-  deployment, script key): read it from Settings → API or
-  `GET /api/settings/api-token`, then front the app with your proxy's
-  auth (authelia/authentik/basic-auth) when humans need a gate — the
-  token read is reachable by anyone who can reach the app, exactly
-  *arr's auth-None semantics.
+- Without the env pin a token is still generated on first run (script
+  key): read it from Settings → API or `GET /api/settings/api-token`,
+  then front the app with your proxy's auth (Authelia/Authentik/
+  PocketID/basic-auth) when humans need a gate — the token read is
+  reachable by anyone who can reach the app, exactly *arr's auth-None
+  semantics.
 - Everything in this cookbook works with the token alone — that is
   exactly how the evidence run was executed.
 
 ## Key-rotation runbook (regenerate → update scripts)
 
 1. Fetch/confirm the current key: Settings → API (copy button), or
-   `GET /api/settings/api-token` with your session/token.
+   `GET /api/settings/api-token`.
 2. Rotate:
    ```bash
    curl -s -X POST -H "Authorization: Bearer $OLD_TOKEN" \
      "$BASE/api/settings/api-token/regenerate" | jq .token
    ```
    (or the Regenerate button — confirm dialog: *"Revokes the current key
-   immediately — update your scripts"*). No password needs to be
-   configured — rotation is a script-key operation (*arr semantics).
-3. The OLD key is rejected on its very next request (verified in the evidence
-   run: `401` on gated routes); the rotation is audit-logged as
+   immediately — update your scripts"*). Rotation is a script-key
+   operation (*arr semantics).
+3. The OLD key stops authenticating its presenter on the very next
+   request; the rotation is audit-logged as
    `{"event":"audit","setting":"api_token","action":"regenerate"}` — the log
    never carries the value.
 4. Update every script/env that carried the old key. Env-pinned deployments
@@ -321,10 +326,7 @@ environment:
 
 ## Limits and notes
 
-- Login rate limit (10/min) applies to `POST /api/auth/login` only; Bearer
-  requests bypass it.
 - One 32-byte-hex token per deployment — regenerate to rotate; there is no
   second token, expiry schedule or scoping (permanent non-goal, R2/R4).
-- The token settings route is credential-gated whenever a password is
-  set; on open deployments the secret is reachable by whoever can reach
-  the app (auth-None parity — put a proxy in front when that matters).
+- The token settings route is readable by whoever can reach the app
+  (auth-None parity — put a proxy in front when that matters).

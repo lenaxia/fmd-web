@@ -55,7 +55,7 @@ describe('generated API client vs committed OpenAPI snapshot', (): void => {
       '"/api/info"',
       '"/api/jobs/download"',
       '"/api/jobs"',
-      '"/api/auth/login"',
+      '"/api/settings/api-token"',
       '"/healthz"',
       '"/readyz"',
     ]) {

@@ -46,10 +46,8 @@ export const ApiErrorEnvelopeSchema = z.object({
   error: z.object({
     code: z.enum([
       'validation_error',
-      'unauthorized',
       'not_found',
       'conflict',
-      'rate_limited',
       'bad_request',
       'upstream_error',
       'internal_error',
@@ -78,17 +76,9 @@ export const ReadyzResponseSchema = z.object({
 export type ReadyzResponseT = z.infer<typeof ReadyzResponseSchema>;
 
 // ── auth ─────────────────────────────────────────────────────────────
-
-export const LoginRequestSchema = z.object({
-  password: z.string().min(1),
-});
-export type LoginRequestT = z.infer<typeof LoginRequestSchema>;
-
-export const LoginResponseSchema = z.object({ ok: z.literal(true) });
-export type LoginResponseT = z.infer<typeof LoginResponseSchema>;
-
-/** Session cookie name (HttpOnly, SameSite=Strict). */
-export const SESSION_COOKIE = 'fmd_session';
+// (The optional-password mode is REMOVED — owner decision 2026-11. There
+// is no login schema and no session cookie; the R4 single API token is
+// the app's only credential, verified in api/auth.ts.)
 
 // ── proxy settings (§5.4 SetProxy parity, global + per-module) ───────
 
@@ -213,15 +203,11 @@ export type DiagnosticsSettingsT = z.infer<typeof DiagnosticsSettingsSchema>;
  * (Sonarr/Radarr model); `token` is null when nothing is stored or the
  * env pin owns the secret (read it from the deployment environment).
  */
-export const ApiTokenModeSchema = z.enum(['none', 'password', 'api-token', 'password+api-token']);
-export type ApiTokenModeT = z.infer<typeof ApiTokenModeSchema>;
 export const ApiTokenResponseSchema = z.object({
   /** The stored token value; null when none stored or env-managed. */
   token: z.string().nullable(),
   /** True when FMD_WEB_API_TOKEN pins the value (env > settings). */
   envManaged: z.boolean(),
-  /** The active auth surface (startup-log vocabulary, never the value). */
-  mode: ApiTokenModeSchema,
 });
 export type ApiTokenResponseT = z.infer<typeof ApiTokenResponseSchema>;
 

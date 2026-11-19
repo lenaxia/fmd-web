@@ -729,7 +729,7 @@ export interface DownloadJobInput {
   readonly idempotencyKey?: string;
   /** cbAddAsStopped parity: queued but held until POST /api/jobs/:id/resume. */
   readonly paused?: boolean;
-  /** edSaveTo parity: custom finalize directory (replaces library/<module>/<manga>). */
+  /** edSaveTo parity: custom finalize directory (replaces library/<manga>). */
   readonly saveTo?: string;
 }
 

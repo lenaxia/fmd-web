@@ -70,7 +70,7 @@ describe('main.ts bridge: raw http → Fastify app (healthcheck path)', (): void
     });
   });
 
-  it('the bridge passes auth cookies through to the app (login over the socket)', async (): Promise<void> => {
+  it('the bridge passes POST bodies through to the app (a write over the raw socket)', async (): Promise<void> => {
     const { createApp: build, createDefaultServices: services } = await import('../../src/main.js');
     const app = build(services());
     const server = createHttp(respond(app));
@@ -82,15 +82,17 @@ describe('main.ts bridge: raw http → Fastify app (healthcheck path)', (): void
     await listening;
     const port = (server.address() as AddressInfo).port;
     try {
-      // With no password set, login is 400 auth_disabled (envelope shape intact).
-      const res = await fetch(`http://127.0.0.1:${String(port)}/api/auth/login`, {
+      // Token-only world: no login route exists — a state-changing
+      // POST through the raw bridge proves body/method passthrough and
+      // the open (*arr auth-None) contract in one shot.
+      const res = await fetch(`http://127.0.0.1:${String(port)}/api/modules/bulk`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ password: 'x' }),
+        body: JSON.stringify({ category: 'no-such-category', enabled: true }),
       });
-      expect(res.status).toBe(400);
-      const envelope = (await res.json()) as { error?: { code?: string } };
-      expect(envelope.error?.code).toBe('bad_request');
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { updated?: number };
+      expect(body.updated).toBe(0);
     } finally {
       await new Promise<void>((resolve): void => {
         server.close((): void => resolve());

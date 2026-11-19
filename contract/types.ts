@@ -312,10 +312,8 @@ export interface HostLogger {
 /** Machine-readable error codes (stable contract values for the SPA). */
 export type ApiErrorCode =
   | 'validation_error'
-  | 'unauthorized'
   | 'not_found'
   | 'conflict'
-  | 'rate_limited'
   | 'bad_request'
   | 'upstream_error'
   | 'internal_error'

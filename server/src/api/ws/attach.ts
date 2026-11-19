@@ -20,10 +20,11 @@ export interface WsAttachOptions {
   /** Upgrade path handled by this hub (default `/ws`). */
   readonly path?: string;
   /**
-   * Auth gate run BEFORE the handshake completes (default: allow all).
-   * The §10 optional password auth hands its session-cookie check in
-   * here; returning false (or rejecting) responds 401 and destroys the
-   * socket.
+   * Optional gate run BEFORE the handshake completes (default: allow
+   * all); returning false (or rejecting) responds 401 and destroys the
+   * socket. Unused by the app itself since the optional-password mode
+   * was removed (owner decision 2026-11) — the hub is open — but kept
+   * as a seam for embedders/tests that need an upgrade gate.
    */
   readonly authenticate?: (req: IncomingMessage) => boolean | Promise<boolean>;
 }

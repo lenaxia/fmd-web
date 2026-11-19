@@ -242,7 +242,6 @@ beforeAll(async (): Promise<void> => {
     liveScrapeTtlMs: 6 * 60 * 60 * 1000,
     liveScrapeConcurrency: 1,
     liveScrapeHostLimit: 4,
-    password: undefined,
     apiTokenEnv: undefined,
   };
   stub = new StubModuleRuntime([stubRegistration()]);
@@ -376,7 +375,6 @@ function runtimeConfigOf(dir: string): RuntimeConfig {
       liveScrapeTtlMs: 6 * 60 * 60 * 1000,
       liveScrapeConcurrency: 1,
       liveScrapeHostLimit: 4,
-      password: undefined,
       apiTokenEnv: undefined,
     }),
   ) as RuntimeConfig;

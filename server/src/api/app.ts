@@ -136,7 +136,7 @@ import {
   type ModuleSummaryT,
   type ReadyzResponseT,
 } from './schemas.js';
-import { registerAuth, AuthService, type AuthConfig } from './auth.js';
+import { AuthService, type AuthConfig } from './auth.js';
 import { attachWebSocketHub, type WsAttachment } from './ws/attach.js';
 import type { WsHub } from './ws/hub.js';
 import { CoverProxyService } from './cover-proxy.js';
@@ -238,9 +238,9 @@ export interface AppOptions {
   /** When undefined, auth is disabled and every route is open. */
   readonly auth?: AuthConfig | undefined;
   /**
-   * R4: pre-built auth service (runtime assembly) so the raw server's
-   * /ws gate shares the SAME session store + token provider as this
-   * app. Absent → built from `auth` above.
+   * R4: pre-built auth service (runtime assembly) so this app shares
+   * the SAME token provider/verification as the raw server entry.
+   * Absent → built from `auth` above.
    */
   readonly authService?: AuthService;
   /**
@@ -403,24 +403,22 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     },
   });
 
-  // ── auth (§10 cookie flow + the R4 single API token) ─────────────
+  // ── auth (R4 single API token — the only credential) ─────────────
   // The runtime assembly may hand in a pre-built service so the raw
-  // server's /ws gate (runtime-entry) shares the SAME session store +
-  // token provider as this app; tests/buildApp-only hosts get a fresh
-  // one from the config.
-  const auth: AuthService = options.authService ?? new AuthService(options.auth ?? { password: undefined });
-  registerAuth(app, auth);
+  // server entry shares the SAME token provider as this app;
+  // tests/buildApp-only hosts get a fresh one from the config. There
+  // is NO request gate: the optional-password mode was removed (owner
+  // decision 2026-11) — every route serves unauthenticated, and the
+  // token only ever authenticates (accepted wherever presented).
+  const auth: AuthService = options.authService ?? new AuthService(options.auth ?? {});
 
   // ── /ws (§10 + D19) — real-socket upgrades only; inject never sees them ──
-  // R4: the upgrade is credential-gated whenever the single API token
-  // is active (header preferred; ?token= for browser clients; the
-  // session cookie also grants when the password flow is on). Without
-  // a token the hub is exactly as open as today.
+  // Open hub: with the password flow removed there is no credential
+  // wall on upgrades (browser live tiles never demanded a bearer; the
+  // R4 token is accepted wherever presented but never gates).
   let wsAttachment: WsAttachment | undefined;
   if (options.wsHub !== undefined) {
-    wsAttachment = attachWebSocketHub(app.server, options.wsHub, {
-      authenticate: (req): boolean => auth.checkUpgradeRequest(req),
-    });
+    wsAttachment = attachWebSocketHub(app.server, options.wsHub);
     app.addHook('onClose', async (): Promise<void> => {
       wsAttachment?.dispose();
     });
@@ -652,24 +650,24 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
   });
 
   // ── R4 single app-wide API token (Settings → API) ─────────────────
-  // GET is credential-gated in EVERY authed mode (the token secret must
-  // never ride an open read — the auth hook holds TOKEN_SECRET_ROUTES);
-  // the value only travels here and in the regenerate response.
+  // The app is OPEN (*arr auth-None semantics: the SPA reads its own
+  // key here — R4 "shown in Settings"); the value only travels here
+  // and in the regenerate response. Put a reverse proxy in front when
+  // that read must not be anonymous (docs/API.md).
   app.get('/api/settings/api-token', async (): Promise<ApiTokenResponseT> => {
     return ApiTokenResponseSchema.parse({
       token: auth.tokenEnvManaged ? null : (auth.effectiveApiToken() ?? null),
       envManaged: auth.tokenEnvManaged,
-      mode: auth.authMode(),
     });
   });
 
   // Regenerate rotates the ONE value in place (old key rejected on the
   // next request — the provider reads the store live). Env-pinned
   // deployments refuse: the secret lives in the environment, rotate it
-  // there. Rotation needs NO password auth: the token is an *arr-style
-  // script key — a reverse-proxy deployment (password unset) rotates it
-  // like any other, and with auth off the API stays open to the SPA
-  // regardless (token existence never gates).
+  // there. Rotation is reachable unauthenticated: the token is an
+  // *arr-style script key on an open deployment (the R4 flow is
+  // unchanged — whoever reaches the app can rotate, exactly like
+  // rotating on any other open settings route).
   app.post('/api/settings/api-token/regenerate', async (): Promise<ApiTokenResponseT> => {
     if (auth.tokenEnvManaged) {
       throw new ApiError(
@@ -681,7 +679,7 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     const token = randomBytes(32).toString('hex');
     settings.setApiToken(token);
     options.onAudit?.({ setting: 'api_token', action: 'regenerate' });
-    return ApiTokenResponseSchema.parse({ token, envManaged: false, mode: auth.authMode() });
+    return ApiTokenResponseSchema.parse({ token, envManaged: false });
   });
 
   // ── sync ──────────────────────────────────────────────────────────

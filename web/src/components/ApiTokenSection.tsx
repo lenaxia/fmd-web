@@ -1,16 +1,13 @@
 /**
  * R4 Settings → API section: the SINGLE app-wide API token
- * (Sonarr/Radarr model, docs/UX-PARITY.md R4). Masked key with a
+ * (Sonarr/Radarr model, docs/UX-PARITY.md R4) — the app's ONLY
+ * credential (the optional-password mode was removed; user-facing
+ * auth belongs to a reverse proxy in front). Masked key with a
  * reveal toggle + copy button + Regenerate behind a confirm dialog
  * ("Revokes the current key immediately — update your scripts").
  * Env-pinned deployments (FMD_WEB_API_TOKEN) show "Managed via
  * environment" and hide Regenerate — the secret lives in the
  * deployment environment, rotation happens there (runbook §API token).
- *
- * *arr semantics (owner directive): the token ALWAYS renders — it
- * exists and rotates with NO password configured. Auth off = an open
- * deployment (reverse-proxy fronting is first-class); the token is the
- * script key, not a password companion.
  */
 import { useState, type ReactElement } from 'react';
 import { Check, Copy, Eye, EyeOff, KeyRound, RotateCw } from 'lucide-react';
@@ -30,13 +27,6 @@ import {
 function mask(token: string): string {
   return token.length <= 4 ? '••••' : `••••••••••••••••${token.slice(-4)}`;
 }
-
-const MODE_LABEL: Record<string, string> = {
-  none: 'open (no token yet)',
-  password: 'password (cookie login)',
-  'api-token': 'open deployment · token for scripts',
-  'password+api-token': 'password + API token',
-};
 
 export function ApiTokenSection(): ReactElement {
   const tokenQuery = useApiToken();
@@ -85,11 +75,10 @@ export function ApiTokenSection(): ReactElement {
       <p className="mb-2 text-xs text-muted-foreground">
         The single app-wide API token (Sonarr/Radarr-style); one key per deployment, used by
         scripts via <code>Authorization: Bearer &lt;token&gt;</code> on every /api route and
-        /ws. It exists and rotates whether or not a password is set: with auth off this is an
-        open deployment (reverse-proxy fronting is first-class) and the token is your script
-        key; anyone who can reach the app can read it, like *arr without auth. Cookbook:
-        docs/API.md. Auth mode:{' '}
-        <span data-testid="api-token-mode">{data !== undefined ? (MODE_LABEL[data.mode] ?? data.mode) : '…'}</span>
+        /ws. It is the app&rsquo;s only credential: the app performs no user authentication — for
+        user-facing auth put Authelia, Authentik or PocketID in front via your reverse proxy.
+        Anyone who can reach the app can read this key, like *arr without auth. Cookbook:
+        docs/API.md.
       </p>
 
       {tokenQuery.isError ? (

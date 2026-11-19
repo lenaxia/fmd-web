@@ -1,11 +1,10 @@
 /**
- * R4 /ws upgrade auth (real loopback WebSockets, offline): the upgrade
- * gate keys on the PASSWORD flow only (*arr semantics) — Authorization
- * header preferred, `?token=` query param for browser WS clients, the
- * session cookie also granting when the password flow is on. Password
- * off (even with a token present) keeps the open hub; password on:
- * wrong or missing credentials reject the handshake with a plain-HTTP
- * 401 before any hub state exists.
+ * R4 /ws upgrade auth (real loopback WebSockets, offline), updated for
+ * the token-only world (owner decision 2026-11): the optional-password
+ * credential wall is REMOVED — the hub is open. Browser live tiles
+ * connect with no credentials; `Authorization: Bearer` and `?token=`
+ * remain accepted spellings for script clients (they authenticate, a
+ * credential is never demanded).
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import type { AddressInfo } from 'node:net';
@@ -18,7 +17,6 @@ import type { JobT } from '@fmd/contract';
 
 const HOST = '127.0.0.1';
 const TOKEN = 'a'.repeat(64);
-const PASSWORD = 'hunter2';
 
 interface Running {
   readonly app: FastifyInstance;
@@ -27,9 +25,9 @@ interface Running {
   close(): Promise<void>;
 }
 
-async function startServer(auth: AuthConfig): Promise<Running> {
+async function startServer(auth?: AuthConfig): Promise<Running> {
   const hub = new WsHub({ tickIntervalMs: 0 });
-  const harness = buildHarness({ auth, wsHub: hub });
+  const harness = buildHarness({ ...(auth !== undefined ? { auth } : {}), wsHub: hub });
   const app = harness.app;
   await app.listen({ port: 0, host: HOST });
   const port = (app.server.address() as AddressInfo).port;
@@ -69,10 +67,6 @@ function tryConnect(port: number, opts: ConnectOptions = {}): Promise<WsClient> 
   });
 }
 
-async function expectRejected(port: number, opts: ConnectOptions): Promise<void> {
-  await expect(tryConnect(port, opts)).rejects.toThrow(/401/);
-}
-
 let jobSeq = 0;
 function publish(hub: WsHub): string {
   jobSeq += 1;
@@ -105,19 +99,8 @@ function nextFrame(ws: WsClient, timeoutMs = 5000): Promise<{ type: string; id?:
   });
 }
 
-async function loginCookie(server: Running): Promise<string> {
-  const res = await server.app.inject({
-    method: 'POST',
-    url: '/api/auth/login',
-    payload: { password: PASSWORD },
-  });
-  expect(res.statusCode).toBe(200);
-  const setCookie = res.headers['set-cookie'] as string;
-  return setCookie.split(';')[0] ?? '';
-}
-
 const servers: Running[] = [];
-async function server(auth: AuthConfig): Promise<Running> {
+async function server(auth?: AuthConfig): Promise<Running> {
   const s = await startServer(auth);
   servers.push(s);
   return s;
@@ -129,20 +112,27 @@ afterEach(async () => {
   }
 });
 
-// ── token present + password unset → OPEN upgrade (*arr) ────────────
+// ── open hub: no credential is ever demanded ─────────────────────────
 
-describe('R4 /ws upgrade: token present + password unset → open upgrade', (): void => {
-  it('browser live tiles connect with NO credentials (a token never gates)', async (): Promise<void> => {
-    const s = await server({ password: undefined, apiToken: TOKEN });
-    const ws = await tryConnect(s.port);
+describe('R4 /ws upgrade: open hub (token-only world)', (): void => {
+  it('browser live tiles connect with NO credentials, token configured or not', async (): Promise<void> => {
+    const withToken = await server({ apiToken: TOKEN });
+    const ws = await tryConnect(withToken.port);
     ws.send(JSON.stringify({ type: 'hello' }));
-    const id = publish(s.hub);
+    const id = publish(withToken.hub);
     expect((await nextFrame(ws)).id).toBe(id);
     ws.close();
+
+    const withoutToken = await server();
+    const ws2 = await tryConnect(withoutToken.port);
+    ws2.send(JSON.stringify({ type: 'hello' }));
+    const id2 = publish(withoutToken.hub);
+    expect((await nextFrame(ws2)).id).toBe(id2);
+    ws2.close();
   });
 
-  it('the Authorization header is still accepted (and serves the hub)', async (): Promise<void> => {
-    const s = await server({ password: undefined, apiToken: TOKEN });
+  it('the Authorization header is accepted (and serves the hub)', async (): Promise<void> => {
+    const s = await server({ apiToken: TOKEN });
     const ws = await tryConnect(s.port, { headers: { authorization: `Bearer ${TOKEN}` } });
     ws.send(JSON.stringify({ type: 'hello' }));
     const id = publish(s.hub);
@@ -151,7 +141,7 @@ describe('R4 /ws upgrade: token present + password unset → open upgrade', (): 
   });
 
   it('the ?token= query param still connects (browser WS clients)', async (): Promise<void> => {
-    const s = await server({ password: undefined, apiToken: TOKEN });
+    const s = await server({ apiToken: TOKEN });
     const ws = await tryConnect(s.port, { path: `/ws?token=${TOKEN}` });
     ws.send(JSON.stringify({ type: 'hello' }));
     const id = publish(s.hub);
@@ -159,56 +149,9 @@ describe('R4 /ws upgrade: token present + password unset → open upgrade', (): 
     ws.close();
   });
 
-  it('a WRONG token is simply ignored when the password is off (open upgrade)', async (): Promise<void> => {
-    const s = await server({ password: undefined, apiToken: TOKEN });
+  it('a WRONG or stale token never rejects the handshake (a credential only labels, never gates)', async (): Promise<void> => {
+    const s = await server({ apiToken: TOKEN });
     const ws = await tryConnect(s.port, { headers: { authorization: `Bearer ${'b'.repeat(64)}` } });
-    ws.close();
-  });
-});
-
-describe('R4 /ws upgrade: token + password deployment', (): void => {
-  it('a browser session cookie also grants the upgrade', async (): Promise<void> => {
-    const s = await server({ password: PASSWORD, apiToken: TOKEN });
-    await expectRejected(s.port, {});
-    const cookie = await loginCookie(s);
-    const ws = await tryConnect(s.port, { headers: { cookie } });
-    ws.send(JSON.stringify({ type: 'hello' }));
-    const id = publish(s.hub);
-    expect((await nextFrame(ws)).id).toBe(id);
-    ws.close();
-  });
-
-  it('the Bearer token still grants alongside the cookie flow', async (): Promise<void> => {
-    const s = await server({ password: PASSWORD, apiToken: TOKEN });
-    const ws = await tryConnect(s.port, { headers: { authorization: `Bearer ${TOKEN}` } });
-    ws.send(JSON.stringify({ type: 'hello' }));
-    const id = publish(s.hub);
-    expect((await nextFrame(ws)).id).toBe(id);
-    ws.close();
-  });
-});
-
-// ── password unset → open hub ────────────────────────────────────────
-
-describe('R4 /ws upgrade: password-less deployments keep the open hub', (): void => {
-  it('no auth at all: open upgrade (no-auth deployments)', async (): Promise<void> => {
-    const s = await server({ password: undefined });
-    const ws = await tryConnect(s.port);
-    ws.send(JSON.stringify({ type: 'hello' }));
-    const id = publish(s.hub);
-    expect((await nextFrame(ws)).id).toBe(id);
-    ws.close();
-  });
-});
-
-// ── password on (token absent) → cookie-gated hub ────────────────────
-
-describe('R4 /ws upgrade: password-only deployment', (): void => {
-  it('anonymous upgrade rejects (401); a browser session cookie grants it', async (): Promise<void> => {
-    const s = await server({ password: PASSWORD });
-    await expectRejected(s.port, {});
-    const cookie = await loginCookie(s);
-    const ws = await tryConnect(s.port, { headers: { cookie } });
     ws.send(JSON.stringify({ type: 'hello' }));
     const id = publish(s.hub);
     expect((await nextFrame(ws)).id).toBe(id);

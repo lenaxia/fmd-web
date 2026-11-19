@@ -53,8 +53,6 @@ import {
   LibraryListQuerySchema,
   LibraryOrphanFileSchema,
   LastRescanResponseSchema,
-  LoginRequestSchema,
-  LoginResponseSchema,
   LibraryListResponseSchema,
   RescanQuerySchema,
   RescanResponseSchema,
@@ -157,8 +155,6 @@ const errorResponse = (status: number, description: string): [string, ResponseEn
 
 const validation = (): [string, ResponseEntry] =>
   errorResponse(400, 'Request failed schema validation (typed error envelope)');
-const unauthorized = (): [string, ResponseEntry] =>
-  errorResponse(401, 'Missing/invalid session (state-changing route with FMD_WEB_PASSWORD set)');
 const notFound = (what: string): [string, ResponseEntry] => errorResponse(404, `${what} not found`);
 const upstream = (why: string): [string, ResponseEntry] => errorResponse(502, why);
 const malformedCursor = (): [string, ResponseEntry] => errorResponse(400, 'Malformed cursor');
@@ -204,7 +200,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     body: ModuleUpdateRequestSchema,
     responses: {
       200: { description: 'Updated module', schema: ModuleSummarySchema },
-      ...errors(validation(), unauthorized(), notFound('Module'), internal()),
+      ...errors(validation(), notFound('Module'), internal()),
     },
   },
   {
@@ -223,7 +219,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     body: ModuleBulkUpdateRequestSchema,
     responses: {
       200: { description: 'The resolved module set after the write + count', schema: ModuleBulkUpdateResponseSchema },
-      ...errors(validation(), unauthorized(), internal()),
+      ...errors(validation(), internal()),
     },
   },
   {
@@ -246,7 +242,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     tags: ['modules'],
     responses: {
       200: { description: 'Probe verdict + the resulting (possibly unchanged) availability record', schema: ModuleCheckResponseSchema },
-      ...errors(validation(), unauthorized(), notFound('Module'), internal()),
+      ...errors(validation(), notFound('Module'), internal()),
     },
   },
   {
@@ -261,7 +257,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     tags: ['accounts'],
     responses: {
       200: { description: 'Account list', schema: AccountListResponseSchema },
-      ...errors(unauthorized(), internal()),
+      ...errors(internal()),
     },
   },
   {
@@ -277,7 +273,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     body: AccountUpsertRequestSchema,
     responses: {
       201: { description: 'Stored account projection', schema: AccountResponseSchema },
-      ...errors(validation(), unauthorized(), internal()),
+      ...errors(validation(), internal()),
     },
   },
   {
@@ -289,7 +285,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     tags: ['accounts'],
     responses: {
       200: { description: 'Removed', schema: z.object({ ok: z.literal(true) }) },
-      ...errors(validation(), unauthorized(), notFound('Account'), internal()),
+      ...errors(validation(), notFound('Account'), internal()),
     },
   },
   {
@@ -307,7 +303,6 @@ const OPERATIONS: readonly RouteOperation[] = [
       200: { description: 'Login outcome', schema: AccountLoginResponseSchema },
       ...errors(
         validation(),
-        unauthorized(),
         notFound('Account'),
         errorResponse(409, 'Account disabled or the module binds no OnLogin handler'),
         errorResponse(502, 'The module OnLogin run failed (typed error envelope)'),
@@ -330,7 +325,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     tags: ['settings'],
     responses: {
       200: { description: 'Settings snapshot', schema: SettingsResponseSchema },
-      ...errors(unauthorized(), internal()),
+      ...errors(internal()),
     },
   },
   {
@@ -346,7 +341,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     body: ProxyUpdateRequestSchema,
     responses: {
       200: { description: 'Settings snapshot after the update', schema: SettingsResponseSchema },
-      ...errors(validation(), unauthorized(), internal()),
+      ...errors(validation(), internal()),
     },
   },
   {
@@ -366,7 +361,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     body: OutputDefaultsUpdateRequestSchema,
     responses: {
       200: { description: 'Settings snapshot after the update', schema: SettingsResponseSchema },
-      ...errors(validation(), unauthorized(), internal()),
+      ...errors(validation(), internal()),
     },
   },
   {
@@ -385,7 +380,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     body: PerformanceSettingsUpdateRequestSchema,
     responses: {
       200: { description: 'Settings snapshot after the update', schema: SettingsResponseSchema },
-      ...errors(validation(), unauthorized(), internal()),
+      ...errors(validation(), internal()),
     },
   },
   {
@@ -401,7 +396,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     body: RetentionSettingsUpdateRequestSchema,
     responses: {
       200: { description: 'Settings snapshot after the update', schema: SettingsResponseSchema },
-      ...errors(validation(), unauthorized(), internal()),
+      ...errors(validation(), internal()),
     },
   },
   {
@@ -417,7 +412,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     body: FilenamePolicySettingsUpdateRequestSchema,
     responses: {
       200: { description: 'Settings snapshot after the update', schema: SettingsResponseSchema },
-      ...errors(validation(), unauthorized(), internal()),
+      ...errors(validation(), internal()),
     },
   },
   {
@@ -433,7 +428,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     body: DiagnosticsSettingsUpdateRequestSchema,
     responses: {
       200: { description: 'Settings snapshot after the update', schema: SettingsResponseSchema },
-      ...errors(validation(), unauthorized(), internal()),
+      ...errors(validation(), internal()),
     },
   },
   {
@@ -451,7 +446,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     body: FavoriteSchedulerSettingsUpdateRequestSchema,
     responses: {
       200: { description: 'Settings snapshot after the update', schema: SettingsResponseSchema },
-      ...errors(validation(), unauthorized(), internal()),
+      ...errors(validation(), internal()),
     },
   },
   {
@@ -467,7 +462,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     bodyRequired: false,
     responses: {
       200: { description: 'Sync outcome + sweep summary', schema: SyncModulesResponseSchema },
-      ...errors(validation(), unauthorized(), upstream('Sync failed (fetch/validate)'), internal()),
+      ...errors(validation(), upstream('Sync failed (fetch/validate)'), internal()),
     },
   },
   {
@@ -481,7 +476,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     bodyRequired: false,
     responses: {
       200: { description: 'Catalog sync outcome', schema: CatalogSyncResponseSchema },
-      ...errors(validation(), unauthorized(), notFound('Catalog'), upstream('Sync failed'), internal()),
+      ...errors(validation(), notFound('Catalog'), upstream('Sync failed'), internal()),
     },
   },
   {
@@ -495,7 +490,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     bodyRequired: false,
     responses: {
       200: { description: 'Per-catalog outcomes', schema: CatalogSyncAllResponseSchema },
-      ...errors(validation(), unauthorized(), upstream('Sync failed'), internal()),
+      ...errors(validation(), upstream('Sync failed'), internal()),
     },
   },
   {
@@ -604,7 +599,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     body: InfoRequestSchema,
     responses: {
       200: { description: 'Normalized MANGAINFO state + downloaded chapter links', schema: InfoResponseSchema },
-      ...errors(validation(), unauthorized(), notFound('Module'), upstream('Module GetInfo failed'), internal()),
+      ...errors(validation(), notFound('Module'), upstream('Module GetInfo failed'), internal()),
     },
   },
   {
@@ -646,13 +641,13 @@ const OPERATIONS: readonly RouteOperation[] = [
       'MangaPage parity options (additive): `paused` (FMD2 cbAddAsStopped, frmMain.lfm:1110) creates ' +
       'the job queued-but-held — the download lane will not claim it until POST /api/jobs/{id}/resume; ' +
       '`saveTo` (FMD2 edSaveTo, frmMain.pas:5613) is a custom save directory that REPLACES the ' +
-      '`library/<module>/<manga>` prefix at finalize (relative paths resolve against the library root).',
+      '`library/<manga>` prefix at finalize (relative paths resolve against the library root).',
     tags: ['jobs'],
     body: JobCreateRequestSchema,
     responses: {
       201: { description: 'Created job', schema: z.object({ job: JobSchema }) },
       200: { description: 'Idempotent replay of the original job', schema: z.object({ job: JobSchema }) },
-      ...errors(validation(), unauthorized(), errorResponse(409, 'Idempotency key reused with a different payload'), internal()),
+      ...errors(validation(), errorResponse(409, 'Idempotency key reused with a different payload'), internal()),
     },
   },
   {
@@ -676,7 +671,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     responses: {
       201: { description: 'Created batch (at least one fresh/chained job)', schema: JobBatchCreatedResponseSchema },
       200: { description: 'Full replay — every chapter returned an existing live job', schema: JobBatchCreatedResponseSchema },
-      ...errors(validation(), unauthorized(), errorResponse(409, 'Batch key reused with a different chapter sequence'), upstream('Module GetInfo failed'), notFound('Module'), internal()),
+      ...errors(validation(), errorResponse(409, 'Batch key reused with a different chapter sequence'), upstream('Module GetInfo failed'), notFound('Module'), internal()),
     },
   },
   {
@@ -728,7 +723,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     bodyRequired: false,
     responses: {
       200: { description: 'The cancelled job snapshot', schema: JobCreatedResponseSchema },
-      ...errors(validation(), unauthorized(), notFound('Job'), errorResponse(409, 'Job is already terminal'), internal()),
+      ...errors(validation(), notFound('Job'), errorResponse(409, 'Job is already terminal'), internal()),
     },
   },
   {
@@ -746,7 +741,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     bodyRequired: false,
     responses: {
       200: { description: 'The resumed job snapshot', schema: JobCreatedResponseSchema },
-      ...errors(validation(), unauthorized(), notFound('Job'), errorResponse(409, 'Job is already terminal'), internal()),
+      ...errors(validation(), notFound('Job'), errorResponse(409, 'Job is already terminal'), internal()),
     },
   },
   {
@@ -771,7 +766,6 @@ const OPERATIONS: readonly RouteOperation[] = [
       200: { description: 'The resulting job snapshot (fresh row for re-enqueue semantics)', schema: JobActionResponseSchema },
       ...errors(
         validation(),
-        unauthorized(),
         notFound('Job'),
         errorResponse(409, 'Action illegal in the job current state (state matrix)'),
         internal(),
@@ -792,7 +786,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     query: JobDeleteQuerySchema,
     responses: {
       200: { description: 'The removed job snapshot + artifact outcome', schema: z.object({ job: JobSchema, dataDeleted: z.boolean() }) },
-      ...errors(validation(), unauthorized(), notFound('Job'), internal()),
+      ...errors(validation(), notFound('Job'), internal()),
     },
   },
   {
@@ -811,7 +805,7 @@ const OPERATIONS: readonly RouteOperation[] = [
     body: JobBulkActionRequestSchema,
     responses: {
       200: { description: 'Bulk outcome: count + touched snapshots', schema: JobBulkActionResponseSchema },
-      ...errors(validation(), unauthorized(), errorResponse(400, 'Scope does not apply to this action'), internal()),
+      ...errors(validation(), errorResponse(400, 'Scope does not apply to this action'), internal()),
     },
   },
   {
@@ -1149,43 +1143,22 @@ const OPERATIONS: readonly RouteOperation[] = [
     },
   },
   {
-    method: 'post',
-    path: '/api/auth/login',
-    operationId: 'login',
-    summary: 'Password login → session cookie (rate-limited 10/min)',
-    description:
-      'Only mounted/meaningful with FMD_WEB_PASSWORD set (otherwise 400 auth_disabled). ' +
-      'Sets an HttpOnly, SameSite=Strict session cookie; the 11th attempt within a minute is 429.',
-    tags: ['auth'],
-    body: LoginRequestSchema,
-    responses: {
-      200: { description: 'Session established', schema: LoginResponseSchema },
-      ...errors(
-        validation(),
-        errorResponse(400, 'Auth disabled (no FMD_WEB_PASSWORD)'),
-        errorResponse(401, 'Invalid credentials'),
-        errorResponse(429, 'Login rate limit exceeded (valid Bearer api-token requests bypass it)'),
-        internal(),
-      ),
-    },
-  },
-  {
     method: 'get',
     path: '/api/settings/api-token',
     operationId: 'getApiToken',
     summary: 'R4 single app-wide API token state (Settings → API)',
     description:
-      'The ONE deployment-wide token (Sonarr/Radarr model — never lists, never per-user). ' +
-      'Returns the stored value (`null` when the FMD_WEB_API_TOKEN env pin owns the secret — ' +
-      'read it from the deployment environment instead), the envManaged flag (UI shows ' +
-      "'Managed via environment', hides Regenerate) and the active auth mode " +
-      '(none|password|api-token|password+api-token). Credential-gated in EVERY authed mode ' +
-      '— the token secret never rides an open read.',
+      'The ONE deployment-wide token (Sonarr/Radarr model — never lists, never per-user); ' +
+      'the app\'s ONLY credential since the optional-password mode was removed. Returns the ' +
+      'stored value (`null` when the FMD_WEB_API_TOKEN env pin owns the secret — read it ' +
+      'from the deployment environment instead) and the envManaged flag (UI shows ' +
+      "'Managed via environment', hides Regenerate). The app is open (*arr auth-None " +
+      'semantics): this read is anonymous — front the app with a reverse proxy ' +
+      '(Authelia/Authentik/PocketID) when it must not be.',
     tags: ['auth'],
     responses: {
       200: { description: 'Token state', schema: ApiTokenResponseSchema },
       ...errors(
-        unauthorized(),
         internal(),
       ),
     },
@@ -1200,15 +1173,13 @@ const OPERATIONS: readonly RouteOperation[] = [
       'key is rejected on the next request, so update your scripts right after rotating ' +
       '(docs/API.md key-rotation runbook). Audit-logged as a settings change (the log never ' +
       'carries the value). 409 when FMD_WEB_API_TOKEN pins the token (rotate the env ' +
-      'instead). Rotation needs NO password auth (*arr semantics: the token is a script ' +
-      'key independent of the login gate; a token never gates the deployment — runbook ' +
-      '§API token).',
+      'instead). Reachable unauthenticated (*arr semantics: the token is a script key on ' +
+      'an open deployment — runbook §API token).',
     tags: ['auth'],
     bodyRequired: false,
     responses: {
       200: { description: 'The new token state (value included, shown once)', schema: ApiTokenResponseSchema },
       ...errors(
-        unauthorized(),
         errorResponse(409, 'Env-pinned (FMD_WEB_API_TOKEN) — rotate the secret in the deployment environment'),
         internal(),
       ),
@@ -1517,15 +1488,11 @@ export function generateOpenApiDocument(version: string): OpenApiDocument {
         content: { 'application/json': { schema: converted } },
       };
     }
-    if (op.method !== 'get' && op.path !== '/api/auth/login') {
-      // R4: gated routes accept EITHER credential (token or session).
-      operation['security'] = [{ bearerToken: [] }, { sessionCookie: [] }];
-    }
-    if (op.path === '/api/settings/api-token') {
-      // The token secret rides this GET: credential-gated in EVERY
-      // authed mode (unlike the open pre-login reads).
-      operation['security'] = [{ bearerToken: [] }, { sessionCookie: [] }];
-    }
+    // No operation carries `security`: the optional-password gate was
+    // removed (owner decision 2026-11) — every route serves
+    // unauthenticated (*arr auth-None semantics) and the R4 bearer
+    // token is merely ACCEPTED wherever presented (securitySchemes
+    // documents it for script authors).
     const pathEntry = paths[op.path] ?? {};
     paths[op.path] = pathEntry;
     pathEntry[op.method] = operation;
@@ -1549,7 +1516,7 @@ export function generateOpenApiDocument(version: string): OpenApiDocument {
       { name: 'catalog', description: 'Catalog browse/search over read-only attached dbs (§6.4–§6.6) + the §6.8 live-scrape fallback' },
       { name: 'info', description: 'Live module info, normalized (§5.8)' },
       { name: 'jobs', description: 'Download job queue (§7.1) with idempotent create' },
-      { name: 'auth', description: 'Optional password session (FMD_WEB_PASSWORD)' },
+      { name: 'auth', description: 'The R4 single app-wide API token — the app\'s only credential (no user auth: front with Authelia/Authentik/PocketID via reverse proxy)' },
       { name: 'health', description: 'Liveness/readiness probes' },
     ],
     paths,
@@ -1561,18 +1528,13 @@ export function generateOpenApiDocument(version: string): OpenApiDocument {
           scheme: 'bearer',
           description:
             'R4 SINGLE app-wide API token (Sonarr/Radarr model): `Authorization: Bearer <token>`. ' +
-            'One value per deployment — auto-generated on first start (with or without a ' +
-            'password: it is an *arr-style script key), rotated in Settings → API ' +
-            '(regenerate) or pinned via FMD_WEB_API_TOKEN (env > settings). Valid on EVERY /api ' +
-            'route and the /ws upgrade; a token never gates anything — the login gate is the ' +
-            'password only, so password-less deployments run open with the token accepted ' +
-            'wherever presented. Constant-time verified; never multiple/per-user tokens.',
-        },
-        sessionCookie: {
-          type: 'apiKey',
-          in: 'cookie',
-          name: 'fmd_session',
-          description: 'Session cookie minted by POST /api/auth/login (only when FMD_WEB_PASSWORD is set).',
+            'One value per deployment — auto-generated on first start (an *arr-style script ' +
+            'key), rotated in Settings → API (regenerate) or pinned via FMD_WEB_API_TOKEN ' +
+            '(env > settings). The app\'s ONLY credential (the optional-password mode was ' +
+            'removed): every route serves unauthenticated (*arr auth-None semantics — put ' +
+            'Authelia/Authentik/PocketID via reverse proxy in front for user auth) and the ' +
+            'token is ACCEPTED wherever presented. Constant-time verified; never ' +
+            'multiple/per-user tokens.',
         },
       },
     },

@@ -681,8 +681,12 @@ catalog sync for the default-selected websites are **auto-triggered**
 states explicitly.
 ```
 
-Auth: optional single password (`FMD_WEB_PASSWORD`) → session cookie;
-login rate-limited (10/min).
+Auth (owner decision 2026-11): the optional single-password mode is
+REMOVED — the app performs no user authentication. The R4 single
+app-wide API token (`Authorization: Bearer` on every `/api` route and
+`/ws`) is the app's only credential: accepted wherever presented,
+never demanded. User-facing auth is a reverse-proxy concern
+(Authelia/Authentik/PocketID — docs/API.md).
 
 ---
 

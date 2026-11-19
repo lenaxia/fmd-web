@@ -30,10 +30,10 @@ function tokenRoute(body: unknown): MockRoute[] {
   ];
 }
 
-describe('Settings → API token section (*arr semantics)', (): void => {
-  it('renders the token with regenerate when one exists (auth off = open deployment)', async (): Promise<void> => {
+describe('Settings → API token section (token-only world)', (): void => {
+  it('renders the token with regenerate (the app’s only credential — no auth-mode surface)', async (): Promise<void> => {
     const { fetch } = mockFetch(
-      tokenRoute({ token: TOKEN, envManaged: false, mode: 'api-token' }),
+      tokenRoute({ token: TOKEN, envManaged: false }),
     );
     renderWithProviders(<ApiTokenSection />, { fetch });
     const section = await screen.findByTestId('api-token-settings');
@@ -42,8 +42,12 @@ describe('Settings → API token section (*arr semantics)', (): void => {
     // not the always-rendered section shell).
     expect(await screen.findByTestId('api-token-value')).toHaveTextContent('••••');
     expect(await screen.findByTestId('api-token-regenerate')).toBeInTheDocument();
-    // Mode label: open deployment vocabulary, NOT 'API-only mode'.
-    expect(screen.getByTestId('api-token-mode')).toHaveTextContent('open deployment · token for scripts');
+    // The auth-mode surface is GONE (password mode removed): no mode
+    // chip renders anywhere in the section.
+    expect(screen.queryByTestId('api-token-mode')).not.toBeInTheDocument();
+    expect(section).not.toHaveTextContent(/auth mode/i);
+    // The reverse-proxy guidance is the documented user-auth story.
+    expect(section).toHaveTextContent(/Authelia/i);
     // The OLD gate copy must never render (it described the removed
     // 'generate only for authed deployments' policy).
     expect(screen.queryByText(/Auth is off/i)).not.toBeInTheDocument();
@@ -52,7 +56,7 @@ describe('Settings → API token section (*arr semantics)', (): void => {
 
   it('env-pinned deployments show "Managed via environment" and no regenerate', async (): Promise<void> => {
     const { fetch } = mockFetch(
-      tokenRoute({ token: null, envManaged: true, mode: 'password+api-token' }),
+      tokenRoute({ token: null, envManaged: true }),
     );
     renderWithProviders(<ApiTokenSection />, { fetch });
     expect(await screen.findByTestId('api-token-managed')).toHaveTextContent('Managed via environment');
@@ -60,7 +64,7 @@ describe('Settings → API token section (*arr semantics)', (): void => {
   });
 
   it('a null stored token (transient) renders neutral copy — still no auth-off gate', async (): Promise<void> => {
-    const { fetch } = mockFetch(tokenRoute({ token: null, envManaged: false, mode: 'none' }));
+    const { fetch } = mockFetch(tokenRoute({ token: null, envManaged: false }));
     renderWithProviders(<ApiTokenSection />, { fetch });
     expect(await screen.findByText('No API token stored')).toBeInTheDocument();
     expect(screen.queryByText(/Auth is off/i)).not.toBeInTheDocument();

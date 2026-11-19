@@ -20,7 +20,9 @@ services:
       # known-broken capability flags stand.
       FMD_WEB_BROWSER_SIDECAR_URL: ${FMD_WEB_BROWSER_SIDECAR_URL:-}
       # FMD_WEB_SECRET: set in production (account encryption, §8)
-      # FMD_WEB_PASSWORD: optional single-password auth (§10)
+      # Auth: token-only (R4 API key) — the app performs no user auth;
+      # front it with Authelia/Authentik/PocketID via reverse proxy.
+      # FMD_WEB_API_TOKEN: pin the script key in the environment.
     volumes:
       - app-data:/app/data
     restart: unless-stopped

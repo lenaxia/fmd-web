@@ -152,11 +152,6 @@ export interface RuntimeConfig {
   /** §6.8 per-host connection gate limit for scrape page fetches (FMD_CATALOG_LIVE_HOST_LIMIT, default 4). */
   readonly liveScrapeHostLimit: number;
   /**
-   * §10 cookie flow: non-empty FMD_WEB_PASSWORD enables the login
-   * route + the state-changing cookie gate (unset = no cookie flow).
-   */
-  readonly password: string | undefined;
-  /**
    * R4 single app-wide API token env pin: non-empty FMD_WEB_API_TOKEN
    * OVERRIDES the stored settings value (precedence env > settings,
    * runbook §API token) — headless/compose deployments keep the secret
@@ -217,11 +212,10 @@ export function loadRuntimeConfig(env: Record<string, string | undefined> = proc
     liveScrapeTtlMs: positiveIntEnv(env['FMD_CATALOG_LIVE_TTL_MS'], DEFAULT_LIVE_SCRAPE_TTL_MS),
     liveScrapeConcurrency: positiveIntEnv(env['FMD_CATALOG_LIVE_CONCURRENCY'], 2),
     liveScrapeHostLimit: positiveIntEnv(env['FMD_CATALOG_LIVE_HOST_LIMIT'], 4),
-    // §10/R4 auth env: empty-string FMD_WEB_PASSWORD = unset (compose
-    // `env_file` blanks); the token pin likewise only when non-empty.
-    password: env['FMD_WEB_PASSWORD'] !== undefined && env['FMD_WEB_PASSWORD'] !== ''
-      ? env['FMD_WEB_PASSWORD']
-      : undefined,
+    // R4 auth env: the token pin applies only when non-empty (compose
+    // `env_file` blanks mean unset). The password env var is no longer
+    // read — the optional-password mode was removed (owner decision
+    // 2026-11).
     apiTokenEnv: env['FMD_WEB_API_TOKEN'] !== undefined && env['FMD_WEB_API_TOKEN'] !== ''
       ? env['FMD_WEB_API_TOKEN']
       : undefined,
@@ -260,9 +254,9 @@ export interface RuntimeAssembly {
   /** §4 structured JSON logger (module-id correlation, dedup bound). */
   readonly logger: StructuredLogger;
   /**
-   * §10/R4 auth service (cookie sessions + the single API token). The
-   * raw-http entry hands `auth.checkUpgradeRequest` to its own /ws
-   * attach so upgrades share this app's credential truth.
+   * R4 auth service (the single API token — the app's only credential).
+   * The raw-http entry shares this instance so upgrades and requests
+   * verify against one token truth.
    */
   readonly auth: AuthService;
   /** Drain: dispose engines + transport + catalog handles + the WS hub. */
@@ -719,14 +713,13 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
   // the secret out of the settings store; the UI shows 'Managed via
   // environment' and regenerate refuses). First-run generation is
   // UNCONDITIONAL (no pin, nothing stored): the token is an *arr-style
-  // API key independent of password auth — reverse-proxy deployments
-  // (authelia/authentik in front, no local password) get a script key
-  // on first start. Password auth stays opt-in for the UI login gate;
-  // with it off the API is open to the browser SPA and the token is
-  // additionally accepted wherever presented. The effective provider
-  // reads the settings store LIVE, so UI regeneration applies to the
-  // very next request (old key rejected immediately) and env
-  // precedence holds per-request.
+  // API key — the app's ONLY credential since the optional-password
+  // mode was removed (owner decision 2026-11; reverse-proxy deployments
+  // front the UI with authelia/authentik/PocketID). The API is open to
+  // the browser SPA and the token is accepted wherever presented. The
+  // effective provider reads the settings store LIVE, so UI
+  // regeneration applies to the very next request (old key rejected
+  // immediately) and env precedence holds per-request.
   const storedApiTokenRaw = libraryStore.getSetting('api.token');
   const storedApiToken: string | null =
     typeof storedApiTokenRaw === 'string' && /^[0-9a-f]{64}$/.test(storedApiTokenRaw)
@@ -748,15 +741,14 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     log('auth: api token generated on first run — copy it from Settings → API');
   }
 
-  // ── §10/R4 auth service (cookie flow + the single API token) ─────
+  // ── R4 auth service (the single API token — no gate to register) ─
   const authService = new AuthService({
-    password: config.password,
     apiToken: effectiveApiToken,
     ...(config.apiTokenEnv !== undefined ? { apiTokenEnvPinned: true } : {}),
   });
   log(
-    `auth: ${authService.authMode()} (password ${authService.enabled ? 'on' : 'off'}, ` +
-      `api token ${authService.tokenActive ? 'on' : 'off'}${authService.tokenEnvManaged ? ', env-pinned' : ''})`,
+    `auth: api key only (api token ${authService.tokenActive ? 'on' : 'off'}` +
+      `${authService.tokenEnvManaged ? ', env-pinned' : ''}; no user auth — front with a reverse proxy when needed)`,
   );
 
   // [parity-sweep] M2: the periodic retention sweep (hourly; §9 said

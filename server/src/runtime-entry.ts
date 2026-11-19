@@ -44,13 +44,10 @@ async function main(): Promise<void> {
 
   // §10/D19: `/ws` upgrades bypass the respondAsync bridge entirely —
   // the hub owns them on the raw server (backfill + live job events).
-  // R4: the upgrade is credential-gated whenever the single API token
-  // is active (Authorization: Bearer preferred; ?token= for browser
-  // WS clients; the session cookie also grants when a password is set)
-  // — token-less deployments keep today's open hub.
-  const ws: WsAttachment = attachWebSocketHub(server, runtime.wsHub, {
-    authenticate: (req): boolean => runtime.auth.checkUpgradeRequest(req),
-  });
+  // Open hub: the optional-password credential wall was removed (owner
+  // decision 2026-11) — browser live tiles connect with no credentials;
+  // the R4 token is accepted wherever presented but never gates.
+  const ws: WsAttachment = attachWebSocketHub(server, runtime.wsHub);
 
   let draining = false;
 

@@ -286,7 +286,7 @@ export function declareFmdFamilies(registry: MetricsRegistry): MetricsRegistry {
     { name: 'fmd_sync_last_success_timestamp_seconds', type: 'gauge', help: 'Last successful sync per kind (unix seconds).', labelNames: ['kind'] },
     { name: 'fmd_log_expression_warns_total', type: 'counter', help: 'Distinct (module, expression-template) WARNs this run (dedup bound, §5.6).', labelNames: [] },
     { name: 'fmd_log_expression_suppressed_total', type: 'counter', help: 'Repeat expression failures suppressed by the deduper this run.', labelNames: [] },
-    { name: 'fmd_http_requests_total', type: 'counter', help: 'HTTP requests by auth mode (none|cookie|token), method, route and status (R4).', labelNames: ['auth', 'method', 'route', 'status'] },
+    { name: 'fmd_http_requests_total', type: 'counter', help: 'HTTP requests by auth mode (none|token), method, route and status (R4).', labelNames: ['auth', 'method', 'route', 'status'] },
   ]);
   return registry;
 }
@@ -358,8 +358,8 @@ export class FmdMetrics {
   }
 
   // ── HTTP requests (R4 auth observability) ────────────────────────
-  /** auth: how the request authenticated — 'none' | 'cookie' | 'token'. */
-  observeHttpRequest(auth: 'none' | 'cookie' | 'token', method: string, route: string, status: number): void {
+  /** auth: how the request authenticated — 'none' | 'token'. */
+  observeHttpRequest(auth: 'none' | 'token', method: string, route: string, status: number): void {
     this.registry.counter('fmd_http_requests_total', {
       auth,
       method,

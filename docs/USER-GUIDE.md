@@ -78,7 +78,9 @@ installed catalog opens instantly afterwards.
   Android); on iOS Safari use Share → Add to Home Screen.
 - The API is script-friendly: a single app-wide **API token** is
   auto-generated on first run and manageable under Settings → API (see
-  [Settings](#settings) and [API.md](API.md)).
+  [Settings](#settings) and [API.md](API.md)). It is the app's only
+  credential — the app itself has no login; for user-facing auth put
+  Authelia, Authentik or PocketID in front via your reverse proxy.
 
 ## Finding manga
 
@@ -430,7 +432,9 @@ manager.
 - **Proxy** — the global proxy (type none/HTTP/SOCKS4/SOCKS5, host, port,
   user, password). A badge shows whether the **browser sidecar** profile is
   active — some sites require it (see [Troubleshooting](#troubleshooting)).
-- **API** — the single app-wide API token: reveal, copy, regenerate
+- **API** — the single app-wide API token (the app's only credential;
+  user auth = a reverse proxy with Authelia/Authentik/PocketID in front):
+  reveal, copy, regenerate
   (regeneration is hidden when the token is pinned via environment for
   headless deployments). See [API.md](API.md).
 - **Performance** — request timeout (s), retry count, threads per chapter,

@@ -126,7 +126,7 @@ interface Harness {
 
 function harness(
   rootUrl: string,
-  options: { password?: string; allowedHosts?: string[]; maxCacheBytes?: number } = {},
+  options: { apiToken?: string; allowedHosts?: string[]; maxCacheBytes?: number } = {},
 ): Harness {
   const modules = new InMemoryModuleService([makeRegistration({ id: MODULE_ID, rootURL: rootUrl })]);
   const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fmd-cover-cache-'));
@@ -142,7 +142,7 @@ function harness(
   };
   const app = buildApp(services, {
     version: '0.1.0-test',
-    ...(options.password !== undefined ? { auth: { password: options.password } } : {}),
+    ...(options.apiToken !== undefined ? { auth: { apiToken: options.apiToken } } : {}),
   });
   return { app, cacheDir };
 }
@@ -350,8 +350,8 @@ describe('cover proxy contract', (): void => {
     expect(new Uint8Array(res.rawPayload)).toEqual(PNG_BYTES);
   });
 
-  it('is never credential-gated: 200 with password auth on (the *arr GET ordering)', async (): Promise<void> => {
-    const { app } = harness(rootUrl, { password: 'sekrit' });
+  it('is never credential-gated: 200 with the API key configured (a plain GET, *arr ordering — the app has no gate at all)', async (): Promise<void> => {
+    const { app } = harness(rootUrl, { apiToken: 'a'.repeat(64) });
     const res = await app.inject({
       method: 'GET',
       url: coverUrl(originUrl, MODULE_ID, `${originUrl}/cover.png`),

@@ -85,26 +85,23 @@ export function createDefaultServices(opts: DefaultServicesOptions = {}): ApiSer
 }
 
 export function createApp(services: ApiServices = createDefaultServices()): ReturnType<typeof buildApp> {
-  const password =
-    process.env['FMD_WEB_PASSWORD'] !== undefined && process.env['FMD_WEB_PASSWORD'] !== ''
-      ? process.env['FMD_WEB_PASSWORD']
-      : undefined;
+  // The optional-password mode is REMOVED (owner decision 2026-11):
+  // the password env var is no longer read. The R4 single API token env
+  // pin remains the only credential input.
   const apiTokenEnv =
     process.env['FMD_WEB_API_TOKEN'] !== undefined && process.env['FMD_WEB_API_TOKEN'] !== ''
       ? process.env['FMD_WEB_API_TOKEN']
       : undefined;
   const options: AppOptions = {
     version: SERVER_VERSION,
-    ...(password !== undefined || apiTokenEnv !== undefined
+    ...(apiTokenEnv !== undefined
       ? {
+          // R4: the env pin OVERRIDES any stored value (headless runs);
+          // the in-memory entry here has no settings store, so the pin
+          // is the only token source.
           auth: {
-            password,
-            // R4: the env pin OVERRIDES any stored value (headless runs);
-            // the in-memory entry here has no settings store, so the pin
-            // is the only token source.
-            ...(apiTokenEnv !== undefined
-              ? { apiToken: apiTokenEnv, apiTokenEnvPinned: true }
-              : {}),
+            apiToken: apiTokenEnv,
+            apiTokenEnvPinned: true,
           },
         }
       : {}),

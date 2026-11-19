@@ -158,7 +158,7 @@ FMD_WEB_BROWSER_SIDECAR_URL=http://flaresolverr:8191 \
   present only with `--profile browser`, pin, healthcheck) on hosts
   with the docker CLI.
 
-## API token (R4) — lifecycle, env pinning, auth modes
+## API token (R4) — lifecycle, env pinning, the one auth mode
 
 The scriptable API is authenticated by a SINGLE app-wide token
 (Sonarr/Radarr model, docs/UX-PARITY.md R4): one 32-byte-hex value per
@@ -167,11 +167,12 @@ the `/ws` upgrade (`?token=` query param for browser WS clients).
 Never multiple tokens, lists, per-user or per-scope tokens — a future
 need that sounds like "another token" is a regenerate of the one key.
 
-The token is an ***arr-style script key***: it EXISTS and ROTATES with
-NO password/auth configured. Password auth (`FMD_WEB_PASSWORD`) is the
-opt-in login gate for the UI; the token is the machine credential
-independent of it. Reverse-proxy deployments (authelia/authentik in
-front, no local password) are first-class.
+The token is the app's ONLY credential (the optional-password mode —
+`FMD_WEB_PASSWORD` + the cookie login — was REMOVED, owner decision
+2026-11): the app performs no user authentication at all. Deployments
+that want a human-facing gate front the app with their reverse proxy
+(Authelia/Authentik/PocketID) — first-class, and the only user-auth
+story there is.
 
 ### Lifecycle
 
@@ -179,22 +180,20 @@ front, no local password) are first-class.
    token and no env pin, one is generated UNCONDITIONALLY (32-byte
    hex), persisted in the app_settings store (`api.token`) and logged
    as `auth: api token generated on first run — copy it from Settings → API`.
-   With no password set the API stays OPEN for the browser SPA — a
-   token's existence never gates anything (out-of-box flows, incl. the
-   e2e harness, are untouched in behavior; they simply also have a
-   script key now).
+   The API stays OPEN for the browser SPA — a token's existence never
+   gates anything (out-of-box flows, incl. the e2e harness, are
+   untouched in behavior; they simply also have a script key now).
 2. **Settings → API** — the key is shown masked with a reveal toggle,
    a copy button and **Regenerate** behind a confirm dialog
    ("Revokes the current key immediately — update your scripts").
    The value only ever travels on `GET /api/settings/api-token`
-   (credential-gated when a password is set; on an open deployment it
-   is readable by whoever can reach the app — exactly *arr's
-   auth-None semantics, front it with a reverse proxy if that matters).
+   (readable by whoever can reach the app — exactly *arr's auth-None
+   semantics, front it with a reverse proxy if that matters).
 3. **Regeneration / immediate revocation** — rotation replaces the ONE
-   value in place; the old key is rejected on its very NEXT request
-   (constant-time compare against the live value). Rotation needs NO
-   password auth — open deployments rotate their script key like any
-   other. It is audit-logged as a settings change
+   value in place; the old key stops authenticating its presenter on
+   the very NEXT request (constant-time compare against the live
+   value). Rotation is reachable unauthenticated like every other
+   route (the app is open). It is audit-logged as a settings change
    (`{"event":"audit","setting":"api_token","action":"regenerate"}`)
    — the log never carries the token value. Scripts may rotate the key
    themselves (the endpoint accepts the current token).
@@ -204,29 +203,33 @@ front, no local password) are first-class.
    regenerate endpoint refuses with `409` (rotate the environment
    instead — the secret stays out of the settings store).
 
-### Auth-modes matrix
+### The one auth mode: open + API key
 
-| `FMD_WEB_PASSWORD` | token (effective) | Behavior |
-| --- | --- | --- |
-| set | set | Either credential grants the gated set (state-changing routes, the token-settings read, `/ws`): session cookie or Bearer. Plain reads stay open (pre-login SPA). |
-| unset | set | **Open deployment** — the token never gates: reads, state-changing POSTs and `/ws` stay open for the SPA (login-free); the token is additionally ACCEPTED wherever presented (scripts use it as a Bearer key; it also bypasses the login rate limit). Front the app with your reverse proxy's auth when you need a gate. |
-| set | unset | Today's cookie flow unchanged: login mints the session, writes gated, reads open. |
-| unset | unset | Auth off — everything open. A token is still generated (script key, not an auth surface). |
+- Every route serves unauthenticated (*arr auth-None semantics):
+  plain GETs, state-changing routes and `/ws` alike — the browser SPA
+  is login-free by design.
+- The R4 token is ACCEPTED wherever presented (scripts use it as a
+  Bearer key; `fmd_http_requests_total{auth="token",…}` labels those
+  requests) and never demanded anywhere.
+- `/healthz` + `/readyz` are plain reads (Docker healthchecks).
+- The startup log states the auth posture (never the value):
+  `fmd: auth: api key only (api token on; no user auth — front with a reverse proxy when needed)`.
+- Metrics: `fmd_http_requests_total{auth="none|token",…}`.
+- Reverse-proxy recipe (authelia/authentik/PocketID/nginx basic-auth):
+  let the proxy authenticate humans, hand scripts the token
+  (Settings → API or `GET /api/settings/api-token` from inside the
+  network). The proxy gate covers the token read too — nothing inside
+  the container re-authenticates.
 
-Notes:
+### Upgrading a password-mode instance (BREAKING)
 
-- Wrong/missing token when required → `401` typed envelope;
-  comparison is constant-time (SHA-256 fingerprints).
-- Token-authenticated requests bypass the login rate limit (10/min).
-- `/healthz` + `/readyz` are never gated (Docker healthchecks).
-- The startup log states the active auth modes (never the value):
-  `fmd: auth: api-token (password off, api token on, env-pinned)`.
-- Metrics: `fmd_http_requests_total{auth="none|cookie|token",…}`.
-- Reverse-proxy recipe (authelia/authentik/nginx basic-auth): leave
-  `FMD_WEB_PASSWORD` unset, let the proxy authenticate humans, hand
-  scripts the token (Settings → API or `GET /api/settings/api-token`
-  from inside the network). The proxy gate covers the token read too —
-  nothing inside the container re-authenticates.
+Instances that had `FMD_WEB_PASSWORD` set upgrade to token-only auth:
+the env var is no longer read, the `POST /api/auth/login` endpoint is
+gone (404), and existing sessions/cookies are simply ignored. The API
+token continues to work unchanged (same value, same Bearer spelling).
+Scripts that never used the password lose nothing; humans who relied
+on the password gate must front the app with a reverse proxy (see
+above) — the app itself no longer offers a login.
 
 Key-rotation walk-through (executed): docs/API.md § *Key-rotation
 runbook* and docs/evidence-api-scripting.md § 14.
@@ -342,8 +345,9 @@ A green run leaves no trace artifacts (retained on failure only).
   stage skips when its artifact is installed, so restarts resume.
   Three start-order retries cover compose service races.
 - Env surface: `FMD_WEB_DATA_DIR` (data root), `PORT`,
-  `FMD_WEB_PASSWORD` / `FMD_WEB_API_TOKEN` (auth — § *API token (R4)*
-  below), `FMD_WEB_SECRET` (account sealing),
+  `FMD_WEB_API_TOKEN` (auth — § *API token (R4)*
+  below; the removed `FMD_WEB_PASSWORD` is no longer read),
+  `FMD_WEB_SECRET` (account sealing),
   `FMD2_REPO` / `FMD2_LUA_SHA` / `FMD2_CODELOAD_URL` (module pin, D9),
   `FMD_DB_URL` / `FMD_DB_API_BASE` (catalog upstream override),
   `FMD_BOOTSTRAP_CATALOGS`, `FMD_BOOTSTRAP_DISABLE` (D20 disable,
