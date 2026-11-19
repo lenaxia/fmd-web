@@ -39,7 +39,17 @@ export interface JobFailureDetail {
 }
 
 /** Extra context accepted on any transition (error text, worker id). */
-export type JobTransitionDetail = Partial<JobFailureDetail>;
+export type JobTransitionDetail = Partial<JobFailureDetail> & {
+  /**
+   * [pipe-health] Earliest claim time (epoch ms) for a `→ retry`
+   * transition: the retry backoff's due stamp. Persisted as
+   * `next_attempt_at`; the claim transaction skips retry rows whose
+   * stamp is in the future, so a backing-off job frees its lane slot
+   * instead of holding it through the wait. Cleared on claim and on
+   * every non-retry transition.
+   */
+  readonly nextAttemptAt?: number;
+};
 
 /** Thrown when a state write violates the §7.1 machine. */
 export class InvalidJobTransitionError extends Error {

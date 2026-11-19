@@ -32,6 +32,7 @@ import type {
   FavoriteCheckResponseT,
   FavoriteCheckScopeT,
   FavoriteCreateRequestT,
+  FavoriteMissingCheckResponseT,
   FavoriteSchedulerSettingsT,
   FavoriteT,
   FavoriteTransferPreviewResponseT,
@@ -1660,6 +1661,28 @@ export class InMemoryFavoriteService implements FavoriteService {
       favorite: updated,
       queuedDownloads: behavior.queuedDownloads ?? 0,
       newChapters: behavior.newChapters ?? [],
+    };
+  }
+
+  /**
+   * [pipe-health] Dev/API-test double: the report-only missing check.
+   * The in-memory double keeps no chapter lists, so the report is the
+   * caller-injected one (behavior seam analog); the row's check-time
+   * fields stamp exactly like the engine's observational bookkeeping.
+   */
+  async checkMissing(
+    id: string,
+    report?: readonly string[],
+  ): Promise<FavoriteMissingCheckResponseT> {
+    const favorite = this.rows.get(id);
+    if (favorite === undefined) {
+      throw new ApiError(404, 'not_found', `unknown favorite: ${id}`);
+    }
+    const updated: FavoriteT = { ...favorite, lastCheck: new Date().toISOString() };
+    this.rows.set(id, updated);
+    return {
+      favorite: updated,
+      missingChapters: (report ?? []).map((link) => ({ link })),
     };
   }
 

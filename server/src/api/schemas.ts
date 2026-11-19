@@ -1341,6 +1341,25 @@ export const FavoriteCheckResponseSchema = z.object({
 });
 export type FavoriteCheckResponseT = z.infer<typeof FavoriteCheckResponseSchema>;
 
+// ── [pipe-health] favorites missing-chapter check (FCheckMissing) ──
+
+/**
+ * One missing chapter: a stored-downloaded link the live site list no
+ * longer contains (reverse link-diff). Report-only — the shape carries
+ * no action field on purpose; nothing downstream may act on it.
+ */
+export const FavoriteMissingChapterSchema = z.object({
+  link: z.string(),
+});
+export type FavoriteMissingChapterT = z.infer<typeof FavoriteMissingChapterSchema>;
+
+/** Manual missing-chapter check result for ONE favorite. */
+export const FavoriteMissingCheckResponseSchema = z.object({
+  favorite: FavoriteSchema,
+  missingChapters: z.array(FavoriteMissingChapterSchema),
+});
+export type FavoriteMissingCheckResponseT = z.infer<typeof FavoriteMissingCheckResponseSchema>;
+
 // ── favorites batch check (btFavoritesCheckNewChapter parity) ───────
 
 /** Which rows a batch check touches (FMD2 Check-for-new-chapter scopes). */

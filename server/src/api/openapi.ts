@@ -22,6 +22,7 @@ import {
   InfoResponseSchema,
   CoverQuerySchema,
   FavoriteCheckResponseSchema,
+  FavoriteMissingCheckResponseSchema,
   FavoriteCheckBatchCancelResponseSchema,
   FavoriteCheckBatchRequestSchema,
   FavoriteCheckBatchResponseSchema,
@@ -1074,6 +1075,27 @@ const OPERATIONS: readonly RouteOperation[] = [
     tags: ['favorites'],
     responses: {
       200: { description: 'Check result', schema: FavoriteCheckResponseSchema },
+      ...errors(validation(), notFound('Favorite'), errorResponse(502, 'Module GetInfo failed'), internal()),
+    },
+  },
+  {
+    // [pipe-health] FCheckMissing parity, web-adapted (reverse link-diff).
+    method: 'post',
+    path: '/api/favorites/{id}/check-missing',
+    operationId: 'checkFavoriteMissing',
+    summary: 'Manual missing-chapter check (report-only)',
+    description:
+      'FMD2 FCheckMissing parity, web-adapted per DESIGN-NORTHSTAR §6 (mechanisms are a strong ' +
+      'prior, not a contract): ONE live GetInfo for the favorite (paced per RootURL host), then ' +
+      'the REVERSE link-diff — every stored-downloaded link the live chapter list no longer ' +
+      'contains is reported as a missing chapter (the site removed it since it was recorded). ' +
+      'REPORT-ONLY by construction: the downloaded list is never rewritten, nothing is enqueued, ' +
+      'no file is touched; the response carries the per-favorite report plus the favorite row ' +
+      'with its refreshed status/count/lastCheck (DoCheckMissing observational bookkeeping). ' +
+      'Live-fetch failures are typed 502s.',
+    tags: ['favorites'],
+    responses: {
+      200: { description: 'Missing-chapter report', schema: FavoriteMissingCheckResponseSchema },
       ...errors(validation(), notFound('Favorite'), errorResponse(502, 'Module GetInfo failed'), internal()),
     },
   },

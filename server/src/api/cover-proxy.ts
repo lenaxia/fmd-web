@@ -95,8 +95,13 @@ export function registrableDomain(host: string): string {
   return second;
 }
 
-/** Parse a module RootURL into a hostname ('' when unparseable). */
-function rootHost(rootUrl: string): string {
+/**
+ * Parse a module RootURL into a hostname ('' when unparseable).
+ * Exported since [pipe-health]: the per-host pacing limiter maps
+ * module → host with the SAME RootURL-reading knowledge (one source
+ * of truth for "which origin does this module speak to").
+ */
+export function rootHost(rootUrl: string): string {
   const withScheme = /^https?:\/\//i.test(rootUrl) ? rootUrl : `https://${rootUrl}`;
   try {
     return new URL(withScheme).hostname.toLowerCase();

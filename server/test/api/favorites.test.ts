@@ -8,6 +8,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { buildHarness, expectEnvelope, MODULE_A_ID, MODULE_B_ID } from './helpers.js';
+import { ApiError } from '../../src/api/errors.js';
 import {
   InMemoryFavoriteService,
   type InMemoryFavoriteCheckBehavior,
@@ -457,5 +458,80 @@ describe('favorites composite ids — encoded and decoded wire forms', (): void 
     expect(batch.statusCode).toBe(200);
     const cancel = await h.app.inject({ method: 'POST', url: '/api/favorites/check/cancel' });
     expect(cancel.statusCode).toBe(200);
+  });
+});
+
+// ── [pipe-health] POST /api/favorites/:id/check-missing (FCheckMissing) ──
+
+/** Double with a fixed missing-chapter report (route-level seam). */
+class MissingReportFavorites extends InMemoryFavoriteService {
+  public report: readonly string[] = [];
+
+  override async checkMissing(
+    id: string,
+  ): Promise<import('../../src/api/schemas.js').FavoriteMissingCheckResponseT> {
+    const favorite = this.get(id);
+    if (favorite === undefined) {
+      throw new ApiError(404, 'not_found', `unknown favorite: ${id}`);
+    }
+    return { favorite, missingChapters: this.report.map((link) => ({ link })) };
+  }
+}
+
+describe('POST /api/favorites/:id/check-missing — manual missing-chapter check', (): void => {
+  const rawUrl = (id: string, suffix = ''): string => `/api/favorites/${id}${suffix}`;
+
+  it('returns the per-favorite report of removed chapters (report-only)', async (): Promise<void> => {
+    const favorites = new MissingReportFavorites();
+    favorites.report = ['https://ex.org/manga/fav/ch/1', 'https://ex.org/manga/fav/ch/2'];
+    const h = buildHarness({ favorites });
+    await h.app.inject({ method: 'POST', url: '/api/favorites', payload: { moduleId: MODULE_A_ID, url: FAV_URL } });
+
+    const res = await h.app.inject({
+      method: 'POST',
+      url: `/api/favorites/${encodeURIComponent(FAV_ID)}/check-missing`,
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as {
+      favorite: Record<string, unknown>;
+      missingChapters: Array<{ link: string }>;
+    };
+    expect(body.favorite.id).toBe(FAV_ID);
+    expect(body.missingChapters).toEqual([
+      { link: 'https://ex.org/manga/fav/ch/1' },
+      { link: 'https://ex.org/manga/fav/ch/2' },
+    ]);
+  });
+
+  it('an empty report is a 200 with an empty list (nothing removed)', async (): Promise<void> => {
+    const h = buildHarness({ favorites: new MissingReportFavorites() });
+    await h.app.inject({ method: 'POST', url: '/api/favorites', payload: { moduleId: MODULE_A_ID, url: FAV_URL } });
+    const res = await h.app.inject({
+      method: 'POST',
+      url: `/api/favorites/${encodeURIComponent(FAV_ID)}/check-missing`,
+    });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as { missingChapters: unknown[] }).missingChapters).toEqual([]);
+  });
+
+  it('an unknown favorite is the typed 404 envelope', async (): Promise<void> => {
+    const h = buildHarness();
+    const res = await h.app.inject({ method: 'POST', url: '/api/favorites/unknown/check-missing' });
+    expect(res.statusCode).toBe(404);
+    expectEnvelope(res.body, 'not_found');
+  });
+
+  it('the raw decoded composite id resolves through the wildcard suffix dispatch', async (): Promise<void> => {
+    const favorites = new MissingReportFavorites();
+    favorites.report = ['https://ex.org/manga/rel/ch/9'];
+    const h = buildHarness({ favorites });
+    await h.app.inject({ method: 'POST', url: '/api/favorites', payload: { moduleId: MODULE_A_ID, url: FAV_URL } });
+    // The id contains slashes (moduleId+url, lowercased) — the decoded
+    // shape must reach the handler, not die as a routing 404.
+    const res = await h.app.inject({ method: 'POST', url: rawUrl(FAV_ID, '/check-missing') });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as { missingChapters: Array<{ link: string }> }).missingChapters).toEqual([
+      { link: 'https://ex.org/manga/rel/ch/9' },
+    ]);
   });
 });

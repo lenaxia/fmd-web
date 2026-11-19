@@ -1433,6 +1433,27 @@ export function useCheckFavoriteNow(): UseMutationResult<FavoriteCheckT, ApiErro
   });
 }
 
+// ── [pipe-health] favorites missing-chapter check (FCheckMissing) ──
+
+export type FavoriteMissingCheckT =
+  operations['checkFavoriteMissing']['responses'][200]['content']['application/json'];
+export type FavoriteMissingChapterT = FavoriteMissingCheckT['missingChapters'][number];
+
+/**
+ * [pipe-health] The per-favorite manual missing-chapter check
+ * (FCheckMissing parity, web-adapted): one paced live fetch, then the
+ * reverse link-diff reports chapters the site's list no longer
+ * contains. REPORT-ONLY — the downloaded list is never rewritten;
+ * the caller surfaces the report, nothing acts on it.
+ */
+export function useCheckFavoriteMissing(): UseMutationResult<FavoriteMissingCheckT, ApiError, string> {
+  const client = useApiClient();
+  return useMutation<FavoriteMissingCheckT, ApiError, string>({
+    mutationFn: (id): Promise<FavoriteMissingCheckT> =>
+      unwrap(client.POST('/api/favorites/{id}/check-missing', { params: { path: { id } } })),
+  });
+}
+
 // ── favorites batch check + transfer (favorites-parity, additive) ───
 
 export type FavoriteCheckBatchT =

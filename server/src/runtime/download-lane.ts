@@ -28,6 +28,7 @@ import {
 import { DownloadChapterRunner } from '../jobs/download/download-runner.js';
 import { ConcurrentImageWorkerPool } from '../jobs/download/image-worker-pool.js';
 import { PerHostSiteLimiter } from '../jobs/download/site-limiter.js';
+import type { HostPacerPort } from '../jobs/host-pacing.js';
 import { indexFileName } from '../jobs/download/filenames.js';
 import { readMarkers, writeMarkers } from '../jobs/download/marker-store.js';
 import { createPacker } from '../jobs/packers/index.js';
@@ -628,6 +629,14 @@ export interface DownloadLaneDeps {
   readonly fileNamePolicy?: () => FileNamePolicyMode | undefined;
   /** [parity-sweep] M10: download-lane slot count (applies at start). */
   readonly parallelChapters?: number;
+  /**
+   * [pipe-health] Per-host pacing (DESIGN-NORTHSTAR §2 PIPE): awaited
+   * before a claimed job's first module hop — concurrent jobs whose
+   * modules share a RootURL host are spaced (no bursts that trip
+   * anti-bot) while different hosts proceed in parallel. Absent =
+   * unpaced (hermetic tests; the pacing unit tests pin the spacing).
+   */
+  readonly pacer?: HostPacerPort;
 }
 
 /** Deterministic work-dir segment for a URL's tail (path-safe) — the
@@ -701,6 +710,22 @@ export function downloadLane(deps: DownloadLaneDeps): LaneRunnerLaneOptions {
       const current = deps.queue.get(job.id);
       if (current !== undefined && current.state === 'cancelled') {
         return { type: 'failed', kind: 'net', error: 'cancelled before start' };
+      }
+
+      // [pipe-health] Per-host pacing (DESIGN-NORTHSTAR §2 PIPE): the
+      // claimed job's FIRST module hop waits for its host's bucket —
+      // concurrent download jobs (and favorites checks, which share the
+      // ONE pacer) whose modules resolve to the same RootURL host are
+      // spaced ≥ intervalMs apart, never a synchronized burst, while
+      // DIFFERENT hosts proceed in parallel. Acquired once per job
+      // attempt (ahead of the module session), not per image: the
+      // §7.1 image-level cadence is the runner's own retry/threads
+      // business. Awaiting before any engine state is built keeps the
+      // wait cancellable-cheap (cancel lands on the claim race above
+      // or through the active registry below, and the pacer's FIFO
+      // hands the token to the next waiter — the slot is never lost).
+      if (deps.pacer !== undefined) {
+        await deps.pacer.acquire(payload.moduleId);
       }
 
       // Default = the wasmoon-backed hooks, loaded lazily through the

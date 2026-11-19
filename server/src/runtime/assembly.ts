@@ -72,6 +72,7 @@ import { openQueueDb, ensureJobSchema } from '../jobs/queue/connection.js';
 import { SqliteJobQueue } from '../jobs/queue/queue.js';
 import { EngineThread, offloadEngineSubstrate, probeOnEngineThread } from '../engine/services/engine-thread.js';
 import { SqliteLibraryStore } from '../jobs/library/store.js';
+import { ModuleHostPacer } from '../jobs/host-pacing.js';
 import { migrateLibraryLayout } from '../jobs/library/migrate.js';
 import {
   ActiveDownloadRegistry,
@@ -805,10 +806,24 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     // first sweep best-effort
   }
 
+  // ── [pipe-health] per-host pacing (DESIGN-NORTHSTAR §2 PIPE) ──────
+  // ONE shared token-bucket pacer maps module → RootURL host (the
+  // cover-proxy RootURL-reading knowledge) and spaces the favorites
+  // checks AND the download jobs so concurrent work on one site never
+  // bursts (different hosts proceed in parallel — one bucket per
+  // host). Conservative fixed defaults, no user knobs in v1; unknown
+  // modules are never gated (registry lag cannot stall the pipe).
+  const hostPacer = new ModuleHostPacer({
+    rootUrlOf: (moduleId): string | undefined =>
+      moduleRows.find((module): boolean => module.id === moduleId)?.rootURL,
+  });
+
   const lane = startDownloadLane(queue, {
     wsHub,
     library: libraryStore,
     dataDir: config.dataDir,
+    // [pipe-health] the download lane consults the shared pacer.
+    pacer: hostPacer,
     // The substrate's download-hooks factory (stub proof substitutes
     // scripted hooks; default = the wasmoon-backed EngineDownloadHooks).
     createHooks: (moduleId, engineOptions): Promise<import('../engine/facade.js').ModuleDownloadHooks> =>
@@ -863,6 +878,9 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     downloads: {
       createDownload: (input): { jobId: string } => ({ jobId: jobs.createDownload(input).job.id }),
     },
+    // [pipe-health] every live favorites fetch (scheduler sweep, manual
+    // check-now, batch check, missing-chapter check) is paced per host.
+    pacer: hostPacer,
   });
   // Options → Updates parity: the persisted favorites scheduler settings
   // (app_settings kv) seed the interval + the startup-sweep gate; PUT

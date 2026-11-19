@@ -19,6 +19,7 @@ import type {
   FavoriteCheckBatchResponseT,
   FavoriteCheckResponseT,
   FavoriteCreateRequestT,
+  FavoriteMissingCheckResponseT,
   FavoriteT,
   FavoriteTransferPreviewResponseT,
   FavoriteUpdateRequestT,
@@ -123,6 +124,23 @@ export class SqliteFavoritesService implements FavoriteService {
       favorite: toFavoriteWire(result.favorite),
       queuedDownloads: result.queuedDownloads,
       newChapters: result.newChapters.map((chapter) => ({ ...chapter })),
+    };
+  }
+
+  /**
+   * [pipe-health] Manual missing-chapter check: live fetch (paced per
+   * host by the engine) → reverse link-diff → the per-favorite report.
+   * The stored downloaded list is NEVER rewritten here — the report is
+   * the entire deliverable (no-auto-action invariant).
+   */
+  async checkMissing(id: string): Promise<FavoriteMissingCheckResponseT> {
+    if (this.engine.storeView().getFavorite(id) === undefined) {
+      throw new ApiError(404, 'not_found', `unknown favorite: ${id}`);
+    }
+    const result = await this.engine.checkMissing(id);
+    return {
+      favorite: toFavoriteWire(result.favorite),
+      missingChapters: result.missingChapters.map((link) => ({ link })),
     };
   }
 

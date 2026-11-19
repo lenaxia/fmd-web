@@ -21,6 +21,7 @@ import { coverSrc } from '../api/cover';
 import { CoverImage } from '@/components/manga/CoverImage';
 import {
   useCancelFavoritesCheck,
+  useCheckFavoriteMissing,
   useCheckFavoriteNow,
   useCreateDownloadJob,
   useFavorites,
@@ -29,6 +30,7 @@ import {
   useUpdateFavorite,
   type FavoriteCheckBatchItemT,
   type FavoriteCheckScopeT,
+  type FavoriteMissingChapterT,
   type FavoriteT,
 } from '../api/hooks';
 import type { ModuleSummaryT } from '../api/hooks';
@@ -38,6 +40,14 @@ import { ListPanel } from '@/components/patterns/ListPanel';
 import { PageHeader } from '@/components/patterns/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -101,6 +111,7 @@ function FavoriteListRow(props: {
   readonly onStartRename: (id: string) => void;
   readonly onCheckNow: (favorite: FavoriteT) => void;
   readonly onDownloadAllNew: (favorite: FavoriteT) => void;
+  readonly onCheckMissing: (favorite: FavoriteT) => void;
   readonly onOpenDialogs: (state: Partial<RowDialogsState>) => void;
   readonly pending: boolean;
 }): ReactElement {
@@ -243,6 +254,16 @@ function FavoriteListRow(props: {
           >
             Download all new
           </DropdownMenuItem>
+          {/* [pipe-health] FCheckMissing parity, web-adapted: the manual
+           * missing-chapter check — report-only, surfaced per favorite. */}
+          <DropdownMenuItem
+            data-testid={`favorite-menu-check-missing-${favorite.id}`}
+            disabled={pending}
+            aria-label={`Check ${label} for missing chapters`}
+            onSelect={(): void => props.onCheckMissing(favorite)}
+          >
+            Check missing chapters
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             data-testid={`favorite-menu-rename-${favorite.id}`}
@@ -311,9 +332,15 @@ export function FavoritesPage(): ReactElement {
   const batch = useFavoritesCheckBatch();
   const cancelBatch = useCancelFavoritesCheck();
   const checkNow = useCheckFavoriteNow();
+  const checkMissing = useCheckFavoriteMissing();
   const createDownload = useCreateDownloadJob();
   const [sheetRows, setSheetRows] = useState<NewChapterRow[] | null>(null);
   const [renamingId, setRenamingId] = useState('');
+  /** [pipe-health] the per-favorite missing-chapter report (report-only). */
+  const [missingReport, setMissingReport] = useState<{
+    favorite: FavoriteT;
+    chapters: readonly FavoriteMissingChapterT[];
+  } | null>(null);
   // [UX-AUDIT F-6] the true split-button's default scope — the action
   // half runs THIS; the caret half's menu items re-set it.
   const [checkScope, setCheckScope] = useState<FavoriteCheckScopeT>('all');
@@ -425,6 +452,25 @@ export function FavoritesPage(): ReactElement {
     });
   };
 
+  /**
+   * [pipe-health] The manual missing-chapter check (FCheckMissing
+   * parity, web-adapted): fetches the live list and reports the
+   * chapters REMOVED from the site since they were recorded — the
+   * report dialog is the ENTIRE effect (nothing is deleted, the
+   * downloaded list is never rewritten).
+   */
+  const runCheckMissing = (favorite: FavoriteT): void => {
+    checkMissing.mutate(favorite.id, {
+      onSuccess: (result): void => {
+        refreshFavorites();
+        setMissingReport({ favorite: result.favorite, chapters: result.missingChapters });
+      },
+      onError: (): void => {
+        toast.error(`Checking ${favorite.title ?? favorite.url} for missing chapters failed; try again in a moment.`);
+      },
+    });
+  };
+
   if (favorites.isPending) {
     return (
       <section aria-label="Favorites">
@@ -473,10 +519,11 @@ export function FavoritesPage(): ReactElement {
               onStartRename={setRenamingId}
               onCheckNow={runCheckNow}
               onDownloadAllNew={downloadAllNew}
+              onCheckMissing={runCheckMissing}
               onOpenDialogs={(next): void =>
                 setDialogs((current): RowDialogsState => ({ ...current, ...next }))
               }
-              pending={checkNow.isPending}
+              pending={checkNow.isPending || checkMissing.isPending}
             />
           )}
         />
@@ -599,6 +646,63 @@ export function FavoritesPage(): ReactElement {
           refreshFavorites();
         }}
       />
+
+      {/* [pipe-health] The missing-chapter report (FCheckMissing parity,
+       * web-adapted): report-only — the dialog lists what the site
+       * removed; nothing in the app acts on it. */}
+      <Dialog
+        open={missingReport !== null}
+        onOpenChange={(open): void => {
+          if (!open) {
+            setMissingReport(null);
+          }
+        }}
+      >
+        <DialogContent
+          className="max-h-[80vh] sm:max-w-lg"
+          data-testid="missing-chapters-dialog"
+        >
+          <DialogHeader>
+            <DialogTitle>
+              Missing chapters — {missingReport?.favorite.title ?? missingReport?.favorite.url}
+            </DialogTitle>
+            <DialogDescription>
+              Chapters the site’s list no longer contains (removed since they were
+              recorded). Reported for your awareness only — nothing was deleted and
+              the downloaded list is unchanged.
+            </DialogDescription>
+          </DialogHeader>
+          {missingReport !== null && missingReport.chapters.length === 0 ? (
+            <p role="status" className="text-sm text-muted-foreground" data-testid="missing-chapters-empty">
+              No missing chapters — every recorded chapter is still on the site’s list.
+            </p>
+          ) : null}
+          {missingReport !== null && missingReport.chapters.length > 0 ? (
+            <ul
+              aria-label="Missing chapter links"
+              className="max-h-60 space-y-1 overflow-y-auto text-sm"
+              data-testid="missing-chapters-list"
+            >
+              {missingReport.chapters.map((chapter): ReactElement => (
+                <li key={chapter.link} className="break-all text-muted-foreground">
+                  {chapter.link}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              data-testid="missing-chapters-close"
+              onClick={(): void => setMissingReport(null)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <SaveToDialog
         open={dialogs.saveTo !== null}

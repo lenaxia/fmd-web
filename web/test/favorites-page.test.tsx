@@ -594,3 +594,104 @@ describe('toSheetRows (check result → sheet rows)', (): void => {
     expect(rows[1]?.autoDownload).toBe(true);
   });
 });
+
+// ── [pipe-health] check-missing (FCheckMissing parity, web-adapted) ──
+
+describe('FavoritesPage — manual missing-chapter check (report-only)', (): void => {
+  it('POSTs check-missing and the dialog lists the removed chapters; NOTHING else is ever called', async (): Promise<void> => {
+    const MISSING = ['https://ex.org/manga/fav/ch-3', 'https://ex.org/manga/fav/ch-7'];
+    const state = favoritesState([favoriteFixture()]);
+    const { fetch, requests } = mockFetch([
+      listRoute(state),
+      {
+        method: 'POST',
+        match: (url): boolean => url.pathname === `/api/favorites/${ENC_ID}/check-missing`,
+        respond: (): { body: object } => ({
+          body: {
+            favorite: favoriteFixture({ lastCheck: '2026-06-01T00:00:00Z' }),
+            missingChapters: MISSING.map((link) => ({ link })),
+          },
+        }),
+      },
+    ]);
+    renderWithProviders(<FavoritesPage />, { fetch });
+
+    await openRowMenu();
+    await userEvent.click(screen.getByTestId(`favorite-menu-check-missing-${FAV_ID}`));
+
+    const dialog = await screen.findByTestId('missing-chapters-dialog');
+    expect(within(dialog).getByText(/Fixture Favorite/u)).toBeInTheDocument();
+    const list = within(dialog).getByTestId('missing-chapters-list');
+    expect(within(list).getAllByRole('listitem').map((li): string => li.textContent ?? '')).toEqual(MISSING);
+    // The report is the ENTIRE effect: the check POST (and the list
+    // refetch) are the only writes — no delete, no download, no PUT.
+    expect(
+      requests.some((r) => r.method === 'POST' && r.path === `/api/favorites/${ENC_ID}/check-missing`),
+    ).toBe(true);
+    const acted = requests.filter(
+      (r) =>
+        r.method === 'DELETE' ||
+        r.method === 'PUT' ||
+        (r.method === 'POST' && r.path !== `/api/favorites/${ENC_ID}/check-missing`),
+    );
+    expect(acted).toEqual([]);
+    // Close dismisses the report (it never lingers as state).
+    await userEvent.click(within(dialog).getByTestId('missing-chapters-close'));
+    await waitFor((): void => {
+      expect(screen.queryByTestId('missing-chapters-dialog')).not.toBeInTheDocument();
+    });
+  });
+
+  it('a nothing-missing report renders the explicit empty state', async (): Promise<void> => {
+    const state = favoritesState([favoriteFixture()]);
+    const { fetch } = mockFetch([
+      listRoute(state),
+      {
+        method: 'POST',
+        match: (url): boolean => url.pathname === `/api/favorites/${ENC_ID}/check-missing`,
+        respond: (): { body: object } => ({
+          body: { favorite: favoriteFixture(), missingChapters: [] },
+        }),
+      },
+    ]);
+    renderWithProviders(<FavoritesPage />, { fetch });
+
+    await openRowMenu();
+    await userEvent.click(screen.getByTestId(`favorite-menu-check-missing-${FAV_ID}`));
+
+    const dialog = await screen.findByTestId('missing-chapters-dialog');
+    expect(within(dialog).getByTestId('missing-chapters-empty')).toHaveTextContent(/no missing chapters/iu);
+    expect(within(dialog).queryByTestId('missing-chapters-list')).not.toBeInTheDocument();
+  });
+
+  it('a failed live fetch surfaces no dialog and issues no side writes', async (): Promise<void> => {
+    const state = favoritesState([favoriteFixture()]);
+    const { fetch, requests } = mockFetch([
+      listRoute(state),
+      {
+        method: 'POST',
+        match: (url): boolean => url.pathname === `/api/favorites/${ENC_ID}/check-missing`,
+        respond: (): { body: object; status: number } => ({
+          body: { error: { code: 'upstream_error', message: 'GetInfo failed' } },
+          status: 502,
+        }),
+      },
+    ]);
+    renderWithProviders(<FavoritesPage />, { fetch });
+
+    await openRowMenu();
+    await userEvent.click(screen.getByTestId(`favorite-menu-check-missing-${FAV_ID}`));
+
+    // The failure is toast-only (sonner) — the DOM-observable contract
+    // is that the report NEVER opens and nothing was acted on (wait
+    // for the attempt itself first, so the assert is post-failure).
+    await waitFor((): void => {
+      expect(
+        requests.some((r) => r.method === 'POST' && r.path === `/api/favorites/${ENC_ID}/check-missing`),
+      ).toBe(true);
+    });
+    expect(screen.queryByTestId('missing-chapters-dialog')).not.toBeInTheDocument();
+    const acted = requests.filter((r) => r.method === 'DELETE' || r.method === 'PUT');
+    expect(acted).toEqual([]);
+  });
+});

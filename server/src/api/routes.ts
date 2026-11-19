@@ -56,6 +56,7 @@ export const API_ROUTES: readonly RouteSpec[] = [
   { method: 'PUT', path: '/api/favorites/:id', description: 'rename + auto-download toggle + save-to + enable/disable (pmFavorites parity)' },
   { method: 'DELETE', path: '/api/favorites/:id', description: 'delete a favorite (its downloaded_chapters row is NOT touched)' },
   { method: 'POST', path: '/api/favorites/:id/check', description: 'manual check-now: immediate DoCheck cycle (live info → diff → auto-download)' },
+  { method: 'POST', path: '/api/favorites/:id/check-missing', description: '[pipe-health] manual missing-chapter check (FMD2 FCheckMissing parity, web-adapted): ONE paced live GetInfo, then the REVERSE link-diff — stored-downloaded links the live chapter list no longer contains are reported as missing chapters (the site removed them). REPORT-ONLY: the downloaded list is never rewritten, nothing is enqueued, no file is touched; the favorite row carries refreshed status/count/lastCheck' },
   { method: 'POST', path: '/api/favorites/check', description: 'batch check (btFavoritesCheckNewChapter parity): scope all|enabled|disabled, sequential DoCheck cycles, per-row results for the new-chapter sheet' },
   { method: 'POST', path: '/api/favorites/check/cancel', description: 'cancel the in-flight batch check (remaining rows untouched; response reports cancelled)' },
   { method: 'POST', path: '/api/favorites/:id/transfer/preview', description: 'website-transfer mapping preview (frmTransferFavorites parity): catalog title match + GetInfo dry-run → valid/invalid + reason' },

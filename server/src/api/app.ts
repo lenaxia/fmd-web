@@ -88,6 +88,7 @@ import {
   FavoriteCheckResponseSchema,
   FavoriteCreateRequestSchema,
   FavoriteIdSchema,
+  FavoriteMissingCheckResponseSchema,
   FavoriteImportRequestSchema,
   FavoriteListQuerySchema,
   FavoriteListResponseSchema,
@@ -113,6 +114,7 @@ import {
   type FavoriteCheckBatchCancelResponseT,
   type FavoriteCheckBatchResponseT,
   type FavoriteCheckResponseT,
+  type FavoriteMissingCheckResponseT,
   type FavoriteResponseT,
   type FavoriteTransferPreviewResponseT,
   type FavoriteTransferResponseT,
@@ -1529,6 +1531,22 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     }
   };
 
+  // [pipe-health] Manual missing-chapter check (FCheckMissing parity,
+  // web-adapted): live info → REVERSE link-diff → per-favorite report
+  // of chapters removed from the site's list. Report-only — the route
+  // mutates nothing beyond the check's observational bookkeeping.
+  const favoriteCheckMissing = async (id: string): Promise<FavoriteMissingCheckResponseT> => {
+    try {
+      const result = await services.favorites.checkMissing(id);
+      return FavoriteMissingCheckResponseSchema.parse(result);
+    } catch (err: unknown) {
+      if (err instanceof ApiError) {
+        throw err;
+      }
+      throw new ApiError(502, 'upstream_error', `module GetInfo failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
   app.get('/api/favorites/:id', async (req): Promise<FavoriteResponseT> => favoriteGet(favoriteId(req)));
   app.get('/api/favorites/*', async (req): Promise<FavoriteResponseT> => favoriteGet(favoriteId(req)));
 
@@ -1545,6 +1563,7 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
   });
 
   app.post('/api/favorites/:id/check', async (req): Promise<FavoriteCheckResponseT> => favoriteCheckNow(favoriteId(req)));
+  app.post('/api/favorites/:id/check-missing', async (req): Promise<FavoriteMissingCheckResponseT> => favoriteCheckMissing(favoriteId(req)));
 
   // ── favorites batch check (btFavoritesCheckNewChapter + cancel) ──
   app.post('/api/favorites/check', async (req): Promise<FavoriteCheckBatchResponseT> => {
@@ -1609,7 +1628,7 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     if (typeof tail !== 'string') {
       throw new ApiError(404, 'not_found', 'route not found');
     }
-    for (const suffix of ['/transfer/preview', '/transfer', '/check']) {
+    for (const suffix of ['/transfer/preview', '/transfer', '/check-missing', '/check']) {
       if (!tail.endsWith(suffix)) {
         continue;
       }
@@ -1623,6 +1642,9 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
       }
       if (suffix === '/transfer') {
         return favoriteTransfer(id, req);
+      }
+      if (suffix === '/check-missing') {
+        return favoriteCheckMissing(id);
       }
       return favoriteCheckNow(id);
     }

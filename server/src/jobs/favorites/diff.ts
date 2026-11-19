@@ -12,7 +12,7 @@
  * duplicates in the live list stay distinct positions).
  */
 
-import { hasChapter } from '../library/merge.js';
+import { asciiLowerCase, hasChapter, splitTextLines } from '../library/merge.js';
 
 /** One new chapter: its live-list position plus the projected name. */
 export interface NewChapter {
@@ -54,4 +54,38 @@ export function newChapters(
     link: liveChapterLinks[position] ?? '',
     name: liveChapterNames[position] ?? '',
   }));
+}
+
+/**
+ * [pipe-health] The missing-chapter REVERSE diff (the FCheckMissing
+ * analog for the link-keyed world, DESIGN-NORTHSTAR §3 "a chapter =
+ * its link"): stored-downloaded links the LIVE site list no longer
+ * contains — chapters the site REMOVED since they were recorded.
+ * The exact set-complement of `newChapterPositions`:
+ *
+ *   new chapters  = live   NOT IN stored
+ *   missing chaps = stored NOT IN live
+ *
+ * Same ASCII-case-insensitive link equality as the forward diff
+ * (`compareLegacyText === 0` ≡ `asciiLowerCase` set keys — verified
+ * against engine/lua/tstrings.ts foldAscii). Stored order preserved
+ * verbatim; duplicate stored lines stay distinct entries. REPORT
+ * ONLY — the caller surfaces the list per favorite; nothing is ever
+ * deleted from any list by this diff (the charter's no-auto-action).
+ */
+export function missingChapters(
+  liveChapterLinks: readonly string[],
+  storedDownloadedList: string,
+): string[] {
+  const liveKeys = new Set(liveChapterLinks.map((link): string => asciiLowerCase(link)));
+  const missing: string[] = [];
+  for (const stored of splitTextLines(storedDownloadedList)) {
+    if (stored === '') {
+      continue;
+    }
+    if (!liveKeys.has(asciiLowerCase(stored))) {
+      missing.push(stored);
+    }
+  }
+  return missing;
 }

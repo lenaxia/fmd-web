@@ -25,8 +25,9 @@ import {
   mergeCaseInsensitive,
 } from '../library/merge.js';
 import type { FavoriteRow, LibraryStore } from '../library/store.js';
+import type { HostPacerPort } from '../host-pacing.js';
 import { doCheck } from './do-check.js';
-import { newChapters } from './diff.js';
+import { missingChapters, newChapters } from './diff.js';
 
 /** The Phase-3 pipeline port the engine auto-downloads through. */
 export interface FavoriteDownloadQueue {
@@ -47,6 +48,15 @@ export interface FavoritesEngineDeps {
   >;
   readonly info: InfoService;
   readonly downloads: FavoriteDownloadQueue;
+  /**
+   * [pipe-health] Per-host pacing (DESIGN-NORTHSTAR §2 PIPE): awaited
+   * before EVERY live module fetch this engine issues — scheduler
+   * sweeps, manual check-now, batch checks AND the missing-chapter
+   * check all space their requests per RootURL host (no bursts that
+   * trip anti-bot; different hosts proceed in parallel). Absent =
+   * unpaced (hermetic tests; the pacing unit tests pin the spacing).
+   */
+  readonly pacer?: HostPacerPort;
   /** Wall/fake clock (epoch ms). */
   readonly now?: () => number;
 }
@@ -62,6 +72,19 @@ export interface FavoriteCheckResult {
   readonly queuedDownloads: number;
   /** true when the tag-100 transfer branch ran (:356-361). */
   readonly transferIngest: boolean;
+}
+
+/** [pipe-health] One manual missing-chapter check cycle's outcome. */
+export interface FavoriteMissingCheckResult {
+  /** The favorite row as persisted by this check (status/count/lastCheck). */
+  readonly favorite: FavoriteRow;
+  /** 'skipped' = empty link (DoCheckMissing :397-399 parity). */
+  readonly outcome: 'checked' | 'skipped';
+  /**
+   * Stored-downloaded links the live site list no longer contains
+   * (reverse link-diff, stored order) — REPORT ONLY, never acted on.
+   */
+  readonly missingChapters: readonly string[];
 }
 
 export class FavoritesEngine {
@@ -85,6 +108,10 @@ export class FavoritesEngine {
     if (favorite.url === '') {
       // :332-334 — a link-less favorite exits before anything happens.
       return { favorite, outcome: 'skipped', newChapters: [], queuedDownloads: 0, transferIngest: false };
+    }
+    // [pipe-health] per-host pacing before the live fetch (§2 PIPE).
+    if (this.deps.pacer !== undefined) {
+      await this.deps.pacer.acquire(favorite.moduleId);
     }
     const live = await this.deps.info.getInfo(favorite.moduleId, favorite.url);
     const outcome = doCheck(favorite, live, this.now());
@@ -144,6 +171,59 @@ export class FavoritesEngine {
     }
 
     return { favorite: updated, outcome: 'checked', newChapters: newChapterSet, queuedDownloads: 0, transferIngest: false };
+  }
+
+  /**
+   * [pipe-health] Manual missing-chapter check (FMD2 uFavoritesManager
+   * `FCheckMissing` parity, web-adapted per the north-star: the manual
+   * check MODE is the parity; the MECHANISM is the reverse link-diff —
+   * DESIGN-NORTHSTAR §6 "mechanisms are a strong prior, not a
+   * contract"). One cycle for one favorite: live info → the stored
+   * downloaded list diffed AGAINST the live chapter list → every
+   * stored link the site no longer lists is reported as missing
+   * (`missingChapters`, diff.ts).
+   *
+   * REPORT ONLY — no auto-action, ever: the downloaded list is NOT
+   * rewritten (downloaded truth stays downloaded truth, §3), nothing
+   * is enqueued, no file is touched ("nothing auto-deletes user
+   * files"). What the check DOES persist is the DoCheckMissing
+   * observational bookkeeping (uFavoritesManager.pas:421-422, :509):
+   * CurrentChapter/Status update immediately and DateLastChecked
+   * stamps now. DateLastUpdated is deliberately NOT set (our field
+   * means "the chapter list grew"; FMD2 sets it here, but a missing
+   * report is not an update — documented divergence).
+   *
+   * Throws on live-info failure (the API maps it to a typed 502).
+   */
+  public async checkMissing(mangaKey: string): Promise<FavoriteMissingCheckResult> {
+    const favorite = this.deps.store.getFavorite(mangaKey);
+    if (favorite === undefined) {
+      throw new ApiError(404, 'not_found', `unknown favorite: ${mangaKey}`);
+    }
+    if (favorite.url === '') {
+      // :397-399 parity — a link-less favorite exits before anything.
+      return { favorite, outcome: 'skipped', missingChapters: [] };
+    }
+    // [pipe-health] per-host pacing before the live fetch (§2 PIPE) —
+    // a manual missing check lands on the same host budget as every
+    // other request to that site.
+    if (this.deps.pacer !== undefined) {
+      await this.deps.pacer.acquire(favorite.moduleId);
+    }
+    const live = await this.deps.info.getInfo(favorite.moduleId, favorite.url);
+    const missing = missingChapters(live.chapterLinks, favorite.downloadedChapterList ?? '');
+    const now = this.now();
+    const updated: FavoriteRow = {
+      ...favorite,
+      // Immediate count/status update (DoCheckMissing :421-422).
+      currentChapter: live.chapterLinks.length,
+      status: live.status,
+      // DateLastChecked := now (:509).
+      lastCheck: now,
+      ...(live.coverLink !== '' ? { coverLink: live.coverLink } : {}),
+    };
+    this.deps.store.upsertFavorite(updated);
+    return { favorite: updated, outcome: 'checked', missingChapters: missing };
   }
 
   /**
@@ -339,6 +419,10 @@ export class FavoritesEngine {
     }
     if (favorite.url === '') {
       return { favorite, outcome: 'skipped', newChapters: [], queuedDownloads: 0, transferIngest: false, importOutcome: 'unchanged' };
+    }
+    // [pipe-health] the transfer re-ingest is a live fetch too — paced.
+    if (this.deps.pacer !== undefined) {
+      await this.deps.pacer.acquire(favorite.moduleId);
     }
     const live = await this.deps.info.getInfo(favorite.moduleId, favorite.url);
     const outcome = doCheck({ ...favorite, transferIngest: true }, live, this.now());

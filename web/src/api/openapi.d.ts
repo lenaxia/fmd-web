@@ -872,6 +872,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/favorites/{id}/check-missing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Manual missing-chapter check (report-only)
+         * @description FMD2 FCheckMissing parity, web-adapted per DESIGN-NORTHSTAR §6 (mechanisms are a strong prior, not a contract): ONE live GetInfo for the favorite (paced per RootURL host), then the REVERSE link-diff — every stored-downloaded link the live chapter list no longer contains is reported as a missing chapter (the site removed it since it was recorded). REPORT-ONLY by construction: the downloaded list is never rewritten, nothing is enqueued, no file is touched; the response carries the per-favorite report plus the favorite row with its refreshed status/count/lastCheck (DoCheckMissing observational bookkeeping). Live-fetch failures are typed 502s.
+         */
+        post: operations["checkFavoriteMissing"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/favorites/check": {
         parameters: {
             query?: never;
@@ -4223,6 +4243,70 @@ export interface operations {
                             position: number;
                             link: string;
                             name: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Favorite not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Module GetInfo failed */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    checkFavoriteMissing: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Module/catalog id (32-hex, §5) */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Missing-chapter report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        favorite: components["schemas"]["Favorite"];
+                        missingChapters: {
+                            link: string;
                         }[];
                     };
                 };

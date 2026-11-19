@@ -82,18 +82,25 @@ export function ensureJobSchema(db: Database.Database): void {
       claimed_at      INTEGER,
       created_at      INTEGER NOT NULL,
       updated_at      INTEGER NOT NULL,
-      paused          INTEGER NOT NULL DEFAULT 0
+      paused          INTEGER NOT NULL DEFAULT 0,
+      next_attempt_at INTEGER
     );
     CREATE INDEX IF NOT EXISTS job_type_state ON job (type, state);
     CREATE INDEX IF NOT EXISTS job_retention  ON job (state, updated_at);
   `);
-  // Additive migration for pre-paused deployments (ALTER cannot be
-  // conditional in SQLite — the pragma read gates it). cbAddAsStopped
-  // parity: paused=1 rows are invisible to the claim transaction until
-  // the resume endpoint lifts the hold.
+  // Additive migrations for pre-existing deployments (ALTER cannot be
+  // conditional in SQLite — the pragma read gates each one).
+  // cbAddAsStopped parity: paused=1 rows are invisible to the claim
+  // transaction until the resume endpoint lifts the hold.
   const columns = db.pragma('table_info(job)') as Array<{ name: string }>;
   if (!columns.some((c): boolean => c.name === 'paused')) {
     db.exec('ALTER TABLE job ADD COLUMN paused INTEGER NOT NULL DEFAULT 0');
+  }
+  // [pipe-health] retry backoff due stamp: NULL (or past) = claimable
+  // now; a future stamp holds the retry row out of the claim pool
+  // until the exponential backoff elapses.
+  if (!columns.some((c): boolean => c.name === 'next_attempt_at')) {
+    db.exec('ALTER TABLE job ADD COLUMN next_attempt_at INTEGER');
   }
 }
 

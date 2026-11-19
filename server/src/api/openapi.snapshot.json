@@ -4796,6 +4796,105 @@
         ]
       }
     },
+    "/api/favorites/{id}/check-missing": {
+      "post": {
+        "operationId": "checkFavoriteMissing",
+        "summary": "Manual missing-chapter check (report-only)",
+        "description": "FMD2 FCheckMissing parity, web-adapted per DESIGN-NORTHSTAR §6 (mechanisms are a strong prior, not a contract): ONE live GetInfo for the favorite (paced per RootURL host), then the REVERSE link-diff — every stored-downloaded link the live chapter list no longer contains is reported as a missing chapter (the site removed it since it was recorded). REPORT-ONLY by construction: the downloaded list is never rewritten, nothing is enqueued, no file is touched; the response carries the per-favorite report plus the favorite row with its refreshed status/count/lastCheck (DoCheckMissing observational bookkeeping). Live-fetch failures are typed 502s.",
+        "tags": [
+          "favorites"
+        ],
+        "responses": {
+          "200": {
+            "description": "Missing-chapter report",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "favorite": {
+                      "$ref": "#/components/schemas/Favorite"
+                    },
+                    "missingChapters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "link": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "link"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "favorite",
+                    "missingChapters"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request failed schema validation (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Favorite not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Unhandled server failure (typed error envelope)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Module GetInfo failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            "description": "Module/catalog id (32-hex, §5)"
+          }
+        ]
+      }
+    },
     "/api/favorites/check": {
       "post": {
         "operationId": "checkFavoritesBatch",

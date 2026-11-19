@@ -36,6 +36,7 @@ import {
   InvalidJobTransitionError,
   type JobTransitionDetail,
 } from './state-machine.js';
+import { resolveRetryBackoffPolicy, retryBackoffMs, type RetryBackoffPolicy } from './backoff.js';
 import {
   laneForPayload,
   parseJobPayload,
@@ -81,6 +82,12 @@ export interface QueueJob {
    * slots with it; undefined for keyless rows).
    */
   readonly idempotencyKey: string | undefined;
+  /**
+   * [pipe-health] Retry backoff due stamp (epoch ms): a `retry` row
+   * with a future stamp is NOT claimable until then (the claim
+   * transaction enforces it). Undefined = claimable immediately.
+   */
+  readonly nextAttemptAt: number | undefined;
   readonly createdAt: number;
   readonly updatedAt: number;
 }
@@ -188,6 +195,7 @@ interface JobRow {
   readonly idempotency_key: string | null;
   readonly created_at: number;
   readonly updated_at: number;
+  readonly next_attempt_at: number | null;
 }
 
 /** Replay lookup also carries the fingerprint (§10 conflict check). */
@@ -225,6 +233,7 @@ function toQueueJob(row: JobRow): QueueJob {
     attempts: row.attempts,
     paused: row.paused !== 0,
     idempotencyKey: idempotencyKeyOf(row),
+    nextAttemptAt: row.next_attempt_at ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -261,7 +270,7 @@ function validatePayloadSemantics(payload: JobPayload): void {
 }
 
 const SELECT_COLUMNS =
-  'id, type, payload, state, priority, progress, failure, error, attempts, paused, idempotency_key, created_at, updated_at';
+  'id, type, payload, state, priority, progress, failure, error, attempts, paused, idempotency_key, created_at, updated_at, next_attempt_at';
 
 export class SqliteJobQueue implements JobQueue {
   private readonly db: Database.Database;
@@ -324,10 +333,12 @@ export class SqliteJobQueue implements JobQueue {
          claimed_by = @worker,
          claimed_at = @now,
          attempts = attempts + 1,
+         next_attempt_at = NULL,
          updated_at = @now
        WHERE id = (
          SELECT id FROM job
          WHERE type = @lane AND state IN ('queued', 'retry') AND paused = 0
+           AND (next_attempt_at IS NULL OR next_attempt_at <= @now)
          ORDER BY priority DESC, id ASC
          LIMIT 1
        )
@@ -360,6 +371,7 @@ export class SqliteJobQueue implements JobQueue {
          failure = @failure,
          error = @error,
          progress = COALESCE(@progress, progress),
+         next_attempt_at = @nextAttempt,
          updated_at = @now
        WHERE id = @id AND state = @from`,
     );
@@ -536,6 +548,10 @@ export class SqliteJobQueue implements JobQueue {
       failure: to === 'failed' ? (detail?.failureKind ?? null) : null,
       error: detail?.error ?? null,
       progress: pendingProgressJson,
+      // [pipe-health] retry rows carry the backoff due stamp; every
+      // other transition clears it (claim clears it again as a belt-
+      // and-braces for raw-SQL claim paths).
+      nextAttempt: to === 'retry' ? (detail?.nextAttemptAt ?? null) : null,
       now: this.clock.now(),
     });
     if (result.changes !== 1) {
@@ -713,10 +729,6 @@ export interface LaneRunnerLaneOptions {
   readonly handler: LaneHandler;
   /** Backoff between empty-poll claims (default 250 ms). */
   readonly pollIntervalMs?: number;
-  /** Dwell after a `retry` outcome before the re-claim (default 1000 ms):
-   * keeps the transient `retry` row state observable on the API/WS
-   * surface (the e2e state-history assertions poll at 100 ms). */
-  readonly retryBackoffMs?: number;
 }
 
 export interface LaneRunnerOptions {
@@ -725,6 +737,16 @@ export interface LaneRunnerOptions {
   /** Total claims allowed per job before `retry` exhausts (default 3). */
   readonly maxAttempts?: number;
   readonly workerIdPrefix?: string;
+  /**
+   * [pipe-health] Retry backoff policy (exponential + jitter, 24 h
+   * cap — see `backoff.ts`): a retrying job's `next_attempt_at` is
+   * stamped `now + backoff(attempts)`, the lane slot is freed
+   * immediately, and the claim transaction holds the row out of the
+   * pool until the stamp elapses. Partial overrides merge over the
+   * conservative defaults; inject a deterministic `jitter` in tests
+   * to pin the curve.
+   */
+  readonly retryBackoff?: Partial<RetryBackoffPolicy>;
 }
 
 function messageOf(cause: unknown): string {
@@ -743,6 +765,7 @@ export class LaneRunner {
   private readonly clock: SyncClock;
   private readonly lanes: Partial<Record<LaneId, LaneRunnerLaneOptions>>;
   private readonly maxAttempts: number;
+  private readonly retryBackoff: RetryBackoffPolicy;
   private readonly workerIdPrefix: string;
   private readonly active = new Map<LaneId, number>();
   private readonly loopPromises: Promise<void>[] = [];
@@ -755,6 +778,7 @@ export class LaneRunner {
     this.clock = opts.clock ?? systemClock;
     this.lanes = opts.lanes;
     this.maxAttempts = opts.maxAttempts ?? 3;
+    this.retryBackoff = resolveRetryBackoffPolicy(opts.retryBackoff);
     this.workerIdPrefix = opts.workerIdPrefix ?? 'lane';
     for (const [lane, laneOpts] of Object.entries(this.lanes) as Array<[LaneId, LaneRunnerLaneOptions]>) {
       if (!Number.isInteger(laneOpts.concurrency) || laneOpts.concurrency < 1) {
@@ -823,13 +847,13 @@ export class LaneRunner {
           },
         });
         this.applyOutcome(job, outcome);
-        if (outcome.type === 'retry' && job.attempts < this.maxAttempts) {
-          // §7.1 retry dwell: the slot holds for the backoff before the
-          // re-claim so the transient 'retry' row state is observable on
-          // the API/WS surface (state-history assertions poll at 100 ms).
-          // Cancellation/stop ends the wait immediately.
-          await Promise.race([this.clock.delay(laneOpts.retryBackoffMs ?? 1000), stopPromise]);
-        }
+        // [pipe-health] No retry dwell: a retry outcome stamps
+        // `next_attempt_at` (exponential backoff — applyOutcome) and
+        // the slot frees immediately; the claim transaction holds the
+        // row out until the stamp elapses, so the 'retry' state stays
+        // observable on the API/WS surface the whole backoff long and
+        // OTHER work (different jobs, different hosts) proceeds in
+        // parallel instead of waiting out a held slot.
       } catch (cause: unknown) {
         // Handler escaped without an outcome: the worker misbehaved —
         // §4 semantics classify that as worker_stalled.
@@ -852,10 +876,18 @@ export class LaneRunner {
           break;
         case 'retry': {
           if (job.attempts < this.maxAttempts) {
+            // [pipe-health] exponential+jitter backoff (24 h cap): the
+            // row flips to 'retry' with a due stamp; the slot is freed
+            // and the claim re-picks the job once the stamp elapses.
             this.queue.transition(
               job.id,
               'retry',
-              outcome.error !== undefined ? { error: outcome.error } : undefined,
+              outcome.error !== undefined
+                ? {
+                    error: outcome.error,
+                    nextAttemptAt: this.clock.now() + retryBackoffMs(this.retryBackoff, job.attempts),
+                  }
+                : { nextAttemptAt: this.clock.now() + retryBackoffMs(this.retryBackoff, job.attempts) },
             );
           } else {
             this.queue.transition(job.id, 'failed', {
