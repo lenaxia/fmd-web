@@ -110,15 +110,46 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 
 Cursor pagination: responses carry `nextCursor` — feed it back as `?cursor=…`.
 
-### All-sites union search
+### All-sites union search (scoped)
 
 ```bash
 curl -s -H "Authorization: Bearer $TOKEN" "$BASE/api/search?q=alpha&limit=20" \
-  | jq '{state, titles: [.results[].title], warnings}'
+  | jq '{scope, titles: [.entries[].title], warnings}'
 ```
 
 Fans out over every installed catalog; failed sites surface in `warnings`
-(typed partial state — a union search never fails wholesale).
+(typed partial state — a union search never fails wholesale). Repeated
+identical pages are served from a short-TTL (30 s) cache.
+
+**Scope** (D1 §2): `?scope=preferred` narrows to the preferred-sites
+allowlist (facets render in its canonical order); an explicit `?sites=`
+list (repeated or comma-separated params) is the tightest scope and wins
+over the named one — unknown ids are a typed 400 naming them. The response
+echoes the effective `scope`. The default (`all`) is answered from the
+local index with **zero network** — catalog-less sites surface in
+`excluded`, never a live scrape.
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" "$BASE/api/search?q=alpha&scope=preferred" | jq '.scope'
+curl -s -H "Authorization: Bearer $TOKEN" "$BASE/api/search?q=alpha&sites=<id1>&sites=<id2>" | jq '.scope'
+```
+
+### Preferred sites — the global allowlist
+
+```bash
+# Read the ordered allowlist (canonical order — fixes scope ordering,
+# picker presentation order, duplicate-title resolution order):
+curl -s -H "Authorization: Bearer $TOKEN" "$BASE/api/preferred-sites" | jq '.sites'
+
+# Replace it wholesale (the one write surface; the submitted order IS
+# the next canonical order; unknown ids are a typed 400 naming them):
+curl -s -X PUT -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"sites": ["<id1>", "<id2>"]}' "$BASE/api/preferred-sites" | jq '.sites'
+```
+
+`GET /api/modules` rows carry `preferred: true` for members (joined live
+per read). A PUT bumps the search cache generation so scoped pages never
+serve a stale allowlist.
 
 ### Manga info — by id or open-by-URL
 

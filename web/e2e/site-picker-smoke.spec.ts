@@ -195,8 +195,8 @@ test('picker: sites by NAME, category groups, chips; broken disabled; hex IDs ne
   await page.goto('/#/browse?sites=1');
 
   await expect(page.getByRole('heading', { name: 'Browse sites' })).toBeVisible();
-  await expect(page.getByRole('button', { name: /MangaRock/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /ManhuaFresh/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /MangaRock: browse/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /ManhuaFresh: browse/ })).toBeVisible();
 
   // Category grouping headers with counts.
   await expect(page.locator('.site-category', { hasText: 'Manga' })).toBeVisible();
@@ -207,14 +207,14 @@ test('picker: sites by NAME, category groups, chips; broken disabled; hex IDs ne
   await expect(page.getByText('needs setup').first()).toBeVisible();
 
   // Known-broken row disabled with its reason.
-  const broken = page.getByRole('button', { name: /BrokenScan/ });
+  const broken = page.getByRole('button', { name: /BrokenScan: browse/ });
   await expect(broken).toBeDisabled();
   await expect(broken).toHaveAttribute('title', /cloudflare-loop/);
 
   // Search narrows the list.
   await page.getByLabel('Search sites').fill('Manhua');
-  await expect(page.getByRole('button', { name: /ManhuaFresh/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /MangaRock/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /ManhuaFresh: browse/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /MangaRock: browse/ })).toHaveCount(0);
 
   // THE hex-ID contract: the id rides data attributes/URL, never text.
   await page.getByLabel('Search sites').fill('');
@@ -239,9 +239,9 @@ test('category facet chips: single / multi / All filter the list and sync ?cats=
 
   // SINGLE: Spanish only — the Manga/Manhua rows and headers vanish.
   await chips.getByRole('button', { name: /Spanish/ }).click();
-  await expect(page.getByRole('button', { name: /SitioLibre/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /MangaRock/ })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: /ManhuaFresh/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /SitioLibre: browse/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /MangaRock: browse/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /ManhuaFresh: browse/ })).toHaveCount(0);
   await expect(page.locator('.site-category', { hasText: 'Spanish' })).toBeVisible();
   await expect(page.locator('.site-category', { hasText: 'Manga' })).toHaveCount(0);
   await expect(page).toHaveURL(/#\/browse\?sites=1&cats=Spanish$/);
@@ -250,40 +250,40 @@ test('category facet chips: single / multi / All filter the list and sync ?cats=
 
   // MULTI: adding Manhua unions the two categories.
   await chips.getByRole('button', { name: /Manhua/ }).click();
-  await expect(page.getByRole('button', { name: /SitioLibre/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /ManhuaFresh/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /MangaRock/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /SitioLibre: browse/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /ManhuaFresh: browse/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /MangaRock: browse/ })).toHaveCount(0);
   const hash = decodeURIComponent(new URL(page.url()).hash);
   expect(hash).toBe('#/browse?sites=1&cats=Manhua,Spanish');
 
   // PERSISTENCE: a reload (shared-URL semantics) restores the facet.
   await page.reload();
-  await expect(page.getByRole('button', { name: /SitioLibre/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /ManhuaFresh/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /MangaRock/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /SitioLibre: browse/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /ManhuaFresh: browse/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /MangaRock: browse/ })).toHaveCount(0);
   const chipsAfterReload = page.getByRole('group', { name: 'Filter sites by category' });
   await expect(chipsAfterReload.getByRole('button', { name: /Manhua/ })).toHaveAttribute('aria-pressed', 'true');
   await expect(chipsAfterReload.getByRole('button', { name: /Spanish/ })).toHaveAttribute('aria-pressed', 'true');
 
   // ALL: clears the facet (full list, cats param gone).
   await chipsAfterReload.getByRole('button', { name: 'All' }).click();
-  await expect(page.getByRole('button', { name: /MangaRock/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /ManhuaFresh/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /SitioLibre/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /MangaRock: browse/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /ManhuaFresh: browse/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /SitioLibre: browse/ })).toBeVisible();
   await expect(page).toHaveURL(/#\/browse\?sites=1$/);
 
   // Chips AND-compose with the search box (matrix completion).
   await chipsAfterReload.getByRole('button', { name: /Manga/ }).click();
   await page.getByLabel('Search sites').fill('rock');
-  await expect(page.getByRole('button', { name: /MangaRock/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /BrokenScan/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /MangaRock: browse/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /BrokenScan: browse/ })).toHaveCount(0);
 });
 
 test('picker → auto-provision(mock catalog, WS progress) → entries → manga deep-link', async ({ page }: { page: Page }): Promise<void> => {
   const mock = await installPickerMockApi(page);
   await page.goto('/#/browse?sites=1');
 
-  await page.getByRole('button', { name: /ManhuaFresh/ }).click();
+  await page.getByRole('button', { name: /ManhuaFresh: browse/ }).click();
   // The hex id rides the URL (?site=), never the UI text.
   await expect(page).toHaveURL(new RegExp(`#/browse\\?site=${FRESH_ID}`));
 
@@ -318,7 +318,7 @@ test('cancel withdraws the provisioning UX and returns to the picker', async ({ 
   const mock = await installPickerMockApi(page, { hangSync: true });
   await page.goto('/#/browse?sites=1');
 
-  await page.getByRole('button', { name: /ManhuaFresh/ }).click();
+  await page.getByRole('button', { name: /ManhuaFresh: browse/ }).click();
   await expect(page.getByTestId('provision-status')).toBeVisible();
   await expect(page.getByText(/Downloading the site’s list/)).toBeVisible();
 
@@ -336,7 +336,7 @@ test('catalog-less directory-capable site → automatic live fallback: ONE progr
   const mock = await installPickerMockApi(page);
   await page.goto('/#/browse?sites=1');
 
-  await page.getByRole('button', { name: /NoCatalogSite/ }).click();
+  await page.getByRole('button', { name: /NoCatalogSite: browse/ }).click();
   await expect(page).toHaveURL(new RegExp(`#/browse\\?site=${NOCATALOG_ID}`));
 
   // ONE progress experience: 'Preparing <site>…' — the same one shown

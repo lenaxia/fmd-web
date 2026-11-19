@@ -125,7 +125,11 @@ describe('BrowsePage pagination', (): void => {
     });
     expect(await screen.findByLabelText('Search all sites')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Browse sites/ })).toBeInTheDocument();
-    expect(pageRequests(homeRequests).map((r): string => r.path)).toEqual(['/api/modules']);
+    // [fuzzy-javelin-pearls] the scope selector reads the allowlist too.
+    expect(pageRequests(homeRequests).map((r): string => r.path)).toEqual([
+      '/api/modules',
+      '/api/preferred-sites',
+    ]);
   });
 
   it('?sites=1 renders the site picker (hex-ID empty state deleted with CatalogIdForm)', async (): Promise<void> => {
@@ -145,8 +149,12 @@ describe('BrowsePage pagination', (): void => {
     const openButton: HTMLElement | undefined = openButtons.at(0);
     expect(openButton).toBeDefined();
     expect(openButton?.closest('[data-testid="open-by-url"]')).not.toBeNull();
-    // The picker fetches the module registry (not catalog entries).
-    expect(pageRequests(requests).map((r): string => r.path)).toEqual(['/api/modules']);
+    // The picker fetches the module registry + the preferred allowlist
+    // (the star), never catalog entries.
+    expect(pageRequests(requests).map((r): string => r.path)).toEqual([
+      '/api/modules',
+      '/api/preferred-sites',
+    ]);
   });
 
   it('badges the serving channel: muted source badge when the page came from the site', async (): Promise<void> => {

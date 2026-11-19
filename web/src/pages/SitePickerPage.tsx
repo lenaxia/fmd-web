@@ -19,7 +19,7 @@
  */
 import { useMemo, useState, type FormEvent, type ReactElement } from 'react';
 import type { ModuleSummaryT } from '../api/hooks';
-import { useModules } from '../api/hooks';
+import { useModules, usePreferredSites, useSetPreferredSites } from '../api/hooks';
 import { SiteRow } from '@/components/SiteRow';
 import { OpenByUrlInput } from '@/components/catalog/OpenByUrlInput';
 import { EmptyState } from '@/components/patterns/EmptyState';
@@ -46,6 +46,9 @@ function matchSite(module: ModuleSummaryT, needle: string): boolean {
   );
 }
 
+/** The preferred group's pinned header label ([fuzzy-javelin-pearls]). */
+export const PREFERRED_GROUP_LABEL = 'Preferred';
+
 // ── ?cats= codec (category facet, URL-synced) ───────────────────────
 
 /**
@@ -68,11 +71,18 @@ export function serializeCats(cats: readonly string[]): Record<string, string> {
   return { cats: [...cats].sort().join(',') };
 }
 
-/** ENABLED modules, search+category-filtered, grouped by category (A→Z, sites A→Z). */
+/**
+ * ENABLED modules, search+category-filtered, grouped by category (A→Z,
+ * sites A→Z) — with the PREFERRED sites floated into a pinned first
+ * group in CANONICAL allowlist order ([fuzzy-javelin-pearls], D1 §3:
+ * the list order is the presentation order; a dead preferred site
+ * stays visible — dimmed by SiteRow's availability hint, never hidden).
+ */
 export function buildPickerItems(
   modules: readonly ModuleSummaryT[],
   needle: string,
   cats: readonly string[] = [],
+  preferredOrder: readonly string[] = [],
 ): readonly PickerItem[] {
   const enabled = modules.filter(
     (m): boolean =>
@@ -80,14 +90,25 @@ export function buildPickerItems(
       matchSite(m, needle) &&
       (cats.length === 0 || cats.includes(m.category)),
   );
+  const preferredSet = new Set(preferredOrder);
+  const items: PickerItem[] = [];
+  const preferred = preferredOrder
+    .map((id): ModuleSummaryT | undefined => enabled.find((m): boolean => m.id === id))
+    .filter((m): m is ModuleSummaryT => m !== undefined);
+  if (preferred.length > 0) {
+    items.push({ kind: 'header', category: PREFERRED_GROUP_LABEL, count: preferred.length });
+    for (const module of preferred) {
+      items.push({ kind: 'site', module });
+    }
+  }
+  const rest = enabled.filter((m): boolean => !preferredSet.has(m.id));
   const byCategory = new Map<string, ModuleSummaryT[]>();
-  for (const module of enabled) {
+  for (const module of rest) {
     const bucket = byCategory.get(module.category) ?? [];
     bucket.push(module);
     byCategory.set(module.category, bucket);
   }
   const categories = [...byCategory.keys()].sort((a, b): number => (a < b ? -1 : a > b ? 1 : 0));
-  const items: PickerItem[] = [];
   for (const category of categories) {
     const sites = (byCategory.get(category) ?? []).sort((a, b): number =>
       a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
@@ -121,6 +142,8 @@ export function SitePickerPage(props: {
   // keeps ?cats= pure under back/forward navigation).
   const route: Route = useRoute(props.route);
   const modules = useModules();
+  const preferred = usePreferredSites();
+  const setPreferred = useSetPreferredSites();
   const [searchText, setSearchText] = useState('');
   const needle = searchText.trim().toLowerCase();
   // [dead-site discovery] 'Hide unavailable' is CLIENT-LOCAL view state
@@ -148,9 +171,22 @@ export function SitePickerPage(props: {
   );
 
   const items = useMemo(
-    (): readonly PickerItem[] => buildPickerItems(pickable, needle, cats),
-    [pickable, needle, cats],
+    (): readonly PickerItem[] => buildPickerItems(pickable, needle, cats, preferred.data?.sites ?? []),
+    [pickable, needle, cats, preferred.data],
   );
+
+  // [fuzzy-javelin-pearls] the one-decision star: append at the END
+  // of the allowlist (canonical order = insertion order; reordering
+  // is a later affordance, not this story's), remove on un-star. Sent
+  // as the next FULL list (the PUT replacement contract).
+  const onTogglePreferred = (module: ModuleSummaryT): void => {
+    const current = preferred.data?.sites ?? [];
+    const next =
+      current.includes(module.id) === false
+        ? [...current, module.id]
+        : current.filter((id): boolean => id !== module.id);
+    setPreferred.mutate(next);
+  };
 
   const onCatsChange = (next: readonly string[]): void => {
     // Discrete facet change → PUSH (back/forward restore the chips).
@@ -272,7 +308,12 @@ export function SitePickerPage(props: {
                 </span>
               </div>
             ) : (
-              <SiteRow module={item.module} onPick={props.onPick} />
+              <SiteRow
+                module={item.module}
+                onPick={props.onPick}
+                isPreferred={(preferred.data?.sites ?? []).includes(item.module.id)}
+                {...(setPreferred.isPending ? {} : { onTogglePreferred })}
+              />
             )
           }
         />

@@ -41,6 +41,16 @@ export {
 export const ModuleIdSchema = z.string().regex(/^[0-9a-f]{32}$/, 'expected 32-hex module id');
 export type ModuleIdT = z.infer<typeof ModuleIdSchema>;
 
+/**
+ * A site id as the preferred-sites allowlist and the search `sites=`
+ * scope carry it: any registry id shape (upstream module ids have
+ * known non-32-hex typos — ColorcitoScan.lua). Registry MEMBERSHIP is
+ * validated at the route (unknown ids are a typed 400); this is shape
+ * hygiene only.
+ */
+export const SiteIdSchema = z.string().min(1).max(64);
+export type SiteIdT = z.infer<typeof SiteIdSchema>;
+
 /** Typed error envelope — the ONE non-2xx shape (see errors.ts). */
 export const ApiErrorEnvelopeSchema = z.object({
   error: z.object({
@@ -361,6 +371,16 @@ export const ModuleSummarySchema = z.object({
    * runtime).
    */
   proxy: ProxySettingsSchema.nullable(),
+  /**
+   * [fuzzy-javelin-pearls] Preferred-sites membership joined LIVE from
+   * the allowlist store (D1 §2 ENTER — the user-ordered list of sites
+   * the operator actually uses). Carries no order by itself: the
+   * canonical order lives in the /api/preferred-sites list; this
+   * boolean only marks membership for row-level affordances (picker
+   * star, scope chips). Optional with a false default so stored
+   * fixtures and older clients keep parsing.
+   */
+  preferred: z.boolean().default(false),
 });
 export type ModuleSummaryT = z.infer<typeof ModuleSummarySchema>;
 
@@ -645,6 +665,18 @@ export const AllSitesSearchQuerySchema = z
     artists: z.string().max(200).optional(),
     summary: z.string().max(500).optional(),
     newDays: z.coerce.number().int().min(1).max(365).optional(),
+    /**
+     * Scope selector: `all` (default) or `preferred`. Ignored when
+     * `sites` is present (an explicit pick is the tightest scope).
+     */
+    scope: z.enum(['all', 'preferred']).default('all'),
+    /**
+     * Explicit site multi-select (comma-separated or repeated param,
+     * normalized at the route boundary). Unknown registry ids are a
+     * typed 400 naming them; known-but-disabled sites drop out of
+     * participation (union parity — the picker lists enabled sites).
+     */
+    sites: z.array(SiteIdSchema).max(64).optional(),
     cursor: z.string().max(4096).optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20),
   })
@@ -672,8 +704,39 @@ export const AllSitesSearchResponseSchema = z.object({
   warnings: z.array(SiteSearchFailureSchema),
   /** Enabled sites skipped because no catalog is installed. */
   excluded: z.array(ExcludedSiteSchema),
+  /**
+   * [fuzzy-javelin-pearls] The scope that served this page:
+   * `all` (default), `preferred` (the allowlist filtered the
+   * participation set), or `specific` (an explicit sites[] pick won).
+   */
+  scope: z.enum(['all', 'preferred', 'specific']).default('all'),
 });
 export type AllSitesSearchResponseT = z.infer<typeof AllSitesSearchResponseSchema>;
+
+// ── preferred sites (D1 §2 ENTER — the global allowlist) ────────────
+
+/**
+ * GET /api/preferred-sites — the ordered allowlist. The ORDER is the
+ * canonical preferred order (D1 §3): it fixes scope ordering,
+ * presentation order in the picker, and duplicate-title resolution
+ * order. Site names are NOT carried — the /api/modules registry is
+ * the name authority and every consumer already joins it.
+ */
+export const PreferredSitesResponseSchema = z.object({
+  sites: z.array(SiteIdSchema),
+});
+export type PreferredSitesResponseT = z.infer<typeof PreferredSitesResponseSchema>;
+
+/**
+ * PUT /api/preferred-sites — full-list REPLACEMENT (the list IS the
+ * truth; a UI add/remove is one decision sent as the next full list,
+ * D1 §2 "one-decision add"). Unknown registry ids are a typed 400
+ * naming them; duplicates keep their first position (canonical).
+ */
+export const PreferredSitesUpdateRequestSchema = z.object({
+  sites: z.array(SiteIdSchema).max(512),
+});
+export type PreferredSitesUpdateRequestT = z.infer<typeof PreferredSitesUpdateRequestSchema>;
 
 // ── live info (§5.8 pipeline, cached) ────────────────────────────────
 

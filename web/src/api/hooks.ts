@@ -6,6 +6,11 @@
  * local UI state stays in useState/useRef. No other store exists.
  */
 import {
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+import {
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -76,6 +81,47 @@ export function useModules(): UseQueryResult<ModuleListT, ApiError> {
     queryKey: ['modules'],
     queryFn: (): Promise<ModuleListT> =>
       unwrap(client.GET('/api/modules')),
+  });
+}
+
+// ── preferred sites (D1 §2 ENTER — [fuzzy-javelin-pearls]) ──────────
+
+export type PreferredSitesT = operations['getPreferredSites']['responses'][200]['content']['application/json'];
+
+/**
+ * GET /api/preferred-sites — the ordered allowlist (canonical order,
+ * D1 §3). Names are NOT carried: the modules registry is the name
+ * authority and every consumer joins it (rows read `preferred: true`).
+ */
+export function usePreferredSites(): UseQueryResult<PreferredSitesT, ApiError> {
+  const client = useApiClient();
+  return useQuery<PreferredSitesT, ApiError>({
+    queryKey: ['preferred-sites'],
+    queryFn: (): Promise<PreferredSitesT> =>
+      unwrap(client.GET('/api/preferred-sites')),
+  });
+}
+
+/**
+ * PUT /api/preferred-sites — full-list replacement (the one-decision
+ * add/remove sent as the next full ordered list). Invalidates the
+ * allowlist AND the modules registry (the `preferred` row join) so
+ * every affordance flips on refetch.
+ */
+export function useSetPreferredSites(): UseMutationResult<
+  PreferredSitesT,
+  ApiError,
+  readonly string[]
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation<PreferredSitesT, ApiError, readonly string[]>({
+    mutationFn: (sites): Promise<PreferredSitesT> =>
+      unwrap(client.PUT('/api/preferred-sites', { body: { sites: [...sites] } })),
+    onSuccess: (): void => {
+      void queryClient.invalidateQueries({ queryKey: ['preferred-sites'] });
+      void queryClient.invalidateQueries({ queryKey: ['modules'] });
+    },
   });
 }
 
@@ -481,6 +527,15 @@ export interface AllSitesSearchInput {
   readonly genres?: readonly string[];
   readonly genresMode?: 'all' | 'any';
   readonly newDays?: number;
+  /**
+   * [fuzzy-javelin-pearls] Scope selector (D1 §2 ENTER): 'all'
+   * (default — zero-network local-index union), 'preferred' (the
+   * persisted allowlist), or 'specific' (an explicit sites pick —
+   * the tightest scope, wins over the named scope server-side).
+   */
+  readonly scope?: 'all' | 'preferred' | 'specific';
+  /** Ordered explicit site ids (the specific multi-select). */
+  readonly sites?: readonly string[];
   readonly limit: number;
   readonly enabled: boolean;
 }
@@ -490,6 +545,8 @@ export interface AllSitesSearchInput {
  * every installed catalog server-side; `warnings` carry typed partial
  * failures (a broken catalog never fails the page) and `excluded`
  * names enabled sites without a catalog (installed-only semantics).
+ * Scope: 'preferred' filters participation to the allowlist (server
+ * resolves it); 'specific' sends the explicit sites[] list.
  */
 export function useAllSitesSearch(
   input: AllSitesSearchInput,
@@ -503,8 +560,10 @@ export function useAllSitesSearch(
   const genres = input.genres ?? [];
   const genresMode = input.genresMode ?? 'all';
   const newDays = input.newDays;
+  const scope = input.scope ?? 'all';
+  const sites = input.sites ?? [];
   return useInfiniteQuery<AllSitesSearchPageT, ApiError, InfiniteData<AllSitesSearchPageT, { cursor?: string }>, QueryKey, { cursor?: string }>({
-    queryKey: ['search-all', q, status, authors, artists, summary, genres, genresMode, newDays, input.limit],
+    queryKey: ['search-all', q, status, authors, artists, summary, genres, genresMode, newDays, scope, sites, input.limit],
     enabled:
       input.enabled &&
       (q !== '' || status !== '' || authors !== '' || artists !== '' || summary !== '' || genres.length > 0 || newDays !== undefined),
@@ -524,6 +583,11 @@ export function useAllSitesSearch(
               ...(genres.length > 0 ? { genres: [...genres] } : {}),
               genresMode,
               ...(newDays !== undefined ? { newDays } : {}),
+              // 'specific' never goes on the wire — the server derives
+              // it from sites[] (the tightest scope wins); only the
+              // named 'preferred' scope is a wire value.
+              ...(scope === 'preferred' ? { scope } : {}),
+              ...(sites.length > 0 ? { sites: [...sites] } : {}),
               ...(pageParam.cursor !== undefined ? { cursor: pageParam.cursor } : {}),
             },
           },
@@ -534,6 +598,156 @@ export function useAllSitesSearch(
     getNextPageParam: (lastPage): { cursor?: string } | undefined =>
       lastPage.nextCursor !== undefined ? { cursor: lastPage.nextCursor } : undefined,
   });
+}
+
+// ── live-scrape search fan-out (D1 §2 — catalog-less scoped sites) ──
+
+/**
+ * Concurrent live sites per fan-out ([fuzzy-javelin-pearls]): one
+ * request per site (each site = a distinct origin — per-HOST
+ * concurrency is 1 by construction; the server-side §6.8 walk behind
+ * each request is single-flight per module + update-lane-gated), and
+ * this cross-site cap bounds the burst so a scoped search can never
+ * shape into the synchronized fan-out D1's killed-ideas ledger bans.
+ */
+export const LIVE_FANOUT_CONCURRENCY = 3;
+
+export interface LiveSiteSearchInput {
+  /** The catalog-less scoped sites to search (scope order = render order). */
+  readonly sites: readonly { readonly id: string; readonly name: string }[];
+  readonly q: string;
+  readonly limit?: number;
+  readonly enabled: boolean;
+}
+
+export interface LiveSiteResult {
+  readonly siteId: string;
+  readonly siteName: string;
+  readonly status: 'pending' | 'done' | 'failed';
+  readonly entries: readonly CatalogEntryT[];
+  /** Failure note (status='failed' only). */
+  readonly error?: string;
+}
+
+export interface LiveSiteSearchState {
+  /** Per-site rows in the GIVEN scope order — progressive by design. */
+  readonly perSite: readonly LiveSiteResult[];
+  readonly anyPending: boolean;
+  readonly totalEntries: number;
+}
+
+const EMPTY_LIVE_STATE: LiveSiteSearchState = { perSite: [], anyPending: false, totalEntries: 0 };
+
+/**
+ * useLiveSiteSearch — the live-scrape leg of search-with-scope
+ * ([fuzzy-javelin-pearls], D1 §2): for CATALOG-LESS sites under an
+ * EXPLICIT scope (preferred/specific — never the default all-sites
+ * firehose, which stays zero-network), fire one per-site
+ * GET /api/catalog/{id}/search per site. That route already serves
+ * catalog-less modules from the §6.8 live directory walk (TTL-cached,
+ * update-lane-gated), so this hook only ORCHESTRATES:
+ *
+ * - concurrency-capped: at most {@link LIVE_FANOUT_CONCURRENCY} live
+ *   site searches in flight at once (per-host is 1 by construction —
+ *   one request per distinct origin);
+ * - progressive: each site's row flips pending → done/failed the
+ *   moment it resolves and its entries render immediately;
+ * - cancellable: navigating away (unmount), or the query/scope
+ *   changing, ABORTS every in-flight request (AbortController) —
+ *   late results never leak into the next view.
+ */
+export function useLiveSiteSearch(input: LiveSiteSearchInput): LiveSiteSearchState {
+  const client = useApiClient();
+  const limit = input.limit ?? 20;
+  const siteKey = input.sites.map((s): string => s.id).join(',');
+  const [state, setState] = useState<LiveSiteSearchState>(EMPTY_LIVE_STATE);
+  const generation = useRef(0);
+
+  useEffect((): (() => void) => {
+    const sites = input.sites;
+    const q = input.q;
+    const myGeneration = generation.current + 1;
+    generation.current = myGeneration;
+    if (!input.enabled || q === '' || sites.length === 0) {
+      setState(EMPTY_LIVE_STATE);
+      return (): void => undefined;
+    }
+    const controller = new AbortController();
+    const compatible: AbortSignal | undefined = requestCompatibleSignal(controller.signal);
+    const seed: LiveSiteResult[] = sites.map((s): LiveSiteResult => ({
+      siteId: s.id,
+      siteName: s.name,
+      status: 'pending',
+      entries: [],
+    }));
+    setState({ perSite: seed, anyPending: true, totalEntries: 0 });
+
+    const patch = (siteId: string, next: Partial<LiveSiteResult>): void => {
+      if (controller.signal.aborted || generation.current !== myGeneration) {
+        return;
+      }
+      setState((prev): LiveSiteSearchState => {
+        const perSite = prev.perSite.map((row): LiveSiteResult =>
+          row.siteId === siteId ? { ...row, ...next } : row,
+        );
+        return {
+          perSite,
+          anyPending: perSite.some((row): boolean => row.status === 'pending'),
+          totalEntries: perSite.reduce((acc, row): number => acc + row.entries.length, 0),
+        };
+      });
+    };
+
+    const runOne = async (site: { readonly id: string; readonly name: string }): Promise<void> => {
+      try {
+        const page = await unwrap(
+          client.GET('/api/catalog/{id}/search', {
+            params: {
+              path: { id: site.id },
+              query: { q, limit },
+            },
+            ...(compatible !== undefined ? { signal: compatible } : {}),
+          }),
+        );
+        patch(site.id, { status: 'done', entries: [...page.entries] });
+      } catch (err: unknown) {
+        if (controller.signal.aborted) {
+          return; // cancelled on navigate — swallow, never render stale
+        }
+        patch(site.id, {
+          status: 'failed',
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    };
+
+    // Bounded worker pool over the scope-ordered queue.
+    const queue = [...sites];
+    const workers = Array.from(
+      { length: Math.min(LIVE_FANOUT_CONCURRENCY, queue.length) },
+      async (): Promise<void> => {
+        for (;;) {
+          if (controller.signal.aborted) {
+            return;
+          }
+          const site = queue.shift();
+          if (site === undefined) {
+            return;
+          }
+          await runOne(site);
+        }
+      },
+    );
+    void Promise.all(workers).catch((): void => undefined);
+
+    return (): void => {
+      controller.abort();
+    };
+    // Deps: siteKey carries the fan-out identity (ids + order);
+    // q/enabled/limit are primitives; client is stable per provider.
+  }, [siteKey, input.q, input.enabled, limit, client]);
+
+  return state;
 }
 
 /** Page cursor: page number for latest/title, opaque cursor for search. */

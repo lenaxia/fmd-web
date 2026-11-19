@@ -49,6 +49,7 @@ export const module: ModuleSummaryT = {
   enabled: true,
   proxy: null,
   catalogInstalled: true,
+  preferred: false,
   availability: { status: 'unknown', checkedAt: null, reason: null },
   options: [
     { name: 'Auto-skip pages', kind: 'checkbox', defaultValue: false },
@@ -125,6 +126,19 @@ export async function installMockApi(page: Page): Promise<void> {
   });
   await page.route(API('modules'), (route): void => {
     void route.fulfill(json({ modules: [module], count: 1 }));
+  });
+  // [fuzzy-javelin-pearls] preferred-sites allowlist: empty default
+  // (the search home's scope selector reads it on every mount); PUT
+  // echoes the submitted list so star-toggle flows round-trip.
+  await page.route(API('preferred-sites$'), (route): void => {
+    if (route.request().method() === 'PUT') {
+      const body = JSON.parse(route.request().postData() ?? '{"sites":[]}') as {
+        sites?: string[];
+      };
+      void route.fulfill(json({ sites: body.sites ?? [] }));
+      return;
+    }
+    void route.fulfill(json({ sites: [] }));
   });
   // [parity-sweep] Settings groups + About version: the default GETs
   // every Settings section issues (kept deterministic for fixtures).

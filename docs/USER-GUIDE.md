@@ -90,13 +90,16 @@ see exactly your list.
 
 ### Search everything (the default home)
 
-`#/browse` opens the search home: one box, **Search all sites**.
+`#/browse` opens the search home: one box, **Search all sites**, plus a
+**scope selector** underneath — *All sites* (the default), *Preferred*,
+or *Choose sites…* (an explicit multi-select).
 
 - Typing searches **every installed site catalog at once**, as you type
   (debounced); the address bar tracks your query, so a search result page is
-  a link.
-- Each result row shows the **website it came from** (Website badge).
-  **Per-site facet chips** with counts appear above the results — click one
+  a link. Under *All sites* the search is answered **entirely from the local
+  catalog index — no network at all**; mirror copies of a series show
+  together, each row carrying its **website badge**.
+- **Per-site facet chips** with counts appear above the results — click one
   to narrow into that site carrying your query.
 - Chips also warn you: a *failed* catalog (warning chip) and sites **skipped
   because no catalog is installed** (excluded chip). Install/open those sites
@@ -106,6 +109,29 @@ see exactly your list.
 - With an empty query the home shows your **Recent sites** and
   **Recent manga** rows (when you have any; clearable), quick category
   chips, and a **Browse sites** button.
+
+#### Scope: preferred sites and explicit picks
+
+- ***Preferred*** narrows the search to your **preferred-sites allowlist**
+  — one global, ordered list of the sites you actually use. Build it in the
+  site picker: the **star** on any site row is a single decision, made once.
+  The list is server-side state (it follows the instance, not the browser),
+  and its **order is yours**: the chips and facets render in it, and the
+  picker floats your starred sites into a pinned *Preferred* group at the
+  top. A dead preferred site **dims** (last-check failed) but is never
+  hidden — pick it anyway if you know better.
+- ***Choose sites…*** is a one-off explicit pick: filter, tick the sites,
+  search. The picks ride the URL (`#/browse?scope=specific&picks=…`) so the
+  view is shareable, and an explicit pick is the tightest scope — it wins
+  over *Preferred*.
+- **Live results**: when your scope contains a site **without an installed
+  catalog** (a site fmd-web can only read from the live site itself), the
+  search also runs a **live** per-site pass for exactly those sites — paced
+  one site at a time (a small concurrent pool, never a synchronized
+  fan-out), with results appearing **as each site answers** and cancelling
+  the moment you navigate. The default *All sites* search never does this —
+  it stays local-index only, and catalog-less sites surface as excluded
+  chips instead.
 
 ### Paste a URL (the universal front door)
 
@@ -135,6 +161,12 @@ grouped by language/category.
 - Each site row shows capability badges (e.g. *browser required*) and a
   catalog chip (installed or not). Known-broken sites are visibly disabled
   with the reason.
+- **The star is your preferred list**: star a site to append it to the
+  preferred-sites allowlist (one decision, made once — see
+  [Search everything](#search-everything-the-default-home)); un-star
+  removes it. Your starred sites float into a pinned **Preferred** group
+  at the top of the picker, in your order, and searches under the
+  *Preferred* scope use exactly that list.
 - Picking a site opens its list. If the catalog is missing, the app prepares
   it automatically with a progress toast you can cancel; if there is no
   prebuilt catalog at all, sites that can serve their own list fall through

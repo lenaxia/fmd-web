@@ -13,6 +13,8 @@ import {
   ApiErrorEnvelopeSchema,
   AllSitesSearchQuerySchema,
   AllSitesSearchResponseSchema,
+  PreferredSitesResponseSchema,
+  PreferredSitesUpdateRequestSchema,
   ApiTokenResponseSchema,
   CatalogEntrySchema,
   HealthzResponseSchema,
@@ -557,25 +559,71 @@ const OPERATIONS: readonly RouteOperation[] = [
     method: 'get',
     path: '/api/search',
     operationId: 'allSitesSearch',
-    summary: 'All-sites union search over installed catalogs (FMD2 cbSearchFromAllSites parity)',
+    summary: 'Scoped union search over installed catalogs (FMD2 cbSearchFromAllSites parity + D1 §2 scope)',
     description:
       'FMD2 parity (frmMain.pas:3411-3416): the union runs simultaneously over every ' +
       'INSTALLED catalog of every enabled site — a LOCAL catalog union, never live scraping. ' +
       'Per-site FTS windows (width 2×limit) are merged by a documented deterministic total ' +
       'order — (normalized title, site id, link) — so result order and cursor bytes are ' +
       'identical under any permutation of the site set. `cursor` continues each site window ' +
-      '(base64 of per-site consumed-row counts, bound to the issued filter state; page-size ' +
-      'independent). Every row carries `site` + `siteName` (FMD2 shows the source Website on ' +
-      'union rows, frmMain.pas:5170). Partial failure is TYPED, never silent: a broken ' +
-      'catalog yields the rest of the union plus a `warnings[]` entry naming it; enabled ' +
-      'sites without an installed catalog are excluded and surfaced in `excluded[]` ' +
+      '(base64 of per-site consumed-row counts, bound to the issued filter state INCLUDING ' +
+      'the scope; page-size independent). Every row carries `site` + `siteName` (FMD2 shows ' +
+      'the source Website on union rows, frmMain.pas:5170). Partial failure is TYPED, never ' +
+      'silent: a broken catalog yields the rest of the union plus a `warnings[]` entry naming ' +
+      'it; enabled sites without an installed catalog are excluded and surfaced in `excluded[]` ' +
       "(reason `no-catalog`) so the UI chip can explain why. `facets[]` carries per-site " +
-      'totals for the count chips.',
+      'totals for the count chips. ' +
+      '[fuzzy-javelin-pearls] SCOPE (D1 §2 ENTER): `scope=all` (the default — every enabled ' +
+      'site with an installed catalog, answered from the local index with ZERO network) or ' +
+      '`scope=preferred` (the persisted user-ordered allowlist filters the participation ' +
+      'set; the allowlist order orders `facets[]`). An explicit `sites` list (the specific ' +
+      'multi-select, comma-separated or repeated param) WINS over the named scope — the ' +
+      'tightest scope; unknown registry ids are a typed 400 naming them, known-but-disabled ' +
+      'sites drop out (invisible, union parity). The response echoes the effective `scope`. ' +
+      'Repeated identical pages are served from a SHORT-TTL cache (30 s, bounded, ' +
+      'generation-bumped by preferred-sites writes).',
     tags: ['catalog'],
     query: AllSitesSearchQuerySchema,
     responses: {
-      200: { description: 'Merged page of site-tagged entries + facets/warnings/excluded', schema: AllSitesSearchResponseSchema },
+      200: { description: 'Merged page of site-tagged entries + facets/warnings/excluded + scope echo', schema: AllSitesSearchResponseSchema },
       ...errors(validation(), malformedCursor(), internal()),
+    },
+  },
+  {
+    method: 'get',
+    path: '/api/preferred-sites',
+    operationId: 'getPreferredSites',
+    summary: 'The preferred-sites allowlist in canonical order (D1 §2 ENTER)',
+    description:
+      'ONE global, user-ordered list of site ids the operator actually uses (single user ' +
+      'per instance, R2/D1 §4.1 — no per-user dimension exists). The ORDER is canonical ' +
+      '(D1 §3): it fixes scope ordering, presentation order in the site picker, and ' +
+      'duplicate-title resolution order. Site names are not carried — /api/modules is the ' +
+      'name authority and consumers join it (rows read `preferred: true` for members). ' +
+      'Never a gate: a dead preferred site dims wherever it renders (availability hint) ' +
+      'and stays fully visible.',
+    tags: ['modules'],
+    responses: {
+      200: { description: 'The ordered allowlist (empty when unset)', schema: PreferredSitesResponseSchema },
+      ...errors(notFound('Route (preferred-sites service not mounted)'), internal()),
+    },
+  },
+  {
+    method: 'put',
+    path: '/api/preferred-sites',
+    operationId: 'setPreferredSites',
+    summary: 'Replace the preferred-sites allowlist (the one-decision add, D1 §2)',
+    description:
+      'Full-list REPLACEMENT — the submitted ordered list IS the next canonical order ' +
+      '(a UI add/remove is one decision sent as the next full list). Unknown registry ' +
+      'ids are a typed 400 naming them; duplicates keep their FIRST position (canonical). ' +
+      'Bumps the /api/search cache generation so scoped pages never serve against a ' +
+      'stale allowlist. GET never mutates; this PUT is the one write surface.',
+    tags: ['modules'],
+    body: PreferredSitesUpdateRequestSchema,
+    responses: {
+      200: { description: 'The persisted ordered allowlist', schema: PreferredSitesResponseSchema },
+      ...errors(validation(), notFound('Route (preferred-sites service not mounted)'), internal()),
     },
   },
   {

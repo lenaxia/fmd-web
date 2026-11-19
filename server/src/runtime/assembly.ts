@@ -89,6 +89,7 @@ import {
   UNKNOWN_AVAILABILITY,
   type SiteAvailabilityRecord,
 } from './site-availability.js';
+import { SqlitePreferredSitesService, type PreferredSitesService } from './preferred-sites.js';
 import { runRootUrlProbe, type AvailabilitySink } from '../engine/services/availability.js';
 import { SqliteFavoritesService } from './favorites-service.js';
 import { FavoritesEngine } from '../jobs/favorites/engine.js';
@@ -295,12 +296,19 @@ class RefreshableModuleService implements ModuleService {
     private readonly catalogInstalled: (id: string) => boolean = (): boolean => false,
     private readonly availability: (id: string) => import('../runtime/site-availability.js').SiteAvailabilityRecord = (): import('../runtime/site-availability.js').SiteAvailabilityRecord =>
       UNKNOWN_AVAILABILITY,
+    private readonly preferred: (id: string) => boolean = (): boolean => false,
   ) {
-    this.current = new InMemoryModuleService(rows, browserProfileEnabled, catalogInstalled, availability);
+    this.current = new InMemoryModuleService(rows, browserProfileEnabled, catalogInstalled, availability, preferred);
   }
 
   refresh(rows: readonly RegistrationRecord[]): void {
-    this.current = new InMemoryModuleService(rows, this.browserProfileEnabled, this.catalogInstalled, this.availability);
+    this.current = new InMemoryModuleService(
+      rows,
+      this.browserProfileEnabled,
+      this.catalogInstalled,
+      this.availability,
+      this.preferred,
+    );
   }
 
   list(): ModuleSummaryT[] {
@@ -461,6 +469,12 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
   const availabilityLookup = (id: string): SiteAvailabilityRecord =>
     lateAvailability.store === undefined ? UNKNOWN_AVAILABILITY : lateAvailability.store.read(id);
   let recordAvailability: AvailabilitySink = (): void => undefined;
+  // [fuzzy-javelin-pearls] the preferred-sites allowlist opens with
+  // app.db further down too — same late-bound posture: preferred:
+  // false everywhere until the kv-backed service exists.
+  const latePreferred: { service?: PreferredSitesService } = {};
+  const preferredLookup = (id: string): boolean =>
+    latePreferred.service === undefined ? false : latePreferred.service.includes(id);
   // Site-first browse join: /api/modules catalogInstalled is read LIVE
   // from the CatalogStore receipts — a finished provision flips the
   // chip on the next modules read, no cache invalidation needed.
@@ -473,6 +487,10 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     // availability join (dead-site discovery): read LIVE so an
     // opportunistic write or a manual Check shows on the next read.
     availabilityLookup,
+    // preferred-sites join ([fuzzy-javelin-pearls]): LATE-BOUND like
+    // availability — the allowlist service opens with app.db further
+    // down; until then every site reads preferred: false.
+    preferredLookup,
   );
   const bypass = browserProfileEnabled
     ? new FlareSolverrBypassExecutor({ baseUrl: config.browserSidecarUrl })
@@ -594,6 +612,13 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
   const queue = new InstrumentedJobQueue(publishingQueue, metrics);
   const libraryRoot = join(config.dataDir, 'library');
   const libraryStore = new SqliteLibraryStore({ db, libraryRoot });
+  // [fuzzy-javelin-pearls] the preferred-sites allowlist: ONE global
+  // user-ordered list persisted in the app_settings kv row
+  // `search.preferredSites` (order-preserving JSON — the canonical
+  // order, D1 §3). Registry validation rides the module service; the
+  // /api/modules `preferred` join goes live from here on.
+  const preferredSites = new SqlitePreferredSitesService(libraryStore);
+  latePreferred.service = preferredSites;
   // [library-layout] one-time idempotent migration onto the flat
   // `<manga>/<file>` convention (module trees → series folders,
   // duplicate suffix per rule 2). Runs at startup post-upgrade; a
@@ -1007,6 +1032,7 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     settings,
     catalogs: catalogSync.store,
     availability: siteAvailability,
+    preferredSites,
     catalogFallback,
     // Covers live-defect: the same-origin cover proxy — module-bound
     // url validation, Referer hotlink posture, token-free disk cache

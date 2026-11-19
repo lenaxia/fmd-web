@@ -109,6 +109,7 @@ function toSummary(
   browserProfileEnabled: boolean,
   catalogInstalled: (id: string) => boolean,
   availability: (id: string) => SiteAvailabilityRecord,
+  preferred: (id: string) => boolean,
 ): ModuleSummaryT {
   return {
     id: row.id,
@@ -126,6 +127,7 @@ function toSummary(
     proxy,
     catalogInstalled: catalogInstalled(row.id),
     availability: availability(row.id),
+    preferred: preferred(row.id),
     capabilities: applyBrowserProfile(
       {
         requires_subprocess: row.capabilities.requires_subprocess,
@@ -208,6 +210,13 @@ export class InMemoryModuleService implements ModuleService {
      * every site (the seeded, silent state).
      */
     availability: (id: string) => SiteAvailabilityRecord = (): SiteAvailabilityRecord => UNKNOWN_AVAILABILITY,
+    /**
+     * Preferred-sites membership lookup ([fuzzy-javelin-pearls],
+     * D1 §2): evaluated per list()/get() call so a PUT to the
+     * allowlist is reflected on the next /api/modules read. Default:
+     * nothing preferred (the seam-absent posture).
+     */
+    preferred: (id: string) => boolean = (): boolean => false,
   ) {
     // Non-32-hex module ids (upstream typos exist — ColorcitoScan.lua
     // ships '5450026642ecrrd48apotd81e57f8e40') can never have an
@@ -217,12 +226,14 @@ export class InMemoryModuleService implements ModuleService {
     this.catalogInstalled = (id: string): boolean =>
       isValidCatalogId(id) && catalogInstalled(id);
     this.availability = availability;
+    this.preferred = preferred;
     for (const row of rows) {
       this.enabled.set(row.id, true);
     }
   }
 
   private readonly availability: (id: string) => SiteAvailabilityRecord;
+  private readonly preferred: (id: string) => boolean;
 
   list(): ModuleSummaryT[] {
     return this.rows.map((row) =>
@@ -233,6 +244,7 @@ export class InMemoryModuleService implements ModuleService {
         this.browserProfileEnabled,
         this.catalogInstalled,
         this.availability,
+        this.preferred,
       ),
     );
   }
@@ -249,6 +261,7 @@ export class InMemoryModuleService implements ModuleService {
       this.browserProfileEnabled,
       this.catalogInstalled,
       this.availability,
+      this.preferred,
     );
   }
 

@@ -33,6 +33,8 @@ import {
   AccountUpsertRequestSchema,
   AllSitesSearchQuerySchema,
   AllSitesSearchResponseSchema,
+  PreferredSitesResponseSchema,
+  PreferredSitesUpdateRequestSchema,
   ApiTokenResponseSchema,
   CatalogBrowseQuerySchema,
   CatalogPageResponseSchema,
@@ -106,6 +108,7 @@ import {
   type AccountResponseT,
   type CatalogPageResponseT,
   type AllSitesSearchResponseT,
+  type PreferredSitesResponseT,
   type ApiTokenResponseT,
   type FavoriteCheckBatchCancelResponseT,
   type FavoriteCheckBatchResponseT,
@@ -142,6 +145,7 @@ import type { WsHub } from './ws/hub.js';
 import { CoverProxyService } from './cover-proxy.js';
 import type { SqliteLibraryFileStateService } from '../runtime/library-file-state.js';
 import type { SiteAvailabilityService } from '../runtime/site-availability.js';
+import type { PreferredSitesService } from '../runtime/preferred-sites.js';
 import { InMemoryAccountService, type AccountService } from '../accounts/account-service.js';
 import { Fmd2ImportService, FMD2_IMPORT_MAX_BYTES, type UploadedPart } from '../import/fmd2/service.js';
 import {
@@ -159,7 +163,8 @@ import {
   type SettingsService,
   type SyncService,
 } from './services.js';
-import { UnionSearchService } from './search-service.js';
+import { UnionSearchService, type UnionSearchInput } from './search-service.js';
+import { SearchResponseCache } from './search-cache.js';
 
 /** Aggregate of the §10 domain seams (all required; tests pass fakes). */
 export interface ApiServices {
@@ -210,6 +215,16 @@ export interface ApiServices {
    * thread probe).
    */
   readonly availability?: SiteAvailabilityService;
+  /**
+   * Preferred sites (D1 §2 ENTER — [fuzzy-javelin-pearls]): the ONE
+   * global user-ordered allowlist, persisted server-side (single
+   * user per instance, R2). Optional with the covers posture: absent
+   * → the /api/preferred-sites routes are not mounted, /api/modules
+   * rows read preferred: false, and GET /api/search?scope=preferred
+   * is a typed 400 (scope truth is unavailable, never silently all);
+   * the runtime assembly always wires the real one (app_settings kv).
+   */
+  readonly preferredSites?: PreferredSitesService;
   /**
    * Library file-state (file-state story): the web window onto server
    * storage — lazy stat-verification, per-title file listings, manual
@@ -826,6 +841,7 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
   // §6.8 live fallback — the FMD2 union is over local DBs), merges by
   // the documented comparator, and surfaces typed partial state.
   const unionSearch = new UnionSearchService(services.modules, services.catalogs);
+  const searchCache = new SearchResponseCache();
 
   app.get('/api/search', async (req): Promise<AllSitesSearchResponseT> => {
     // Boundary normalization: `genres` accepts repeated params or one
@@ -843,25 +859,94 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
     } else {
       delete rawQuery['genresExclude'];
     }
+    // `sites` rides the same comma-separated/repeated wire form.
+    const sites: unknown = normalizeGenresParam(rawQuery['sites']);
+    if (Array.isArray(sites) && sites.length > 0) {
+      rawQuery['sites'] = sites;
+    } else {
+      delete rawQuery['sites'];
+    }
     const query = parseOr400(AllSitesSearchQuerySchema, rawQuery, 'all-sites search query');
-    return AllSitesSearchResponseSchema.parse(
-      await unionSearch.search({
-        ...(query.q !== undefined && query.q !== '' ? { q: query.q } : {}),
-        ...(query.status !== undefined && query.status !== '' ? { status: query.status } : {}),
-        ...(query.genres !== undefined && query.genres.length > 0 ? { genres: query.genres } : {}),
-        ...(query.genresExclude !== undefined && query.genresExclude.length > 0
-          ? { genresExclude: query.genresExclude }
-          : {}),
-        genresMode: query.genresMode,
-        ...(query.authors !== undefined && query.authors !== '' ? { authors: query.authors } : {}),
-        ...(query.artists !== undefined && query.artists !== '' ? { artists: query.artists } : {}),
-        ...(query.summary !== undefined && query.summary !== '' ? { summary: query.summary } : {}),
-        ...(query.newDays !== undefined ? { newDays: query.newDays } : {}),
-        ...(query.cursor !== undefined ? { cursor: query.cursor } : {}),
-        limit: query.limit,
-      }),
-    );
+
+    // Scope resolution (route-side, so the service stays a pure
+    // ordered-list consumer): explicit sites[] wins; scope=preferred
+    // resolves the persisted allowlist (absent service → typed 400,
+    // never a silent fall-back to all — scope truth is not guessable).
+    let scope: UnionSearchInput['scope'] = 'all';
+    let scopeSites: readonly string[] | undefined;
+    if (query.sites !== undefined && query.sites.length > 0) {
+      const registryIds = new Set(services.modules.list().map((m): string => m.id));
+      const unknown = query.sites.filter((id): boolean => !registryIds.has(id));
+      if (unknown.length > 0) {
+        throw new ApiError(400, 'bad_request', `unknown site id(s) in sites: ${unknown.join(', ')}`);
+      }
+      scope = 'specific';
+      scopeSites = query.sites;
+    } else if (query.scope === 'preferred') {
+      if (services.preferredSites === undefined) {
+        throw new ApiError(400, 'bad_request', 'preferred-sites scope is not available (no allowlist service mounted)');
+      }
+      scope = 'preferred';
+      scopeSites = services.preferredSites.list();
+    }
+
+    const input: UnionSearchInput = {
+      ...(query.q !== undefined && query.q !== '' ? { q: query.q } : {}),
+      ...(query.status !== undefined && query.status !== '' ? { status: query.status } : {}),
+      ...(query.genres !== undefined && query.genres.length > 0 ? { genres: query.genres } : {}),
+      ...(query.genresExclude !== undefined && query.genresExclude.length > 0
+        ? { genresExclude: query.genresExclude }
+        : {}),
+      genresMode: query.genresMode,
+      ...(query.authors !== undefined && query.authors !== '' ? { authors: query.authors } : {}),
+      ...(query.artists !== undefined && query.artists !== '' ? { artists: query.artists } : {}),
+      ...(query.summary !== undefined && query.summary !== '' ? { summary: query.summary } : {}),
+      ...(query.newDays !== undefined ? { newDays: query.newDays } : {}),
+      scope,
+      ...(scopeSites !== undefined ? { sites: scopeSites } : {}),
+      ...(query.cursor !== undefined ? { cursor: query.cursor } : {}),
+      limit: query.limit,
+    };
+
+    const cached: AllSitesSearchResponseT | undefined = searchCache.get(input);
+    if (cached !== undefined) {
+      return cached;
+    }
+    const parsed = AllSitesSearchResponseSchema.parse(await unionSearch.search(input));
+    searchCache.put(input, parsed);
+    return parsed;
   });
+
+  // ── preferred sites (D1 §2 ENTER — the global allowlist) ─────────
+  // Mounted only when the service is bound (the covers posture); the
+  // runtime assembly always binds it. GET never mutates; PUT is the
+  // ONE full-list replacement write (D1 §2 one-decision add) and
+  // bumps the search cache generation so scoped pages never serve
+  // against a stale allowlist.
+  if (services.preferredSites !== undefined) {
+    const preferredSites = services.preferredSites;
+    app.get('/api/preferred-sites', async (): Promise<PreferredSitesResponseT> => {
+      return PreferredSitesResponseSchema.parse({ sites: [...preferredSites.list()] });
+    });
+    app.put('/api/preferred-sites', async (req): Promise<PreferredSitesResponseT> => {
+      const body = parseOr400(PreferredSitesUpdateRequestSchema, req.body, 'preferred sites body');
+      // Registry membership gate (the search `sites=` posture): the
+      // typed 400 names the offenders; the list is unchanged.
+      const registryIds = new Set(services.modules.list().map((m): string => m.id));
+      const unknown = body.sites.filter((id): boolean => !registryIds.has(id));
+      if (unknown.length > 0) {
+        throw new ApiError(400, 'bad_request', `unknown site id(s): ${unknown.join(', ')}`);
+      }
+      let sites: readonly string[];
+      try {
+        sites = preferredSites.set(body.sites);
+      } catch (err: unknown) {
+        throw new ApiError(400, 'bad_request', err instanceof Error ? err.message : String(err));
+      }
+      searchCache.bumpGeneration();
+      return PreferredSitesResponseSchema.parse({ sites: [...sites] });
+    });
+  }
 
   // ── live info (§5.8, cached) ─────────────────────────────────────
   // §15 per-module series: every REAL module-engine call feeds the

@@ -75,6 +75,17 @@ export interface UnionSearchInput {
   readonly artists?: string;
   readonly summary?: string;
   readonly newDays?: number;
+  /**
+   * [fuzzy-javelin-pearls] The scope selector (D1 §2 ENTER): `all`
+   * (default — every enabled site with an installed catalog), or a
+   * SCOPED query (`preferred` allowlist / `specific` multi-select)
+   * where `sites` carries the ROUTE-RESOLVED ordered id list (the
+   * allowlist order for preferred, the caller's order for specific —
+   * the canonical order, D1 §3). The route validates membership; the
+   * service treats `sites` as authoritative whenever scope ≠ all.
+   */
+  readonly scope?: 'all' | 'preferred' | 'specific';
+  readonly sites?: readonly string[];
   readonly cursor?: string;
   readonly limit: number;
 }
@@ -130,7 +141,9 @@ interface UnionCursor {
 /** Genres join separator (a char that never occurs in a genre name). */
 const CURSOR_GENRE_SEP = '\x1f';
 
-/** The canonical filter fingerprint: binds the FULL issued filter set. */
+/** The canonical filter fingerprint: binds the FULL issued filter set
+ * (scope included — a cursor issued under one scope is a typed 400
+ * under another, the same class as a filter change). */
 export function unionCursorKey(input: Omit<UnionSearchInput, 'cursor' | 'limit'>): string {
   return JSON.stringify([
     input.q ?? '',
@@ -142,6 +155,8 @@ export function unionCursorKey(input: Omit<UnionSearchInput, 'cursor' | 'limit'>
     (input.genresExclude ?? []).join(CURSOR_GENRE_SEP),
     input.genresMode ?? 'all',
     input.newDays ?? null,
+    input.scope ?? 'all',
+    input.sites ?? [],
   ]);
 }
 
@@ -236,17 +251,42 @@ export class UnionSearchService {
     // catalog and the store's path-safety assert would throw OUTSIDE
     // the per-lane try/catch, 500ing the whole union — the same guard
     // class as services.ts's catalogInstalled wrapper.
+    //
+    // [fuzzy-javelin-pearls] SCOPE: a scoped query (preferred /
+    // specific) intersects the enabled registry with the route-
+    // resolved ordered `sites` list — participation AND the
+    // facets/excluded presentation follow the SCOPE order (the
+    // canonical order, D1 §3) while the entry merge keeps the
+    // documented comparator (deterministic + cursor-stable). Known-
+    // but-disabled scoped sites drop out entirely (invisible — union
+    // parity with scope=all, where disabled sites never appear).
+    const scope = input.scope ?? 'all';
+    const scoped: boolean = scope !== 'all' && input.sites !== undefined;
+    const scopeOrder: ReadonlyMap<string, number> = scoped
+      ? new Map((input.sites as readonly string[]).map((id, i): readonly [string, number] => [id, i]))
+      : new Map();
+    const byScopeThenId = (a: { id: string }, b: { id: string }): number => {
+      if (scoped) {
+        const pa = scopeOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+        const pb = scopeOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+        if (pa !== pb) {
+          return pa < pb ? -1 : 1;
+        }
+      }
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+    };
     const enabled = this.modules
       .list()
-      .filter((m): boolean => m.enabled && isValidCatalogId(m.id));
+      .filter((m): boolean => m.enabled && isValidCatalogId(m.id))
+      .filter((m): boolean => !scoped || scopeOrder.has(m.id));
     const metaFor = (m: (typeof enabled)[number]): CatalogMeta | undefined =>
       this.catalogs.getMeta(m.id);
     const participating = enabled
       .filter((m): boolean => metaFor(m) !== undefined)
-      .sort((a, b): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      .sort(byScopeThenId);
     const excluded: ExcludedSiteT[] = enabled
       .filter((m): boolean => metaFor(m) === undefined)
-      .sort((a, b): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+      .sort(byScopeThenId)
       .map((m): ExcludedSiteT => ({ siteId: m.id, siteName: m.name, reason: 'no-catalog' }));
 
     const lanes: SiteLane[] = participating.map((m): SiteLane => ({
@@ -376,6 +416,7 @@ export class UnionSearchService {
       facets,
       warnings,
       excluded,
+      scope,
     };
   }
 }

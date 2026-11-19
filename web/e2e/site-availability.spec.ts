@@ -102,13 +102,13 @@ test('picker: an unreachable site dims with its reason but stays clickable; unkn
   await expect(deadRow).toBeVisible();
   await expect(deadRow).toHaveAttribute('data-unavailable', 'true');
   // the reason surfaces on the row hint
-  await expect(deadRow.locator('button')).toHaveAttribute('title', /connect ECONNREFUSED/);
+  await expect(deadRow.getByRole('button', { name: /browse/ })).toHaveAttribute('title', /connect ECONNREFUSED/);
   // unknown renders as a NORMAL row (no dim, no marker)
   const freshRow = page.locator(`[data-site-id="${FRESH_ID}"]`);
   await expect(freshRow).toBeVisible();
   await expect(freshRow).not.toHaveAttribute('data-unavailable', 'true');
   // the hint is NOT a gate: clicking the dead site still navigates
-  await deadRow.locator('button').click();
+  await deadRow.getByRole('button', { name: /browse/ }).click();
   await page.waitForFunction(
     (needle: string): boolean => globalThis.location.hash.includes(needle),
     `site=${DEAD_ID}`,

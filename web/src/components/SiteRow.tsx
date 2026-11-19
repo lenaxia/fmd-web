@@ -8,7 +8,7 @@
  * web shows standing breakage instead of a mystery failure.
  */
 import type { ReactElement, MouseEventHandler } from 'react';
-import { WifiOff } from 'lucide-react';
+import { Star, WifiOff } from 'lucide-react';
 import type { ModuleSummaryT } from '../api/hooks';
 import { availabilityTitle } from './AvailabilityChip';
 import { CapabilityBadges } from './CapabilityBadges';
@@ -41,6 +41,14 @@ function safeHost(url: string): string {
 export function SiteRow(props: {
   module: ModuleSummaryT;
   onPick: (module: ModuleSummaryT) => void;
+  /**
+   * [fuzzy-javelin-pearls] Preferred-sites star: present when the
+   * embedding surface offers the allowlist affordance (the picker);
+   * absent everywhere else — the row renders identically to before.
+   */
+  isPreferred?: boolean;
+  /** Pending mutation → the star disables (one decision in flight). */
+  onTogglePreferred?: (module: ModuleSummaryT) => void;
 }): ReactElement {
   const { module } = props;
   const brokenReason = siteRowDisabledReason(module);
@@ -55,8 +63,9 @@ export function SiteRow(props: {
     <div
       data-site-id={module.id}
       data-unavailable={unavailable ? 'true' : undefined}
+      data-preferred={props.isPreferred === true ? 'true' : undefined}
       className={cn(
-        'site-row w-full',
+        'site-row flex w-full items-stretch gap-1',
         disabled ? 'opacity-60' : '',
         unavailable ? 'site-row-unavailable opacity-70' : '',
       )}
@@ -74,7 +83,7 @@ export function SiteRow(props: {
               : ''
         }`}
         className={cn(
-          'flex w-full flex-col items-start gap-1 rounded-md px-3 py-2 text-left',
+          'flex min-w-0 flex-1 flex-col items-start gap-1 rounded-md px-3 py-2 text-left',
           'transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
           disabled ? 'cursor-not-allowed' : 'cursor-pointer',
         )}
@@ -108,6 +117,37 @@ export function SiteRow(props: {
         </span>
         <CapabilityBadges module={module} />
       </button>
+      {props.onTogglePreferred !== undefined ? (
+        <button
+          type="button"
+          onClick={(): void => {
+            props.onTogglePreferred?.(module);
+          }}
+          disabled={disabled}
+          title={
+            props.isPreferred === true
+              ? `Remove ${module.name} from preferred sites`
+              : `Add ${module.name} to preferred sites (searches prefer it)`
+          }
+          aria-label={
+            props.isPreferred === true
+              ? `${module.name}: remove from preferred sites`
+              : `${module.name}: add to preferred sites`
+          }
+          aria-pressed={props.isPreferred === true}
+          data-testid={`prefer-toggle-${module.id}`}
+          className={cn(
+            'flex w-9 shrink-0 items-center justify-center rounded-md',
+            'transition-colors hover:bg-surface-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+            props.isPreferred === true ? 'text-amber-500' : 'text-muted-foreground',
+          )}
+        >
+          <Star
+            aria-hidden="true"
+            className={cn('size-4', props.isPreferred === true ? 'fill-current' : '')}
+          />
+        </button>
+      ) : null}
     </div>
   );
 }

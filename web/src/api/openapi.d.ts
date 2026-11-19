@@ -436,11 +436,35 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * All-sites union search over installed catalogs (FMD2 cbSearchFromAllSites parity)
-         * @description FMD2 parity (frmMain.pas:3411-3416): the union runs simultaneously over every INSTALLED catalog of every enabled site — a LOCAL catalog union, never live scraping. Per-site FTS windows (width 2×limit) are merged by a documented deterministic total order — (normalized title, site id, link) — so result order and cursor bytes are identical under any permutation of the site set. `cursor` continues each site window (base64 of per-site consumed-row counts, bound to the issued filter state; page-size independent). Every row carries `site` + `siteName` (FMD2 shows the source Website on union rows, frmMain.pas:5170). Partial failure is TYPED, never silent: a broken catalog yields the rest of the union plus a `warnings[]` entry naming it; enabled sites without an installed catalog are excluded and surfaced in `excluded[]` (reason `no-catalog`) so the UI chip can explain why. `facets[]` carries per-site totals for the count chips.
+         * Scoped union search over installed catalogs (FMD2 cbSearchFromAllSites parity + D1 §2 scope)
+         * @description FMD2 parity (frmMain.pas:3411-3416): the union runs simultaneously over every INSTALLED catalog of every enabled site — a LOCAL catalog union, never live scraping. Per-site FTS windows (width 2×limit) are merged by a documented deterministic total order — (normalized title, site id, link) — so result order and cursor bytes are identical under any permutation of the site set. `cursor` continues each site window (base64 of per-site consumed-row counts, bound to the issued filter state INCLUDING the scope; page-size independent). Every row carries `site` + `siteName` (FMD2 shows the source Website on union rows, frmMain.pas:5170). Partial failure is TYPED, never silent: a broken catalog yields the rest of the union plus a `warnings[]` entry naming it; enabled sites without an installed catalog are excluded and surfaced in `excluded[]` (reason `no-catalog`) so the UI chip can explain why. `facets[]` carries per-site totals for the count chips. [fuzzy-javelin-pearls] SCOPE (D1 §2 ENTER): `scope=all` (the default — every enabled site with an installed catalog, answered from the local index with ZERO network) or `scope=preferred` (the persisted user-ordered allowlist filters the participation set; the allowlist order orders `facets[]`). An explicit `sites` list (the specific multi-select, comma-separated or repeated param) WINS over the named scope — the tightest scope; unknown registry ids are a typed 400 naming them, known-but-disabled sites drop out (invisible, union parity). The response echoes the effective `scope`. Repeated identical pages are served from a SHORT-TTL cache (30 s, bounded, generation-bumped by preferred-sites writes).
          */
         get: operations["allSitesSearch"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preferred-sites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The preferred-sites allowlist in canonical order (D1 §2 ENTER)
+         * @description ONE global, user-ordered list of site ids the operator actually uses (single user per instance, R2/D1 §4.1 — no per-user dimension exists). The ORDER is canonical (D1 §3): it fixes scope ordering, presentation order in the site picker, and duplicate-title resolution order. Site names are not carried — /api/modules is the name authority and consumers join it (rows read `preferred: true` for members). Never a gate: a dead preferred site dims wherever it renders (availability hint) and stays fully visible.
+         */
+        get: operations["getPreferredSites"];
+        /**
+         * Replace the preferred-sites allowlist (the one-decision add, D1 §2)
+         * @description Full-list REPLACEMENT — the submitted ordered list IS the next canonical order (a UI add/remove is one decision sent as the next full list). Unknown registry ids are a typed 400 naming them; duplicates keep their FIRST position (canonical). Bumps the /api/search cache generation so scoped pages never serve against a stale allowlist. GET never mutates; this PUT is the one write surface.
+         */
+        put: operations["setPreferredSites"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1116,6 +1140,8 @@ export interface components {
             catalogInstalled: boolean;
             availability: components["schemas"]["ModuleAvailability"];
             proxy: components["schemas"]["ProxySettings"] | null;
+            /** @default false */
+            preferred: boolean;
         };
         ProxySettings: {
             type: components["schemas"]["ModuleSummary0"];
@@ -1445,9 +1471,17 @@ export interface components {
         AllSitesSearchQuery8: string;
         AllSitesSearchQuery9: string;
         AllSitesSearchQuery10: number;
-        AllSitesSearchQuery11: string;
+        /**
+         * @default all
+         * @enum {string}
+         */
+        AllSitesSearchQuery11: "all" | "preferred";
+        AllSitesSearchQuery12: components["schemas"]["AllSitesSearchQuery13"][];
+        AllSitesSearchQuery13: string;
+        AllSitesSearchQuery14: string;
         /** @default 20 */
-        AllSitesSearchQuery12: number;
+        AllSitesSearchQuery15: number;
+        SetPreferredSitesBody0: string;
         LiveInfoBody0: string;
         LiveInfoBody1: string;
         CreateDownloadJobsBatchBody0: string;
@@ -2680,8 +2714,10 @@ export interface operations {
                 artists?: components["schemas"]["AllSitesSearchQuery8"];
                 summary?: components["schemas"]["AllSitesSearchQuery9"];
                 newDays?: components["schemas"]["AllSitesSearchQuery10"];
-                cursor?: components["schemas"]["AllSitesSearchQuery11"];
-                limit?: components["schemas"]["AllSitesSearchQuery12"];
+                scope?: components["schemas"]["AllSitesSearchQuery11"];
+                sites?: components["schemas"]["AllSitesSearchQuery12"];
+                cursor?: components["schemas"]["AllSitesSearchQuery14"];
+                limit?: components["schemas"]["AllSitesSearchQuery15"];
             };
             header?: never;
             path?: never;
@@ -2689,7 +2725,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Merged page of site-tagged entries + facets/warnings/excluded */
+            /** @description Merged page of site-tagged entries + facets/warnings/excluded + scope echo */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2727,11 +2763,111 @@ export interface operations {
                             /** @constant */
                             reason: "no-catalog";
                         }[];
+                        /**
+                         * @default all
+                         * @enum {string}
+                         */
+                        scope: "all" | "preferred" | "specific";
                     };
                 };
             };
             /** @description Malformed cursor */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    getPreferredSites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The ordered allowlist (empty when unset) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        sites: string[];
+                    };
+                };
+            };
+            /** @description Route (preferred-sites service not mounted) not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    setPreferredSites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    sites: components["schemas"]["SetPreferredSitesBody0"][];
+                };
+            };
+        };
+        responses: {
+            /** @description The persisted ordered allowlist */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        sites: string[];
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Route (preferred-sites service not mounted) not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

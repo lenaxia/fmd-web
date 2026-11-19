@@ -135,7 +135,7 @@ describe('SitePickerPage (browse default state)', (): void => {
 
   it('known-broken rows are disabled with the reason surfaced', async (): Promise<void> => {
     picker([broken]);
-    const row = await screen.findByRole('button', { name: /BrokenSite/ });
+    const row = await screen.findByRole('button', { name: /BrokenSite: browse/ });
     expect(row).toBeDisabled();
     expect(row.getAttribute('title')).toContain('cloudflare-loop');
     // Both the row badge and the capability list carry the flag.
@@ -154,7 +154,7 @@ describe('SitePickerPage (browse default state)', (): void => {
       />,
       { fetch: mockFetch([modulesRoute([installed])]).fetch, hash: '#/browse' },
     );
-    await userEvent.click(await screen.findByRole('button', { name: /InstalledSite/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /InstalledSite: browse/ }));
     expect(picked).toHaveLength(1);
     expect(picked[0]?.id).toBe(installed.id);
   });

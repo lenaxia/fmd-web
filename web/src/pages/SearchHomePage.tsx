@@ -24,12 +24,25 @@
  * search via the always-visible input).
  */
 import { useEffect, useMemo, type FormEvent, type KeyboardEvent, type ReactElement } from 'react';
-import { LayoutGrid, Loader2, Search, X } from 'lucide-react';
+import { LayoutGrid, Loader2, Radio, Search, X } from 'lucide-react';
 import type { Route } from '../router';
 import { navigate, navigateToManga, replaceRoute } from '../router';
 import { useRoute } from '../state/use-route';
-import { useAllSitesSearch, useModules, type SearchEntryT } from '../api/hooks';
+import {
+  useAllSitesSearch,
+  useLiveSiteSearch,
+  useModules,
+  usePreferredSites,
+  type CatalogEntryT,
+  type SearchEntryT,
+} from '../api/hooks';
 import { SEARCH_DEBOUNCE_MS, useDebouncedValue } from '../state/use-catalog-query';
+import {
+  liveSearchCandidates,
+  parseSearchScope,
+  serializeSearchScope,
+  type SearchScopeState,
+} from '../state/search-scope-state';
 import { useHighlightNew } from '../state/highlight-new';
 import {
   clearRecentManga,
@@ -50,6 +63,7 @@ import { PageHeader } from '@/components/patterns/PageHeader';
 import { StatPill } from '@/components/patterns/StatPill';
 import { CatalogEntryRow } from '@/components/catalog/CatalogEntryRow';
 import { PasteUrlAdd } from '@/components/catalog/PasteUrlAdd';
+import { ScopeSelector, type PreferredRow } from '@/components/catalog/ScopeSelector';
 import { WebsiteBadge } from '@/components/catalog/WebsiteBadge';
 import { FacetChips, UnionExcludedChips, UnionWarningChips } from '@/components/catalog/UnionSearchChips';
 import { Button } from '@/components/ui/button';
@@ -76,6 +90,76 @@ function UnionRow(props: { entry: SearchEntryT; highlightNew: boolean }): ReactE
       badges={<WebsiteBadge siteName={entry.siteName} siteId={entry.site} />}
       website={entry.siteName}
     />
+  );
+}
+
+/**
+ * [fuzzy-javelin-pearls] The live-scrape leg's PROGRESSIVE results:
+ * one group per catalog-less scoped site, rendered in scope order —
+ * each group flips pending → entries/failed the moment its site
+ * resolves (never a blocking spinner over the whole fan-out; groups
+ * that finish early render early). Cancelling on navigate is the
+ * hook's job (AbortController); a cancelled group simply stops
+ * updating.
+ */
+function LiveResultsSection(props: {
+  readonly live: ReturnType<typeof useLiveSiteSearch>;
+}): ReactElement {
+  const { live } = props;
+  const [highlightNew] = useHighlightNew();
+  return (
+    <section
+      aria-label="Live results from sites without an installed catalog"
+      className="mt-6"
+      data-testid="live-results"
+      data-live-pending={live.anyPending ? 'true' : 'false'}
+    >
+      <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+        <Radio aria-hidden="true" className="size-4 text-muted-foreground" />
+        Live results
+        {live.anyPending ? (
+          <Loader2 aria-hidden="true" className="size-3.5 animate-spin text-muted-foreground" />
+        ) : null}
+        <span className="font-normal text-muted-foreground">
+          {String(live.totalEntries)} entr{live.totalEntries === 1 ? 'y' : 'ies'} · searched
+          one site at a time, results appear as each site answers
+        </span>
+      </h2>
+      {live.perSite.map(
+        (row): ReactElement => (
+          <div key={row.siteId} className="mb-4" data-live-site={row.siteId} data-live-status={row.status}>
+            <h3 className="mb-1.5 flex items-center gap-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+              <WebsiteBadge siteName={row.siteName} siteId={row.siteId} />
+              {row.status === 'pending' ? (
+                <Loader2 aria-hidden="true" className="size-3 animate-spin" />
+              ) : null}
+              {row.status === 'failed' ? (
+                <span className="normal-case text-destructive">failed — {row.error ?? 'unreachable'}</span>
+              ) : null}
+            </h3>
+            {row.status === 'done' && row.entries.length > 0 ? (
+              <ListPanel
+                className="catalog-list"
+                ariaLabel={`Live results from ${row.siteName}`}
+                items={[...row.entries]}
+                itemKey={(entry: CatalogEntryT): string => `${row.siteId}-${entry.link}`}
+                renderItem={(entry: CatalogEntryT): ReactElement => (
+                  <CatalogEntryRow
+                    entry={entry}
+                    siteId={row.siteId}
+                    highlightNew={highlightNew}
+                    website={row.siteName}
+                  />
+                )}
+              />
+            ) : null}
+            {row.status === 'done' && row.entries.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No matches.</p>
+            ) : null}
+          </div>
+        ),
+      )}
+    </section>
   );
 }
 
@@ -208,13 +292,76 @@ export function SearchHomePage(props: { route: Route }): ReactElement {
   // keeps q pure under replaceState typing + back/forward).
   const route: Route = useRoute(props.route);
   const q: string = route.query['q'] ?? '';
+  // [fuzzy-javelin-pearls] scope state rides the same URL (absent =
+  // all sites — the pre-scope URL shape keeps meaning "all").
+  const scopeState: SearchScopeState = parseSearchScope(route.query);
 
   const debouncedQ: string = useDebouncedValue(q, SEARCH_DEBOUNCE_MS);
-  const pages = useAllSitesSearch({ q: debouncedQ, limit: PAGE_LIMIT, enabled: true });
+  const pages = useAllSitesSearch({
+    q: debouncedQ,
+    limit: PAGE_LIMIT,
+    enabled: true,
+    scope: scopeState.scope,
+    sites: scopeState.scope === 'specific' ? scopeState.picks : [],
+  });
   const [highlightNew] = useHighlightNew();
   const recentSites = useRecentSites();
   const recentManga = useRecentManga();
   const modules = useModules();
+  const preferred = usePreferredSites();
+
+  // The registry join feeding the selector: the allowlist in CANONICAL
+  // order (D1 §3), names + availability hint state from /api/modules.
+  const registry = modules.data?.modules ?? [];
+  const preferredOrder = preferred.data?.sites ?? [];
+  const preferredRows = useMemo(
+    (): readonly PreferredRow[] =>
+      preferredOrder.flatMap((id): PreferredRow[] => {
+        const module = registry.find((m): boolean => m.id === id);
+        if (module === undefined) {
+          return [];
+        }
+        return [
+          {
+            id,
+            name: module.name,
+            unreachable: module.availability.status === 'unreachable',
+          },
+        ];
+      }),
+    [preferredOrder, registry],
+  );
+
+  // Live-scrape leg: catalog-less sites under an EXPLICIT scope only
+  // (scope=all stays zero-network — its catalog-less sites surface as
+  // the excluded chips instead), capped, progressive, cancelled on
+  // navigate by the hook's AbortController.
+  const liveSites = useMemo(
+    (): readonly { readonly id: string; readonly name: string }[] =>
+      liveSearchCandidates(
+        scopeState,
+        preferredOrder,
+        registry.map((m): {
+          readonly id: string;
+          readonly name: string;
+          readonly enabled: boolean;
+          readonly catalogInstalled: boolean;
+          readonly liveCapable: boolean;
+        } => ({
+          id: m.id,
+          name: m.name,
+          enabled: m.enabled,
+          catalogInstalled: m.catalogInstalled,
+          liveCapable: m.capabilities.live_scrape_fallback,
+        })),
+      ),
+    [scopeState, preferredOrder, registry],
+  );
+  const live = useLiveSiteSearch({
+    sites: liveSites,
+    q: debouncedQ,
+    enabled: scopeState.scope !== 'all' && debouncedQ !== '',
+  });
 
   // '/' focus channel: a request that navigated here first is pending
   // at mount; later requests (already on the home) arrive as events.
@@ -250,12 +397,23 @@ export function SearchHomePage(props: { route: Route }): ReactElement {
   );
 
   const writeQ = (text: string): void => {
-    // Typing REPLACES the URL entry (shareable, no history spam).
+    // Typing REPLACES the URL entry (shareable, no history spam) and
+    // PRESERVES the scope params — typing narrows within the scope.
+    const scopeParams = serializeSearchScope(scopeState);
     if (text === '') {
-      replaceRoute('browse', {});
+      replaceRoute('browse', { ...scopeParams });
     } else {
-      replaceRoute('browse', { q: text });
+      replaceRoute('browse', { q: text, ...scopeParams });
     }
+  };
+
+  // A scope change is a DISCRETE mode change → PUSH (back/forward
+  // restore the selector); q rides along unchanged.
+  const onScopeChange = (next: SearchScopeState): void => {
+    navigate('browse', {
+      ...(q !== '' ? { q } : {}),
+      ...serializeSearchScope(next),
+    });
   };
 
   const onSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
@@ -285,7 +443,11 @@ export function SearchHomePage(props: { route: Route }): ReactElement {
       <div className="search-hero mx-auto mb-6 max-w-2xl">
         <form onSubmit={onSearchSubmit}>
           <label htmlFor={HOME_SEARCH_INPUT_ID} className="mb-1.5 block text-sm font-medium">
-            Search all sites
+            {scopeState.scope === 'all'
+              ? 'Search all sites'
+              : scopeState.scope === 'preferred'
+                ? 'Search preferred sites'
+                : 'Search picked sites'}
           </label>
           <div className="relative">
             <Search
@@ -311,6 +473,18 @@ export function SearchHomePage(props: { route: Route }): ReactElement {
             </kbd>
           </div>
         </form>
+        {/* [fuzzy-javelin-pearls] the scope selector rides under the
+         * search box — all (default, zero network) / preferred (the
+         * allowlist) / specific (explicit picks). */}
+        <div className="mt-3">
+          <ScopeSelector
+            scope={scopeState.scope}
+            picks={scopeState.picks}
+            preferred={preferredRows}
+            registry={registry}
+            onChange={onScopeChange}
+          />
+        </div>
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
           <Button
             type="button"
@@ -433,6 +607,8 @@ export function SearchHomePage(props: { route: Route }): ReactElement {
               ) : null}
             </>
           ) : null}
+
+          {live.perSite.length > 0 ? <LiveResultsSection live={live} /> : null}
 
           {!pages.isPending && entries.length === 0 && !pages.isError ? (
             <EmptyState title="No entries">
