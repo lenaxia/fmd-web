@@ -776,7 +776,7 @@ export const JobCreateRequestSchema = z.object({
   /**
    * Save-to override (FMD2 edSaveTo parity, frmMain.pas:5613): the
    * directory the finalized artifact lands in — REPLACES the default
-   * `library/<module>/<manga>` path. Relative paths resolve against
+   * `library/<manga>` path. Relative paths resolve against
    * the library root; the file name keeps §7.1 sanitization.
    */
   saveTo: z.string().min(1).max(1024).optional(),

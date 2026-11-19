@@ -1,8 +1,9 @@
 /**
  * edSaveTo parity (FMD2 frmMain.pas:5613): a custom save directory
- * REPLACES the `<libraryRoot>/<module>/<manga>` prefix at finalize —
- * relative values resolve against the library root, absolute values
- * are used verbatim, and the file name keeps §7.1 sanitization.
+ * REPLACES the `<libraryRoot>/<manga>` prefix at finalize — relative
+ * values resolve against the library root, absolute values are used
+ * verbatim, and the file name keeps §7.1 sanitization (semantics
+ * unchanged by the flat [library-layout] relayout).
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -29,7 +30,6 @@ describe('LibraryFinalizer — saveTo override (edSaveTo parity)', (): void => {
 
   function request(saveTo?: string): FinalizeRequest {
     return {
-      moduleId: MODULE,
       manga: 'Fixture Manga',
       fileName: 'Chapter 1',
       ext: 'zip',
@@ -38,12 +38,12 @@ describe('LibraryFinalizer — saveTo override (edSaveTo parity)', (): void => {
     };
   }
 
-  it('default path stays library/<module>/<manga> (regression)', (): void => {
+  it('default path stays library/<manga> (flat layout regression)', (): void => {
     const target = finalizer.targetPath(request());
-    expect(target.dir).toBe(path.join(root, MODULE, 'Fixture Manga'));
+    expect(target.dir).toBe(path.join(root, 'Fixture Manga'));
   });
 
-  it('a RELATIVE saveTo replaces the module/manga prefix, resolved against the library root', (): void => {
+  it('a RELATIVE saveTo replaces the manga folder prefix, resolved against the library root', (): void => {
     const target = finalizer.targetPath(request('custom/dir'));
     expect(target.dir).toBe(path.resolve(root, 'custom/dir'));
     expect(target.dir).not.toContain(MODULE);

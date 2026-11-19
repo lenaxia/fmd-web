@@ -550,7 +550,10 @@ Job = chapter (module, manga, chapter link/name)
     (SaveImage → returns filename) → AfterImageSaved(FILENAME)
  3. assemble ordered files (module FileNames[] honored)
  4. pack (§7.3)
- 5. finalize: atomic move into library/<module>/<manga>/<chapter>.<ext>
+ 5. finalize: atomic move into library/<manga>/<chapter>.<ext> (flat
+    series folders — the module is NOT a path segment; a duplicate
+    title followed from a second site writes `<manga> [<module>]`
+    instead, first writer keeps the clean name)
 ```
 
 Per-job watchdog per §4; cancellation sets `HTTP.Terminated` and fails

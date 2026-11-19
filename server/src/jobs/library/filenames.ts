@@ -1,6 +1,8 @@
 /**
  * Library chapter filename resolution (DESIGN §7.1 — the
- * `library/<module>/<manga>/<chapter>.<ext>` entry name).
+ * `library/<manga>/<chapter>.<ext>` entry name under the flat
+ * series-folder layout; the module is not a path segment, a duplicate
+ * title writes `<manga> [<module>]` per layout.ts).
  *
  * Resolution order (first non-empty wins):
  *   1. module `FileNames[]` entry for the chapter

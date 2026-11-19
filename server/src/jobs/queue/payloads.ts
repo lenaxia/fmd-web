@@ -26,7 +26,7 @@ export const DownloadChapterJobSchema = z.object({
   mangaKey: z.string().min(1).optional(),
   /**
    * FMD2 edSaveTo parity (frmMain.pas:5613): the directory the
-   * finalized artifact lands in — REPLACES `library/<module>/<manga>`.
+   * finalized artifact lands in — REPLACES `library/<manga>`.
    * Relative paths resolve against the library root. (The add-as-stopped
    * `paused` hold is queue-level — a column, not payload.)
    */

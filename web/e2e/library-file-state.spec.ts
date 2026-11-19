@@ -22,8 +22,8 @@ const SEED = {
     createdAt: '2026-11-18T17:34:02.117Z',
     state: 'downloaded',
     verifiedAt: '2026-11-19T00:00:00.000Z',
-    path: 'modu/Alpha Quest/Chapter 1 The Beginning.zip',
-    absolutePath: '/srv/fmd/library/modu/Alpha Quest/Chapter 1 The Beginning.zip',
+    path: 'Alpha Quest/Chapter 1 The Beginning.zip',
+    absolutePath: '/srv/fmd/library/Alpha Quest/Chapter 1 The Beginning.zip',
     mtime: '2026-11-18T17:34:02.117Z',
   },
   ch2Deleted: {
@@ -35,8 +35,8 @@ const SEED = {
     createdAt: '2026-11-18T17:40:00.000Z',
     state: 'missing',
     verifiedAt: '2026-11-19T00:00:00.000Z',
-    path: 'modu/Alpha Quest/Chapter 2 The Middle.zip',
-    absolutePath: '/srv/fmd/library/modu/Alpha Quest/Chapter 2 The Middle.zip',
+    path: 'Alpha Quest/Chapter 2 The Middle.zip',
+    absolutePath: '/srv/fmd/library/Alpha Quest/Chapter 2 The Middle.zip',
   },
   ch3Moved: {
     id: '103',
@@ -48,12 +48,12 @@ const SEED = {
     // BEFORE the rescan: still recorded at the OLD directory → missing.
     state: 'missing',
     verifiedAt: '2026-11-19T00:00:00.000Z',
-    path: 'modu/Alpha Quest/Chapter 3 The Finale.zip',
-    absolutePath: '/srv/fmd/library/modu/Alpha Quest/Chapter 3 The Finale.zip',
+    path: 'Alpha Quest/Chapter 3 The Finale.zip',
+    absolutePath: '/srv/fmd/library/Alpha Quest/Chapter 3 The Finale.zip',
   },
   orphan: {
-    path: 'modu/Alpha Quest/untracked-legacy.zip',
-    absolutePath: '/srv/fmd/library/modu/Alpha Quest/untracked-legacy.zip',
+    path: 'Alpha Quest/untracked-legacy.zip',
+    absolutePath: '/srv/fmd/library/Alpha Quest/untracked-legacy.zip',
     bytes: 512,
     mtime: '2026-11-17T10:00:00.000Z',
   },
@@ -66,10 +66,10 @@ const REPORT = {
   scope: 'library',
   counts: { scanned: 3, present: 1, relinked: 1, missing: 1, orphans: 1, outsideRoot: 0 },
   relinked: [
-    { id: '103', fromPath: 'modu/Alpha Quest/Chapter 3 The Finale.zip', toPath: 'imported/Chapter 3 The Finale.zip' },
+    { id: '103', fromPath: 'Alpha Quest/Chapter 3 The Finale.zip', toPath: 'imported/Chapter 3 The Finale.zip' },
   ],
   missing: [
-    { id: '102', manga: 'Alpha Quest', fileName: 'Chapter 2 The Middle.zip', path: 'modu/Alpha Quest/Chapter 2 The Middle.zip', candidates: [] },
+    { id: '102', manga: 'Alpha Quest', fileName: 'Chapter 2 The Middle.zip', path: 'Alpha Quest/Chapter 2 The Middle.zip', candidates: [] },
   ],
   orphans: [SEED.orphan],
 };
@@ -158,7 +158,7 @@ test('library: rescan re-links the moved file, keeps the deleted one missing, su
   const report = page.getByTestId('rescan-report');
   await expect(report).toBeVisible();
   await expect(report.getByTestId('rescan-relink')).toContainText('imported/Chapter 3 The Finale.zip');
-  await expect(report.getByTestId('rescan-relink')).toContainText('modu/Alpha Quest/Chapter 3 The Finale.zip');
+  await expect(report.getByTestId('rescan-relink')).toContainText('Alpha Quest/Chapter 3 The Finale.zip');
   await expect(report.getByTestId('rescan-counts')).toContainText('1 re-linked');
   await expect(report.getByTestId('rescan-counts')).toContainText('1 missing');
 

@@ -16,7 +16,6 @@ import { mkTmpDir, rmDir } from '../helpers.js';
  * at every boundary; `.tmp-` litter is sweepable, never referenced).
  */
 
-const MODULE = 'a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8';
 const FAULT_POINTS: readonly FinalizeFaultPoint[] = [
   'begin',
   'before-stage',
@@ -33,7 +32,8 @@ function request(
   maxLength?: number,
 ): FinalizeRequest {
   return {
-    moduleId: MODULE,
+    // [library-layout] the module is NOT a path segment — the folder is
+    // the (already-effective, sanitized) manga component.
     manga: 'My/Manga: Title?',
     fileName,
     ext,
@@ -56,24 +56,19 @@ afterEach(() => {
 });
 
 describe('LibraryFinalizer — happy path', () => {
-  it('commits the artifact at library/<module>/<manga>/<name>.<ext> with sanitized components', () => {
+  it('commits the artifact at library/<manga>/<name>.<ext> with a sanitized folder (no module segment)', () => {
     dir = mkTmpDir('lib-finalize-ok');
     const root = path.join(dir, 'library');
     const source = makeSource(dir, new Uint8Array([1, 2, 3, 4, 5]));
     const finalizer = new LibraryFinalizer({ libraryRoot: root });
     const result = finalizer.finalize(request(source));
-    const expectedPath = path.join(
-      root,
-      MODULE,
-      'MyManga Title',
-      'Chapter 5.cbz',
-    );
+    const expectedPath = path.join(root, 'MyManga Title', 'Chapter 5.cbz');
     expect(result.path).toBe(expectedPath);
     expect(result.bytes).toBe(5);
     expect(result.replaced).toBe(false);
     expect(fs.readFileSync(expectedPath)).toEqual(Buffer.from([1, 2, 3, 4, 5]));
     // no litter anywhere (the per-target stage dir is removed on success)
-    expect(finalizeLeftovers(path.join(root, MODULE, 'MyManga Title'))).toEqual([]);
+    expect(finalizeLeftovers(path.join(root, 'MyManga Title'))).toEqual([]);
   });
 
   it('replacing an entry swaps the file atomically (replaced=true, new bytes)', () => {
@@ -94,8 +89,8 @@ describe('LibraryFinalizer — happy path', () => {
     expect(() => finalizer.finalize(request(source, 'X', 'rar'))).toThrow(/unknown chapter format/);
     expect(() => finalizer.finalize(request(source, '???*|'))).toThrow(/empty after sanitization/);
     expect(() =>
-      finalizer.finalize({ ...request(source), moduleId: '???' }),
-    ).toThrow(/moduleId/);
+      finalizer.finalize({ ...request(source), manga: '???*|' }),
+    ).toThrow(/manga/);
   });
 
   it('tail-truncates the final name when over maxLength (D5)', () => {

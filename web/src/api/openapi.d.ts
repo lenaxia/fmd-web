@@ -661,7 +661,7 @@ export interface paths {
         };
         /**
          * Finalized chapter artifacts (§7.1 library listing)
-         * @description Newest-first page over the library rows (one per packed chapter file, `library/<module>/<manga>/<file>`). `cursor` is the keyset boundary like /api/jobs. [file-state] Rows carry additive stat-verified fields (`state` downloaded|missing, `verifiedAt`, root-relative `path` + `absolutePath`, `mtime`) and the Library page chips ride `filter`: `all` (default), `missing` (stat-verified missing rows, keyset-paginated) or `orphans` (serves the LAST RESCAN's persisted orphan list — orphan truth is rescan truth, never a live walk per listing).
+         * @description Newest-first page over the library rows (one per packed chapter file, `library/<manga>/<file>` — the flat series layout; duplicates live under `<manga> [<module>]`). `cursor` is the keyset boundary like /api/jobs. [file-state] Rows carry additive stat-verified fields (`state` downloaded|missing, `verifiedAt`, root-relative `path` + `absolutePath`, `mtime`) and the Library page chips ride `filter`: `all` (default), `missing` (stat-verified missing rows, keyset-paginated) or `orphans` (serves the LAST RESCAN's persisted orphan list — orphan truth is rescan truth, never a live walk per listing).
          */
         get: operations["listLibrary"];
         put?: never;
@@ -707,7 +707,7 @@ export interface paths {
         put?: never;
         /**
          * Rescan library — reconcile the ledger against disk (persisted diff report)
-         * @description Walks the configured downloads root via the shared directory-walker seam (dotfiles skipped, symlink escapes clamped out) and reconciles the `library_files` ledger against what is actually on disk. CONSERVATIVE re-linking for moved-within-root files only: an exact-filename match at a different directory, or the app's own output naming convention (`<module>/<manga>/<file>`) hitting exactly one candidate. Ambiguous matches (two+ same-name candidates) are NEVER auto-linked — they surface as an orphan+missing pair for the operator to resolve (v1: delete the ledger entry or ignore the orphan; interactive adoption is deferred). The diff report (re-linked with former paths, missing with former paths + candidates, orphans with path/size/mtime, counts) is persisted and re-served by GET /api/library/rescan. Optional `moduleId`+`url` scope the reconcile to one title (the per-title variant on the manga detail Files section).
+         * @description Walks the configured downloads root via the shared directory-walker seam (dotfiles skipped, symlink escapes clamped out) and reconciles the `library_files` ledger against what is actually on disk. CONSERVATIVE re-linking for moved-within-root files only: an exact-filename match at a different directory, or the app's own output naming convention (`<manga>/<file>` — the effective folder, module-suffixed for duplicates) hitting exactly one candidate. Ambiguous matches (two+ same-name candidates) are NEVER auto-linked — they surface as an orphan+missing pair for the operator to resolve (v1: delete the ledger entry or ignore the orphan; interactive adoption is deferred). The diff report (re-linked with former paths, missing with former paths + candidates, orphans with path/size/mtime, counts) is persisted and re-served by GET /api/library/rescan. Optional `moduleId`+`url` scope the reconcile to one title (the per-title variant on the manga detail Files section).
          */
         post: operations["rescanLibrary"];
         delete?: never;

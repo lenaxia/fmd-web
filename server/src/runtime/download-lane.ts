@@ -801,6 +801,14 @@ export function downloadLane(deps: DownloadLaneDeps): LaneRunnerLaneOptions {
       const packed = await createPacker(output.format).pack(pages, { outputDir: workDir });
 
       // ── finalize (§7.1 step 5): atomic move + ledger + listing row ──
+      // [library-layout] the module is NOT a path segment: the default
+      // target is `<libraryRoot>/<effective manga folder>/<file>` where
+      // the effective folder is the clean sanitized title, or the
+      // suffixed `<manga> [<module>]` duplicate form when a DIFFERENT
+      // module already claims the title (computed once, persisted on
+      // the favorite/ledger — never recomputed). saveTo (edSaveTo)
+      // still REPLACES the computed prefix entirely, and no effective
+      // folder is derived for an overridden download.
       // Filename: the FMD2 custom-rename template when the output
       // defaults carry one (edOptionMangaCustomRename parity; '' keeps
       // the chapter-name fallback — the previous behavior).
@@ -825,9 +833,20 @@ export function downloadLane(deps: DownloadLaneDeps): LaneRunnerLaneOptions {
         applyOutputRenameOptions(rawFileName, output, payload.mangaTitle ?? mangaSegment),
         120,
             );
+      // [library-layout] rule 2: the effective folder (clean, or the
+      // suffixed duplicate form when a different module claims the
+      // title) — resolved ONLY for default-layout downloads; a saveTo
+      // override replaces the prefix and derives nothing.
+      const effectiveManga: string =
+        payload.saveTo !== undefined
+          ? mangaSegment
+          : deps.library.resolveMangaFolder({
+              moduleId: payload.moduleId,
+              mangaUrl: payload.mangaUrl,
+              segment: mangaSegment,
+            });
       const finalized = deps.library.finalize({
-        moduleId: moduleSegment,
-        manga: mangaSegment,
+        manga: effectiveManga,
         fileName,
         ext: output.format,
         sourcePath: packed.filePath,
@@ -835,7 +854,7 @@ export function downloadLane(deps: DownloadLaneDeps): LaneRunnerLaneOptions {
       });
       deps.library.recordLibraryFile({
         moduleId: moduleSegment,
-        manga: mangaSegment,
+        manga: effectiveManga,
         fileName: `${fileName}.${output.format}`,
         path: finalized.path,
         bytes: finalized.bytes,

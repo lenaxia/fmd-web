@@ -207,7 +207,6 @@ describe('SqliteLibraryStore — finalize integration', () => {
     const source = path.join(path.dirname(dbFile), 'pack.zip');
     fs.writeFileSync(source, Buffer.from('PK-payload'));
     const result = store.finalize({
-      moduleId: MODULE,
       manga: 'My Manga',
       fileName: 'Ch. 1',
       ext: 'zip',
@@ -215,7 +214,7 @@ describe('SqliteLibraryStore — finalize integration', () => {
     });
     expect(result.bytes).toBe(10);
     expect(fs.readFileSync(result.path).toString()).toBe('PK-payload');
-    expect(result.path.endsWith(path.join(MODULE, 'My Manga', 'Ch. 1.zip'))).toBe(true);
+    expect(result.path.endsWith(path.join('My Manga', 'Ch. 1.zip'))).toBe(true);
   });
 
   it('finalize without a libraryRoot refuses loudly', () => {
@@ -224,7 +223,6 @@ describe('SqliteLibraryStore — finalize integration', () => {
     const store = new SqliteLibraryStore({ db: raw });
     expect(() =>
       store.finalize({
-        moduleId: MODULE,
         manga: 'm',
         fileName: 'c',
         ext: 'zip',

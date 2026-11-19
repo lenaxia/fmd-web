@@ -8,8 +8,11 @@
  * auto-relays a ledger row onto a moved file:
  *
  *   1. CONVENTION — the app's own output layout
- *      `<root>/<module>/<manga>/<fileName>` (§7.1 fixed-depth) points
- *      at exactly one unclaimed disk file (unique by construction);
+ *      `<root>/<manga>/<fileName>` (§7.1 fixed-depth as re-ruled by the
+ *      library-layout story: the module is not a path segment; the
+ *      recorded `manga` segment IS the effective folder — clean, or the
+ *      suffixed duplicate form) points at exactly one unclaimed disk
+ *      file (unique by construction);
  *   2. EXACT FILENAME — exactly ONE unclaimed disk file anywhere
  *      under the root carries the same file name at a different
  *      directory.

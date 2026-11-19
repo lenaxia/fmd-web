@@ -72,6 +72,7 @@ import { openQueueDb, ensureJobSchema } from '../jobs/queue/connection.js';
 import { SqliteJobQueue } from '../jobs/queue/queue.js';
 import { EngineThread, offloadEngineSubstrate, probeOnEngineThread } from '../engine/services/engine-thread.js';
 import { SqliteLibraryStore } from '../jobs/library/store.js';
+import { migrateLibraryLayout } from '../jobs/library/migrate.js';
 import {
   ActiveDownloadRegistry,
   PublishingJobQueue,
@@ -593,6 +594,17 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
   const queue = new InstrumentedJobQueue(publishingQueue, metrics);
   const libraryRoot = join(config.dataDir, 'library');
   const libraryStore = new SqliteLibraryStore({ db, libraryRoot });
+  // [library-layout] one-time idempotent migration onto the flat
+  // `<manga>/<file>` convention (module trees → series folders,
+  // duplicate suffix per rule 2). Runs at startup post-upgrade; a
+  // migrated tree re-runs as a no-op (old-layout detection only).
+  migrateLibraryLayout({
+    store: libraryStore,
+    root: libraryRoot,
+    log: (message): void => {
+      logger.info(message, { event: 'library_layout_migration' });
+    },
+  });
   // [file-state] the download-route path resolver carries the realpath
   // clamp (out-of-root recorded paths 403, dotfiles never served); the
   // file-state service owns lazy verify, per-title listings, rescan.

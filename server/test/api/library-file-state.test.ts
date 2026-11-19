@@ -50,7 +50,8 @@ function seed(r: RealHarness, rel: string, opts?: { mangaUrl?: string; chapterLi
   const segments = rel.split('/');
   const row = r.store.recordLibraryFile({
     moduleId: MODULE_A_ID,
-    manga: segments[1] ?? 'mangam',
+    // [library-layout] flat convention: the folder is the first segment.
+    manga: segments[0] ?? 'mangam',
     fileName: segments[segments.length - 1] ?? 'ch.cbz',
     path: abs,
     bytes: 12,
@@ -64,7 +65,7 @@ describe('GET /api/library/title-files', (): void => {
   it('serves the per-title Files shape: verified states, display paths, orphans — metadata only', async (): Promise<void> => {
     const r = openReal();
     r.store.setDownloadedChapters(MODULE_A_ID, URL, linesToText(['https://ex.org/manga/x/1']));
-    seed(r, `${MODULE_A_ID}/mangam/ch-001.cbz`, { mangaUrl: URL, chapterLink: 'https://ex.org/manga/x/1' });
+    seed(r, 'mangam/ch-001.cbz', { mangaUrl: URL, chapterLink: 'https://ex.org/manga/x/1' });
     const res = await r.h.app.inject({ method: 'GET', url: `/api/library/title-files?moduleId=${MODULE_A_ID}&url=${encodeURIComponent(URL)}` });
     expect(res.statusCode).toBe(200);
     const body = res.json() as {
@@ -74,7 +75,7 @@ describe('GET /api/library/title-files', (): void => {
     };
     expect(body.files).toHaveLength(1);
     expect(body.files[0]?.state).toBe('downloaded');
-    expect(body.files[0]?.path).toBe(`${MODULE_A_ID}/mangam/ch-001.cbz`);
+    expect(body.files[0]?.path).toBe('mangam/ch-001.cbz');
     expect(body.files[0]?.bytes).toBe(12);
     expect(body.files[0]?.mtime).toBeDefined();
     expect(body.files[0]?.verifiedAt).toBeDefined();
@@ -97,11 +98,11 @@ describe('GET /api/library/title-files', (): void => {
 describe('POST/GET /api/library/rescan', (): void => {
   it('moved + deleted + orphan seed: re-link, missing, orphans; the report persists and re-serves', async (): Promise<void> => {
     const r = openReal();
-    const moved = seed(r, `${MODULE_A_ID}/mangam/ch-moved.cbz`);
-    seed(r, `${MODULE_A_ID}/mangam/ch-deleted.cbz`);
-    rmSync(join(r.root, MODULE_A_ID, 'mangam', 'ch-deleted.cbz'));
+    const moved = seed(r, 'mangam/ch-moved.cbz');
+    seed(r, 'mangam/ch-deleted.cbz');
+    rmSync(join(r.root, 'mangam', 'ch-deleted.cbz'));
     mkdirSync(join(r.root, 'imported'), { recursive: true });
-    rmSync(join(r.root, MODULE_A_ID, 'mangam', 'ch-moved.cbz'));
+    rmSync(join(r.root, 'mangam', 'ch-moved.cbz'));
     writeFileSync(join(r.root, 'imported', 'ch-moved.cbz'), Buffer.alloc(12, 3));
     mkdirSync(join(r.root, 'stray'), { recursive: true });
     writeFileSync(join(r.root, 'stray', 'orphan.cbz'), Buffer.alloc(4, 1));
@@ -121,7 +122,7 @@ describe('POST/GET /api/library/rescan', (): void => {
     expect(report.counts.relinked).toBe(1);
     expect(report.relinked[0]?.id).toBe(String(moved));
     expect(report.relinked[0]?.toPath).toBe('imported/ch-moved.cbz');
-    expect(report.missing[0]?.path).toBe(`${MODULE_A_ID}/mangam/ch-deleted.cbz`);
+    expect(report.missing[0]?.path).toBe('mangam/ch-deleted.cbz');
     expect(report.orphans.map((o) => o.path)).toEqual(['stray/orphan.cbz']);
 
     const last = await r.h.app.inject({ method: 'GET', url: '/api/library/rescan' });
@@ -139,9 +140,9 @@ describe('POST/GET /api/library/rescan', (): void => {
 describe('GET /api/library filters + state enrichment', (): void => {
   it('rows carry verified state; filter=missing narrows; filter=orphans serves the persisted report', async (): Promise<void> => {
     const r = openReal();
-    seed(r, `${MODULE_A_ID}/mangam/ch-001.cbz`, { mangaUrl: URL, chapterLink: 'l1' });
-    seed(r, `${MODULE_A_ID}/mangam/ch-002.cbz`, { mangaUrl: URL, chapterLink: 'l2' });
-    rmSync(join(r.root, MODULE_A_ID, 'mangam', 'ch-002.cbz'));
+    seed(r, 'mangam/ch-001.cbz', { mangaUrl: URL, chapterLink: 'l1' });
+    seed(r, 'mangam/ch-002.cbz', { mangaUrl: URL, chapterLink: 'l2' });
+    rmSync(join(r.root, 'mangam', 'ch-002.cbz'));
 
     const all = await r.h.app.inject({ method: 'GET', url: '/api/library?limit=50' });
     expect(all.statusCode).toBe(200);
@@ -185,8 +186,8 @@ describe('GET /api/library/:id/file — realpath clamp', (): void => {
     mkdirSync(outsideDir, { recursive: true });
     const outsideFile = join(outsideDir, 'secret.cbz');
     writeFileSync(outsideFile, Buffer.alloc(6, 9));
-    const linkPath = join(r.root, MODULE_A_ID, 'mangam', 'linked.cbz');
-    mkdirSync(join(r.root, MODULE_A_ID, 'mangam'), { recursive: true });
+    const linkPath = join(r.root, 'mangam', 'linked.cbz');
+    mkdirSync(join(r.root, 'mangam'), { recursive: true });
     symlinkSync(outsideFile, linkPath);
     const row = r.store.recordLibraryFile({
       moduleId: MODULE_A_ID,
@@ -203,10 +204,10 @@ describe('GET /api/library/:id/file — realpath clamp', (): void => {
 
   it('an in-root symlinked file still streams (the clamp admits in-root targets)', async (): Promise<void> => {
     const r = openReal();
-    const target = join(r.root, MODULE_A_ID, 'mangam', 'real.cbz');
-    mkdirSync(join(r.root, MODULE_A_ID, 'mangam'), { recursive: true });
+    const target = join(r.root, 'mangam', 'real.cbz');
+    mkdirSync(join(r.root, 'mangam'), { recursive: true });
     writeFileSync(target, Buffer.alloc(6, 9));
-    const linkPath = join(r.root, MODULE_A_ID, 'mangam', 'alias.cbz');
+    const linkPath = join(r.root, 'mangam', 'alias.cbz');
     symlinkSync(target, linkPath);
     const row = r.store.recordLibraryFile({
       moduleId: MODULE_A_ID,

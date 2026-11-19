@@ -21,8 +21,8 @@ const DOWNLOADED = {
   id: '7',
   chapterLink: 'https://ex.org/manga/x/1',
   fileName: 'Ch. 1 The Beginning.cbz',
-  path: 'aaaa/mangam/Ch. 1 The Beginning.cbz',
-  absolutePath: '/srv/fmd/library/aaaa/mangam/Ch. 1 The Beginning.cbz',
+  path: 'mangam/Ch. 1 The Beginning.cbz',
+  absolutePath: '/srv/fmd/library/mangam/Ch. 1 The Beginning.cbz',
   bytes: 1258291,
   mtime: '2026-11-18T17:34:02.117Z',
   state: 'downloaded',
@@ -32,13 +32,13 @@ const MISSING = {
   id: '8',
   chapterLink: 'https://ex.org/manga/x/2',
   fileName: 'Ch. 2 The Middle.cbz',
-  path: 'aaaa/mangam/Ch. 2 The Middle.cbz',
+  path: 'mangam/Ch. 2 The Middle.cbz',
   state: 'missing',
   verifiedAt: '2026-11-19T00:00:00.000Z',
 };
 const ORPHAN = {
-  path: 'aaaa/mangam/untracked.cbz',
-  absolutePath: '/srv/fmd/library/aaaa/mangam/untracked.cbz',
+  path: 'mangam/untracked.cbz',
+  absolutePath: '/srv/fmd/library/mangam/untracked.cbz',
   bytes: 2048,
   mtime: '2026-11-17T10:00:00.000Z',
 };
@@ -80,7 +80,7 @@ function titleFilesRoutes(refreshSeen: { value: boolean }): MockRoute[] {
             scope: { kind: 'title', moduleId: MODULE, url: URL_ },
             counts: { scanned: 3, present: 1, relinked: 1, missing: 1, orphans: 1, outsideRoot: 0 },
             relinked: [{ id: '9', fromPath: 'a/old.cbz', toPath: 'b/new.cbz' }],
-            missing: [{ id: '8', manga: 'mangam', fileName: 'Ch. 2 The Middle.cbz', path: 'aaaa/mangam/Ch. 2 The Middle.cbz', candidates: [] }],
+            missing: [{ id: '8', manga: 'mangam', fileName: 'Ch. 2 The Middle.cbz', path: 'mangam/Ch. 2 The Middle.cbz', candidates: [] }],
             orphans: [ORPHAN],
           },
         },
@@ -114,7 +114,7 @@ describe('FilesSection', (): void => {
     // Verification age line (visible text, never tooltip-only — R3).
     expect(screen.getByText(/Verified/)).toBeInTheDocument();
     // The orphan surfaces in its own list.
-    expect(await screen.findByText('aaaa/mangam/untracked.cbz')).toBeInTheDocument();
+    expect(await screen.findByText('mangam/untracked.cbz')).toBeInTheDocument();
     expect(screen.getByText('orphan')).toBeInTheDocument();
   });
 
@@ -129,7 +129,7 @@ describe('FilesSection', (): void => {
     await userEvent.click(buttons[0] as HTMLElement);
     // The FIRST copy-path belongs to the downloaded row (files render
     // before orphans): the absolute path, not the display rel path.
-    expect(globalThis.navigator.clipboard.writeText).toHaveBeenCalledWith('/srv/fmd/library/aaaa/mangam/Ch. 1 The Beginning.cbz');
+    expect(globalThis.navigator.clipboard.writeText).toHaveBeenCalledWith('/srv/fmd/library/mangam/Ch. 1 The Beginning.cbz');
   });
 
   it('refresh sends ?refresh=1 (the explicit re-verification leg)', async (): Promise<void> => {

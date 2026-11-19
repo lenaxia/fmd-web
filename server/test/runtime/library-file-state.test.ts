@@ -52,7 +52,9 @@ function record(h: Harness, opts: { file: string; mangaUrl?: string; chapterLink
   const segments = opts.file.split('/');
   const row = h.store.recordLibraryFile({
     moduleId: MODULE,
-    manga: opts.mangaSegment ?? segments[1] ?? 'mangam',
+    // [library-layout] flat convention: the folder is the FIRST (only)
+    // directory segment.
+    manga: opts.mangaSegment ?? segments[0] ?? 'mangam',
     fileName: segments[segments.length - 1] ?? 'ch.cbz',
     path: abs,
     bytes: opts.bytes ?? 16,
@@ -70,14 +72,14 @@ describe('titleFiles — lazy verify + the state contract', (): void => {
   it('downloaded: ledger row AND file at recorded path (stat-verified, stamps persisted)', (): void => {
     const h = open();
     h.store.setDownloadedChapters(MODULE, URL, linesToText(['https://ex.org/manga/x/1']));
-    record(h, { file: 'a1b2/mangam/ch-001.cbz', mangaUrl: URL, chapterLink: 'https://ex.org/manga/x/1' });
+    record(h, { file: 'mangam/ch-001.cbz', mangaUrl: URL, chapterLink: 'https://ex.org/manga/x/1' });
     const result = h.service.titleFiles({ moduleId: MODULE, url: URL });
     expect(result.files).toHaveLength(1);
     const entry = result.files[0];
     expect(entry?.state).toBe('downloaded');
     expect(entry?.chapterLink).toBe('https://ex.org/manga/x/1');
-    expect(entry?.path).toBe('a1b2/mangam/ch-001.cbz');
-    expect(entry?.absolutePath).toBe(join(h.root, 'a1b2/mangam/ch-001.cbz'));
+    expect(entry?.path).toBe('mangam/ch-001.cbz');
+    expect(entry?.absolutePath).toBe(join(h.root, 'mangam/ch-001.cbz'));
     expect(entry?.bytes).toBe(16);
     expect(entry?.mtime).toBeDefined();
     expect(entry?.verifiedAt).toBeDefined();
@@ -86,8 +88,8 @@ describe('titleFiles — lazy verify + the state contract', (): void => {
   it('fresh verdict serves from cache (a just-deleted file stays downloaded INSIDE the tolerance window)', (): void => {
     const h = open();
     h.store.setDownloadedChapters(MODULE, URL, linesToText(['https://ex.org/manga/x/1']));
-    const id = record(h, { file: 'a1b2/mangam/ch-001.cbz', mangaUrl: URL, chapterLink: 'https://ex.org/manga/x/1' });
-    rmSync(join(h.root, 'a1b2/mangam/ch-001.cbz'));
+    const id = record(h, { file: 'mangam/ch-001.cbz', mangaUrl: URL, chapterLink: 'https://ex.org/manga/x/1' });
+    rmSync(join(h.root, 'mangam/ch-001.cbz'));
     // Freshly recorded → verified_at is now → cached verdict wins.
     const cached = h.service.titleFiles({ moduleId: MODULE, url: URL });
     expect(cached.files[0]?.state).toBe('downloaded');
@@ -100,8 +102,8 @@ describe('titleFiles — lazy verify + the state contract', (): void => {
   it('stale stamps (>15 min) re-verify on open — no refresh flag needed', (): void => {
     const h = open();
     h.store.setDownloadedChapters(MODULE, URL, linesToText(['https://ex.org/manga/x/1']));
-    const id = record(h, { file: 'a1b2/mangam/ch-001.cbz', mangaUrl: URL, chapterLink: 'https://ex.org/manga/x/1' });
-    rmSync(join(h.root, 'a1b2/mangam/ch-001.cbz'));
+    const id = record(h, { file: 'mangam/ch-001.cbz', mangaUrl: URL, chapterLink: 'https://ex.org/manga/x/1' });
+    rmSync(join(h.root, 'mangam/ch-001.cbz'));
     backdate(h, id, VERIFY_STALE_MS + 60_000);
     const result = h.service.titleFiles({ moduleId: MODULE, url: URL });
     expect(result.files[0]?.state).toBe('missing');
@@ -119,7 +121,7 @@ describe('titleFiles — lazy verify + the state contract', (): void => {
       URL,
       linesToText(['https://ex.org/manga/x/1', 'https://ex.org/manga/x/imported-only']),
     );
-    record(h, { file: 'a1b2/mangam/ch-001.cbz', mangaUrl: URL, chapterLink: 'https://ex.org/manga/x/1' });
+    record(h, { file: 'mangam/ch-001.cbz', mangaUrl: URL, chapterLink: 'https://ex.org/manga/x/1' });
     const result = h.service.titleFiles({ moduleId: MODULE, url: URL });
     expect(result.files).toHaveLength(2);
     const imported = result.files.find((f) => f.chapterLink === 'https://ex.org/manga/x/imported-only');
@@ -130,20 +132,20 @@ describe('titleFiles — lazy verify + the state contract', (): void => {
 
   it('legacy rows (no provenance) match by the sanitized manga segment from the title', (): void => {
     const h = open();
-    record(h, { file: 'a1b2/Alpha Quest/ch-001.cbz', mangaSegment: 'Alpha Quest' });
+    record(h, { file: 'Alpha Quest/ch-001.cbz', mangaSegment: 'Alpha Quest' });
     const result = h.service.titleFiles({ moduleId: MODULE, url: URL, manga: 'Alpha Quest' });
     expect(result.files).toHaveLength(1);
-    expect(result.files[0]?.path).toBe('a1b2/Alpha Quest/ch-001.cbz');
+    expect(result.files[0]?.path).toBe('Alpha Quest/ch-001.cbz');
   });
 
   it('orphans: untracked files under the title convention dir, dotfiles skipped', (): void => {
     const h = open();
-    record(h, { file: `${MODULE}/mangam/ch-001.cbz`, mangaUrl: URL, chapterLink: 'https://ex.org/manga/x/1' });
-    writeFileSync(join(h.root, MODULE, 'mangam', 'untracked.cbz'), Buffer.alloc(5, 1));
-    writeFileSync(join(h.root, MODULE, 'mangam', '.DS_Store'), Buffer.alloc(5, 1));
+    record(h, { file: 'mangam/ch-001.cbz', mangaUrl: URL, chapterLink: 'https://ex.org/manga/x/1' });
+    writeFileSync(join(h.root, 'mangam', 'untracked.cbz'), Buffer.alloc(5, 1));
+    writeFileSync(join(h.root, 'mangam', '.DS_Store'), Buffer.alloc(5, 1));
     const result = h.service.titleFiles({ moduleId: MODULE, url: URL, manga: 'x' });
     expect(result.orphans).toHaveLength(1);
-    expect(result.orphans[0]?.path).toBe(`${MODULE}/mangam/untracked.cbz`);
+    expect(result.orphans[0]?.path).toBe('mangam/untracked.cbz');
     expect(result.orphans[0]?.bytes).toBe(5);
     expect(result.orphans[0]?.mtime).toBeDefined();
   });
@@ -152,13 +154,13 @@ describe('titleFiles — lazy verify + the state contract', (): void => {
 describe('rescan — conservative reconcile + persisted report', (): void => {
   it('moved + deleted + orphan seed: re-link persists, missing stays, orphan surfaces, report round-trips', (): void => {
     const h = open();
-    const movedId = record(h, { file: 'a1b2/mangam/ch-moved.cbz', mangaUrl: URL, chapterLink: 'https://ex.org/manga/x/1' });
-    const deletedId = record(h, { file: 'a1b2/mangam/ch-deleted.cbz', mangaUrl: URL, chapterLink: 'https://ex.org/manga/x/2' });
+    const movedId = record(h, { file: 'mangam/ch-moved.cbz', mangaUrl: URL, chapterLink: 'https://ex.org/manga/x/1' });
+    const deletedId = record(h, { file: 'mangam/ch-deleted.cbz', mangaUrl: URL, chapterLink: 'https://ex.org/manga/x/2' });
     // The moved file relocates within the root.
     mkdirSync(join(h.root, 'imported'), { recursive: true });
-    renameSync(join(h.root, 'a1b2/mangam/ch-moved.cbz'), join(h.root, 'imported/ch-moved.cbz'));
+    renameSync(join(h.root, 'mangam/ch-moved.cbz'), join(h.root, 'imported/ch-moved.cbz'));
     // The deleted file just goes away.
-    rmSync(join(h.root, 'a1b2/mangam/ch-deleted.cbz'));
+    rmSync(join(h.root, 'mangam/ch-deleted.cbz'));
     // An orphan appears.
     mkdirSync(join(h.root, 'stray'), { recursive: true });
     writeFileSync(join(h.root, 'stray/orphan.cbz'), Buffer.alloc(21, 1));
@@ -170,8 +172,8 @@ describe('rescan — conservative reconcile + persisted report', (): void => {
     expect(report.counts.relinked).toBe(1);
     expect(report.counts.missing).toBe(1);
     expect(report.counts.orphans).toBe(1);
-    expect(report.relinked[0]).toMatchObject({ id: String(movedId), fromPath: 'a1b2/mangam/ch-moved.cbz', toPath: 'imported/ch-moved.cbz' });
-    expect(report.missing[0]).toMatchObject({ id: String(deletedId), path: 'a1b2/mangam/ch-deleted.cbz' });
+    expect(report.relinked[0]).toMatchObject({ id: String(movedId), fromPath: 'mangam/ch-moved.cbz', toPath: 'imported/ch-moved.cbz' });
+    expect(report.missing[0]).toMatchObject({ id: String(deletedId), path: 'mangam/ch-deleted.cbz' });
     expect(report.orphans[0]?.path).toBe('stray/orphan.cbz');
     expect(report.durationMs).toBeGreaterThanOrEqual(0);
     expect(report.startedAt).toBeDefined();
@@ -197,8 +199,8 @@ describe('rescan — conservative reconcile + persisted report', (): void => {
 
   it('ambiguity: two same-name candidates stay an orphan+missing pair, never auto-linked', (): void => {
     const h = open();
-    record(h, { file: 'a1b2/mangam/ch-amb.cbz', mangaUrl: URL, chapterLink: 'https://ex.org/manga/x/1' });
-    rmSync(join(h.root, 'a1b2/mangam/ch-amb.cbz'));
+    record(h, { file: 'mangam/ch-amb.cbz', mangaUrl: URL, chapterLink: 'https://ex.org/manga/x/1' });
+    rmSync(join(h.root, 'mangam/ch-amb.cbz'));
     mkdirSync(join(h.root, 'one'), { recursive: true });
     mkdirSync(join(h.root, 'two'), { recursive: true });
     writeFileSync(join(h.root, 'one/ch-amb.cbz'), Buffer.alloc(3, 1));
@@ -212,8 +214,8 @@ describe('rescan — conservative reconcile + persisted report', (): void => {
 
   it('per-title variant scopes rows and orphans to the title', (): void => {
     const h = open();
-    record(h, { file: 'a1b2/mangam/ch-001.cbz', mangaUrl: URL, chapterLink: 'https://ex.org/manga/x/1' });
-    record(h, { file: 'b2c3/otherm/ch-002.cbz', mangaUrl: 'https://ex.org/manga/y', chapterLink: 'https://ex.org/manga/y/1' });
+    record(h, { file: 'mangam/ch-001.cbz', mangaUrl: URL, chapterLink: 'https://ex.org/manga/x/1' });
+    record(h, { file: 'otherm/ch-002.cbz', mangaUrl: 'https://ex.org/manga/y', chapterLink: 'https://ex.org/manga/y/1' });
     mkdirSync(join(h.root, 'stray'), { recursive: true });
     writeFileSync(join(h.root, 'stray/global-orphan.cbz'), Buffer.alloc(2, 1));
     const report = h.service.rescan({ moduleId: MODULE, url: URL });
@@ -229,17 +231,17 @@ describe('rescan — conservative reconcile + persisted report', (): void => {
 describe('listWithState — Library page enrichment', (): void => {
   it('default: rows carry verified state + display path; missing filter narrows to missing rows', (): void => {
     const h = open();
-    const presentId = record(h, { file: 'a1b2/mangam/ch-001.cbz', mangaUrl: URL, chapterLink: 'l1' });
-    const missingId = record(h, { file: 'a1b2/mangam/ch-002.cbz', mangaUrl: URL, chapterLink: 'l2' });
-    rmSync(join(h.root, 'a1b2/mangam/ch-002.cbz'));
+    const presentId = record(h, { file: 'mangam/ch-001.cbz', mangaUrl: URL, chapterLink: 'l1' });
+    const missingId = record(h, { file: 'mangam/ch-002.cbz', mangaUrl: URL, chapterLink: 'l2' });
+    rmSync(join(h.root, 'mangam/ch-002.cbz'));
 
     const all = h.service.listWithState({ limit: 50 });
     expect(all.files).toHaveLength(2);
     const byId = new Map(all.files.map((f) => [f.id, f]));
     expect(byId.get(String(presentId))?.state).toBe('downloaded');
     expect(byId.get(String(missingId))?.state).toBe('missing');
-    expect(byId.get(String(presentId))?.path).toBe('a1b2/mangam/ch-001.cbz');
-    expect(byId.get(String(presentId))?.absolutePath).toBe(join(h.root, 'a1b2/mangam/ch-001.cbz'));
+    expect(byId.get(String(presentId))?.path).toBe('mangam/ch-001.cbz');
+    expect(byId.get(String(presentId))?.absolutePath).toBe(join(h.root, 'mangam/ch-001.cbz'));
 
     const missing = h.service.listWithState({ limit: 50, filter: 'missing' });
     expect(missing.files.map((f) => f.id)).toEqual([String(missingId)]);

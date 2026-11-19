@@ -23,8 +23,8 @@ const FILE = (overrides: Record<string, unknown> = {}): Record<string, unknown> 
   createdAt: '2026-11-18T17:34:02.117Z',
   state: 'downloaded',
   verifiedAt: '2026-11-19T00:00:00.000Z',
-  path: 'aaaa/Fixture Manga/Chapter 1 The Beginning.zip',
-  absolutePath: '/srv/fmd/library/aaaa/Fixture Manga/Chapter 1 The Beginning.zip',
+  path: 'Fixture Manga/Chapter 1 The Beginning.zip',
+  absolutePath: '/srv/fmd/library/Fixture Manga/Chapter 1 The Beginning.zip',
   mtime: '2026-11-18T17:34:02.117Z',
   ...overrides,
 });
@@ -33,8 +33,8 @@ const MISSING_FILE = FILE({
   id: '8',
   fileName: 'Chapter 2 The Middle.zip',
   state: 'missing',
-  path: 'aaaa/Fixture Manga/Chapter 2 The Middle.zip',
-  absolutePath: '/srv/fmd/library/aaaa/Fixture Manga/Chapter 2 The Middle.zip',
+  path: 'Fixture Manga/Chapter 2 The Middle.zip',
+  absolutePath: '/srv/fmd/library/Fixture Manga/Chapter 2 The Middle.zip',
 });
 
 const ORPHAN = {
@@ -51,7 +51,7 @@ const RESCAN_REPORT = {
   scope: 'library',
   counts: { scanned: 4, present: 1, relinked: 1, missing: 1, orphans: 1, outsideRoot: 0 },
   relinked: [{ id: '9', fromPath: 'a/old.cbz', toPath: 'b/new.cbz' }],
-  missing: [{ id: '8', manga: 'Fixture Manga', fileName: 'Chapter 2 The Middle.zip', path: 'aaaa/Fixture Manga/Chapter 2 The Middle.zip', candidates: [] }],
+  missing: [{ id: '8', manga: 'Fixture Manga', fileName: 'Chapter 2 The Middle.zip', path: 'Fixture Manga/Chapter 2 The Middle.zip', candidates: [] }],
   orphans: [ORPHAN],
 };
 
@@ -137,7 +137,7 @@ describe('LibraryPage rows (file-state enrichment)', (): void => {
     await screen.findByText('Fixture Manga');
     await userEvent.click(screen.getAllByTestId('library-copy-path')[0] as HTMLElement);
     expect(globalThis.navigator.clipboard.writeText).toHaveBeenCalledWith(
-      '/srv/fmd/library/aaaa/Fixture Manga/Chapter 1 The Beginning.zip',
+      '/srv/fmd/library/Fixture Manga/Chapter 1 The Beginning.zip',
     );
   });
 });

@@ -23,10 +23,13 @@
  * finalize precedes the ledger write so the ledger never cites a
  * missing artifact).
  */
-import { rmSync, statSync } from 'node:fs';
+import { existsSync, rmSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import type Database from 'better-sqlite3';
 import { downloadedChaptersKey, linesToText, mergeCaseInsensitive } from './merge.js';
 import { sanitizeFileName } from './filenames.js';
+import { isForeignClaim, safeFolderComponent, suffixedMangaFolder } from './layout.js';
+import { lexicalRelFromRoot } from '../../fs-walk.js';
 import type { LibraryLedgerRow } from './reconcile.js';
 import type { FinalizeRequest, FinalizeResult } from './finalize.js';
 import { LibraryFinalizer } from './finalize.js';
@@ -60,6 +63,17 @@ export interface FavoriteRow {
   readonly downloadedChapterList?: string;
   /** Per-favorite download directory override ('' = default layout). */
   readonly saveTo?: string;
+  /**
+   * [library-layout] The effective library folder for the favorite's
+   * chapters — the clean sanitized title, or the suffixed
+   * `<manga> [<module>]` duplicate form. COMPUTED ONCE at the first
+   * default-layout download and persisted (the same additive-column
+   * seam saveTo rides); never recomputed — adding/deleting other
+   * favorites must never re-point an existing folder. Absent while no
+   * default-layout download has run (and forever for saveTo-only
+   * favorites — an overridden prefix has no effective folder).
+   */
+  readonly libraryFolder?: string;
   /** Disabled favorites are skipped by the scheduler (FMD2 `Enabled`). */
   readonly enabled?: boolean;
   /** Creation stamp (FMD2 `DateAdded`, epoch ms). */
@@ -109,8 +123,47 @@ export interface LibraryStore extends DownloadedChaptersAccess {
   deleteFavorite(mangaKey: string): void;
   /** §7.2 dual-write chapter completion (see module doc). */
   completeChapter(request: ChapterCompletionRequest): ChapterCompletionResult;
-  /** §7.1 step 5 — atomic move into library/<module>/<manga>/. */
+  /** §7.1 step 5 — atomic move into library/<manga>/. */
   finalize(request: FinalizeRequest): FinalizeResult;
+  /**
+   * [library-layout] The effective folder for a title's next
+   * default-layout download (layout.ts rule 2): the favorite's
+   * persisted folder when computed before (never recomputed), else the
+   * folder this module's own recorded rows already use, else the clean
+   * title folder — suffixed when a DIFFERENT module (or an unattributed
+   * on-disk folder) claims it. Persists the computed value onto the
+   * favorite when one exists (computed-once seam).
+   */
+  resolveMangaFolder(input: {
+    readonly moduleId: string;
+    readonly mangaUrl: string;
+    readonly segment: string;
+  }): string;
+  /**
+   * [library-layout] Persist the effective folder onto a favorite row
+   * (UPDATE-only — never creates a row; a no-op when the favorite is
+   * absent or already records the value).
+   */
+  setFavoriteLibraryFolder(mangaKey: string, folder: string): void;
+  /**
+   * [library-layout] Distinct sanitized module segments with ledger
+   * rows recorded under `dirAbs` (the claim check input for rule 2).
+   */
+  distinctModuleIdsUnderPath(dirAbs: string): string[];
+  /**
+   * [library-layout] One-transaction layout-migration persist: per row
+   * the new path + effective folder, with fresh stat metadata
+   * (bytes/mtime → verified 'downloaded') when the file was moved on
+   * disk, path-only otherwise (the file was already gone — the row
+   * keeps its missing posture at the new recorded location).
+   */
+  applyLayoutMigration(rows: readonly {
+    id: number;
+    path: string;
+    manga: string;
+    bytes?: number;
+    mtimeMs?: number;
+  }[]): void;
   /** Record a finalized artifact (insert-or-update by absolute path). */
   recordLibraryFile(entry: {
     moduleId: string;
@@ -241,6 +294,12 @@ export function ensureLibrarySchema(db: Database.Database): void {
   if (!favoriteColumns.has('cover_link')) {
     db.exec('ALTER TABLE favorite ADD COLUMN cover_link TEXT');
   }
+  // [library-layout] computed-once effective folder (the saveTo seam's
+  // additive-column pattern): set at the first default-layout download,
+  // read forever after — never recomputed.
+  if (!favoriteColumns.has('library_folder')) {
+    db.exec('ALTER TABLE favorite ADD COLUMN library_folder TEXT');
+  }
   // Library file-state story (additive, same guarded-ALTER pattern):
   // verified_at = the stat-verified truth stamp (lazy verify); manga_url
   // + chapter_link = the download-lane provenance that keys per-title
@@ -335,8 +394,8 @@ export class SqliteLibraryStore implements LibraryStore {
         `INSERT INTO favorite
             (manga_key, module_id, url, title, status, current_chapter, last_check,
              last_updated, auto_download, new_chapter_count, downloaded_chapter_list,
-             save_to, enabled, date_added, cover_link)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             save_to, enabled, date_added, cover_link, library_folder)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(manga_key) DO UPDATE SET
             module_id = excluded.module_id,
             url = excluded.url,
@@ -351,7 +410,8 @@ export class SqliteLibraryStore implements LibraryStore {
             save_to = excluded.save_to,
             enabled = excluded.enabled,
             date_added = excluded.date_added,
-            cover_link = excluded.cover_link`,
+            cover_link = excluded.cover_link,
+            library_folder = COALESCE(excluded.library_folder, favorite.library_folder)`,
       )
       .run(
         favorite.mangaKey,
@@ -369,6 +429,7 @@ export class SqliteLibraryStore implements LibraryStore {
         favorite.enabled === false ? 0 : 1,
         favorite.dateAdded ?? null,
         favorite.coverLink ?? null,
+        favorite.libraryFolder ?? null,
       );
   }
 
@@ -377,7 +438,7 @@ export class SqliteLibraryStore implements LibraryStore {
       .prepare(
         `SELECT manga_key, module_id, url, title, status, current_chapter, last_check,
                 last_updated, auto_download, new_chapter_count, downloaded_chapter_list,
-                save_to, enabled, date_added, cover_link
+                save_to, enabled, date_added, cover_link, library_folder
            FROM favorite WHERE manga_key = ?`,
       )
       .get(mangaKey) as FavoriteDbRow | undefined;
@@ -389,7 +450,7 @@ export class SqliteLibraryStore implements LibraryStore {
       .prepare(
         `SELECT manga_key, module_id, url, title, status, current_chapter, last_check,
                 last_updated, auto_download, new_chapter_count, downloaded_chapter_list,
-                save_to, enabled, date_added, cover_link
+                save_to, enabled, date_added, cover_link, library_folder
            FROM favorite ORDER BY rowid`,
       )
       .all() as FavoriteDbRow[];
@@ -448,6 +509,102 @@ export class SqliteLibraryStore implements LibraryStore {
       throw new Error('SqliteLibraryStore was opened without a libraryRoot — finalize unavailable');
     }
     return this.finalizer.finalize(request);
+  }
+
+  public resolveMangaFolder(input: {
+    readonly moduleId: string;
+    readonly mangaUrl: string;
+    readonly segment: string;
+  }): string {
+    const root = this.options.libraryRoot;
+    const ownSegment = sanitizeFileName(input.moduleId);
+    // 1. Computed-once seam: a favorite that already knows its effective
+    //    folder is never re-derived (adding/deleting other favorites
+    //    must never re-point it).
+    const favorite = this.getFavorite(downloadedChaptersKey(input.moduleId, input.mangaUrl));
+    if (favorite?.libraryFolder !== undefined && favorite.libraryFolder !== '') {
+      return favorite.libraryFolder;
+    }
+    // 2. The ledger persistence of the folder: this module's own
+    //    recorded layout rows (`<root>/<row.manga>/<row.fileName>`).
+    if (root !== undefined) {
+      let recorded: string | undefined;
+      for (const row of this.listLibraryRowsForTitle(input.moduleId, input.mangaUrl, [input.segment])) {
+        const rel = lexicalRelFromRoot(root, row.path);
+        if (rel === undefined) {
+          continue;
+        }
+        const segments = rel.split('/');
+        if (segments.length === 2 && segments[0] === row.manga) {
+          recorded = row.manga; // rows ascend by id — the last is newest
+        }
+      }
+      if (recorded !== undefined) {
+        if (favorite !== undefined) {
+          this.setFavoriteLibraryFolder(favorite.mangaKey, recorded);
+        }
+        return recorded;
+      }
+    }
+    // 3. Fresh computation: clean title folder unless a DIFFERENT module
+    //    (or an unattributed on-disk folder) claims it (layout.ts rule 2).
+    const clean = safeFolderComponent(input.segment);
+    const dirAbs = root !== undefined ? join(root, clean) : undefined;
+    const claimants = dirAbs !== undefined ? this.distinctModuleIdsUnderPath(dirAbs) : [];
+    const diskClaim = dirAbs !== undefined && existsSync(dirAbs);
+    const folder = isForeignClaim(claimants, ownSegment, diskClaim)
+      ? suffixedMangaFolder(clean, ownSegment)
+      : clean;
+    if (favorite !== undefined) {
+      this.setFavoriteLibraryFolder(favorite.mangaKey, folder);
+    }
+    return folder;
+  }
+
+  public setFavoriteLibraryFolder(mangaKey: string, folder: string): void {
+    if (folder === '') {
+      return;
+    }
+    this.options.db
+      .prepare('UPDATE favorite SET library_folder = ? WHERE manga_key = ? AND (library_folder IS NULL OR library_folder != ?)')
+      .run(folder, mangaKey, folder);
+  }
+
+  public distinctModuleIdsUnderPath(dirAbs: string): string[] {
+    // substr equality, not LIKE — folder names legitimately contain %
+    // and _ after sanitization and must never act as wildcards.
+    const prefix = dirAbs.endsWith('/') ? dirAbs : `${dirAbs}/`;
+    const rows = this.options.db
+      .prepare('SELECT DISTINCT module_id FROM library_files WHERE substr(path, 1, ?) = ?')
+      .all(prefix.length, prefix) as Array<{ readonly module_id: string }>;
+    return rows.map((row): string => row.module_id);
+  }
+
+  public applyLayoutMigration(rows: readonly {
+    id: number;
+    path: string;
+    manga: string;
+    bytes?: number;
+    mtimeMs?: number;
+  }[]): void {
+    if (rows.length === 0) {
+      return;
+    }
+    const now = Date.now();
+    const write = this.options.db.transaction((): void => {
+      const moved = this.options.db.prepare(
+        "UPDATE library_files SET path = ?, manga = ?, bytes = ?, verified_at = ?, state = 'downloaded', mtime = ? WHERE id = ?",
+      );
+      const repointed = this.options.db.prepare('UPDATE library_files SET path = ?, manga = ? WHERE id = ?');
+      for (const row of rows) {
+        if (row.bytes !== undefined && row.mtimeMs !== undefined) {
+          moved.run(row.path, row.manga, row.bytes, now, row.mtimeMs, row.id);
+        } else {
+          repointed.run(row.path, row.manga, row.id);
+        }
+      }
+    });
+    write();
   }
 
   public recordLibraryFile(entry: {
@@ -713,6 +870,7 @@ interface FavoriteDbRow {
   readonly enabled: number | null;
   readonly date_added: number | null;
   readonly cover_link: string | null;
+  readonly library_folder: string | null;
 }
 
 function toFavoriteRow(row: FavoriteDbRow): FavoriteRow {
@@ -734,6 +892,7 @@ function toFavoriteRow(row: FavoriteDbRow): FavoriteRow {
     enabled: row.enabled !== 0,
     ...(row.date_added !== null ? { dateAdded: row.date_added } : {}),
     ...(row.cover_link !== null ? { coverLink: row.cover_link } : {}),
+    ...(row.library_folder !== null ? { libraryFolder: row.library_folder } : {}),
   };
 }
 

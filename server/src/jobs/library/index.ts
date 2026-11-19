@@ -1,6 +1,8 @@
 /**
  * server/jobs/library — the download library facade (DESIGN §7.1/§9):
- * atomic chapter finalize (`library/<module>/<manga>/<chapter>.<ext>`,
+ * atomic chapter finalize (`library/<manga>/<chapter>.<ext>` (flat
+ * series folders — the [library-layout] relayout; module suffix only on
+ * duplicate folders),
  * temp-dir + rename at every boundary), FMD2 `DownloadedChaptersDB`
  * dedupe parity (key = LowerCase(ModuleID+Link), case-insensitively
  * merged lists), and the §7.2 dual-write chapter completion (favorite

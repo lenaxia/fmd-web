@@ -27,6 +27,7 @@ import { statSync } from 'node:fs';
 import { join } from 'node:path';
 import { ApiError } from '../api/errors.js';
 import { sanitizeFileName, urlSegment } from '../jobs/library/filenames.js';
+import { suffixedMangaFolder } from '../jobs/library/layout.js';
 import { splitTextLines } from '../jobs/library/merge.js';
 import { reconcileLibrary, type LibraryLedgerRow } from '../jobs/library/reconcile.js';
 import type { SqliteLibraryStore } from '../jobs/library/store.js';
@@ -225,7 +226,7 @@ export class SqliteLibraryFileStateService {
       url: opts.url,
       verifiedAt: new Date(now).toISOString(),
       files,
-      orphans: this.titleOrphans(rows, opts.moduleId, opts.manga, opts.url),
+      orphans: this.titleOrphans(rows, opts.manga, opts.url),
     };
   }
 
@@ -279,12 +280,7 @@ export class SqliteLibraryFileStateService {
     const orphanScope = titleScoped === undefined
       ? result.orphans
       : (() => {
-          const dirs = this.titleConventionDirs(
-            rows,
-            titleScoped.moduleId,
-            opts?.manga,
-            titleScoped.url,
-          );
+          const dirs = this.titleConventionDirs(rows, opts?.manga, titleScoped.url);
           return result.orphans.filter((file): boolean =>
             dirs.some((dir): boolean => file.relPath === dir || file.relPath.startsWith(`${dir}/`)),
           );
@@ -428,10 +424,23 @@ export class SqliteLibraryFileStateService {
   /** Rows for one title: provenance join + legacy segment fallback. */
   private rowsForTitle(moduleId: string, url: string, manga?: string): LibraryLedgerRow[] {
     const legacy: string[] = [];
+    const push = (segment: string): void => {
+      if (segment === '') {
+        return;
+      }
+      legacy.push(segment);
+      // [library-layout] duplicate-collision rows record the SUFFIXED
+      // folder (`<manga> [<module>]`) — pre-provenance legacy rows for
+      // this title may live under it.
+      const suffixed = suffixedMangaFolder(segment, sanitizeFileName(moduleId));
+      if (suffixed !== segment) {
+        legacy.push(suffixed);
+      }
+    };
     if (manga !== undefined && manga !== '') {
-      legacy.push(urlSegment(manga, 'manga'));
+      push(urlSegment(manga, 'manga'));
     }
-    legacy.push(urlSegment(url, 'manga'));
+    push(urlSegment(url, 'manga'));
     return this.store.listLibraryRowsForTitle(moduleId, url, [...new Set(legacy)]);
   }
 
@@ -439,15 +448,20 @@ export class SqliteLibraryFileStateService {
    * predicted segment when no rows exist yet). */
   private titleConventionDirs(
     rows: readonly LibraryLedgerRow[],
-    moduleId: string,
     manga: string | undefined,
     url: string,
   ): string[] {
+    // [library-layout] the convention dir is the recorded effective
+    // folder — `<root>/<manga>` — with no module segment. saveTo rows
+    // record the clean segment as metadata while their files live at
+    // the override; walking the clean dir stays correct (claimed =
+    // ANY row recording into the dir, so foreign files never
+    // false-orphan).
     const dirs = new Set<string>();
     for (const row of rows) {
-      dirs.add(`${row.moduleId}/${row.manga}`);
+      dirs.add(row.manga);
     }
-    dirs.add(`${sanitizeFileName(moduleId)}/${urlSegment(manga ?? url, 'manga')}`);
+    dirs.add(urlSegment(manga ?? url, 'manga'));
     return [...dirs];
   }
 
@@ -459,11 +473,10 @@ export class SqliteLibraryFileStateService {
    */
   private titleOrphans(
     rows: readonly LibraryLedgerRow[],
-    moduleId: string,
     manga: string | undefined,
     url: string,
   ): OrphanFileEntry[] {
-    const dirs = this.titleConventionDirs(rows, moduleId, manga, url);
+    const dirs = this.titleConventionDirs(rows, manga, url);
     if (dirs.length === 0) {
       return [];
     }

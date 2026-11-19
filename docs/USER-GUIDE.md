@@ -213,8 +213,8 @@ Next to the enqueue controls:
 - **Start paused** — creates the jobs held (paused) instead of running them;
   resume later from [Downloads](#downloading).
 - **Save to** — per-manga output-directory override (empty = the default
-  `library/<site>/<manga>` layout). The value is remembered per title and
-  recalled next time you open it.
+  `library/<manga>` layout — one folder per series, no site subdirectory).
+  The value is remembered per title and recalled next time you open it.
 
 Select chapters and click **Enqueue N chapters**. One job is created
 **per chapter** (the queue model). A status line confirms the job id (and
@@ -262,8 +262,12 @@ The Downloads page (`#/downloads`) is the live queue.
 ### Where files land
 
 Finished chapters are packed into the server's data directory as
-`library/<site>/<manga>/<chapter>.<format>` (format from Settings → Output
-defaults). Retrieve them from the [Library](#library) page.
+`library/<manga>/<chapter>.<format>` — one folder per series (the
+downloading site is *not* a subdirectory, so browsing stays
+title-first). Following the same series from a second site (e.g. a
+different scanlation group) writes `<manga> [<site>]` — the first site
+keeps the plain folder (format from Settings → Output defaults).
+Retrieve them from the [Library](#library) page.
 
 ## Library
 

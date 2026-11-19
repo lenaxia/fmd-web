@@ -1137,7 +1137,7 @@ export class InMemoryJobService implements JobService {
 export interface LibraryFileRecord {
   id: string;
   moduleId: string;
-  /** Sanitized manga segment (`library/<module>/<manga>/<file>`). */
+  /** Effective manga folder segment (`library/<manga>/<file>`). */
   manga: string;
   /** File name inside its manga dir (base name only). */
   fileName: string;

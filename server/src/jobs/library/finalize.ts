@@ -1,6 +1,9 @@
 /**
  * Chapter finalize — the atomic move into
- * `library/<module>/<manga>/<chapter>.<ext>` (DESIGN §7.1 step 5, §4
+ * `library/<manga>/<chapter>.<ext>` (DESIGN §7.1 step 5 as re-ruled by
+ * the library-layout story: the module is NOT a path segment — the
+ * flat series folder is the clean sanitized title, or the suffixed
+ * `<manga> [<module>]` duplicate form computed in layout.ts; §4
  * "finish atomic renames"). Temp-dir + rename at EVERY boundary so a
  * crash can never expose a partial file at the library path:
  *
@@ -42,9 +45,11 @@ export type FinalizeFaultPoint =
   | 'before-commit';
 
 export interface FinalizeRequest {
-  /** Library component 1 — sanitized (`library/<module>/…`). */
-  readonly moduleId: string;
-  /** Library component 2 — sanitized (`…/<manga>/…`). */
+  /**
+   * The effective manga FOLDER component (layout.ts: the clean
+   * sanitized title, or the suffixed `<manga> [<module>]` duplicate
+   * form) — `<libraryRoot>/<this>/<file>`.
+   */
   readonly manga: string;
   /** Resolved chapter base name (resolution order §7.1). */
   readonly fileName: string;
@@ -56,9 +61,9 @@ export interface FinalizeRequest {
   readonly maxLength?: number;
   /**
    * FMD2 edSaveTo parity (frmMain.pas:5613): custom save directory —
-   * when present it REPLACES the `<libraryRoot>/<module>/<manga>`
-   * prefix entirely. Relative paths resolve against the library root;
-   * the file name keeps §7.1 sanitization either way.
+   * when present it REPLACES the `<libraryRoot>/<manga>` prefix
+   * entirely. Relative paths resolve against the library root; the
+   * file name keeps §7.1 sanitization either way.
    */
   readonly saveTo?: string;
 }
@@ -136,16 +141,12 @@ export class LibraryFinalizer {
     }
     const ext = normalizeChapterExtension(request.ext);
     const name = truncateKeepTail(baseName, request.maxLength ?? 0);
-    // edSaveTo parity: a custom save directory replaces the module/manga
-    // prefix (relative values resolve against the library root).
+    // edSaveTo parity: a custom save directory replaces the manga
+    // folder prefix (relative values resolve against the library root).
     const dir =
       request.saveTo !== undefined
         ? path.resolve(this.options.libraryRoot, request.saveTo)
-        : path.join(
-            this.options.libraryRoot,
-            safeComponent(request.moduleId, 'moduleId'),
-            safeComponent(request.manga, 'manga'),
-          );
+        : path.join(this.options.libraryRoot, safeComponent(request.manga, 'manga'));
     const file = `${name}.${ext}`;
     return { dir, file, path: path.join(dir, file) };
   }

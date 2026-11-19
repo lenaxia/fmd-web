@@ -111,20 +111,20 @@ describe('realpath clamp', (): void => {
 describe('reconcileLibrary', (): void => {
   it('present at recorded path; deleted file stays missing; unclaimed disk file is an orphan', (): void => {
     const root = makeRoot();
-    put(root, 'modulea/mangam/ch-001.cbz');
+    put(root, 'mangam/ch-001.cbz');
     put(root, 'stray/orphan-001.cbz', 33);
     const result = reconcileLibrary({
       root,
       rows: [
-        row({ id: 1, path: join(root, 'modulea/mangam/ch-001.cbz') }),
-        row({ id: 2, path: join(root, 'modulea/mangam/ch-002.cbz'), fileName: 'ch-002.cbz' }),
+        row({ id: 1, path: join(root, 'mangam/ch-001.cbz') }),
+        row({ id: 2, path: join(root, 'mangam/ch-002.cbz'), fileName: 'ch-002.cbz' }),
       ],
       disk: walkTree(root, { skipDotfiles: true, followSymlinkedFiles: true }),
     });
     expect(result.present.map((p) => p.id)).toEqual([1]);
     expect(result.relinked).toEqual([]);
     expect(result.missing.map((m) => m.id)).toEqual([2]);
-    expect(result.missing[0]?.path).toBe('modulea/mangam/ch-002.cbz');
+    expect(result.missing[0]?.path).toBe('mangam/ch-002.cbz');
     expect(result.missing[0]?.candidates).toEqual([]);
     expect(result.orphans.map((o) => o.relPath)).toEqual(['stray/orphan-001.cbz']);
     expect(result.orphans[0]?.bytes).toBe(33);
@@ -137,7 +137,7 @@ describe('reconcileLibrary', (): void => {
     put(root, 'imported/mangam/ch-001.cbz', 12);
     const result = reconcileLibrary({
       root,
-      rows: [row({ id: 7, path: join(root, 'modulea/mangam/ch-001.cbz') })],
+      rows: [row({ id: 7, path: join(root, 'mangam/ch-001.cbz') })],
       disk: walkTree(root, { skipDotfiles: true, followSymlinkedFiles: true }),
     });
     expect(result.present).toEqual([]);
@@ -146,7 +146,7 @@ describe('reconcileLibrary', (): void => {
     expect(result.relinked).toHaveLength(1);
     const relink = result.relinked[0];
     expect(relink?.id).toBe(7);
-    expect(relink?.fromPath).toBe('modulea/mangam/ch-001.cbz');
+    expect(relink?.fromPath).toBe('mangam/ch-001.cbz');
     expect(relink?.toPath).toBe('imported/mangam/ch-001.cbz');
     expect(relink?.bytes).toBe(12);
   });
@@ -154,8 +154,8 @@ describe('reconcileLibrary', (): void => {
   it('moved back onto the naming-convention slot (saveTo row) → convention re-link wins', (): void => {
     const root = makeRoot();
     // Recorded with a saveTo override OUTSIDE the convention; the file
-    // sits at the app's own output slot.
-    put(root, 'modulea/mangam/ch-009.cbz', 40);
+    // sits at the app's own output slot (`<manga>/<file>`, flat).
+    put(root, 'mangam/ch-009.cbz', 40);
     const result = reconcileLibrary({
       root,
       rows: [
@@ -168,8 +168,32 @@ describe('reconcileLibrary', (): void => {
       disk: walkTree(root, { skipDotfiles: true, followSymlinkedFiles: true }),
     });
     expect(result.relinked).toHaveLength(1);
-    expect(result.relinked[0]?.toPath).toBe('modulea/mangam/ch-009.cbz');
+    expect(result.relinked[0]?.toPath).toBe('mangam/ch-009.cbz');
     expect(result.relinked[0]?.fromPath).toBe('custom-dir/ch-009.cbz');
+  });
+
+  it('[library-layout] the convention slot is the flat effective folder — suffixed duplicate rows re-link onto the suffixed slot', (): void => {
+    const root = makeRoot();
+    // A duplicate-collision row records the SUFFIXED folder as its
+    // manga segment (`mangam [moduleb]`); the module is not a path
+    // segment anywhere.
+    put(root, 'mangam [moduleb]/ch-010.cbz', 21);
+    const result = reconcileLibrary({
+      root,
+      rows: [
+        row({
+          id: 10,
+          moduleId: 'moduleb',
+          manga: 'mangam [moduleb]',
+          fileName: 'ch-010.cbz',
+          path: join(root, 'imported/moduleb/ch-010.cbz'),
+        }),
+      ],
+      disk: walkTree(root, { skipDotfiles: true, followSymlinkedFiles: true }),
+    });
+    expect(result.relinked).toHaveLength(1);
+    expect(result.relinked[0]?.toPath).toBe('mangam [moduleb]/ch-010.cbz');
+    expect(result.relinked[0]?.fromPath).toBe('imported/moduleb/ch-010.cbz');
   });
 
   it('ambiguous same-name candidates → orphan+missing PAIR, never auto-linked', (): void => {
@@ -178,7 +202,7 @@ describe('reconcileLibrary', (): void => {
     put(root, 'two/ch-001.cbz', 5);
     const result = reconcileLibrary({
       root,
-      rows: [row({ id: 3, path: join(root, 'modulea/mangam/ch-001.cbz') })],
+      rows: [row({ id: 3, path: join(root, 'mangam/ch-001.cbz') })],
       disk: walkTree(root, { skipDotfiles: true, followSymlinkedFiles: true }),
     });
     expect(result.relinked).toEqual([]);
@@ -192,12 +216,12 @@ describe('reconcileLibrary', (): void => {
 
   it('a claimed file is never an orphan or a second candidate (present row claims its path)', (): void => {
     const root = makeRoot();
-    put(root, 'modulea/mangam/ch-001.cbz');
+    put(root, 'mangam/ch-001.cbz');
     put(root, 'copy/ch-001.cbz', 9);
     const result = reconcileLibrary({
       root,
       rows: [
-        row({ id: 1, path: join(root, 'modulea/mangam/ch-001.cbz') }),
+        row({ id: 1, path: join(root, 'mangam/ch-001.cbz') }),
         row({ id: 2, path: join(root, 'gone/ch-001.cbz'), fileName: 'ch-001.cbz' }),
       ],
       disk: walkTree(root, { skipDotfiles: true, followSymlinkedFiles: true }),
@@ -220,13 +244,13 @@ describe('reconcileLibrary', (): void => {
     const outsideDir = join(parent, 'outside-save');
     mkdirSync(outsideDir, { recursive: true });
     try {
-      put(root, 'modulea/mangam/ch-001.cbz');
+      put(root, 'mangam/ch-001.cbz');
       const outside = join(outsideDir, 'ch-777.cbz');
       writeFileSync(outside, Buffer.alloc(4, 1));
       const result = reconcileLibrary({
         root,
         rows: [
-          row({ id: 1, path: join(root, 'modulea/mangam/ch-001.cbz') }),
+          row({ id: 1, path: join(root, 'mangam/ch-001.cbz') }),
           row({ id: 77, path: outside, fileName: 'ch-777.cbz' }),
         ],
         disk: walkTree(root, { skipDotfiles: true, followSymlinkedFiles: true }),
@@ -241,11 +265,11 @@ describe('reconcileLibrary', (): void => {
 
   it('dotfiles on disk are invisible to the reconcile (never orphans, never candidates)', (): void => {
     const root = makeRoot();
-    put(root, 'modulea/mangam/.tmp-1-ch-001.cbz');
+    put(root, 'mangam/.tmp-1-ch-001.cbz');
     put(root, '.DS_Store');
     const result = reconcileLibrary({
       root,
-      rows: [row({ id: 1, path: join(root, 'modulea/mangam/ch-001.cbz') })],
+      rows: [row({ id: 1, path: join(root, 'mangam/ch-001.cbz') })],
       disk: walkTree(root, { skipDotfiles: true, followSymlinkedFiles: true }),
     });
     expect(result.orphans).toEqual([]);
