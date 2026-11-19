@@ -10,8 +10,11 @@
  *                   same gating as the site picker) → opens its entries
  *   Recent manga  — the shared recents store (localStorage, capped +
  *                   deduped; cleared from the search home rows)
- *   Actions       — 'Sync all catalogs', 'Check favorites for new
- *                   chapters', 'Toggle theme'
+ *   Actions       — 'Add manga by URL' ([crystal-nectar-pricks] D1 §2
+ *                   ENTER: paste-URL — the URL-shaped query or the
+ *                   clipboard lands in the search home's paste box,
+ *                   the ONE preview/follow flow), 'Sync all catalogs',
+ *                   'Check favorites for new chapters', 'Toggle theme'
  *
  * Ephemeral BY DESIGN: the palette's open state and query are React
  * state — never URL-synced (the query resets on every open; only the
@@ -27,6 +30,7 @@ import {
   Download,
   Heart,
   Library,
+  Link2,
   RefreshCw,
   Search,
   Settings,
@@ -37,6 +41,7 @@ import { useFavoritesCheckBatch, useModules, useSyncAllCatalogs } from '../../ap
 import { promptInstall, useInstallAvailability } from '../../state/pwa-install';
 import { useRecentManga, type RecentManga } from '../../state/recents';
 import { useTheme } from '../../state/theme';
+import { armPasteUrl, normalizePastedUrl } from '../../state/paste-url-arm';
 import { siteRowDisabledReason } from '@/components/SiteRow';
 import {
   CommandDialog,
@@ -117,6 +122,9 @@ export function CommandPalette(props: {
   // Jump-to-site: the FULL registry searched by name/category — the
   // whole 454, one flat list capped per query (registry order).
   const needle: string = query.trim().toLowerCase();
+  // [crystal-nectar-pricks] a URL-shaped query (pasted into the
+  // palette) routes to Add-by-URL instead of the site matcher.
+  const urlShaped: boolean = normalizePastedUrl(query) !== undefined;
   const siteHits = useMemo(
     (): readonly {
       readonly id: string;
@@ -155,6 +163,33 @@ export function CommandPalette(props: {
         toast.error('Catalog sync failed');
       },
     });
+  };
+
+  /**
+   * [crystal-nectar-pricks] Add-by-URL: the palette is a LAUNCHER, not
+   * a second form — the URL-shaped query (else the clipboard) arms the
+   * search home's paste box, where the one preview/follow flow lives.
+   * Nothing to resolve from → the palette STAYS OPEN (toast) so the
+   * user can paste into it first.
+   */
+  const onAddByUrl = (): void => {
+    void (async (): Promise<void> => {
+      let target: string | undefined = normalizePastedUrl(query);
+      if (target === undefined) {
+        try {
+          target = normalizePastedUrl(await globalThis.navigator.clipboard.readText());
+        } catch {
+          target = undefined;
+        }
+      }
+      if (target === undefined) {
+        toast.error('Paste (or type) a manga URL first, then pick Add manga by URL.');
+        return;
+      }
+      navigate('browse', {});
+      armPasteUrl(target);
+      close();
+    })();
   };
 
   const onCheckFavorites = (): void => {
@@ -270,6 +305,29 @@ export function CommandPalette(props: {
 
         <CommandSeparator />
         <CommandGroup heading="Actions">
+          {/* [crystal-nectar-pricks] the universal front door from the
+           * palette: a URL-shaped query folds INTO the item's value —
+           * cmdk's fuzzy filter scores the pasted URL against it (a
+           * bare label scores zero and the item would vanish; keywords
+           * alone re-register too late to survive the search-change
+           * recompute — the value prop re-registers in the same
+           * commit, empirically the seam that holds). */}
+          <CommandItem
+            value={`Add manga by URL${urlShaped ? ` ${query.trim()}` : ''}`}
+            keywords={urlShaped ? [query.trim()] : ['paste', 'follow']}
+            onSelect={(): void => {
+              onAddByUrl();
+            }}
+            data-testid="palette-action-add-by-url"
+          >
+            <Link2 aria-hidden="true" />
+            Add manga by URL
+            {urlShaped ? (
+              <span className="max-w-72 truncate text-xs text-muted-foreground" data-testid="palette-add-by-url-target">
+                {query.trim()}
+              </span>
+            ) : null}
+          </CommandItem>
           {install.available && !install.installed ? (
             <CommandItem
               value="Install app"

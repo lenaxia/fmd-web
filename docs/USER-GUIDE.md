@@ -107,6 +107,22 @@ see exactly your list.
   **Recent manga** rows (when you have any; clearable), quick category
   chips, and a **Browse sites** button.
 
+### Paste a URL (the universal front door)
+
+Found a series on a site fmd-web knows? Copy the page URL and paste it
+into **Add by URL** on the search home (the command palette's
+**Add manga by URL** action lands in the same box — paste into the
+palette, or run it to read your clipboard). The site is detected from
+the URL — no site picker, no mode switch. A preview shows the title,
+cover and alternative titles; then it's **one decision**: **Follow**
+(watch for new chapters) or **Follow + auto-download** (new chapters
+download by themselves). That single decision is never re-asked — the
+scheduler takes it from there, and the manga shows up in Favorites.
+
+Unknown hosts get a straight answer: *no site matches this URL* (with
+a link to browse what's supported); a host shared by several sites
+lists the candidates so you can open the one you meant.
+
 ### Pick a site (site-first browsing)
 
 Click **Browse sites** (or open `#/browse?sites=1`; the **Change site**

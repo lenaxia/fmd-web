@@ -49,6 +49,7 @@ import { ListPanel } from '@/components/patterns/ListPanel';
 import { PageHeader } from '@/components/patterns/PageHeader';
 import { StatPill } from '@/components/patterns/StatPill';
 import { CatalogEntryRow } from '@/components/catalog/CatalogEntryRow';
+import { PasteUrlAdd } from '@/components/catalog/PasteUrlAdd';
 import { WebsiteBadge } from '@/components/catalog/WebsiteBadge';
 import { FacetChips, UnionExcludedChips, UnionWarningChips } from '@/components/catalog/UnionSearchChips';
 import { Button } from '@/components/ui/button';
@@ -330,6 +331,11 @@ export function SearchHomePage(props: { route: Route }): ReactElement {
           ) : null}
         </div>
       </div>
+
+      {/* [crystal-nectar-pricks] D1 §2 ENTER: paste-URL — the
+       * universal front door (always on the search home; the palette's
+       * Add-by-URL action arms this box). */}
+      <PasteUrlAdd />
 
       {idle ? (
         <>
