@@ -12,12 +12,23 @@
  * Pattern shape — case-insensitive SUBSTRINGS, deliberately UNANCHORED:
  * a `\b` whole-word form was shipped first and the review bounce
  * (merry-woodland-refrains) proved it green under this codebase's own
- * naming idiom — `telegramAdapter`, `sendDiscordMessage`, `ntfyClient`,
- * `slackWebhookUrl` all evaded word boundaries. Substring matching
- * catches every casing/compound shape; the mutation proof lives in
- * scripts/no-channel-adapters-mutate.sh (the engine-boundary-mutate
- * discipline: adapter-shaped fixtures planted in BOTH roots must make
- * this gate FAIL).
+ * naming idiom — `telegramAdapter`, `sendDiscordMessage`,
+ * `ntfyClient`-style camelCase evaded word boundaries. The second bounce
+ * (sober-melon-weeds) then caught the worse, older hole underneath:
+ * WEB_ROOT was spelled one level too high (`../../../../web/src`
+ * resolved OUTSIDE the repo to /workspace/web/src), the walk()'s
+ * silent catch swallowed the dead path, and the web tree contributed
+ * ZERO files to every scan — adapter code in web/src entered green
+ * while the gate read clean. Both are structural now:
+ *
+ *   - LOUD roots: each scan root must EXIST and yield a non-empty
+ *     file set — a scan that can quietly shrink to zero files is
+ *     exactly how this shipped green, so absence/warp is a hard
+ *     failure, never a silent pass;
+ *   - the mutation proof (scripts/no-channel-adapters-mutate.sh,
+ *     wired into ci.sh) plants adapter-shaped fixtures in BOTH roots
+ *     and requires this gate to FAIL — M3 is the web-root leg that
+ *     pins the anchoring.
  *
  * Scope notes (the auth-removal-gate discipline):
  *   - docs/ are DELIBERATELY outside the scan: design records may NAME
@@ -36,7 +47,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const SERVER_ROOT = fileURLToPath(new URL('../../src', import.meta.url));
-const WEB_ROOT = fileURLToPath(new URL('../../../../web/src', import.meta.url));
+const WEB_ROOT = fileURLToPath(new URL('../../../web/src', import.meta.url));
 
 /**
  * Per-channel adapter vocabulary that must never appear in source —
@@ -52,13 +63,13 @@ const FORBIDDEN: readonly { readonly pattern: RegExp; readonly what: string }[] 
 
 const ALLOWED_SUFFIXES = new Set(['.ts', '.tsx', '.json']);
 
+/**
+ * LOUD walk: a missing/unreadable root THROWS instead of silently
+ * contributing nothing (the failure mode that shipped the web tree
+ * unscanned). Callers additionally assert a non-empty yield.
+ */
 function* walk(root: string): Generator<string> {
-  let entries: fs.Dirent[];
-  try {
-    entries = fs.readdirSync(root, { withFileTypes: true });
-  } catch {
-    return; // web/src may be absent in server-only checkouts
-  }
+  const entries = fs.readdirSync(root, { withFileTypes: true });
   for (const entry of entries) {
     const full = path.join(root, entry.name);
     if (entry.isDirectory()) {
@@ -72,18 +83,20 @@ function* walk(root: string): Generator<string> {
 }
 
 describe('no-channel-adapters grep gate (D1 §3: one webhook, zero adapters)', (): void => {
+  it('both scan roots are live and non-empty (the anchoring is loud, never silent)', (): void => {
+    for (const root of [SERVER_ROOT, WEB_ROOT]) {
+      expect(fs.existsSync(root), `scan root missing: ${root}`).toBe(true);
+      const files = [...walk(root)];
+      expect(
+        files.length,
+        `scan root walked zero files: ${root} (a silently-empty scan is how adapter code once entered green)`,
+      ).toBeGreaterThan(0);
+    }
+  });
+
   it('no per-channel notification adapter vocabulary exists in server or web source', (): void => {
     const offenders: string[] = [];
-    for (const file of walk(SERVER_ROOT)) {
-      const text = fs.readFileSync(file, 'utf8');
-      for (const { pattern, what } of FORBIDDEN) {
-        if (pattern.test(text)) {
-          offenders.push(`${file}: ${what}`);
-          break;
-        }
-      }
-    }
-    for (const file of walk(WEB_ROOT)) {
+    for (const file of [...walk(SERVER_ROOT), ...walk(WEB_ROOT)]) {
       const text = fs.readFileSync(file, 'utf8');
       for (const { pattern, what } of FORBIDDEN) {
         if (pattern.test(text)) {

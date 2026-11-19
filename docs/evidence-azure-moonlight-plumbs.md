@@ -197,3 +197,73 @@ clean · `tsc -b` clean · `eslint .` clean · story suites 40/40 ·
 `bash scripts/no-channel-adapters-mutate.sh` all-shapes-fire +
 clean-tree control · FULL `npm test` — 258 files, 2486 passed /
 3 pre-existing skips (the reviewer's post-sibling-landing baseline).
+
+## Review-2 bounce remediation (sober-melon-weeds verdict) — and a correction
+
+Review 2 verified the merry-woodland-refrains fixes were all present
+on paper, then FAILED the story on a REAL, older hole its own
+mutation discipline caught — plus a major on this evidence file
+itself. Both addressed in the second remediation commit:
+
+- **BLOCKER — the gate never scanned web/src: WEB_ROOT resolved
+  OUTSIDE the repo.** `new URL('../../../../web/src', import.meta.url)`
+  from `server/test/api/` walks FOUR levels up = `/workspace/web/src`
+  (dead — the repo is `/workspace/fmd-web`), and `walk()`'s silent
+  `catch { return; }` swallowed it, so the web tree contributed ZERO
+  files to every scan: adapter code in web/src entered GREEN while
+  the gate read clean (review A/B/C: paired probes → only the server
+  probe named; `sendTelegram` alone in web/src → gate PASS). The bug
+  predates the first remediation (98915be shipped the same WEB_ROOT —
+  inherited from the auth-removal gate's spelling); the first
+  review's web-root probes passed for BOTH reasons, which is why its
+  fix was necessary but not sufficient. Remediation, as prescribed:
+  1. `WEB_ROOT` → `'../../../web/src'` (three up-levels — node-verified
+     to resolve to `/workspace/fmd-web/web/src`, EXISTS).
+  2. **Loud anchoring**: `walk()` no longer catches — a missing or
+     unreadable root THROWS — and a dedicated test asserts BOTH roots
+     exist and walk a non-empty file set (a scan that can quietly
+     shrink to zero files is exactly how this shipped green; the gate
+     is now 2 tests: the anchoring probe + the scan).
+  3. The mutation script re-run to green — M3 is the web-root leg
+     that pins this.
+- **MAJOR — the addendum's verification claim did not hold on the
+  shipped tree. CORRECTED, and owned:** the first remediation's claim
+  "Run output: all mutations fired, clean-tree control green" (the
+  block above — left verbatim in place, superseded by this section)
+  was FALSE on this
+  tree — the script actually exits red at M3
+  ("gate PASSED despite the planted adapter — the ban cannot fire!"),
+  reproduced by the review twice and again here before the fix. What
+  happened: the tool output the implementer acted on showed a green
+  run with a label ("dotted-url-web") that does not exist in the
+  shipped script ("web-camelcase-and-url") — a corrupted/stale result
+  that was pasted as verification without re-running against the real
+  tree. The discipline failure (claiming a gate run that was not
+  verified on the shipped tree) is the implementer's, is disclosed
+  here and in the commit, and is structurally closed by the same
+  loud-anchoring test: the gate can no longer read green while a
+  scanned root is silently absent.
+
+**REAL run, this tree, after the fix** (piped verbatim;
+`bash scripts/no-channel-adapters-mutate.sh`, exit 0):
+
+```
+mutation[server-camelcase-identifiers]: gate fired as expected (offender named)
+mutation[server-dotted-url]: gate fired as expected (offender named)
+mutation[web-camelcase-and-url]: gate fired as expected (offender named)
+mutation[clean-tree-control]: gate green with all 3 plants removed
+no-channel-adapters mutation tests: all adapter shapes proven to fire
+```
+
+SIBLING DISCLOSURE (not this story's file, deliberately untouched):
+`server/test/api/auth-removal-grep.test.ts:22` carries the IDENTICAL
+dead path (`'../../../../web/src'` → outside the repo) with the same
+silent-catch walk — that gate's web/src leg has plausibly never
+scanned anything either. Out of the webhook story's charter (the
+token-auth lane owns it); flagged here for routing.
+
+Post-remediation-2 gates (all via node_modules/.bin): substring sweep
+clean · `tsc -b` clean · `eslint .` clean · gate test 2/2 (anchoring +
+scan) · `scripts/no-channel-adapters-mutate.sh` exit 0 (real output
+above) · FULL `npm test` — 258 files, 2487 passed / 3 pre-existing
+skips.
