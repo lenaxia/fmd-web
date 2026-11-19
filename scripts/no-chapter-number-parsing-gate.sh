@@ -1,4 +1,4 @@
-#!/usr/bin/bin bash
+#!/usr/bin/env bash
 # Chapter-number-parsing gate (D1 §5 killed-ideas + §7, the Komga/Kavita
 # scan-target story): chapter numbers are NEVER parsed out of chapter
 # titles/names — numbering is the 1-based LIST ORDINAL carried on the

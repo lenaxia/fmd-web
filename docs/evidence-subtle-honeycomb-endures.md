@@ -146,3 +146,153 @@ left to its owning lanes.
   the reconstructed shared files.
 - `server/test/api/openapi.test.ts` — 6/6 (snapshot byte-equality over
   the merged surface).
+
+## Review-bounce remediation (fail verdict by tidal-marsh-shines)
+
+Two findings; both real. The remediation commit that follows 168787c
+changes exactly TWO files — `scripts/no-chapter-number-parsing-gate.sh`
+(1 line, the minor) and this addendum — and deliberately TOUCHES NO
+APPLICATION CODE; why the blocker is repaired by verification and
+disclosure rather than another edit is the point of this section.
+
+### The blocker (services.ts:1481, staged hunk @@ -1465,6 +1472,13 @@)
+
+168787c accidentally committed SEVEN LINES of the concurrently-active
+[pipe-health] sibling lane's WIP — the `checkMissing` method on the
+`FavoriteService` interface — inside this story's reconstructed
+services.ts staging. The referenced type
+`FavoriteMissingCheckResponseT` existed NOWHERE else in the committed
+tree (its definition lives in the sibling's schemas.ts), so
+**HEAD(168787c) did not compile**: the update-index reconstruction
+had silently captured one sibling hunk too many, and the "full suite
+on the exact staged content" claim in the commit message was
+therefore false as stated for the committed tree.
+
+**Reproduction (re-run for this record, isolated trees).** `git
+archive 168787c` into a `/tmp/opencode` tree with its own
+`node_modules` (cross-device symlink farm — `/workspace` and `/tmp`
+are distinct mounts, hardlinks refuse EXDEV — with the four
+`node_modules/@fmd/*` workspace links re-pointed at the ISOLATED
+tree so `@fmd/server` resolves to the archived sources, §8.1 tool
+paths): `tsc -b tsconfig.json --force` → **rc=2, 25 errors**, led by
+the reviewer's exact citation
+`server/src/api/services.ts(1481,37): error TS2552: Cannot find name
+'FavoriteMissingCheckResponseT'`. All 25 are the leak's own cascade
+(the missing type name; `TS2741 Property 'checkMissing' is missing
+… required in type 'FavoriteService'` against
+`InMemoryFavoriteService`/`SqliteFavoritesService`; the
+assignability fallout in `main.ts`) — **zero errors touch this
+story's own surface** (filenames/comic-info/packers/queue/settings).
+The same isolation over HEAD(83b7f0d) → **rc=0, 0 errors**.
+
+**Leak audit.** `git diff 62dcd4e 168787c` grepped for
+pipe-health markers (`checkMissing|MissingCheck|hostPacing|HostPacer|
+backoff|nextAttemptAt`) yields EXACTLY ONE foreign line — the
+interface declaration (plus its 6-line doc comment, the staged hunk
+@@ -1465,6 +1472,13 @@). No other sibling content rode along; the
+story's own 17-file surface is otherwise exactly what the commit
+message claims.
+
+**Why the fix is not "remove the 7 lines" (the sequencing turn).**
+This remediation was first drafted — before the bounce re-claim — as
+a forward-removal commit: `168787c:services.ts` minus lines
+1475–1481, staged by `hash-object`+`update-index`, with the leak
+reverted to the sibling's uncommitted WIP. Before that commit could
+land, the sibling lane landed **83b7f0d** (its SEQUENCING note
+records the same accident from its side), which supplies the
+implementations the leaked declaration was waiting for: the
+`FavoriteMissingCheckResponseT` import, the in-memory
+`checkMissing`, `SqliteFavoritesService.checkMissing`
+(runtime/favorites-service.ts:136), and the route
+`POST /api/favorites/:id/check-missing` whose handler calls
+`services.favorites.checkMissing(id)` through the `FavoriteService`
+type (app.ts:1540) — repairing `tsc -b` on a clean checkout of
+master DELIBERATELY, with no history rewrite (coordinated with the
+release lane, which already has v0.3.2 work based on this history).
+Executing the drafted removal NOW would delete the interface method
+that landed code compiles against — re-breaking the build this
+story's own gate claims to keep green and gutting a landed sibling
+feature — strictly worse than the accident it purports to cure. The
+draft is therefore stood down; the disclosure above, the
+reproduction, and the audit ARE this lane's remediation, plus the
+green proof below that the exact content this lane now commits is
+sound. The class-level lesson is already pinned by the repo's own
+precedents (121ed33's discarded 4167172, 83b7f0d's repair note):
+shared-worktree staging is explicit-pathspec-only, and a
+reconstruction must be diffed against the sibling lanes' known-good
+markers BEFORE commit, not grep-audited after.
+
+**Gates on the exact staged tree.** The remediation was verified on
+`git write-tree` of the staged index (hash recorded in the commit
+message), archived into an isolated `/tmp/opencode` tree with the
+same symlink-farm `node_modules` discipline as the reproduction
+above — NOT on the WIP-contaminated shared worktree:
+
+- `node_modules/.bin/tsc -b tsconfig.json` — rc=0 (identical sources
+  to HEAD for every tsconfig scope; the delta is docs + one shell
+  script line, outside all of them — the run proves it).
+- Full offline suite — counts in the commit message; includes
+  `server/test/api/openapi.test.ts` 6/6 (no API surface change: the
+  OpenAPI snapshot is untouched).
+- `bash scripts/ci.sh`-shaped gate invocation and the direct-exec
+  A/B below.
+
+Two verification-harness incidents during this run, disclosed:
+
+- **The cross-device isolation artifact.** `/workspace` and `/tmp`
+  are distinct mounts here, so the prior lanes' hardlinked
+  `node_modules` isolation was impossible; a symlink-farm
+  (`cp -rs`) copy was used instead — and made
+  `server/test/engine/shims/corpus-live.test.ts` fail BOTH golden
+  byte-stability tests on PURE HEAD as well (A/B: same single file
+  green in the real worktree, red in the isolated tree). Root cause,
+  byte-pinned by diffing a regenerated report against the committed
+  golden: fontoxpath stack frames inside recorded `error` strings
+  resolve to the symlink TARGET (`/workspace/fmd-web/node_modules/…`,
+  absolute) instead of the root-relative `node_modules/…` the golden
+  carries. Fix: `node_modules/fontoxpath` replaced with a REAL copy
+  inside each isolated tree (660 KB; node_modules content, not tree
+  content) — corpus-live then passes 4/4 on pure HEAD and the staged
+  tree alike. No source, golden, or report byte differs between
+  isolated and real trees.
+- **One load-induced crash re-run.** The first full-suite attempt on
+  the staged tree after the fontoxpath swap died in a vitest worker
+  (V8 fatal → tinypool `ERR_IPC_CHANNEL_CLOSED`) with three isolated
+  trees resident; after deleting the two diagnostic trees the
+  canonical `vitest run` completed green (counts in the commit
+  message). Same class as the SIGTERM-drain flake disclosed on
+  168787c.
+
+The remediation commit's tree equals HEAD(83b7f0d) plus exactly the
+two files named above; `git diff-tree -r HEAD <commit> --` proves
+the delta, and the post-commit shared index/worktree are byte-equal
+to their pre-commit state for every sibling lane.
+
+### The minor (scripts/no-chapter-number-parsing-gate.sh:1)
+
+The shebang was `#!/usr/bin/bin bash` — a typo for
+`#!/usr/bin/env bash`. Latent (ci.sh invokes the script as
+`bash scripts/...`, so CI never tripped) but real: direct execution
+of the committed 100755 script failed.
+
+**Fix**: line 1 corrected to `#!/usr/bin/env bash`. A/B on the
+isolated tree: the old-shebang copy execs with rc=127
+(`cannot execute: required file not found` — the kernel hunting for
+`/usr/bin/bin`); the fixed script runs **both** ways —
+`./scripts/no-chapter-number-parsing-gate.sh` → rc=0 OK, and
+`bash scripts/no-chapter-number-parsing-gate.sh` → rc=0 OK (the
+ci.sh path unchanged). The four grep patterns are byte-identical to
+the mutation-verified set from 168787c (1-line diff, pinned by
+`git diff HEAD <commit> -- scripts/`).
+
+### Remediation standing-constraints checklist (D1 §8)
+
+1. All gates via `node_modules/.bin` in the isolated tree — no npx.
+2. No API surface change in the remediation (docs + one script
+   shebang); the OpenAPI snapshot is untouched and its byte-equality
+   suite ran green in the full-suite pass above.
+3. Restart canon: not needed — no dev-preview interaction; the
+   verification is entirely offline-suite based.
+4. Long-form commit (the remediation commit message).
+5. No release tag.
+
