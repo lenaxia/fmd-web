@@ -75,7 +75,7 @@ import { SiteFailureCoalescer } from '../webhook/digest.js';
 import { SweepAccumulator } from '../webhook/sweep.js';
 import { openQueueDb, ensureJobSchema } from '../jobs/queue/connection.js';
 import { SqliteJobQueue } from '../jobs/queue/queue.js';
-import { EngineThread, offloadEngineSubstrate, probeOnEngineThread } from '../engine/services/engine-thread.js';
+import { EngineThread, offloadEngineSubstrate, probeOnEngineThread } from '../engine/facade.js';
 import { SqliteLibraryStore } from '../jobs/library/store.js';
 import { ModuleHostPacer } from '../jobs/host-pacing.js';
 import { migrateLibraryLayout } from '../jobs/library/migrate.js';
@@ -96,7 +96,7 @@ import {
   type SiteAvailabilityRecord,
 } from './site-availability.js';
 import { SqlitePreferredSitesService, type PreferredSitesService } from './preferred-sites.js';
-import { runRootUrlProbe, type AvailabilitySink } from '../engine/services/availability.js';
+import { runRootUrlProbe, type AvailabilitySink } from '../engine/facade.js';
 import { SqliteFavoritesService } from './favorites-service.js';
 import { SqliteInboxService } from './inbox.js';
 import { FavoritesEngine } from '../jobs/favorites/engine.js';

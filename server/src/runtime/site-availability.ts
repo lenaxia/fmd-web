@@ -18,7 +18,7 @@
  * fire-and-forget from traffic-path sinks).
  */
 import type Database from 'better-sqlite3';
-import { classifyHttpOutcome, type SiteAvailabilityOutcome } from '../engine/services/availability.js';
+import { classifyHttpOutcome, type SiteAvailabilityOutcome } from '../engine/facade.js';
 
 /** The wire/record status; `unknown` exists only as the absent-row view. */
 export type SiteAvailabilityStatus = 'reachable' | 'unreachable' | 'unknown';

@@ -33,8 +33,7 @@ import * as path from 'node:path';
 import { fetch as undiciFetch } from 'undici';
 import { ApiError, notFound } from './errors.js';
 import type { ModuleService } from './services.js';
-import { ACCEPT_IMAGE_VALUE } from '../engine/shims/http-headers.js';
-import { DEFAULT_TIMEOUT_MS, DEFAULT_USER_AGENT } from '../engine/shims/http-pipeline.js';
+import { ACCEPT_IMAGE_VALUE, DEFAULT_TIMEOUT_MS, DEFAULT_USER_AGENT } from '../engine/facade.js';
 
 /**
  * Known image-CDN hosts that are NOT under any module's RootURL domain

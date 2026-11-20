@@ -144,6 +144,16 @@ export { normalizeProxyConfig } from './shims/http-proxy.js';
 export { LoopbackHttpTransport } from './shims/http-transport.js';
 export { SyncHostGate, type HostGatePort } from './shims/http-hostgate.js';
 export { setDefaultRequestTimeoutMs } from './shims/http-pipeline.js';
+// [inbox-bounce] app-layer constants that previously deep-imported the
+// shims (the engine-boundary gate's facade-only rule) — surfaced
+// through the domain door like every other app-facing engine value.
+export { ACCEPT_IMAGE_VALUE } from './shims/http-headers.js';
+export { DEFAULT_TIMEOUT_MS, DEFAULT_USER_AGENT } from './shims/http-pipeline.js';
+// [inbox-bounce] the thread-offload surface + the availability
+// classifier/probe the runtime layer consumes — same facade-only rule.
+export { EngineThread, offloadEngineSubstrate, probeOnEngineThread } from './services/engine-thread.js';
+export { runRootUrlProbe, classifyHttpOutcome } from './services/availability.js';
+export type { AvailabilitySink, SiteAvailabilityOutcome } from './services/availability.js';
 export type { BypassExecutorPort } from './sidecar/bypass-adapter.js';
 export { FlareSolverrBypassExecutor } from './sidecar/bypass-adapter.js';
 export type { ModuleSharedState } from './state/module-state.js';

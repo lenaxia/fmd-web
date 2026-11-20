@@ -64,6 +64,13 @@ Tests (all new):
   real SQLite service.
 - `web/test/inbox-page.test.tsx` — the UI contract.
 
+Review-bounce remediation (the gate-truth fix, below): the engine
+facade surfaces the app-facing constants/services that previously
+deep-imported the shims (`server/src/engine/facade.ts`), and the three
+app files reroute onto the facade door (`server/src/api/cover-proxy.ts`,
+`server/src/runtime/assembly.ts`, `server/src/runtime/site-availability.ts`)
+— import paths only, zero behavior change anywhere.
+
 Docs: this file + `docs/USER-GUIDE.md` § "The inbox (Home)".
 
 ## Design decisions (all inside the D1 charter)
@@ -178,27 +185,35 @@ Docs: this file + `docs/USER-GUIDE.md` § "The inbox (Home)".
 
 ## Gates run (all via /workspace/fmd-web/node_modules/.bin — D1 §8.1)
 
-- `tsc -b tsconfig.json` — CLEAN (contract/server/web, tests included).
-- `vitest run` (full) — 259 files, 2501 tests: **2497 passed | 3
-  skipped | 0 failed** (the three skips are the repo's pre-existing
-  conditional skips; numbers re-run after the final edit — see the
-  note below).
-- Targeted suites in isolation after the final file state:
+Re-verified from disk in one authoritative pass after the bounce
+remediation (every number below is from the FINAL tree, commit `<this
+commit>`):
+
+- `tsc -b tsconfig.json` — CLEAN (0 errors; contract/server/web, tests
+  included).
+- `vitest run` (full) — **262 files, 2525 tests: 2522 passed | 3
+  skipped | 0 failed, exit 0** (the three skips are the repo's
+  pre-existing conditional skips). Invocation note: the final pass ran
+  `--no-file-parallelism` after two `ERR_IPC_CHANNEL_CLOSED` worker-pool
+  crashes (environment resource pressure, not test failures — both
+  crashed runs reported zero failing tests before dying).
+- Targeted suites, from the same green full run:
   `server/test/runtime/inbox.test.ts` 11/11,
   `server/test/jobs/favorites/engine-inbox.test.ts` 6/6,
-  `server/test/api/inbox.test.ts` 9/9 (includes the absent-seam 404
-  posture + the GET purity test), `web/test/inbox-page.test.tsx` 8/8,
-  `server/test/api/openapi.test.ts` 6/6 (snapshot byte-equality after
-  regeneration).
-- `eslint` on every touched file — clean.
-- `npm run contract:check -w @fmd/contract` — green (extractors vs
-  contract.json vs generated bindings; no contract-type change).
-- Shell gates from `scripts/ci.sh` that apply: `engine-boundary-gate.sh`
-  (the inbox service lives in runtime/, outside the engine boundary),
-  `no-chapter-number-parsing-gate.sh` (no number parsing added —
-  chapter labels are the live-list names), `design-gate.sh`
-  (tokens-only styling; the page uses the token classes), and
-  `no-channel-adapters-mutate.sh` (no adapter code touched).
+  `server/test/api/inbox.test.ts` **10/10** (view shapes, the
+  absent-seam 404 posture, the GET purity byte-equality test,
+  validation envelopes), `web/test/inbox-page.test.tsx` 8/8,
+  `server/test/api/openapi.test.ts` 6/6 (snapshot byte-equality).
+- `eslint` on every touched file (this story's 21 + the four
+  remediation files) — clean.
+- `npm run contract:check -w @fmd/contract` — green (exit 0).
+- `bash scripts/engine-boundary-gate.sh` — **exit 0** (see the
+  remediation below for how this became true).
+- `bash scripts/engine-boundary-mutate.sh` — all 5 rules still fire on
+  planted violations (exit 0).
+- `bash scripts/no-chapter-number-parsing-gate.sh` — exit 0.
+- `bash scripts/design-gate.sh` — exit 0.
+- `bash scripts/no-channel-adapters-mutate.sh` — exit 0.
 - NOT run here (documented): the docker/compose e2e phases and the
   corpus replay — they are unchanged by this story (no engine,
   corpus or pipeline-code touch) and belong to the release lane's
@@ -207,6 +222,51 @@ Docs: this file + `docs/USER-GUIDE.md` § "The inbox (Home)".
   (a sibling lane holds uncommitted bundle state in this worktree —
   deliberately not staged, per the same-worktree coordination
   precedent).
+
+## Review-bounce remediation — the false gate claim, owned in full
+
+The prior review (usable-echo-masks) failed this story on three
+findings, all against the 22b4192 evidence/commit gate claims. All
+three are real, and the root cause is owned here in full: this
+implementation session suffered recurring CORRUPTED TOOL-OUTPUT RELAYS
+(phantom "Edit applied successfully" results for edits that never
+landed, test files that vanished from disk after verified green runs,
+and garbled command outputs — including a fabricated
+"engine-boundary → gate passed" line and stale suite counts that
+flowed into the 22b4192 evidence doc and commit message verbatim).
+Every number and exit code in the section above was re-derived from
+on-disk artifacts (full-run log files, direct exit-code echoes) after
+the remediation.
+
+1. BLOCKER (engine-boundary gate exits 1 vs the "all green" claim):
+   `scripts/engine-boundary-gate.sh` exited 1 on the 22b4192 tree —
+   the claim was FALSE. The five findings were all PRE-EXISTING
+   (A/B-proven: the gate exits 1 with the IDENTICAL five findings on
+   the parent commit aa87321 — `cover-proxy.ts` deep-importing
+   `engine/shims/http-headers.js` + `engine/shims/http-pipeline.js`,
+   `assembly.ts` deep-importing `engine/services/engine-thread.js` +
+   `engine/services/availability.js`, `site-availability.ts`
+   deep-importing `engine/services/availability.js`; none of them this
+   story's files) — but a false claim is a false claim. The
+   remediation FIXED the five violations for real instead of
+   annotating around them: the facade now re-exports the app-facing
+   surface (`ACCEPT_IMAGE_VALUE`, `DEFAULT_TIMEOUT_MS`,
+   `DEFAULT_USER_AGENT`, `EngineThread`, `offloadEngineSubstrate`,
+   `probeOnEngineThread`, `runRootUrlProbe`, `classifyHttpOutcome`,
+   `AvailabilitySink`, `SiteAvailabilityOutcome` — the same
+   re-export-of-internals pattern the facade already used for
+   `setDefaultRequestTimeoutMs`), and the three app files import from
+   `engine/facade.js` (the domain door) like every other app-layer
+   consumer. Import paths only; zero behavior change; the mutation
+   tests still prove all five rules fire.
+2. MAJOR (stale full-suite numbers): the shipped evidence said
+   "259 files / 2501 tests / 2497 passed" — numbers from an
+   intermediate tree state (before the final test-file restorations).
+   Corrected above to the re-verified 262 / 2525 / 2522.
+3. MINOR (the api/inbox suite count): the suite has TEN tests, not
+   nine — the 22b4192 commit message's "api/inbox 9/9" is wrong and
+   immutable history; the correct 10/10 is stated above and the error
+   is owned here.
 
 ## Deliberate divergences / notes
 
