@@ -1,5 +1,243 @@
 # Release notes — fmd-web
 
+## 0.3.2 — 2026-11-20
+
+**Released:** 2026-11-20 · **Tag:** `v0.3.2` (annotated) · **Commits:**
+`4836887` (live HTTPS egress, range base) → `62dcd4e` (search scope +
+preferred sites) → `121ed33` (picker-star touch floor) → `83b7f0d`
+(pipe health) → `1324e65` (visual-baseline close-out) → `98915be` (single webhook) → `1679ca6` (triage surface) → `22b4192`
+(inbox home) → `790eebf` (inbox remediation) → `cbd8028` (e2e
+phase-3 spec alignment — release-charter amendment 2) → `8cf8f8c`
+(inbox-shell e2e remediation: visual baselines + a11y cycle + arrival
+retarget — feature head) → the release-notes commit (release head);
+46 commits over 0.3.1 (45 feature + the release-notes commit)
+
+The "works for real" release. Where 0.3.1 fixed the registry and the
+auth token, 0.3.2 makes the app actually work against live sites —
+downloads end-to-end, a server that stays responsive when a site
+hangs, real cover art — and adds the migration path from a desktop
+FMD2 install, library file truth, dead-site visibility, and a
+paste-URL front door. The pipe-with-an-inbox lanes land too: per-host
+pacing, a single outbound webhook, an Attention triage screen, and an
+inbox home for new chapters. One BREAKING change: password auth is
+removed.
+
+### BREAKING — token-only authentication (`52166e0`, `be654a4`, `f1bf8d5`)
+
+The optional-password mode is removed. The single API token (0.3.1's
+*arr semantics: generated on first boot, rotatable in Settings) is
+now the app's **only** credential. User authentication belongs at the
+edge — front the app with a reverse proxy (authelia / authentik /
+PocketID) as the README's auth note describes. Deployments that set
+`FMD_WEB_PASSWORD` must move authentication to the proxy; scripts and
+automation use the token.
+
+### Live sites work end-to-end (`4836887`, `513ddfb`, `0818ec2`, `eab3f1f`)
+
+- **Real HTTPS egress.** The live module engine previously hard-refused
+  https and non-loopback hosts — every live GetInfo, search, and
+  download failed in every deployment while the offline suite stayed
+  green. The transport now performs TLS-verified https with SNI
+  directly and through HTTP-CONNECT and SOCKS tunnels.
+- **The download pipeline works on real sites.** A fresh connection
+  per request (CDN idle-timeout parity), Duktape `ExecJS` results
+  marshaled exactly as FMD2's `duk_safe_to_string` renders them,
+  `BeforeDownloadImage` module headers reaching hotlink-checking CDNs
+  (the FanFox Referer), protocol-relative image URLs massaged, and
+  enqueue canonicalizing the manga URL so the downloaded-chapters
+  ledger matches `/api/info`. Proven live: FanFox chapter → packed
+  file in the library, marker set.
+- **One hung site no longer freezes the server.** Module dispatch ran
+  on the main event loop, so a silent origin stalled the whole API —
+  the Downloads page, even `/readyz` — for the full 15 s request
+  budget per hop, with no download running at all. The engine
+  substrate now lives on a persistent worker thread (the designed
+  §5.12 topology): the API stays responsive, worker ops run to their
+  budgets, a wedged worker is recycled. A follow-up fixed chapter
+  hooks that take no task snapshot (FanFox's image path).
+
+### Import from FMD2 (`d57f156`, review chain `ae5fb4d`–`3c6a8cf`)
+
+Bring a desktop install over: upload `db.sqlite` + `config.json` (or
+a zip of the whole data dir), preview exactly what maps — favorites,
+downloaded chapters, accounts, settings — then apply. Unmapped sites
+are listed, credentials are opt-in and never echoed back, re-import
+is idempotent and merges case-insensitively, and FMD2's encrypted
+stores are decrypted with the FMD2 key. Documented in the USER-GUIDE
+("Bringing over a desktop install") with the not-imported list.
+
+### Library file truth and the flat layout (`99c5edd`, `c7ee640`, `26318fa`)
+
+- Every chapter file carries a stat-verified state — **downloaded**
+  (ledger row and file present), **missing** (row, file gone),
+  **orphan** (file, no row) — re-verified lazily when stale, with the
+  verification age visible in the UI.
+- **Rescan library** walks the downloads root and re-links files that
+  moved within it (exact filename, or the app's own naming slot);
+  ambiguous matches deliberately surface as an orphan+missing pair
+  for the operator to resolve — never a guess. The diff report
+  (re-linked with former paths, missing, orphans, counts) persists.
+- A per-title **Files** section lists chapter, filename, size, date,
+  state, and copy-path — metadata only; no endpoint serves file
+  bytes, and every path is realpath-clamped to the library root.
+  The Library page gains All / Missing / Orphans filter chips.
+- Series folders are now flat — `<libraryRoot>/<manga>/<file>` — with
+  a `[module]` suffix only on duplicate titles (first writer keeps
+  the clean name); existing trees migrate once on boot.
+
+### Site availability (`b8de66f`)
+
+Dead sites (parked domains, Cloudflare 523, DNS gone) are identified
+as a byproduct of normal traffic through one conservative
+classification seam: transport-class failures and 5xx/523 write
+`unreachable` with a reason; successful answers write `reachable`;
+4xx (anti-bot) writes nothing. Settings→Websites shows a Last-check
+status column with All / Reachable / Unreachable / Unknown filters
+and a manual per-row Check; the site picker dims unreachable rows
+while keeping them fully clickable, with a client-local
+Hide-unavailable toggle. Batch probing is deliberately not built
+(anti-bot risk) — documented deferral with a revisit trigger.
+
+### Covers render — same-origin cover proxy (`70d67da`)
+
+Module cover URLs are absolute CDN links a browser behind the strict
+CSP can never load. A same-origin, module-validated `/api/cover`
+proxy now fetches them with the module's own HTTP posture (Referer,
+UA fallbacks), caches them on disk keyed by the token-free URL, and
+serves them with CSP unchanged. The manga hero and the favorites grid
+(which now stores and shows cover thumbnails) display real art; the
+preview tunnel's manifest 401 is also mitigated.
+
+### Favorites composite-id + PWA install fixes (`77b8dc7`)
+
+Toggling auto-download on an existing favorite 404'd behind proxies
+that decode `%2F` — both the encoded and decoded id shapes now
+resolve. The web manifest is served as `application/manifest+json`
+(browsers refused to parse `application/octet-stream`), so PWA
+install works; a contract test pins the static/auth gate ordering.
+
+### UX audit P1+P2 and the favorites rebuild
+
+Back-navigation context restored after in-app navigation, honest
+metadata nulls (no more "null" in the manga header), a jargon gate on
+error copy, real library dates, Settings wayfinding; loading
+skeletons and consistent chrome, mobile and a11y polish,
+downloads/library file management, and the em-dash sweep. The
+favorites page is rebuilt title-primary with one kebab action
+column. (`0c306a8`, `343e95c`, `ae5fb4d`, `8684f2a`, `70762d7`,
+`3c6a8cf`, `ac88d9a`, `ae4b1e1`, `f4b0ed8`)
+
+### Paste-URL add — the universal front door (`4635bfc`)
+
+Paste any series URL into the always-present box on the search home
+(or use the command palette's "Add manga by URL"): it resolves to its
+module, previews title / cover / alt titles, and follows with a
+single decision — Follow, or Follow + auto-download. An
+already-followed series shows "Already in your Favorites" instead of
+re-asking; a racing conflict lands as the same friendly state.
+
+### Search scope + preferred sites (`62dcd4e`, touch-floor fix-up `121ed33`)
+
+- The search home's scope selector: **all sites** (answered entirely
+  from the local FMD2-DB catalog index — zero network), **Preferred**
+  (your starred sites, in your order), or an explicit multi-select.
+  The scope lives on the URL (`?scope=`, `?picks=`) and survives
+  back/forward navigation.
+- Catalog-less sites under an explicit scope are scraped live with a
+  concurrency-capped, cancellable fan-out (never a synchronized
+  all-sites blast); per-site results stream in progressively and
+  abort when you navigate or retype. Repeated queries hit a short TTL
+  cache; a preferred-sites change invalidates it immediately.
+- Star sites in the site picker to build the one global allowlist —
+  persisted server-side (shared across devices), rendered as a pinned
+  Preferred group in canonical order, with dead sites dimmed but
+  never hidden. The star meets the 44px touch-target floor
+  (`121ed33`, the release-gate audit's catch).
+
+### Pipe health — pacing, retry backoff, missing-chapter check (`83b7f0d`)
+
+- Favorites checks and download jobs that target the same site are
+  spaced by a per-host pacer (a conservative fixed cadence), so a
+  sweep over many favorites — or concurrent downloads — never arrives
+  at one origin as a burst; different sites proceed fully in
+  parallel.
+- Failed downloads retry on an exponential backoff with jitter,
+  capped at 24 h: the retry state stays visible for the whole wait,
+  the queue slot is freed meanwhile so other work proceeds, and a
+  cohort of failed jobs on one host cannot re-align into a burst.
+- Each favorite's row menu gains **Check missing chapters** — the
+  reverse of the new-chapter diff: a paced live check that reports
+  which chapters you have downloaded but the site's current list no
+  longer contains (FMD2's FCheckMissing). Report-only by
+  construction — the downloaded ledger is never rewritten, and the
+  report dialog offers no destructive action.
+
+### Single outbound webhook (`98915be`, gate remediation `e6415a8`)
+
+The pipe's push half: ONE generic JSON POST destination — configure
+the url, an optional secret, and per-event-class toggles in Settings,
+then verify with the test-send action. Event classes:
+`chapter.downloaded` (individual, per finalized chapter),
+`favorites.digest` (one summary per completed check sweep), and
+`failure.digest` (per-site check failures coalesced into 15-minute
+windows — a dead site with 50 favorites produces ONE entry, never 50).
+With a secret, every attempt carries an `X-FMD-Signature`
+HMAC-SHA256 header. Delivery is fire-and-forget with 2 retries then
+drop — advisory and lossy-tolerated, the inbox remains the source of
+truth. Bridge to chat/push services yourself; a grep gate keeps
+per-channel adapter code out of the tree.
+
+### Triage surface — one Attention screen (`1679ca6`)
+
+Failed downloads grouped by cause, never per-chapter noise: four
+groups in a fixed order — site down (joined onto the availability
+record the pipe already observed, cross-linked into the Settings
+registry), anti-bot / bypass-unavailable, rate limited, and other.
+Each group carries a paced **Retry all** that funnels every row
+through the same per-job retry path the downloads tab uses, so
+per-host pacing applies to retries exactly as to fresh work.
+Availability never gates an action: a dead site dims its rows and
+explains itself while every retry stays clickable. A healthy state is
+an explicit empty state that celebrates doing nothing. Reachable from
+primary nav on desktop and mobile (the `Attention` tab).
+
+### Inbox home — the new-chapters feed (`22b4192`, remediation `790eebf`)
+
+Home becomes what the product identity says it must be: a
+reverse-chronological feed of what arrived. One row per detected new
+chapter (cover thumbnail, title, chapter label, site, arrival time)
+with per-chapter seen state, one shared **Caught up** bulk action, and
+an archive of acknowledged entries for a rolling 30 days. Seen state
+is server-side — a single-user instance, so caught up once means
+caught up everywhere; marking read on one device never replays on
+another. Detection derives from the one check-engine path
+(scheduler sweeps, manual check-now, batch checks); the feed
+celebrates being caught up, `#/browse` keeps every existing deep link
+working, and webhook notifications complement but never gate it.
+
+### Diagnosability and ops
+
+- `net_problem` failures now carry the upstream cause in the error —
+  "(HTTP 500: timeout)" for a slow origin, "(HTTP 405: Method Not
+  Allowed)" for a parked domain — instead of failing silently
+  (`6beb4d5`).
+- The global proxy editor is an inline-expand box in
+  Settings→Websites — no more bottom drawer (`b83db04`).
+- A weekly site-liveness workflow picks a random series per enabled
+  site, downloads one chapter through the real pipeline, and flags
+  sites that warn three weeks running (`a7635ef`).
+- The post-0.3.2 product direction — "a pipe with an inbox" — is
+  recorded as a decision record in `docs/DESIGN-NORTHSTAR.md`
+  (`359c20a`).
+
+### Version string
+
+Matching 0.2.0/0.3.0/0.3.1 precedent, the workspace `package.json`
+version remains `0.1.0`; release identity lives in the annotated git
+tag and the GitHub release.
+
+---
+
 ## 0.3.1 — 2026-11-18
 
 **Released:** 2026-11-18 · **Tag:** `v0.3.1` (annotated) · **Commits:**
