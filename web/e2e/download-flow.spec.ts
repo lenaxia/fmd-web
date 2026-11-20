@@ -213,7 +213,7 @@ test.describe('phase3 — download → pack → library → cancel/resume → re
 
     // library listing shows the packed file
     await page.getByRole('link', { name: 'Library' }).click();
-    const libraryRow = page.locator('.library-row', { hasText: 'Chapter 1 The Beginning.zip' });
+    const libraryRow = page.locator('.library-row', { hasText: '0003 Chapter 1 The Beginning.cbz' });
     await expect(libraryRow).toBeVisible({ timeout: 30_000 });
 
     // artifact download + ZIP structure validation (central directory)
@@ -222,10 +222,10 @@ test.describe('phase3 — download → pack → library → cancel/resume → re
     const response = await request.get(`/api/library/${String(id)}/file`);
     expect(response.ok()).toBeTruthy();
     const disposition = response.headers()['content-disposition'] ?? '';
-    expect(disposition).toContain('Chapter 1 The Beginning.zip');
+    expect(disposition).toContain('0003 Chapter 1 The Beginning.cbz');
     const bytes = await response.body();
     const entries = walkZipCentralDirectory(bytes);
-    expect(entries.map((entry) => entry.name).sort()).toEqual(['001.jpg', '002.jpg', '003.jpg']);
+    expect(entries.map((entry) => entry.name).sort()).toEqual(['001.jpg', '002.jpg', '003.jpg', 'ComicInfo.xml']);
     for (const entry of entries) {
       expect(entry.uncompressedSize).toBeGreaterThan(0);
       expect(entry.method).toBe(0); // stored (D16: images are stored raw)
@@ -290,7 +290,7 @@ test.describe('phase3 — download → pack → library → cancel/resume → re
     // the resume landed as a library entry too
     await page.getByRole('link', { name: 'Library' }).click();
     await expect(
-      page.locator('.library-row', { hasText: 'Chapter 2 The Middle.zip' }),
+      page.locator('.library-row', { hasText: '0002 Chapter 2 The Middle.cbz' }),
     ).toBeVisible({ timeout: 30_000 });
   });
 
@@ -326,12 +326,12 @@ test.describe('phase3 — download → pack → library → cancel/resume → re
 
     // and the recovered chapter packs + lands in the library
     await page.getByRole('link', { name: 'Library' }).click();
-    const libraryRow = page.locator('.library-row', { hasText: 'Chapter 3 The Finale.zip' });
+    const libraryRow = page.locator('.library-row', { hasText: '0001 Chapter 3 The Finale.cbz' });
     await expect(libraryRow).toBeVisible({ timeout: 30_000 });
     const id = await libraryRow.getAttribute('data-file-id');
     const response = await request.get(`/api/library/${String(id)}/file`);
     expect(response.ok()).toBeTruthy();
     const entries = walkZipCentralDirectory(await response.body());
-    expect(entries.map((entry) => entry.name).sort()).toEqual(['001.jpg', '002.jpg']);
+    expect(entries.map((entry) => entry.name).sort()).toEqual(['001.jpg', '002.jpg', 'ComicInfo.xml']);
   });
 });
