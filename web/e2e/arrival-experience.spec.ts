@@ -123,6 +123,10 @@ async function installAwayNews(
 }
 
 // ── away summary (desktop matrix) ────────────────────────────────────
+// The card's surface is the search home (SearchHomePage, rendered by
+// BrowsePage) — '#/browse' since the inbox lane (22b4192) made '/' the
+// inbox feed. Every assertion below is unchanged: same card, same
+// states, same strength.
 
 test.describe('away summary', (): void => {
   test.skip((): boolean => false, '');
@@ -141,7 +145,7 @@ test.describe('away summary', (): void => {
       ],
     });
 
-    await page.goto('/');
+    await page.goto('/#/browse');
     const card = page.getByTestId('away-summary');
     await expect(card).toBeVisible();
     await expect(page.getByTestId('away-summary-downloads')).toBeVisible();
@@ -171,7 +175,7 @@ test.describe('away summary', (): void => {
     await installAwayNews(page, {
       favorites: [newsyFavorite('Gamma Saga', 2, '2026-11-16T12:00:00.000Z')],
     });
-    await page.goto('/');
+    await page.goto('/#/browse');
     await expect(page.getByTestId('away-summary')).toBeVisible();
     await expect(page.getByTestId('away-summary-downloads')).toHaveCount(0);
     await expect(page.getByTestId('away-summary-favorites')).toBeVisible();
@@ -191,7 +195,7 @@ test.describe('away summary', (): void => {
       doneJobs: [doneJob('51', 'Delta Tales', 'Ch. 4', '2026-11-16T11:00:00.000Z')],
       favorites: [newsyFavorite('Gamma Saga', 2, '2026-11-16T12:00:00.000Z')],
     });
-    await page2.goto('/');
+    await page2.goto('/#/browse');
     await expect(page2.getByTestId('away-summary')).toBeVisible();
     await expect(page2.getByTestId('away-summary-downloads')).toBeVisible();
     await expect(page2.getByTestId('away-summary-favorites')).toBeVisible();
@@ -208,7 +212,7 @@ test.describe('away summary', (): void => {
       doneJobs: [doneJob('61', 'Alpha Quest', 'Ch. 1', '2026-11-16T08:00:00.000Z')],
     });
 
-    await page.goto('/');
+    await page.goto('/#/browse');
     await expect(page.getByTestId('away-summary')).toBeVisible();
     await page.getByTestId('away-summary-dismiss').click();
     await expect(page.getByTestId('away-summary')).toHaveCount(0);
@@ -240,7 +244,7 @@ test.describe('away summary', (): void => {
     await seedStaleVisit(page);
     await installMockApi(page);
     await installAwayNews(page, {});
-    await page.goto('/');
+    await page.goto('/#/browse');
     await expect(page.getByTestId('away-summary')).toHaveCount(0);
 
     // Fresh visit (no stamp at all): even with news on the server the
@@ -252,7 +256,7 @@ test.describe('away summary', (): void => {
     await installAwayNews(page2, {
       doneJobs: [doneJob('71', 'Alpha Quest', 'Ch. 1', '2026-11-16T08:00:00.000Z')],
     });
-    await page2.goto('/');
+    await page2.goto('/#/browse');
     await expect(page2.getByTestId('away-summary')).toHaveCount(0);
     await fresh!.close();
   });
@@ -462,7 +466,10 @@ test.describe('arrival experience (mobile)', (): void => {
       ws.onMessage((): void => undefined);
     });
 
-    await page.goto('/');
+    // The away-summary card lives on the search home (SearchHomePage),
+    // which BrowsePage renders at '#/browse' — '/' became the inbox
+    // feed (22b4192), so the card's surface is reached by its route.
+    await page.goto('/#/browse');
     // The card renders at the mobile viewport.
     await expect(page.getByTestId('away-summary')).toBeVisible();
     await expect(page.getByTestId('away-summary-download')).toHaveCount(1);

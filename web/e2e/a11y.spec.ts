@@ -15,7 +15,7 @@ test.beforeEach(async ({ page }: { page: Page }): Promise<void> => {
   });
 });
 
-const NAV_HREFS = ['#/browse', '#/favorites', '#/downloads', '#/library', '#/settings'];
+const NAV_HREFS = ['#/inbox', '#/browse', '#/favorites', '#/downloads', '#/attention', '#/library', '#/settings'];
 
 /** Press Tab until the active element matches a named predicate (or bail). */
 async function tabUntil(page: Page, target: 'browse-search' | 'toggle-theme' | 'catalog-entry', maxTabs = 30): Promise<boolean> {
@@ -44,12 +44,12 @@ async function tabUntil(page: Page, target: 'browse-search' | 'toggle-theme' | '
   return false;
 }
 
-test('Tab cycles the shell nav (brand → five tabs in order → theme toggle)', async ({ page }: { page: Page }): Promise<void> => {
+test('Tab cycles the shell nav (brand → seven tabs in order → theme toggle)', async ({ page }: { page: Page }): Promise<void> => {
   await page.goto(`/#/browse?catalog=${CATALOG_ID}`);
   await expect(page.getByRole('button', { name: /^Alpha Quest/ })).toBeVisible();
 
   const seen: (string | null)[] = [];
-  const steps = 9; // brand + 5 nav links + theme toggle + first content stops
+  const steps = 12; // brand + 7 nav links + palette button + theme toggle + first content stops
   for (let i = 0; i < steps; i += 1) {
     await page.keyboard.press('Tab');
     seen.push(
@@ -64,7 +64,9 @@ test('Tab cycles the shell nav (brand → five tabs in order → theme toggle)',
     );
   }
 
-  // The five primary tabs receive focus consecutively, in DOM order.
+  // The seven primary tabs (the brand link shares the inbox href — it
+  // IS the home tab's destination) receive focus consecutively, in
+  // DOM order.
   const navIndexes = NAV_HREFS.map((href): number => seen.indexOf(href));
   for (const [i, href] of NAV_HREFS.entries()) {
     expect(seen).toContain(href);
