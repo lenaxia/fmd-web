@@ -80,6 +80,12 @@ import {
   TriageGroupSchema,
   TriageSiteSchema,
   TriageJobSchema,
+  InboxAckRequestSchema,
+  InboxAckResponseSchema,
+  InboxCaughtUpResponseSchema,
+  InboxEntrySchema,
+  InboxListQuerySchema,
+  InboxListResponseSchema,
   OutputDefaultsSchema,
   OutputDefaultsUpdateRequestSchema,
   PerformanceSettingsUpdateRequestSchema,
@@ -117,6 +123,7 @@ const REGISTRY: readonly [z.ZodType, string][] = [
   [TriageJobSchema, 'TriageJob'],
   [TriageSiteSchema, 'TriageSite'],
   [TriageGroupSchema, 'TriageGroup'],
+  [InboxEntrySchema, 'InboxEntry'],
   [ProxySettingsSchema, 'ProxySettings'],
   [OutputDefaultsSchema, 'OutputDefaults'],
   [SettingsResponseSchema, 'SettingsResponse'],
@@ -963,6 +970,65 @@ const OPERATIONS: readonly RouteOperation[] = [
     responses: {
       200: { description: 'The group\'s retry outcome: count + the re-enqueued snapshots', schema: TriageRetryResponseSchema },
       ...errors(validation(), internal()),
+    },
+  },
+  {
+    method: 'get',
+    path: '/api/inbox',
+    operationId: 'listInbox',
+    summary: 'The Home feed: new-chapter arrivals with per-chapter seen state (D1 §2 INBOX)',
+    description:
+      '[inbox] The inbox IS the source of truth for what arrived (webhook notifications are ' +
+      'advisory and complement it, never gate it). ONE row per detected new chapter, written ' +
+      'by the ONE check-engine detection path (`FavoritesEngine.checkFavorite` — scheduler ' +
+      'sweeps, manual check-now and batch checks all flow through it; no second detection ' +
+      'path exists anywhere). `view=new` (default) serves the unacknowledged arrivals ' +
+      'newest-first; `view=archive` serves the acknowledged entries inside the rolling ' +
+      '30-day window, newest acknowledgment first (a feed, not a ledger — the ' +
+      'downloaded-truth ledger is separate and permanent). Seen state is PER CHAPTER ' +
+      '(`chapterKey` = lowercased `module|link`, D1 §3 "a chapter = its link") and ' +
+      'SERVER-SIDE: caught up once, caught up everywhere — the documented multi-device ' +
+      'posture of the single-user instance (D1 §4/R2). A GET never mutates (D1 §3): the ' +
+      'archive window is a WHERE clause and the physical purge is scheduled housekeeping. ' +
+      '`newCount` (the unacknowledged total) rides both views.',
+    tags: ['favorites'],
+    query: InboxListQuerySchema,
+    responses: {
+      200: { description: 'The requested feed view + the live newCount', schema: InboxListResponseSchema },
+      ...errors(validation(), internal()),
+    },
+  },
+  {
+    method: 'post',
+    path: '/api/inbox/ack',
+    operationId: 'acknowledgeInboxChapters',
+    summary: 'Acknowledge EXACTLY the named chapters (per-row seen)',
+    description:
+      '[inbox] The per-chapter seen action: the listed `chapterKeys` flip to acknowledged; ' +
+      'unknown or already-acknowledged keys are no-ops and the response counts only the rows ' +
+      'that actually flipped (a raced double-submit reports 0, never errors). Acknowledged ' +
+      'entries move to the archive view for their rolling 30-day window.',
+    tags: ['favorites'],
+    body: InboxAckRequestSchema,
+    responses: {
+      200: { description: 'How many rows this call flipped', schema: InboxAckResponseSchema },
+      ...errors(validation(), internal()),
+    },
+  },
+  {
+    method: 'post',
+    path: '/api/inbox/caught-up',
+    operationId: 'markInboxCaughtUp',
+    summary: 'The shared caught-up action: acknowledge everything visible',
+    description:
+      '[inbox] "I\'ve seen everything up to here" — stamps EVERY unacknowledged row in one ' +
+      'write. Server-side state shared across devices (single-user instance, D1 §4/R2): ' +
+      'caught up once, caught up everywhere; marking read on one device never replays on ' +
+      'another because no per-device state exists. Idempotent — an empty feed acknowledges 0.',
+    tags: ['favorites'],
+    responses: {
+      200: { description: 'How many rows this call flipped', schema: InboxCaughtUpResponseSchema },
+      ...errors(internal()),
     },
   },
   {

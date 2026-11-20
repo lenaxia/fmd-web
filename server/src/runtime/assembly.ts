@@ -98,6 +98,7 @@ import {
 import { SqlitePreferredSitesService, type PreferredSitesService } from './preferred-sites.js';
 import { runRootUrlProbe, type AvailabilitySink } from '../engine/services/availability.js';
 import { SqliteFavoritesService } from './favorites-service.js';
+import { SqliteInboxService } from './inbox.js';
 import { FavoritesEngine } from '../jobs/favorites/engine.js';
 import {
   DEFAULT_INTERVAL_MS,
@@ -650,6 +651,28 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
   // the service — one seam for manual and opportunistic writes alike.
   const availabilityStoreHandle = new SqliteSiteAvailabilityStore(db);
   lateAvailability.store = availabilityStoreHandle;
+  // ── [inbox] the Home feed's persisted truth (D1 §2 INBOX) ──────────
+  // app.db table `inbox_event` — ONE row per detected new chapter
+  // (`seen_at` NULL = the feed, a stamp = the archive). Written by the
+  // check engine's ONE detection path (the favoritesEngine dep below),
+  // read by GET /api/inbox. The rolling 30-day archive window rides
+  // the archive query (a GET never mutates); the physical purge is
+  // the SAME hourly-housekeeping posture as the job retention sweep
+  // — unref'd interval + one pass at boot, never a read side effect.
+  const inboxService = new SqliteInboxService(db);
+  const inboxPurgeInterval = setInterval((): void => {
+    try {
+      inboxService.purge(Date.now());
+    } catch {
+      // db closing/closed — the drain path owns shutdown
+    }
+  }, 60 * 60 * 1000);
+  inboxPurgeInterval.unref?.();
+  try {
+    inboxService.purge(Date.now());
+  } catch {
+    // first purge best-effort (schema just ensured — belt and braces)
+  }
   const probeSite: (moduleId: string) => Promise<{ readonly resultCode: number; readonly resultString: string }> =
     engineThread === undefined
       ? (moduleId: string): Promise<{ readonly resultCode: number; readonly resultString: string }> => {
@@ -926,6 +949,29 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     // [pipe-health] every live favorites fetch (scheduler sweep, manual
     // check-now, batch check, missing-chapter check) is paced per host.
     pacer: hostPacer,
+    // [inbox] the feed write (D1 §2 INBOX): the diff's new-chapter set
+    // becomes feed rows — snapshots ride the favorite row so entries
+    // render even after a favorite is later deleted. Guarded
+    // fire-and-forget inside the engine (a sink must never take a
+    // check down).
+    inbox: {
+      recordNewChapters: (favorite, chapters, at): void => {
+        inboxService.record({
+          moduleId: favorite.moduleId,
+          mangaKey: favorite.mangaKey,
+          mangaUrl: favorite.url,
+          ...(favorite.title !== undefined ? { mangaTitle: favorite.title } : {}),
+          ...(favorite.coverLink !== undefined && favorite.coverLink !== ''
+            ? { coverLink: favorite.coverLink }
+            : {}),
+          chapters: chapters.map((chapter): { readonly link: string; readonly name: string } => ({
+            link: chapter.link,
+            name: chapter.name,
+          })),
+          at,
+        });
+      },
+    },
   });
   // Options → Updates parity: the persisted favorites scheduler settings
   // (app_settings kv) seed the interval + the startup-sweep gate; PUT
@@ -1146,6 +1192,10 @@ export async function buildRuntime(options: BuildRuntimeOptions): Promise<Runtim
     library: libraryService,
     fileState: libraryFileState,
     favorites: favoritesService,
+    // [inbox] the Home feed service (D1 §2 INBOX) — per-chapter seen
+    // rows over the check engine's new-chapter events + the ack /
+    // caught-up writes + the 30-day archive view.
+    inbox: inboxService,
     // Site-first browse: catalog provisions stream WS `sync` frames
     // (progress toast) keyed `catalog-sync:<moduleId>`; REST contract
     // unchanged (the decorator is pass-through on the wire).

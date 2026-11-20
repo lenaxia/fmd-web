@@ -1165,6 +1165,90 @@ export const TriageRetryResponseSchema = z.object({
 export type TriageRetryResponseT = z.infer<typeof TriageRetryResponseSchema>;
 
 
+// ── inbox (D1 §2 INBOX — the Home feed) ──────────────────────────────
+
+/** Feed views: `new` = unacknowledged arrivals, `archive` = acknowledged. */
+export const InboxViewSchema = z.enum(['new', 'archive']);
+export type InboxViewT = z.infer<typeof InboxViewSchema>;
+
+/**
+ * One feed entry = ONE detected new chapter (D1 §3 "a chapter = its
+ * link"). Snapshots (title, coverLink) were taken at detection, so an
+ * entry renders even after its favorite is deleted — the inbox is a
+ * feed of arrivals, not a favorites join.
+ */
+export const InboxEntrySchema = z.object({
+  /** `asciiLowerCase(moduleId) + '|' + asciiLowerCase(chapterLink)` — the seen identity. */
+  chapterKey: z.string().min(1),
+  moduleId: z.string().min(1),
+  mangaKey: z.string().min(1),
+  mangaUrl: z.string().min(1),
+  /** Title snapshot at detection (null when the favorite had none). */
+  mangaTitle: z.string().nullable(),
+  /** Cover url snapshot at detection (proxied client-side via /api/cover). */
+  coverLink: z.string().nullable(),
+  /** The chapter's site link — D1 §3 identity, never a parsed number. */
+  chapterLink: z.string().min(1),
+  /** The chapter name as the live list carried it ('' when absent). */
+  chapterLabel: z.string(),
+  /** When the check engine detected the chapter (RFC 3339 UTC). */
+  detectedAt: TimestampSchema,
+  /** When the chapter was acknowledged (null = unacknowledged). */
+  seenAt: TimestampSchema.nullable(),
+});
+export type InboxEntryT = z.infer<typeof InboxEntrySchema>;
+
+/**
+ * GET /api/inbox — the Home feed. `view=new` serves the
+ * unacknowledged arrivals (newest first); `view=archive` serves the
+ * acknowledged entries of the rolling 30-day window (D1 §2 — a feed,
+ * not a ledger), newest acknowledgment first. A read: the window is a
+ * WHERE clause and the physical purge is scheduled housekeeping (a GET
+ * never mutates, D1 §3). `newCount` rides both views (the tab badge).
+ */
+export const InboxListQuerySchema = z.object({
+  view: InboxViewSchema.optional(),
+});
+export type InboxListQueryT = z.infer<typeof InboxListQuerySchema>;
+
+export const InboxListResponseSchema = z.object({
+  view: InboxViewSchema,
+  /** Unacknowledged arrivals right now (both views carry it). */
+  newCount: z.number().int().nonnegative(),
+  entries: z.array(InboxEntrySchema),
+});
+export type InboxListResponseT = z.infer<typeof InboxListResponseSchema>;
+
+/**
+ * POST /api/inbox/ack — acknowledge EXACTLY the named chapters (the
+ * per-row seen action). Unknown or already-acknowledged keys are
+ * no-ops; the response counts the rows that actually flipped, so a
+ * raced-away double-submit reports 0 instead of erroring.
+ */
+export const InboxAckRequestSchema = z.object({
+  chapterKeys: z.array(z.string().min(1)).min(1).max(500),
+});
+export type InboxAckRequestT = z.infer<typeof InboxAckRequestSchema>;
+
+export const InboxAckResponseSchema = z.object({
+  /** Rows that flipped to acknowledged by THIS call. */
+  acknowledged: z.number().int().nonnegative(),
+});
+export type InboxAckResponseT = z.infer<typeof InboxAckResponseSchema>;
+
+/**
+ * POST /api/inbox/caught-up — the shared bulk action ("I've seen
+ * everything up to here"): stamps EVERY unacknowledged row. Server-side
+ * state — caught up once, caught up everywhere (single-user instance,
+ * D1 §4/R2; marking read on one device never replays on another).
+ */
+export const InboxCaughtUpResponseSchema = z.object({
+  /** Rows that flipped to acknowledged by THIS call. */
+  acknowledged: z.number().int().nonnegative(),
+});
+export type InboxCaughtUpResponseT = z.infer<typeof InboxCaughtUpResponseSchema>;
+
+
 // ── library (§7.1 listing/download) ──────────────────────────────────
 
 /** One finalized chapter artifact (§9 `library_files` projection). */

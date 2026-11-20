@@ -15,6 +15,7 @@ so you can bookmark, share, or reload any screen described here.
 - [Manga and chapters](#manga-and-chapters)
 - [Downloading](#downloading)
 - [Library](#library)
+- [The inbox (Home)](#the-inbox-home)
 - [Favorites lifecycle](#favorites-lifecycle)
 - [Accounts](#accounts)
 - [Settings](#settings)
@@ -364,6 +365,37 @@ gone) and a **Copy path** action for the recorded server path.
 - **Interactive orphan adoption** (picking which missing entry an
   orphan belongs to) — v1 resolves by deleting the row or ignoring
   the orphan.
+
+## The inbox (Home)
+
+Home is an **inbox**, not a favorites list: a reverse-chronological
+feed of the new chapters the checker found (and, with auto-download,
+the pipe delivered). Each row shows the cover, the title, the chapter
+label and the site badge — tapping the cover or title opens the manga
+page.
+
+- **Per-chapter seen state** — the **Seen** button acknowledges exactly
+  that chapter; every other arrival stays in the feed.
+- **Caught up** — the bulk "I've seen everything up to here" action:
+  one tap acknowledges everything currently in the feed.
+- **Archive** — the second tab (`#/inbox?view=archive`) keeps
+  acknowledged chapters readable for a rolling 30 days ("what arrived
+  last week"); after that they are pruned. The URL is the truth: the
+  `?view=` param *is* the view, so every view is shareable and
+  reloadable.
+
+**One inbox, every device (documented):** seen state lives on the
+server (one row per chapter), so caught-up-on-one-device is
+caught-up-on-everywhere, and marking read never replays on another
+device. fmd-web is a single-user instance by design — there is no
+per-device or per-user read state anywhere.
+
+The feed rows are written by the same check engine that drives
+favorites (scheduled sweeps, **Check now**, batch checks — one
+detection path); nothing re-detects chapters on its own. Webhook
+notifications (Settings → Webhook) *complement* the inbox — they are
+advisory and lossy-tolerated; the inbox is the source of truth for
+what arrived.
 
 ## Favorites lifecycle
 

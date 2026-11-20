@@ -50,6 +50,10 @@ export type ProxySettingsT = components['schemas']['ProxySettings'];
 export type SyncModulesT = operations['syncModules']['responses'][200]['content']['application/json'];
 export type SyncAllT = operations['syncAllCatalogs']['responses'][200]['content']['application/json'];
 export type CatalogSyncOneT = operations['syncCatalog']['responses'][200]['content']['application/json'];
+export type InboxListT = operations['listInbox']['responses'][200]['content']['application/json'];
+export type InboxEntryT = components['schemas']['InboxEntry'];
+export type InboxViewT = InboxListT['view'];
+export type InboxAckResponseT = operations['acknowledgeInboxChapters']['responses'][200]['content']['application/json'];
 
 type FetchResult<TData> = {
   data?: TData;
@@ -1106,6 +1110,62 @@ export function useTriageRetry(): UseMutationResult<TriageRetryResponseT, ApiErr
       // every ['jobs', *] page sees the fresh queued attempts (the WS
       // feed patches live clients; the invalidation covers the rest).
       void queryClient.invalidateQueries({ queryKey: ['jobs'] });
+    },
+  });
+}
+
+// ── inbox (D1 §2 INBOX — the Home feed) ──────────────────────────────
+
+/**
+ * GET /api/inbox — the Home feed. `view` is the URL's ?view= (the
+ * page keeps them in lockstep — URL-as-truth): 'new' = the
+ * unacknowledged arrivals, 'archive' = the acknowledged entries of
+ * the rolling 30-day window. The query re-subscribes on refocus like
+ * every query; the WS feed does not carry inbox frames (the feed is
+ * check-engine driven server-side), so the page also invalidates on
+ * visit.
+ */
+export function useInbox(view: InboxViewT): UseQueryResult<InboxListT, ApiError> {
+  const client = useApiClient();
+  return useQuery<InboxListT, ApiError>({
+    queryKey: ['inbox', view],
+    queryFn: (): Promise<InboxListT> =>
+      unwrap(client.GET('/api/inbox', { params: { query: { view } } })),
+  });
+}
+
+/**
+ * POST /api/inbox/ack — acknowledge EXACTLY the named chapters (the
+ * per-row seen action; unknown/already-seen keys are server-side
+ * no-ops). Invalidates every inbox view (the row leaves the feed and
+ * joins the archive).
+ */
+export function useAckInboxChapters(): UseMutationResult<InboxAckResponseT, ApiError, readonly string[]> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation<InboxAckResponseT, ApiError, readonly string[]>({
+    mutationFn: async (chapterKeys): Promise<InboxAckResponseT> =>
+      unwrap(client.POST('/api/inbox/ack', { body: { chapterKeys: [...chapterKeys] } })),
+    onSuccess: (): void => {
+      void queryClient.invalidateQueries({ queryKey: ['inbox'] });
+    },
+  });
+}
+
+/**
+ * POST /api/inbox/caught-up — the shared bulk action ("I've seen
+ * everything up to here"): stamps every unacknowledged row. Server-
+ * side state — caught up once, caught up everywhere (single-user
+ * instance, D1 §4/R2).
+ */
+export function useInboxCaughtUp(): UseMutationResult<InboxAckResponseT, ApiError, void> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation<InboxAckResponseT, ApiError, void>({
+    mutationFn: async (): Promise<InboxAckResponseT> =>
+      unwrap(client.POST('/api/inbox/caught-up')),
+    onSuccess: (): void => {
+      void queryClient.invalidateQueries({ queryKey: ['inbox'] });
     },
   });
 }

@@ -57,6 +57,22 @@ export interface FavoritesEngineDeps {
    * unpaced (hermetic tests; the pacing unit tests pin the spacing).
    */
   readonly pacer?: HostPacerPort;
+  /**
+   * [inbox] The Home feed's recording seam (D1 §2 INBOX — the feed IS
+   * the check engine's new-chapter events; there is no second
+   * detection path). Called with exactly the diff's new-chapter set
+   * on every check that finds one, wherever that check came from
+   * (scheduler sweep, manual check-now, batch check). Absent = no
+   * feed rows (hermetic tests). Must never throw into the check —
+   * the engine guards the call fire-and-forget style.
+   */
+  readonly inbox?: {
+    recordNewChapters(
+      favorite: FavoriteRow,
+      chapters: ReadonlyArray<{ readonly link: string; readonly name: string }>,
+      at: number,
+    ): void;
+  };
   /** Wall/fake clock (epoch ms). */
   readonly now?: () => number;
 }
@@ -142,6 +158,19 @@ export class FavoritesEngine {
       // Tag-100 branch (:356-361): everything is marked downloaded, no
       // downloads run, the global ledger is untouched (parity).
       return { favorite: updated, outcome: 'checked', newChapters: [], queuedDownloads: 0, transferIngest: true };
+    }
+
+    // [inbox] The feed write (D1 §2 INBOX): the diff's new-chapter set
+    // becomes feed rows — snapshots ride the updated favorite row so an
+    // entry keeps rendering even after the favorite is later deleted.
+    // Guarded: a feed sink must never take the check down (the same
+    // posture as the availability sink).
+    if (newChapterSet.length > 0 && this.deps.inbox !== undefined) {
+      try {
+        this.deps.inbox.recordNewChapters(updated, newChapterSet, this.now());
+      } catch {
+        // recorded nowhere — the check itself already persisted fine
+      }
     }
 
     // Auto-download: queue every new chapter through the Phase-3

@@ -756,6 +756,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/inbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Home feed: new-chapter arrivals with per-chapter seen state (D1 §2 INBOX)
+         * @description [inbox] The inbox IS the source of truth for what arrived (webhook notifications are advisory and complement it, never gate it). ONE row per detected new chapter, written by the ONE check-engine detection path (`FavoritesEngine.checkFavorite` — scheduler sweeps, manual check-now and batch checks all flow through it; no second detection path exists anywhere). `view=new` (default) serves the unacknowledged arrivals newest-first; `view=archive` serves the acknowledged entries inside the rolling 30-day window, newest acknowledgment first (a feed, not a ledger — the downloaded-truth ledger is separate and permanent). Seen state is PER CHAPTER (`chapterKey` = lowercased `module|link`, D1 §3 "a chapter = its link") and SERVER-SIDE: caught up once, caught up everywhere — the documented multi-device posture of the single-user instance (D1 §4/R2). A GET never mutates (D1 §3): the archive window is a WHERE clause and the physical purge is scheduled housekeeping. `newCount` (the unacknowledged total) rides both views.
+         */
+        get: operations["listInbox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inbox/ack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Acknowledge EXACTLY the named chapters (per-row seen)
+         * @description [inbox] The per-chapter seen action: the listed `chapterKeys` flip to acknowledged; unknown or already-acknowledged keys are no-ops and the response counts only the rows that actually flipped (a raced double-submit reports 0, never errors). Acknowledged entries move to the archive view for their rolling 30-day window.
+         */
+        post: operations["acknowledgeInboxChapters"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/inbox/caught-up": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The shared caught-up action: acknowledge everything visible
+         * @description [inbox] "I've seen everything up to here" — stamps EVERY unacknowledged row in one write. Server-side state shared across devices (single-user instance, D1 §4/R2): caught up once, caught up everywhere; marking read on one device never replays on another because no per-device state exists. Idempotent — an empty feed acknowledges 0.
+         */
+        post: operations["markInboxCaughtUp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/library": {
         parameters: {
             query?: never;
@@ -1279,6 +1339,18 @@ export interface components {
             count: number;
             sites: components["schemas"]["TriageSite"][];
         };
+        InboxEntry: {
+            chapterKey: string;
+            moduleId: string;
+            mangaKey: string;
+            mangaUrl: string;
+            mangaTitle: string | null;
+            coverLink: string | null;
+            chapterLink: string;
+            chapterLabel: string;
+            detectedAt: components["schemas"]["Timestamp"];
+            seenAt: components["schemas"]["Timestamp"] | null;
+        };
         OutputDefaults: {
             /**
              * @default cbz
@@ -1654,6 +1726,7 @@ export interface components {
         LiveInfoBody0: string;
         LiveInfoBody1: string;
         CreateDownloadJobsBatchBody0: string;
+        AcknowledgeInboxChaptersBody0: string;
         RescanLibrary200Response0: string;
         LastRescanReport200Response0: string;
         AnalyzeFmd2Import200Response0: {
@@ -3915,6 +3988,128 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    listInbox: {
+        parameters: {
+            query?: {
+                view?: "new" | "archive";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The requested feed view + the live newCount */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        view: "new" | "archive";
+                        newCount: number;
+                        entries: components["schemas"]["InboxEntry"][];
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    acknowledgeInboxChapters: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    chapterKeys: components["schemas"]["AcknowledgeInboxChaptersBody0"][];
+                };
+            };
+        };
+        responses: {
+            /** @description How many rows this call flipped */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        acknowledged: number;
+                    };
+                };
+            };
+            /** @description Request failed schema validation (typed error envelope) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+            /** @description Unhandled server failure (typed error envelope) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorEnvelope"];
+                };
+            };
+        };
+    };
+    markInboxCaughtUp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description How many rows this call flipped */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        acknowledged: number;
+                    };
                 };
             };
             /** @description Unhandled server failure (typed error envelope) */

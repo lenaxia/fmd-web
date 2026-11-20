@@ -78,6 +78,15 @@ import {
   TriageRetryResponseSchema,
   type TriageSnapshotResponseT,
   type TriageRetryResponseT,
+  InboxAckRequestSchema,
+  InboxAckResponseSchema,
+  InboxCaughtUpResponseSchema,
+  InboxListQuerySchema,
+  InboxListResponseSchema,
+  type InboxAckResponseT,
+  type InboxCaughtUpResponseT,
+  type InboxListResponseT,
+  type InboxViewT,
   OutputDefaultsUpdateRequestSchema,
   PerformanceSettingsUpdateRequestSchema,
   RetentionSettingsUpdateRequestSchema,
@@ -155,6 +164,7 @@ import type { WsHub } from './ws/hub.js';
 import { CoverProxyService } from './cover-proxy.js';
 import type { SqliteLibraryFileStateService } from '../runtime/library-file-state.js';
 import type { SiteAvailabilityService } from '../runtime/site-availability.js';
+import type { InboxService } from '../runtime/inbox.js';
 import { TriageService } from '../runtime/triage.js';
 import type { PreferredSitesService } from '../runtime/preferred-sites.js';
 import { InMemoryAccountService, type AccountService } from '../accounts/account-service.js';
@@ -263,6 +273,14 @@ export interface ApiServices {
    * always wires the real one.
    */
   readonly fileState?: SqliteLibraryFileStateService;
+  /**
+   * Inbox (D1 §2 INBOX — the Home feed): per-chapter seen rows over
+   * the check engine's new-chapter events, the ack/caught-up writes
+   * and the rolling 30-day archive view. Optional with the
+   * covers/metrics posture: absent → the /api/inbox routes are not
+   * mounted; the runtime assembly always wires the real one (app.db).
+   */
+  readonly inbox?: InboxService;
   /** Readiness probe input (default: always ready). */
   readonly readiness?: () => ReadinessStatus;
 }
@@ -1368,6 +1386,41 @@ export function buildApp(services: ApiServices, options: AppOptions): FastifyIns
       jobs: result.jobs,
     });
   });
+
+  // ── inbox (D1 §2 INBOX — the Home feed) ────────────────────────────
+  // The feed IS the check engine's new-chapter events: this service
+  // holds the per-chapter seen rows (chapter_key, seen_at) those events
+  // persist to. Reads never mutate (the 30-day archive window is a
+  // WHERE clause; the physical purge is scheduled housekeeping in the
+  // runtime assembly) — D1 §3 "GET never mutates".
+  if (services.inbox !== undefined) {
+    const inbox = services.inbox;
+    app.get('/api/inbox', async (req): Promise<InboxListResponseT> => {
+      const query = parseOr400(InboxListQuerySchema, req.query, 'inbox query');
+      const view: InboxViewT = query.view ?? 'new';
+      return InboxListResponseSchema.parse({
+        view,
+        ...inbox.list(view),
+      });
+    });
+    // Per-chapter acknowledge: EXACTLY the named chapters flip (unknown
+    // or already-seen keys are no-ops — a raced double-submit reports
+    // 0, never errors).
+    app.post('/api/inbox/ack', async (req): Promise<InboxAckResponseT> => {
+      const body = parseOr400(InboxAckRequestSchema, req.body, 'inbox ack body');
+      return InboxAckResponseSchema.parse({
+        acknowledged: inbox.acknowledge(body.chapterKeys, Date.now()),
+      });
+    });
+    // The shared caught-up bulk action ("I've seen everything up to
+    // here"): stamps every unacknowledged row. Server-side state —
+    // caught up once, caught up everywhere (single-user, D1 §4/R2).
+    app.post('/api/inbox/caught-up', async (): Promise<InboxCaughtUpResponseT> =>
+      InboxCaughtUpResponseSchema.parse({
+        acknowledged: inbox.caughtUp(Date.now()),
+      }),
+    );
+  }
 
   // ── triage (D1 §2 TRIAGE — the one attention surface) ─────────────
   // Built from seams that already exist in every deployment: the job

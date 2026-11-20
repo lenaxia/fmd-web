@@ -10,7 +10,7 @@
  * this file knows names, not colors.
  */
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
-import { BookOpenText, Compass, Download as DownloadIcon, Heart, LibraryBig, Moon, Search, Settings as SettingsIcon, Sun, TriangleAlert } from 'lucide-react';
+import { BookOpenText, Compass, Download as DownloadIcon, Heart, Inbox as InboxIcon, LibraryBig, Moon, Search, Settings as SettingsIcon, Sun, TriangleAlert } from 'lucide-react';
 import { useBootstrapStatus } from './api/hooks';
 import { navigate, parseHash, ROUTE_NAMES, type Route, type RouteName } from './router';
 import { useTheme } from './state/theme';
@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Toaster } from '@/components/ui/sonner';
 import { cn } from 'cn';
 import { BrowsePage } from './pages/BrowsePage';
+import { InboxPage } from './pages/InboxPage';
 import { MangaPage } from './pages/MangaPage';
 import { AttentionPage } from './pages/AttentionPage';
 import { DownloadsPage } from './pages/DownloadsPage';
@@ -33,6 +34,7 @@ import { SettingsPage } from './pages/SettingsPage';
 /** Primary nav = the router's top-level tabs (manga is a detail route,
  * reached from Browse entries). One product order, shared by every tab. */
 const NAV_TABS: readonly { readonly name: RouteName; readonly label: string }[] = [
+  { name: 'inbox', label: 'Inbox' },
   { name: 'browse', label: 'Browse' },
   { name: 'favorites', label: 'Favorites' },
   { name: 'downloads', label: 'Downloads' },
@@ -57,6 +59,7 @@ const BOTTOM_NAV_DESTINATIONS: readonly BottomTabDestination[] = NAV_TABS.map(
     name: tab.name,
     label: tab.label,
     icon:
+      tab.name === 'inbox' ? <InboxIcon aria-hidden="true" /> :
       tab.name === 'browse' ? <Compass aria-hidden="true" /> :
       tab.name === 'favorites' ? <Heart aria-hidden="true" /> :
       tab.name === 'downloads' ? <DownloadIcon aria-hidden="true" /> :
@@ -291,7 +294,7 @@ function AppShell(): ReactElement {
           {/* Compact below md (R3): icon-only brand; the wordmark returns
            * with the top tab nav at >=md. */}
           <a
-            href="#/browse"
+            href="#/inbox"
             aria-label="FMD Web home"
             className="flex items-center gap-2 rounded-md py-1 text-sm font-semibold whitespace-nowrap max-md:min-h-touch-target max-md:min-w-touch-target md:py-1"
           >
@@ -311,6 +314,7 @@ function AppShell(): ReactElement {
         </div>
       </header>
       <main className="mx-auto w-full max-w-page flex-1 px-4 py-6 max-md:pb-[calc(var(--spacing-bottom-nav)+var(--spacing-safe-bottom)+1.5rem)]">
+        {route.name === 'inbox' ? <InboxPage route={route} /> : null}
         {route.name === 'browse' ? <BrowsePage route={route} /> : null}
         {route.name === 'manga' ? <MangaPage route={route} /> : null}
         {route.name === 'attention' ? <AttentionPage /> : null}

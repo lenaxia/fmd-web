@@ -420,6 +420,9 @@ export function buildHarness(
     /** Webhook story: the test-send notifier seam (absent → the
      * POST /api/settings/webhook/test route is not mounted). */
     webhookTestSend?: import('../../src/api/app.js').ApiServices['webhookTestSend'];
+    /** [inbox] the Home feed seam (absent → the /api/inbox routes are
+     * not mounted; the inbox tests wire the REAL SqliteInboxService). */
+    inbox?: import('../../src/runtime/inbox.js').InboxService;
   } = {},
 ): Harness {
   const jobs = opts.jobs ?? new InMemoryJobService();
@@ -466,6 +469,7 @@ export function buildHarness(
       favorites,
       ...(opts.fileState !== undefined ? { fileState: opts.fileState } : {}),
       ...(opts.webhookTestSend !== undefined ? { webhookTestSend: opts.webhookTestSend } : {}),
+      ...(opts.inbox !== undefined ? { inbox: opts.inbox } : {}),
       ...(opts.readiness !== undefined ? { readiness: opts.readiness } : {}),
     },
     options,

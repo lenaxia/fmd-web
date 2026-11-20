@@ -5,11 +5,13 @@
  * same destinations (identical routes on mobile and desktop; layout
  * adapts, capability does not).
  *
- * Pattern contract: max 5 destinations, icon + label each, every
- * target >= the 44px touch token, and the bar respects the
- * notched-device home-indicator inset via the safe-area token —
- * the shell pads the content flow by the same band so nothing
- * scrolls under the bar unreachable.
+ * Pattern contract: icon + label each, every target >= the 44px touch
+ * token, and the bar respects the notched-device home-indicator inset
+ * via the safe-area token — the shell pads the content flow by the
+ * same band so nothing scrolls under the bar unreachable. The grid is
+ * COUNT-AWARE (one column per destination, 5–8): a hardcoded
+ * grid-cols-5 silently wrapped the 6th+ tab onto a second row — the
+ * latent mobile defect the inbox story (7 destinations) fixed.
  */
 import type { ReactElement, ReactNode } from 'react';
 import { cn } from 'cn';
@@ -30,19 +32,28 @@ export interface BottomTabBadge {
   readonly dot?: boolean;
 }
 
+/** Tailwind needs literal class names — the count → grid map (5–8). */
+const GRID_COLUMNS: Readonly<Record<number, string>> = {
+  5: 'grid-cols-5',
+  6: 'grid-cols-6',
+  7: 'grid-cols-7',
+  8: 'grid-cols-8',
+};
+
 export function BottomTabNav(props: {
   readonly destinations: readonly BottomTabDestination[];
   readonly current: string;
   /** R5 arrival: optional per-destination badge (e.g. downloads queue). */
   readonly badges?: Readonly<Record<string, BottomTabBadge | undefined>>;
 }): ReactElement {
+  const columns = GRID_COLUMNS[props.destinations.length] ?? 'grid-cols-8';
   return (
     <nav
       aria-label="Primary"
       data-testid="bottom-nav"
       className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur-sm md:hidden"
     >
-      <div className="mx-auto grid w-full max-w-page grid-cols-5 pb-[var(--spacing-safe-bottom)]">
+      <div className={cn('mx-auto grid w-full max-w-page pb-[var(--spacing-safe-bottom)]', columns)}>
         {props.destinations.map(
           (destination): ReactElement => {
             const badge = props.badges?.[destination.name];
@@ -83,7 +94,7 @@ export function BottomTabNav(props: {
                     />
                   ) : null}
                 </span>
-                {destination.label}
+                <span className="max-w-full truncate">{destination.label}</span>
               </a>
             );
           },

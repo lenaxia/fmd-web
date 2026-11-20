@@ -1,12 +1,13 @@
 /**
- * Minimal hash router (§11 SPA): `#/browse?…`, `#/manga?…`,
- * `#/attention`, `#/downloads`, `#/favorites`, `#/settings`. No router
- * dependency — the pages and their query params are the entire
- * surface; `navigate()` and the `useRoute()` hook keep the URL
- * shareable.
+ * Minimal hash router (§11 SPA): `#/inbox?…` (the Home feed),
+ * `#/browse?…`, `#/manga?…`, `#/attention`, `#/downloads`,
+ * `#/favorites`, `#/settings`. No router dependency — the pages and
+ * their query params are the entire surface; `navigate()` and the
+ * `useRoute()` hook keep the URL shareable.
  */
 
 export type RouteName =
+  | 'inbox'
   | 'browse'
   | 'manga'
   | 'attention'
@@ -16,6 +17,7 @@ export type RouteName =
   | 'settings';
 
 export const ROUTE_NAMES: readonly RouteName[] = [
+  'inbox',
   'browse',
   'manga',
   'attention',
@@ -30,7 +32,14 @@ export interface Route {
   readonly query: Record<string, string>;
 }
 
-const DEFAULT_ROUTE: RouteName = 'browse';
+/**
+ * Home IS the inbox (D1 §2 INBOX — the pipe-with-an-inbox identity:
+ * arrival is a feed you clear, and the home surface answers "what
+ * arrived since I last looked"). The old search-home default lives on
+ * at `#/browse` (deep links unchanged); unknown hashes land on the
+ * feed.
+ */
+const DEFAULT_ROUTE: RouteName = 'inbox';
 
 function isRouteName(value: string): value is RouteName {
   return (ROUTE_NAMES as readonly string[]).includes(value);
